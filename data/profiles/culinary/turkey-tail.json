@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "id": "turkey-tail",
+  "name": "Turkey Tail",
+  "species": "Trametes versicolor",
+  "strain": "Wild-type",
+  "variety_group": "trametes",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "medicinal",
+    "woodlover"
+  ],
+  "restricted": false,
+  "summary": "Thin polypore. Long fruiting, lots of FAE, not a thick-fleshed edible.",
+  "notes": "",
+  "chamber_notes": "",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). T. versicolor fruits across a wide temperate band with good air and light for zoning."
+    },
+    {
+      "title": "Practice",
+      "detail": "Indoor bags produce thin brackets over many weeks; do not expect oyster-like flushes."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 28,
+      "humidity_percent": 88,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 24,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 19,
+      "temperature_warning_max_c": 29,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Primordia",
+      "duration_days": 10,
+      "humidity_percent": 90,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16,
+      "temperature_warning_max_c": 26,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 250,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 15,
+        "run_duration_s": 30,
+        "speed_percent": 35
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Brackets",
+      "duration_days": 40,
+      "humidity_percent": 86,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 20,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 15,
+      "temperature_warning_max_c": 25,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 300,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 12,
+        "run_duration_s": 30,
+        "speed_percent": 40
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [
+    {
+      "id": "example-spawn",
+      "label": "Culinary spawn (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/culinary-spawn",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    },
+    {
+      "id": "example-substrate",
+      "label": "Substrate ingredients (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/substrate",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    }
+  ],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  }
+}

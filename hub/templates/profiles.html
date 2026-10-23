@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Profiles · Hub{% endblock %}
+{% block content %}
+<h1>Mushroom profiles</h1>
+{% if error %}<p class="notice">{{ error }}</p>{% endif %}
+<div class="row">
+  <form method="post" action="/sync/pull"><button class="secondary" type="submit">Pull from community</button></form>
+  <form method="post" action="/sync/push"><button type="submit">Push library + grow reports</button></form>
+</div>
+<p class="muted">Sync needs <code>COMMUNITY_URL</code> and <code>COMMUNITY_TOKEN</code>.</p>
+<form class="card" method="post" action="/profiles/import">
+  <h2>Import JSON</h2>
+  <textarea name="document" rows="8" placeholder='{"schema_version":1,"id":"..."}'></textarea>
+  <button type="submit">Validate and save</button>
+</form>
+<div class="cards">
+  {% for profile in profiles %}
+  <article class="card">
+    <h3><a href="/profiles/{{ profile.id }}">{{ profile.name }}</a></h3>
+    <p class="muted">{{ profile.species }}{% if profile.strain %} · {{ profile.strain }}{% endif %}</p>
+    <p>{{ profile.summary }}</p>
+    <p>{{ profile.stages|length }} stages · {{ profile.total_days() }} days · {{ profile.pricing.kind }}</p>
+    {% if profile.is_psilocybin %}<p class="notice">Restricted pack</p>{% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}

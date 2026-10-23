@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profile · OpenShrooly Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="profile">
+  <header>
+    <strong><a href="/">OpenShrooly Community</a></strong>
+    <nav>
+      <a href="/">Catalog</a>
+      <span id="session-nav"></span>
+    </nav>
+  </header>
+  <main>
+    <h1 id="title">Profile</h1>
+    <p id="meta" class="muted"></p>
+    <p id="legal" class="legal hidden"></p>
+    <p id="summary"></p>
+    <section id="locked" class="hidden">
+      <p class="notice">Paid culinary recipe: <span id="price"></span>. Sign in, then complete the Stripe stub checkout (no live charge).</p>
+      <button type="button" id="buy">Stub checkout</button>
+    </section>
+    <section id="full" class="hidden">
+      <p><a id="json-link" href="#">Download JSON</a></p>
+      <p id="notes"></p>
+      <p id="chamber" class="muted"></p>
+      <h2>Stages</h2>
+      <div id="stages"></div>
+      <h2>Sources</h2>
+      <ul id="sources"></ul>
+      <div id="affiliates"></div>
+      <p><button type="button" id="fork" class="secondary">Fork</button></p>
+      <h2>Rate</h2>
+      <form id="rate" class="card">
+        <label>Stars <input name="stars" type="number" min="1" max="5" value="5"></label>
+        <label>Comment <input name="comment"></label>
+        <button type="submit">Save rating</button>
+      </form>
+      <h2>Grow report</h2>
+      <form id="report" class="card">
+        <label>Outcome
+          <select name="outcome">
+            <option value="success">success</option>
+            <option value="partial">partial</option>
+            <option value="fail">fail</option>
+          </select>
+        </label>
+        <label>Days <input name="days"></label>
+        <label>Flushes <input name="flushes"></label>
+        <label>Notes <input name="notes"></label>
+        <label>Photo <input name="photo" type="file" accept="image/*"></label>
+        <button type="submit">Publish report</button>
+      </form>
+    </section>
+    <h2>Ratings</h2>
+    <ul id="ratings"></ul>
+    <h2>Grow reports</h2>
+    <ul id="reports"></ul>
+  </main>
+  <footer>Photos are stored on Cloudflare R2 (no egress fees). Psilocybin cards stay free and never show affiliate links.</footer>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

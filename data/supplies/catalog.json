@@ -1,0 +1,44 @@
+{
+  "disclosure": "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.",
+  "items": [
+    {
+      "id": "hardwood-pellets",
+      "name": "Hardwood fuel pellets",
+      "category": "substrate",
+      "notes": "Useful for supplemented sawdust blocks (shiitake, lion's mane, reishi).",
+      "affiliate": {
+        "id": "hardwood-pellets",
+        "label": "Hardwood pellets (example)",
+        "merchant": "example-supplier",
+        "url": "https://example.com/affiliate/hardwood-pellets",
+        "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+      }
+    },
+    {
+      "id": "master-spawn-bag",
+      "name": "Spawn / grow bag",
+      "category": "bags",
+      "notes": "Filter-patch bags for grain spawn or fruiting blocks.",
+      "affiliate": {
+        "id": "master-spawn-bag",
+        "label": "Filter-patch grow bags (example)",
+        "merchant": "example-supplier",
+        "url": "https://example.com/affiliate/grow-bags",
+        "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+      }
+    },
+    {
+      "id": "oyster-sawdust-spawn",
+      "name": "Oyster sawdust spawn",
+      "category": "spawn",
+      "notes": "Culinary oyster spawn only. Never listed on restricted profiles.",
+      "affiliate": {
+        "id": "oyster-sawdust-spawn",
+        "label": "Oyster spawn (example)",
+        "merchant": "example-supplier",
+        "url": "https://example.com/affiliate/oyster-spawn",
+        "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+      }
+    }
+  ]
+}

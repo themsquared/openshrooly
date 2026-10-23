@@ -1,0 +1,17 @@
+{
+  "name": "openshrooly-community-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle-seeds": "node scripts/bundle-seeds.js",
+    "dev": "npm run bundle-seeds && node server.js",
+    "dev:worker": "npm run bundle-seeds && wrangler dev",
+    "test": "npm run bundle-seeds && node --test test/*.test.js",
+    "db:init": "wrangler d1 execute openshrooly --file=schema.sql",
+    "db:init:remote": "wrangler d1 execute openshrooly --remote --file=schema.sql",
+    "deploy": "npm run bundle-seeds && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  }
+}

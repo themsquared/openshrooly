@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Hub · OpenShrooly{% endblock %}
+{% block content %}
+<h1>Local hub</h1>
+<p>This machine talks to Shroolys on your LAN using the stock ESPHome web API. No cloud required.</p>
+<div class="cards">
+  <article class="card"><h2>{{ devices|length }}</h2><p>Devices</p></article>
+  <article class="card"><h2>{{ profile_count }}</h2><p>Profiles in library</p></article>
+  <article class="card"><h2>{{ grows|length }}</h2><p>Active grows</p></article>
+</div>
+<h2>Devices</h2>
+<div class="cards">
+  {% for device in devices %}
+  <article class="card">
+    <h3><a href="/devices/{{ device.id }}">{{ device.name }}</a></h3>
+    <p class="muted">{{ device.host }}:{{ device.port }}</p>
+    <p class="{% if device.online %}ok{% else %}bad{% endif %}">{% if device.online %}Online{% else %}Offline / last poll{% endif %}</p>
+    {% if device.current_profile_id %}<p>{{ device.current_profile_id }} · {{ device.current_stage_id }}</p>{% endif %}
+  </article>
+  {% else %}
+  <p>No devices yet. <a href="/devices">Add one by IP</a>.</p>
+  {% endfor %}
+</div>
+{% endblock %}

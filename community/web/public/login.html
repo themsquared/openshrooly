@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in · OpenShrooly Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="login">
+  <header>
+    <strong><a href="/">OpenShrooly Community</a></strong>
+    <nav><span id="session-nav"></span></nav>
+  </header>
+  <main>
+    <h1>Log in</h1>
+    <p id="error" class="notice hidden"></p>
+    <form id="form" class="card">
+      <label>Username <input name="username" required autocomplete="username"></label>
+      <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+      <button type="submit">Log in</button>
+    </form>
+  </main>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

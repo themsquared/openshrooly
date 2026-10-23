@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "id": "golden-oyster",
+  "name": "Golden Oyster",
+  "species": "Pleurotus citrinopileatus",
+  "strain": "Golden",
+  "variety_group": "oyster",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "oyster",
+    "warm"
+  ],
+  "restricted": false,
+  "summary": "Warm oyster with dense golden clusters. Needs strong FAE to keep stems short.",
+  "notes": "",
+  "chamber_notes": "",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. citrinopileatus fruits in a wide warm band, often 18\u201330 \u00b0C."
+    },
+    {
+      "title": "Vendor cards",
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Golden oyster cards emphasize light and air for color."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 12,
+      "humidity_percent": 90,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 25,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 20,
+      "temperature_warning_max_c": 30,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 4,
+      "humidity_percent": 93,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17,
+      "temperature_warning_max_c": 27,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 280,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 12,
+        "run_duration_s": 35,
+        "speed_percent": 40
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 8,
+      "humidity_percent": 87,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16,
+      "temperature_warning_max_c": 26,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 350,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 10,
+        "run_duration_s": 40,
+        "speed_percent": 50
+      },
+      "notes": "More light helps hold gold color."
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [
+    {
+      "id": "example-spawn",
+      "label": "Culinary spawn (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/culinary-spawn",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    },
+    {
+      "id": "example-substrate",
+      "label": "Substrate ingredients (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/substrate",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    }
+  ],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  }
+}

@@ -16,3 +16,9 @@ webapp/out/
 
 **/__pycache__/
 esphome/data/www/_next/static/
+.venv/
+hub/data/*.sqlite
+hub/data/*.sqlite-*
+community/api/node_modules/
+community/web/node_modules/
+community/api/src/seeds.json

@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "id": "enoki",
+  "name": "Enoki",
+  "species": "Flammulina velutipes",
+  "strain": "White enoki",
+  "variety_group": "enoki",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "advanced",
+    "cool"
+  ],
+  "restricted": false,
+  "summary": "Needs cold fruiting and low FAE for supermarket-long stems.",
+  "notes": "",
+  "chamber_notes": "A Shrooly cannot reach true 4\u201310 \u00b0C enoki rooms. This profile uses the coolest firmware target (15 \u00b0C) and very low FAE as a chamber approximation.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Commercial enoki: ~10\u201316 \u00b0C, high CO2, low light, 90\u201395% RH."
+    },
+    {
+      "title": "Vendor cards",
+      "detail": "Home growers who lack a cold room get shorter, darker, more petaled fruits \u2014 still edible."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 18,
+      "humidity_percent": 90,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17,
+      "temperature_warning_max_c": 27,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 7,
+      "humidity_percent": 95,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 13,
+      "temperature_warning_max_c": 20,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 4,
+        "white_led_lux": 40,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 90,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Keep still and wet to pile up pins."
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 18,
+      "humidity_percent": 93,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 13,
+      "temperature_warning_max_c": 19,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 4,
+        "white_led_lux": 50,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 90,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Low FAE stretches stems. More air makes stocky wild-type caps."
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [
+    {
+      "id": "example-spawn",
+      "label": "Culinary spawn (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/culinary-spawn",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    },
+    {
+      "id": "example-substrate",
+      "label": "Substrate ingredients (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/substrate",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    }
+  ],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  }
+}

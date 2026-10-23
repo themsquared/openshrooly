@@ -1,0 +1,17 @@
+# Local hub + (optional) community API/web are usually run with Python/Node.
+# This file is the Pi-friendly hub container only.
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: hub/Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      HUB_ENABLE_PSILOCYBIN: "0"
+      COMMUNITY_URL: ${COMMUNITY_URL:-http://127.0.0.1:8787}
+      COMMUNITY_TOKEN: ${COMMUNITY_TOKEN:-}
+    volumes:
+      - hub-data:/app/hub/data
+volumes:
+  hub-data:

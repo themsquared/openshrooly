@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}History · Hub{% endblock %}
+{% block content %}
+<h1>Grow history</h1>
+<h2>Grows</h2>
+<table>
+  <tr><th>Device</th><th>Profile</th><th>Started</th><th>Stage</th><th>Ended</th></tr>
+  {% for grow in grows %}
+  <tr>
+    <td>{{ grow.device_name }}</td>
+    <td>{{ grow.profile_id }}</td>
+    <td>{{ grow.started_at }}</td>
+    <td>{{ grow.current_stage_id }}</td>
+    <td>{{ grow.ended_at or "active" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<h2>Events</h2>
+<table>
+  <tr><th>Time</th><th>Kind</th><th>Detail</th></tr>
+  {% for event in events %}
+  <tr>
+    <td>{{ event.recorded_at }}</td>
+    <td>{{ event.kind }}</td>
+    <td><code>{{ event.detail }}</code></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

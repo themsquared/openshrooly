@@ -1,0 +1,70 @@
+:root {
+  --bg: #f4efe6;
+  --ink: #2b2118;
+  --muted: #6b5b4d;
+  --card: #fffaf2;
+  --line: #d8cbb8;
+  --accent: #3f6b4e;
+  --accent-2: #8a4b2f;
+  --warn: #8a3d1b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 16px/1.45 "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+header, footer { padding: 1rem 1.5rem; }
+header {
+  background: #2b2118;
+  color: #f4efe6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+header a { color: #f4efe6; }
+nav { display: flex; gap: 1rem; flex-wrap: wrap; }
+main { padding: 1.25rem 1.5rem 3rem; max-width: 1100px; }
+a { color: var(--accent); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.card, form.card, article.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.muted { color: var(--muted); }
+.ok { color: var(--accent); font-weight: 600; }
+.bad { color: var(--warn); font-weight: 600; }
+label { display: block; margin: 0.5rem 0; }
+input, textarea, select, button {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  width: 100%;
+}
+button, .button {
+  background: var(--accent);
+  color: white;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  width: auto;
+  padding: 0.45rem 0.8rem;
+}
+button.secondary { background: var(--accent-2); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.4rem 0.3rem; border-bottom: 1px solid var(--line); }
+.notice {
+  background: #fff3d6;
+  border: 1px solid #e2c57a;
+  padding: 0.8rem;
+  border-radius: 10px;
+}
+.row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 140px; }
+pre { white-space: pre-wrap; background: #2b2118; color: #f4efe6; padding: 0.8rem; border-radius: 8px; overflow: auto; }

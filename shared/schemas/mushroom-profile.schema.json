@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openshrooly.local/schemas/mushroom-profile.schema.json",
+  "title": "OpenShrooly mushroom profile",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "species", "pack", "stages"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "name": { "type": "string" },
+    "species": { "type": "string" },
+    "strain": { "type": "string" },
+    "variety_group": { "type": "string" },
+    "pack": { "enum": ["culinary", "psilocybin"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "restricted": { "type": "boolean" },
+    "summary": { "type": "string" },
+    "notes": { "type": "string" },
+    "chamber_notes": { "type": "string" },
+    "legal_notice": { "type": ["string", "null"] },
+    "source_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "detail"],
+        "properties": {
+          "title": { "type": "string" },
+          "detail": { "type": "string" },
+          "url": { "type": "string" }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "duration_days", "humidity_percent", "temperature_c"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "duration_days": { "type": "number", "exclusiveMinimum": 0 },
+          "humidity_percent": { "type": "number", "minimum": 30, "maximum": 100 },
+          "temperature_c": { "type": "number", "minimum": 10, "maximum": 35 },
+          "light": { "type": "object" },
+          "fan": { "type": "object" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "properties": {
+        "kind": { "enum": ["free", "paid"] },
+        "amount_cents": { "type": "integer", "minimum": 0 },
+        "currency": { "type": "string" },
+        "creator_share_percent": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "allowed_payment_providers": {
+      "type": "array",
+      "items": { "enum": ["stripe", "btcpay"] }
+    },
+    "affiliates_allowed": { "type": "boolean" },
+    "affiliate_links": { "type": "array" },
+    "firmware_compat": { "type": "object" }
+  }
+}

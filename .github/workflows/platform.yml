@@ -1,0 +1,36 @@
+name: Hub and community tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  python:
+    name: Profile lib + hub
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements-dev.txt -r hub/requirements.txt
+      - name: Test
+        env:
+          PYTHONPATH: shared:.
+        run: pytest -q
+
+  community-api:
+    name: Community API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Test
+        working-directory: community/api
+        run: npm test

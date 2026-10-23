@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account · OpenShrooly Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="account">
+  <header>
+    <strong><a href="/">OpenShrooly Community</a></strong>
+    <nav><span id="session-nav"></span></nav>
+  </header>
+  <main>
+    <h1>Account</h1>
+    <p>Signed in as <strong id="who"></strong></p>
+    <h2>Hub API token</h2>
+    <p>Mint a token and set it as <code>COMMUNITY_TOKEN</code> on your local hub. The hub calls this Cloudflare API with <code>Authorization: Bearer</code>.</p>
+    <form id="mint" class="card">
+      <label>Name <input name="name" value="home-hub"></label>
+      <button type="submit">Mint token</button>
+    </form>
+    <p id="new-token-wrap" class="notice hidden">Copy this token now.<br><code id="new-token"></code></p>
+    <ul id="tokens"></ul>
+    <h2>Purchases</h2>
+    <ul id="ents"></ul>
+  </main>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "id": "chestnut",
+  "name": "Chestnut Mushroom",
+  "species": "Pholiota adiposa",
+  "strain": "Chestnut",
+  "variety_group": "pholiota",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "intermediate"
+  ],
+  "restricted": false,
+  "summary": "Clustered woodlover. Cool fruiting and high RH keep caps glossy.",
+  "notes": "",
+  "chamber_notes": "",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Vendor cards",
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Chestnut / Pholiota adiposa cards typically 13\u201318 \u00b0C and 90\u201395% RH."
+    },
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Related Pholiota spp. like cool, wet fruiting conditions."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 18,
+      "humidity_percent": 90,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 23,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 18,
+      "temperature_warning_max_c": 28,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 6,
+      "humidity_percent": 95,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 11,
+      "temperature_warning_max_c": 21,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 180,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 18,
+        "run_duration_s": 25,
+        "speed_percent": 30
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 10,
+      "humidity_percent": 92,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 11,
+      "temperature_warning_max_c": 20,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 200,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 15,
+        "run_duration_s": 30,
+        "speed_percent": 30
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [
+    {
+      "id": "example-spawn",
+      "label": "Culinary spawn (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/culinary-spawn",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    },
+    {
+      "id": "example-substrate",
+      "label": "Substrate ingredients (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/substrate",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    }
+  ],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  }
+}

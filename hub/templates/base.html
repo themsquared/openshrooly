@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}OpenShrooly Hub{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <strong>OpenShrooly Hub</strong>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/devices">Devices</a>
+      <a href="/profiles">Profiles</a>
+      <a href="/history">History</a>
+    </nav>
+  </header>
+  <main>
+    {% if not enable_psilocybin %}
+    <p class="muted">Psilocybin pack is disabled. Set <code>HUB_ENABLE_PSILOCYBIN=1</code> only where legal.</p>
+    {% else %}
+    <p class="notice">Psilocybin pack is enabled on this hub. Legality varies by jurisdiction.</p>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="muted">Local-first. Devices keep working if this hub is off. Firmware by Graham Stewart / OpenShrooly contributors.</footer>
+</body>
+</html>

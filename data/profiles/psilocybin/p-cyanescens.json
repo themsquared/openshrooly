@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "id": "p-cyanescens",
+  "name": "Psilocybe cyanescens",
+  "species": "Psilocybe cyanescens",
+  "strain": "Woodlover",
+  "variety_group": "woodlover",
+  "pack": "psilocybin",
+  "tags": [
+    "psilocybin",
+    "woodlover",
+    "cool",
+    "advanced"
+  ],
+  "restricted": true,
+  "summary": "Cool-weather woodlover. Indoor chambers are a poor substitute for outdoor beds.",
+  "notes": "",
+  "chamber_notes": "Cyanescens is typically an outdoor chip-bed species. This profile only approximates a cool, humid woodlover climate. Firmware cannot reach true winter nights.",
+  "legal_notice": "Legality of cultivating Psilocybe species varies by jurisdiction. This pack is informational environmental setpoints for a fruiting chamber and is disabled by default. You are responsible for following local law.",
+  "source_notes": [
+    {
+      "title": "Field / grower notes",
+      "detail": "P. cyanescens fruits in cool, wet weather, often 10\u201318 \u00b0C, on lignin-rich mulch. Indoor success is inconsistent."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 28,
+      "humidity_percent": 88,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 20,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 14,
+      "temperature_warning_max_c": 24,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 10,
+      "humidity_percent": 94,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 12,
+      "temperature_warning_max_c": 20,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 10,
+        "white_led_lux": 150,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 20,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 14,
+      "humidity_percent": 90,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 12,
+      "temperature_warning_max_c": 19,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 10,
+        "white_led_lux": 160,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 16,
+        "run_duration_s": 25,
+        "speed_percent": 28
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": false,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  }
+}

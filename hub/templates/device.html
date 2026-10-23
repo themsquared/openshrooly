@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ device.name }} · Hub{% endblock %}
+{% block content %}
+<h1>{{ device.name }}</h1>
+<p class="muted">{{ device.host }}:{{ device.port }} · last seen {{ device.last_seen or "never" }}</p>
+<p class="{% if status.online %}ok{% else %}bad{% endif %}">{% if status.online %}Reachable{% else %}Not reachable on this poll{% endif %}</p>
+<div class="cards">
+  {% for key, payload in status.entities.items() %}
+  <article class="card"><strong>{{ key }}</strong><p>{{ payload.value if payload.value is defined else payload.state }}</p></article>
+  {% endfor %}
+</div>
+<form method="post" action="/devices/{{ device.id }}/refresh"><button class="secondary" type="submit">Refresh now</button></form>
+<h2>Apply a profile</h2>
+<form class="card" method="post" action="/devices/{{ device.id }}/apply">
+  <label>Profile
+    <select name="profile_id" required>
+      {% for profile in profiles %}
+      <option value="{{ profile.id }}">{{ profile.name }} ({{ profile.species }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Stage id <input name="stage_id" placeholder="leave blank for first stage"></label>
+  <label><input type="hidden" name="start_grow" value="1">Starts a new grow log and applies that stage via the existing number/switch REST API.</label>
+  <button type="submit">Apply to device</button>
+</form>
+<h2>Recent samples</h2>
+<table>
+  <tr><th>Time</th><th>Temp</th><th>RH</th><th>Water</th></tr>
+  {% for sample in samples %}
+  <tr>
+    <td>{{ sample.recorded_at }}</td>
+    <td>{{ sample.temperature }}</td>
+    <td>{{ sample.humidity }}</td>
+    <td>{{ sample.water_level }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Publish · OpenShrooly Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="publish">
+  <header>
+    <strong><a href="/">OpenShrooly Community</a></strong>
+    <nav><a href="/">Catalog</a> <span id="session-nav"></span></nav>
+  </header>
+  <main>
+    <h1>Publish a profile</h1>
+    <p>Paste schema version 1 JSON. Psilocybin profiles must stay free and cannot include affiliate links or payment providers.</p>
+    <p id="error" class="notice hidden"></p>
+    <form id="form" class="card">
+      <textarea id="document" rows="16" required></textarea>
+      <button type="submit">Validate and publish</button>
+    </form>
+  </main>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

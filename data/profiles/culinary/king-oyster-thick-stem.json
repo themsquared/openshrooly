@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "id": "king-oyster-thick-stem",
+  "name": "King Oyster \u2014 thick-stem method",
+  "species": "Pleurotus eryngii",
+  "strain": "King",
+  "variety_group": "oyster",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "intermediate",
+    "oyster",
+    "premium"
+  ],
+  "restricted": false,
+  "summary": "Paid example recipe: cooler, drier fruiting to favor thick stems.",
+  "notes": "Demo premium profile for the community store. Same species as the free king oyster card.",
+  "chamber_notes": "Top-fruit in a shallow tray or restrict side pins. Top-dress with a thin casing if stems stay skinny.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Stem morphology in P. eryngii responds to CO2 and humidity."
+    },
+    {
+      "title": "Practice",
+      "detail": "Growers often drop RH into the low 80s after pins set and keep FAE moderate, not oyster-high."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 20,
+      "humidity_percent": 88,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16,
+      "temperature_warning_max_c": 26,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 7,
+      "humidity_percent": 88,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 10,
+      "temperature_warning_max_c": 20,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 8,
+        "white_led_lux": 150,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 30,
+        "run_duration_s": 20,
+        "speed_percent": 20
+      },
+      "notes": "Fewer, larger pins beat a full flush of thin fruits."
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 16,
+      "humidity_percent": 80,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 14,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 11,
+      "temperature_warning_max_c": 19,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 8,
+        "white_led_lux": 160,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 30,
+        "run_duration_s": 20,
+        "speed_percent": 20
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "paid",
+    "amount_cents": 299,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [
+    "stripe"
+  ],
+  "affiliates_allowed": true,
+  "affiliate_links": [
+    {
+      "id": "example-spawn",
+      "label": "Culinary spawn (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/culinary-spawn",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    },
+    {
+      "id": "example-substrate",
+      "label": "Substrate ingredients (example affiliate)",
+      "merchant": "example-supplier",
+      "url": "https://example.com/affiliate/substrate",
+      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
+    }
+  ],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  }
+}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ profile.name }} · Hub{% endblock %}
+{% block content %}
+<h1>{{ profile.name }}</h1>
+<p class="muted">{{ profile.species }}{% if profile.strain %} · {{ profile.strain }}{% endif %} · pack {{ profile.pack }}</p>
+<p>{{ profile.summary }}</p>
+<p><a href="/profiles/{{ profile.id }}.json">Export JSON</a></p>
+{% if profile.legal_notice %}<p class="notice">{{ profile.legal_notice }}</p>{% endif %}
+<p>{{ profile.notes }}</p>
+<p class="muted">{{ profile.chamber_notes }}</p>
+<h2>Stages</h2>
+{% for stage in profile.stages %}
+<article class="card">
+  <h3>{{ stage.name }} <span class="muted">{{ stage.duration_days }} days</span></h3>
+  <p>{{ stage.humidity_percent }}% RH · {{ stage.temperature_c }} °C · light {{ stage.light.duration_hours }} h @ {{ stage.light.white_led_lux }} lux · fan {{ stage.fan.speed_percent }}% every {{ stage.fan.period_min }} min</p>
+  <p>{{ stage.notes }}</p>
+</article>
+{% endfor %}
+<h2>Source notes</h2>
+<ul>
+  {% for note in profile.source_notes %}
+  <li><strong>{{ note.title }}.</strong> {{ note.detail }}</li>
+  {% endfor %}
+</ul>
+<h2>Firmware commands for this profile</h2>
+<p class="muted">Applied one stage at a time through the existing ESPHome REST API. No firmware change required.</p>
+{% endblock %}

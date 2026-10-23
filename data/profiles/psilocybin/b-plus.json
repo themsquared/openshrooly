@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "b-plus",
+  "name": "B+",
+  "species": "Psilocybe cubensis",
+  "strain": "B+",
+  "variety_group": "cubensis",
+  "pack": "psilocybin",
+  "tags": [
+    "psilocybin",
+    "cubensis",
+    "beginner"
+  ],
+  "restricted": true,
+  "summary": "Forgiving cubensis strain with a slightly wider temperature window.",
+  "notes": "Informational climate only.",
+  "chamber_notes": "",
+  "legal_notice": "Legality of cultivating Psilocybe species varies by jurisdiction. This pack is informational environmental setpoints for a fruiting chamber and is disabled by default. You are responsible for following local law.",
+  "source_notes": [
+    {
+      "title": "Chamber consensus",
+      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. B+ is widely described as more tolerant of cooler rooms than many cubensis clones."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 16,
+      "humidity_percent": 92,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 24,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 19,
+      "temperature_warning_max_c": 29,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 6,
+      "humidity_percent": 95,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16,
+      "temperature_warning_max_c": 26,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 180,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 20,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 10,
+      "humidity_percent": 89,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16,
+      "temperature_warning_max_c": 26,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 200,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 15,
+        "run_duration_s": 30,
+        "speed_percent": 30
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": false,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  }
+}
