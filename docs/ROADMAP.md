@@ -1,37 +1,35 @@
-# OpenShrooly community platform roadmap
+# Shroom Labs + OpenShrooly platform roadmap
 
-OpenShrooly is replacement firmware for the Shrooly mushroom grower, started by **Graham Stewart** (`grahamsz/openshrooly`) and continued here on Mike's fork. Devices already have solid local control (on-device UI, embedded web dashboard, Home Assistant). This document is the first-pass plan to grow that into a **community platform** without making the firmware depend on a cloud.
+**Shroom Labs** ([shroomlabs.io](https://shroomlabs.io)) is the community product: shared profiles, accounts, and hub sync. It **works with Shrooly devices running OpenShrooly**. Shrooly is the hardware trademark; OpenShrooly is the open firmware started by **Graham Stewart** (`grahamsz/openshrooly`). This fork keeps that firmware offline-first and adds a local hub plus Shroom Labs.
 
 ## Architecture (current decision)
 
 ```
-┌────────────┐     ESPHome REST      ┌─────────────┐
-│  Shrooly   │◄─────────────────────►│  Local hub  │  Raspberry Pi / Docker
-│  firmware  │   /number /switch     │  hub/       │  SQLite, LAN only
-│  (offline) │   /sensor  /events    └──────┬──────┘
-└────────────┘                              │ HTTPS + Bearer token
-                                            ▼
-                               ┌────────────────────────┐
-                               │ Cloudflare Worker API  │
-                               │ D1 (SQLite) + R2 photos│
-                               └───────────┬────────────┘
-                                           │ CORS + Bearer
-                                           ▼
-                               ┌────────────────────────┐
-                               │ Netlify static site    │
-                               │ community/web          │
-                               └────────────────────────┘
+┌────────────────────┐  ESPHome REST   ┌─────────────┐
+│ Device running     │◄───────────────►│  Local hub  │  Raspberry Pi / Docker
+│ OpenShrooly        │  /number/switch │  hub/       │  SQLite, LAN only
+│ (offline-first)    │  /sensor/events └──────┬──────┘
+└────────────────────┘                        │ HTTPS + Bearer
+                                              ▼
+                                 api.shroomlabs.io
+                                 Cloudflare Worker + D1
+                                              │
+                         photos: cdn.shroomlabs.io (R2)
+                                              │
+                                              ▼
+                                 shroomlabs.io
+                                 Netlify static frontend
 ```
 
 Three tiers:
 
-1. **Firmware** (`esphome/`, `webapp/`, `coprocessor/`) — source of truth for a single grower. Must stay **offline-first**. If the hub or community site is down, the device still works from buttons, the local web UI, and Home Assistant.
-2. **Local hub** (`hub/`) — one lightweight process on a home computer or Pi. Discovers or adds devices by IP/mDNS, shows status, applies profiles, logs history, optionally syncs with the community API.
-3. **Community site** — free hosted SaaS:
-   - **Frontend** on **Netlify** (static site only).
-   - **API** on **Cloudflare Workers**.
-   - **Data** on **Cloudflare D1** (SQLite).
-   - **Photos** on **Cloudflare R2** (no egress fees).
+1. **Firmware** (`esphome/`, `webapp/`, `coprocessor/`) — source of truth for a single grower. Must stay **offline-first**. If the hub or Shroom Labs is down, the device still works from buttons, the local web UI, and Home Assistant.
+2. **Local hub** (`hub/`) — one lightweight process on a home computer or Pi. Discovers or adds devices by IP/mDNS, shows status, applies profiles, logs history, optionally syncs with Shroom Labs.
+3. **Shroom Labs** — free hosted SaaS at **shroomlabs.io**:
+   - **Frontend** on **Netlify**: `https://shroomlabs.io`
+   - **API** on **Cloudflare Workers**: `https://api.shroomlabs.io`
+   - **Data** on **Cloudflare D1** (SQLite)
+   - **Photos** on **Cloudflare R2**: `https://cdn.shroomlabs.io`
 
 Shared contract: JSON mushroom profiles in `data/profiles/` plus `shared/openshrooly_lib` (Python) and `community/api/src/profile.js` (same validation rules).
 
@@ -114,7 +112,7 @@ Cold shock (shiitake) **cannot** be done inside the chamber; the profile documen
 
 ## Monetization
 
-The community site is a **free hosted SaaS**. Revenue is meant to come from small paid items and affiliates, not subscriptions or ads on the firmware.
+**Shroom Labs** is a **free hosted SaaS**. Revenue is meant to come from small paid items and affiliates, not subscriptions or ads on the firmware.
 
 | Stream | This pass | Notes |
 | --- | --- | --- |

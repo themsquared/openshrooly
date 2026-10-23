@@ -1,8 +1,8 @@
 # OpenShrooly local hub
 
-A single lightweight process that manages one or more OpenShrooly devices on your LAN. Designed to run on a Raspberry Pi (or any always-on computer) without a cloud account.
+A single lightweight process that manages one or more devices running OpenShrooly on your LAN. Designed to run on a Raspberry Pi (or any always-on computer) without a cloud account.
 
-The device firmware stays offline-first. If this hub is stopped, each Shrooly still works from its local web UI, buttons, and Home Assistant.
+Works with Shrooly devices running OpenShrooly. The firmware stays offline-first: if this hub is stopped, each device still works from its local web UI, buttons, and Home Assistant. Optional library sync goes to **Shroom Labs** (`https://api.shroomlabs.io`).
 
 ## What it does
 
@@ -11,7 +11,7 @@ The device firmware stays offline-first. If this hub is stopped, each Shrooly st
 - Apply a mushroom profile stage through the **existing** ESPHome REST API (`/number/.../set`, `/switch/.../turn_on`)
 - Keep grow history and poll samples in SQLite
 - Import / export profiles as JSON
-- Push / pull the library to the community site when `COMMUNITY_TOKEN` is set
+- Push / pull the library to Shroom Labs when `COMMUNITY_TOKEN` is set
 
 It does **not** flash firmware or replace the on-device dashboard.
 
@@ -51,8 +51,8 @@ On a Pi, `--network host` makes mDNS discovery more reliable.
 | `HUB_DATA_DIR` | `hub/data` | SQLite location |
 | `OPENSHROOLY_DATA_DIR` | repo `data/` | Seed profiles |
 | `HUB_ENABLE_PSILOCYBIN` | `0` | Load the restricted pack |
-| `COMMUNITY_URL` | `http://127.0.0.1:8100` | Community site |
-| `COMMUNITY_TOKEN` | empty | Hub API token from the community account |
+| `COMMUNITY_URL` | `http://127.0.0.1:8787` | Shroom Labs API (`https://api.shroomlabs.io` in production) |
+| `COMMUNITY_TOKEN` | empty | Hub API token from a Shroom Labs account |
 | `HUB_POLL_SECONDS` | `60` | Sensor history interval |
 
 The psilocybin pack is **off** unless you opt in. Even then, those profiles stay free and never carry affiliate links.

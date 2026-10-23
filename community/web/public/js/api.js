@@ -1,4 +1,4 @@
-const cfg = window.OPENSHROOLY || { apiBase: "http://127.0.0.1:8787" };
+const cfg = window.SHROOM_LABS || window.OPENSHROOLY || { apiBase: "http://127.0.0.1:8787" };
 const TOKEN_KEY = "openshrooly_token";
 
 export function apiBase() {

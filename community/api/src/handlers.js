@@ -15,8 +15,25 @@ import seeds from "./seeds.json" with { type: "json" };
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
 
-export function corsHeaders(env, extra = {}) {
-  const origin = env.CORS_ORIGIN || "*";
+export const DEFAULT_CORS_ORIGINS =
+  "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888";
+
+export function allowedOrigins(env) {
+  return String(env.CORS_ORIGIN || DEFAULT_CORS_ORIGINS)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function pickCorsOrigin(env, request) {
+  const allowed = allowedOrigins(env);
+  const requestOrigin = request?.headers?.get?.("origin") || "";
+  if (requestOrigin && allowed.includes(requestOrigin)) return requestOrigin;
+  return allowed[0] || "*";
+}
+
+export function corsHeaders(env, request, extra = {}) {
+  const origin = pickCorsOrigin(env, request);
   return {
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": origin === "*" ? "false" : "true",
@@ -28,10 +45,17 @@ export function corsHeaders(env, extra = {}) {
   };
 }
 
-export function withCors(response, env) {
+export function withCors(response, env, request) {
   const headers = new Headers(response.headers);
-  for (const [key, value] of Object.entries(corsHeaders(env))) headers.set(key, value);
+  for (const [key, value] of Object.entries(corsHeaders(env, request))) headers.set(key, value);
   return new Response(response.body, { status: response.status, headers });
+}
+
+export function mediaUrl(env, key) {
+  if (!key) return null;
+  const cdn = String(env.CDN_BASE_URL || "").replace(/\/$/, "");
+  if (cdn) return `${cdn}/${key}`;
+  return `/api/media/${encodeURIComponent(key)}`;
 }
 
 function json(body, status = 200, headers = {}) {
@@ -107,7 +131,7 @@ export async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
-  if (method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env) });
+  if (method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env, request) });
 
   try {
     return await route(method, path, url, request, env);
@@ -121,7 +145,7 @@ export async function handleRequest(request, env) {
 async function route(method, path, url, request, env) {
   const { db, storage } = env;
   if (method === "GET" && path === "/health") {
-    return json({ ok: true, site: env.SITE_NAME || "OpenShrooly Community", driver: db.driver });
+    return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver });
   }
 
   if (method === "POST" && path === "/api/auth/register") {
@@ -477,7 +501,9 @@ async function showProfile(request, db, env, profileId) {
     [profileId]
   );
   const avgRow = await db.one("SELECT AVG(stars) AS a FROM ratings WHERE profile_id=?", [profileId]);
-  const reports = await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId]);
+  const reports = (await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId])).map(
+    (report) => ({ ...report, photo_url: mediaUrl(env, report.photo_key) })
+  );
   const publicDoc = unlocked
     ? profile
     : {

@@ -4,8 +4,11 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # Set API_BASE_URL in the Netlify UI to the Cloudflare Worker origin,
-  # e.g. https://openshrooly-community-api.workers.dev
+  # Production defaults. Override in the Netlify UI if needed.
+  API_BASE_URL = "https://api.shroomlabs.io"
+  MEDIA_BASE_URL = "https://cdn.shroomlabs.io"
+
+# Custom domain: shroomlabs.io (and www.shroomlabs.io → apex) in the Netlify UI.
 
 [[headers]]
   for = "/*"

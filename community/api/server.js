@@ -10,9 +10,12 @@ const port = Number(process.env.COMMUNITY_API_PORT || 8787);
 const env = {
   db: createMemoryDb(),
   storage: createMemoryStorage(),
-  CORS_ORIGIN: process.env.CORS_ORIGIN || "http://127.0.0.1:8888",
+  CORS_ORIGIN:
+    process.env.CORS_ORIGIN ||
+    "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888",
+  CDN_BASE_URL: process.env.CDN_BASE_URL || "",
   SHOW_PSILOCYBIN: process.env.COMMUNITY_SHOW_PSILOCYBIN || "1",
-  SITE_NAME: process.env.COMMUNITY_SITE_NAME || "OpenShrooly Community",
+  SITE_NAME: process.env.COMMUNITY_SITE_NAME || "Shroom Labs",
 };
 
 const server = createServer(async (req, res) => {
@@ -25,12 +28,12 @@ const server = createServer(async (req, res) => {
     headers: req.headers,
     body: ["GET", "HEAD"].includes(req.method || "") ? undefined : body,
   });
-  const response = withCors(await handleRequest(request, env), env);
+  const response = withCors(await handleRequest(request, env), env, request);
   res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
   const buf = Buffer.from(await response.arrayBuffer());
   res.end(buf);
 });
 
 server.listen(port, host, () => {
-  console.log(`OpenShrooly community API (local) http://${host}:${port}`);
+  console.log(`Shroom Labs API (local) http://${host}:${port}`);
 });

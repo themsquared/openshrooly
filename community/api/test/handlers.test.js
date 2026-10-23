@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createMemoryDb } from "../src/db.js";
-import { handleRequest } from "../src/handlers.js";
+import { handleRequest, pickCorsOrigin, withCors } from "../src/handlers.js";
 import { createMemoryStorage } from "../src/storage.js";
 
 function env() {
@@ -65,6 +65,18 @@ test("accounts, paid checkout stub, hub sync", async () => {
   assert.equal(unlocked.data.unlocked, true);
   const hub = await call(ctx, "GET", "/api/hub/pull", { token });
   assert.ok(hub.data.profiles.some((p) => p.id === "king-oyster-thick-stem"));
+});
+
+test("CORS allows shroomlabs.io and local frontend", async () => {
+  const ctx = env();
+  ctx.CORS_ORIGIN =
+    "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888";
+  const request = new Request("https://api.shroomlabs.io/health", {
+    headers: { origin: "https://shroomlabs.io" },
+  });
+  assert.equal(pickCorsOrigin(ctx, request), "https://shroomlabs.io");
+  const res = withCors(new Response("ok"), ctx, request);
+  assert.equal(res.headers.get("access-control-allow-origin"), "https://shroomlabs.io");
 });
 
 test("affiliate click is blocked for psilocybin ids", async () => {

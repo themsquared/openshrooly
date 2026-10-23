@@ -18,6 +18,7 @@ async function envContext(env) {
         async get() { return null; },
       }),
       CORS_ORIGIN: env.CORS_ORIGIN,
+      CDN_BASE_URL: env.CDN_BASE_URL,
       SHOW_PSILOCYBIN: env.SHOW_PSILOCYBIN,
       SITE_NAME: env.SITE_NAME,
       COMMUNITY_SECRET: env.COMMUNITY_SECRET,
@@ -30,6 +31,6 @@ export default {
   async fetch(request, env) {
     const ctx = await envContext(env);
     const response = await handleRequest(request, ctx);
-    return withCors(response, ctx);
+    return withCors(response, ctx, request);
   },
 };

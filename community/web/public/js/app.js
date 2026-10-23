@@ -1,4 +1,16 @@
-import { api, getToken, isSignedIn, setToken } from "./api.js";
+import { api, apiBase, getToken, isSignedIn, setToken } from "./api.js";
+
+function cfg() {
+  return window.SHROOM_LABS || {};
+}
+
+function mediaUrl(key, fallback) {
+  if (fallback) return fallback;
+  if (!key) return "";
+  const base = String(cfg().mediaBase || "").replace(/\/$/, "");
+  if (base) return `${base}/${key}`;
+  return `${apiBase()}/api/media/${encodeURIComponent(key)}`;
+}
 
 function $(sel) {
   return document.querySelector(sel);
@@ -70,7 +82,7 @@ async function renderProfile() {
   $("#full").classList.remove("hidden");
   $("#notes").textContent = p.notes || "";
   $("#chamber").textContent = p.chamber_notes || "";
-  $("#json-link").href = `${(window.OPENSHROOLY.apiBase || "").replace(/\/$/, "")}/api/profiles/${id}.json`;
+  $("#json-link").href = `${apiBase()}/api/profiles/${id}`;
   $("#stages").innerHTML = (p.stages || [])
     .map(
       (s) => `<article class="card"><h3>${escapeHtml(s.name)} <span class="muted">${s.duration_days} d</span></h3>
@@ -87,7 +99,7 @@ async function renderProfile() {
       data.links
         .map(
           (l) =>
-            `<li><a href="${(window.OPENSHROOLY.apiBase || "").replace(/\/$/, "")}/api/go/${id}/${l.id}">${escapeHtml(l.label)}</a></li>`
+            `<li><a href="${apiBase()}/api/go/${id}/${l.id}">${escapeHtml(l.label)}</a></li>`
         )
         .join("") +
       "</ul>";
@@ -98,9 +110,8 @@ async function renderProfile() {
   $("#reports").innerHTML =
     data.reports
       .map((r) => {
-        const photo = r.photo_key
-          ? ` <a href="${(window.OPENSHROOLY.apiBase || "").replace(/\/$/, "")}/api/media/${encodeURIComponent(r.photo_key)}">photo</a>`
-          : "";
+        const href = mediaUrl(r.photo_key, r.photo_url);
+        const photo = href ? ` <a href="${href}">photo</a>` : "";
         return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}</li>`;
       })
       .join("") || "<li class='muted'>No community reports yet.</li>";

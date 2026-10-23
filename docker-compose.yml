@@ -9,7 +9,7 @@ services:
       - "8090:8090"
     environment:
       HUB_ENABLE_PSILOCYBIN: "0"
-      COMMUNITY_URL: ${COMMUNITY_URL:-http://127.0.0.1:8787}
+      COMMUNITY_URL: ${COMMUNITY_URL:-https://api.shroomlabs.io}
       COMMUNITY_TOKEN: ${COMMUNITY_TOKEN:-}
     volumes:
       - hub-data:/app/hub/data
