@@ -21,7 +21,7 @@ jobs:
       - name: Test
         env:
           PYTHONPATH: shared:.
-        run: pytest -q
+        run: python -m pytest -q
 
   community-api:
     name: Community API
