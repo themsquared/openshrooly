@@ -165,12 +165,11 @@ app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 def page(request: Request, name: str, **context):
     context.update(
         {
-            "request": request,
             "enable_psilocybin": config.ENABLE_PSILOCYBIN,
             "community_url": config.COMMUNITY_URL,
         }
     )
-    return templates.TemplateResponse(name, context)
+    return templates.TemplateResponse(request, name, context)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -325,10 +324,9 @@ def profile_detail(request: Request, profile_id: str):
     )
 
 
-@app.get("/profiles/{profile_id}.json")
-def export_profile(request: Request, profile_id: str):
-    profile = get_profile(request.app.state.conn, profile_id)
-    return JSONResponse(profile.to_dict())
+@app.get("/api/profiles/{profile_id}")
+def api_profile(request: Request, profile_id: str):
+    return JSONResponse(get_profile(request.app.state.conn, profile_id).to_dict())
 
 
 @app.post("/profiles/import")

@@ -33,12 +33,12 @@ def test_health_and_seeded_profiles(client):
 
 
 def test_import_and_export_json(client):
-    pearl = client.get("/profiles/pearl-oyster.json").json()
+    pearl = client.get("/api/profiles/pearl-oyster").json()
     pearl["id"] = "pearl-oyster-copy"
     pearl["name"] = "Pearl copy"
     res = client.post("/profiles/import", data={"document": __import__("json").dumps(pearl)}, follow_redirects=False)
-    assert res.status_code in {303, 200}
-    exported = client.get("/profiles/pearl-oyster-copy.json").json()
+    assert res.status_code == 303
+    exported = client.get("/api/profiles/pearl-oyster-copy").json()
     assert exported["id"] == "pearl-oyster-copy"
 
 
