@@ -16,6 +16,16 @@ const env = {
   CDN_BASE_URL: process.env.CDN_BASE_URL || "",
   SHOW_PSILOCYBIN: process.env.COMMUNITY_SHOW_PSILOCYBIN || "1",
   SITE_NAME: process.env.COMMUNITY_SITE_NAME || "Shroom Labs",
+  AUTH_DEBUG: process.env.AUTH_DEBUG || "1",
+  HIBP_DISABLED: process.env.HIBP_DISABLED || "1",
+  SITE_ORIGIN: process.env.SITE_ORIGIN || "http://127.0.0.1:8888",
+  OIDC_STUB: process.env.OIDC_STUB || "1",
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
+  APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
+  TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
 };
 
 const server = createServer(async (req, res) => {

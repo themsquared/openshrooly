@@ -18,7 +18,7 @@ export async function api(path, { method = "GET", body, jsonBody } = {}) {
   const headers = { accept: "application/json" };
   const token = getToken();
   if (token) headers.authorization = `Bearer ${token}`;
-  const opts = { method, headers };
+  const opts = { method, headers, credentials: "include" };
   if (jsonBody !== undefined) {
     headers["content-type"] = "application/json";
     opts.body = JSON.stringify(jsonBody);
@@ -44,4 +44,8 @@ export async function api(path, { method = "GET", body, jsonBody } = {}) {
 
 export function isSignedIn() {
   return Boolean(getToken());
+}
+
+export function oidcStart(provider) {
+  return `${apiBase()}/api/auth/oidc/${provider}/start`;
 }

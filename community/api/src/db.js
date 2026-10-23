@@ -13,8 +13,30 @@ export function createMemoryDb() {
     checkouts: [],
     affiliate_clicks: [],
     guides: [],
+    auth_identities: [],
+    sessions: [],
+    refresh_tokens: [],
+    magic_links: [],
+    webauthn_credentials: [],
+    webauthn_challenges: [],
+    oauth_states: [],
+    security_events: [],
+    rate_limits: [],
   };
-  let ids = { users: 1, api_tokens: 1, grow_reports: 1, affiliate_clicks: 1 };
+  let ids = {
+    users: 1,
+    api_tokens: 1,
+    grow_reports: 1,
+    affiliate_clicks: 1,
+    auth_identities: 1,
+    sessions: 1,
+    refresh_tokens: 1,
+    magic_links: 1,
+    webauthn_credentials: 1,
+    webauthn_challenges: 1,
+    oauth_states: 1,
+    security_events: 1,
+  };
 
   return {
     driver: "memory",
@@ -59,7 +81,32 @@ export function createD1Db(d1) {
 function dispatch(mode, tables, ids, sql, params) {
   const q = sql.replace(/\s+/g, " ").trim();
   if (q.startsWith("INSERT INTO users")) {
-    const row = { id: ids.users++, username: params[0], password_hash: params[1], created_at: params[2] };
+    const row =
+      params.length >= 7
+        ? {
+            id: ids.users++,
+            username: params[0],
+            password_hash: params[1],
+            email: params[2],
+            email_verified: params[3],
+            display_name: params[4],
+            role: params[5],
+            totp_secret_enc: null,
+            totp_enabled: 0,
+            created_at: params[6],
+          }
+        : {
+            id: ids.users++,
+            username: params[0],
+            password_hash: params[1],
+            email: null,
+            email_verified: 0,
+            display_name: params[0],
+            role: "user",
+            totp_secret_enc: null,
+            totp_enabled: 0,
+            created_at: params[2],
+          };
     if (tables.users.some((u) => u.username === row.username)) throw new Error("UNIQUE");
     tables.users.push(row);
     return { lastRowId: row.id };
@@ -67,8 +114,199 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM users WHERE username=")) {
     return tables.users.filter((u) => u.username === params[0]);
   }
+  if (q.startsWith("SELECT * FROM users WHERE email=")) {
+    return tables.users.filter((u) => u.email === params[0]);
+  }
   if (q.startsWith("SELECT * FROM users WHERE id=")) {
     return tables.users.filter((u) => u.id === Number(params[0]));
+  }
+  if (q.startsWith("UPDATE users SET email_verified=")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    if (row) row.email_verified = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE users SET password_hash=")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    if (row) row.password_hash = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE users SET totp_secret_enc=")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    if (row) row.totp_secret_enc = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE users SET totp_enabled=")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    if (row) row.totp_enabled = params[0];
+    return {};
+  }
+  if (q.includes("FROM users JOIN sessions")) {
+    const session = tables.sessions.find((s) => s.session_hash === params[0] && !s.revoked_at);
+    if (!session) return [];
+    return tables.users.filter((u) => u.id === session.user_id);
+  }
+  if (q.includes("FROM users JOIN refresh_tokens")) {
+    const tok = tables.refresh_tokens.find((s) => s.token_hash === params[0] && !s.revoked_at);
+    if (!tok) return [];
+    return tables.users.filter((u) => u.id === tok.user_id);
+  }
+  if (q.startsWith("SELECT * FROM sessions WHERE session_hash=")) {
+    return tables.sessions.filter((s) => s.session_hash === params[0]);
+  }
+  if (q.startsWith("SELECT id, created_at, expires_at, revoked_at, user_agent FROM sessions")) {
+    return tables.sessions.filter((s) => s.user_id === Number(params[0]));
+  }
+  if (q.startsWith("INSERT INTO sessions")) {
+    tables.sessions.push({
+      id: ids.sessions++,
+      user_id: params[0],
+      session_hash: params[1],
+      user_agent: params[2],
+      ip: params[3],
+      expires_at: params[4],
+      revoked_at: null,
+      created_at: params[5],
+    });
+    return {};
+  }
+  if (q.startsWith("INSERT INTO refresh_tokens")) {
+    tables.refresh_tokens.push({
+      id: ids.refresh_tokens++,
+      user_id: params[0],
+      token_hash: params[1],
+      family: params[2],
+      expires_at: params[3],
+      revoked_at: null,
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM refresh_tokens WHERE token_hash=")) {
+    return tables.refresh_tokens.filter((s) => s.token_hash === params[0]);
+  }
+  if (q.startsWith("INSERT INTO magic_links")) {
+    tables.magic_links.push({
+      id: ids.magic_links++,
+      email: params[0],
+      token_hash: params[1],
+      purpose: params[2],
+      expires_at: params[3],
+      used_at: null,
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM magic_links WHERE token_hash=")) {
+    return tables.magic_links.filter((s) => s.token_hash === params[0]);
+  }
+  if (q.startsWith("UPDATE magic_links SET used_at=")) {
+    const row = tables.magic_links.find((s) => s.token_hash === params[1]);
+    if (row) row.used_at = params[0];
+    return {};
+  }
+  if (q.startsWith("INSERT INTO webauthn_challenges")) {
+    tables.webauthn_challenges.push({
+      id: ids.webauthn_challenges++,
+      challenge: params[0],
+      user_id: params[1],
+      purpose: params[2],
+      expires_at: params[3],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM webauthn_challenges WHERE challenge=? AND user_id=")) {
+    return tables.webauthn_challenges.filter((s) => s.challenge === params[0] && s.user_id === Number(params[1]));
+  }
+  if (q.startsWith("SELECT * FROM webauthn_challenges WHERE challenge=")) {
+    return tables.webauthn_challenges.filter((s) => s.challenge === params[0]);
+  }
+  if (q.startsWith("INSERT INTO webauthn_credentials")) {
+    tables.webauthn_credentials.push({
+      id: ids.webauthn_credentials++,
+      user_id: params[0],
+      credential_id: params[1],
+      public_key: params[2],
+      sign_count: params[3],
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM webauthn_credentials WHERE credential_id=")) {
+    return tables.webauthn_credentials.filter((s) => s.credential_id === params[0]);
+  }
+  if (q.startsWith("INSERT INTO oauth_states")) {
+    tables.oauth_states.push({
+      id: ids.oauth_states++,
+      state: params[0],
+      nonce: params[1],
+      code_verifier: params[2],
+      provider: params[3],
+      redirect_to: params[4],
+      expires_at: params[5],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM oauth_states WHERE state=")) {
+    return tables.oauth_states.filter((s) => s.state === params[0]);
+  }
+  if (q.startsWith("INSERT INTO auth_identities")) {
+    tables.auth_identities.push({
+      id: ids.auth_identities++,
+      user_id: params[0],
+      provider: params[1],
+      subject: params[2],
+      created_at: params[3],
+    });
+    return {};
+  }
+  if (q.startsWith("INSERT INTO security_events")) {
+    tables.security_events.push({
+      id: ids.security_events++,
+      user_id: params[0],
+      kind: params[1],
+      detail: params[2],
+      ip: params[3],
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM rate_limits WHERE key=")) {
+    return tables.rate_limits.filter((s) => s.key === params[0]);
+  }
+  if (q.startsWith("INSERT INTO rate_limits")) {
+    tables.rate_limits.push({ key: params[0], count: params[1], window_start: params[2] });
+    return {};
+  }
+  if (q.startsWith("UPDATE rate_limits SET count=?, window_start=")) {
+    const row = tables.rate_limits.find((s) => s.key === params[2]);
+    if (row) {
+      row.count = params[0];
+      row.window_start = params[1];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE rate_limits SET count=?")) {
+    const row = tables.rate_limits.find((s) => s.key === params[1]);
+    if (row) row.count = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE sessions SET revoked_at=? WHERE session_hash=")) {
+    const row = tables.sessions.find((s) => s.session_hash === params[1]);
+    if (row) row.revoked_at = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE sessions SET revoked_at=? WHERE user_id=")) {
+    for (const row of tables.sessions.filter((s) => s.user_id === Number(params[1]))) row.revoked_at = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE refresh_tokens SET revoked_at=? WHERE token_hash=")) {
+    const row = tables.refresh_tokens.find((s) => s.token_hash === params[1]);
+    if (row) row.revoked_at = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE refresh_tokens SET revoked_at=? WHERE user_id=")) {
+    for (const row of tables.refresh_tokens.filter((s) => s.user_id === Number(params[1]))) row.revoked_at = params[0];
+    return {};
   }
   if (q.startsWith("INSERT INTO api_tokens")) {
     const row = {

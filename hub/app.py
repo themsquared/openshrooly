@@ -160,6 +160,25 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="OpenShrooly Hub", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
+design_dir = REPO / "design"
+if design_dir.is_dir():
+    app.mount("/design", StaticFiles(directory=str(design_dir)), name="design")
+
+
+def entity_reading(status: dict) -> dict:
+    entities = status.get("entities") or {}
+
+    def val(key: str):
+        payload = entities.get(key) or {}
+        value = payload.get("value", payload.get("state"))
+        if value in (None, "unknown", "unavailable"):
+            return None
+        try:
+            return round(float(value), 1)
+        except (TypeError, ValueError):
+            return value
+
+    return {"temperature": val("temperature"), "humidity": val("humidity"), "water": val("water_level")}
 
 
 def page(request: Request, name: str, **context):
@@ -178,7 +197,14 @@ def home(request: Request):
     devices = []
     for row in conn.execute("SELECT * FROM devices ORDER BY name").fetchall():
         status = json.loads(row["last_status"] or "{}")
-        devices.append({**dict(row), "status": status, "online": status.get("online", False)})
+        devices.append(
+            {
+                **dict(row),
+                "status": status,
+                "online": status.get("online", False),
+                "reading": entity_reading(status),
+            }
+        )
     grows = conn.execute(
         """
         SELECT grows.*, devices.name AS device_name
@@ -263,6 +289,7 @@ def device_detail(request: Request, device_id: int):
         profiles=all_profiles(conn),
         samples=samples,
         preview=None,
+        reading=entity_reading(status),
     )
 
 

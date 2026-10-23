@@ -8,7 +8,9 @@ import {
   validateProfile,
   ValidationError,
 } from "./profile.js";
-import { hashPassword, nowIso, randomToken, sha256Hex, verifyPassword } from "./crypto.js";
+import { nowIso, randomToken, sha256Hex } from "./crypto.js";
+import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
+import { originAllowed, securityHeaders } from "./security.js";
 import { seedIfEmpty } from "./db.js";
 import seeds from "./seeds.json" with { type: "json" };
 
@@ -37,7 +39,7 @@ export function corsHeaders(env, request, extra = {}) {
   return {
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": origin === "*" ? "false" : "true",
-    "access-control-allow-headers": "authorization, content-type",
+    "access-control-allow-headers": "authorization, content-type, x-csrf-token",
     "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
     "access-control-max-age": "86400",
     vary: "Origin",
@@ -47,7 +49,9 @@ export function corsHeaders(env, request, extra = {}) {
 
 export function withCors(response, env, request) {
   const headers = new Headers(response.headers);
-  for (const [key, value] of Object.entries(corsHeaders(env, request))) headers.set(key, value);
+  for (const [key, value] of Object.entries({ ...securityHeaders(), ...corsHeaders(env, request) })) {
+    if (!headers.has(key)) headers.set(key, value);
+  }
   return new Response(response.body, { status: response.status, headers });
 }
 
@@ -84,13 +88,7 @@ async function readJson(request) {
 }
 
 async function userFromAuth(request, db) {
-  const header = request.headers.get("authorization") || "";
-  if (!header.toLowerCase().startsWith("bearer ")) return null;
-  const tokenHash = await sha256Hex(header.slice(7).trim());
-  return db.one(
-    "SELECT users.* FROM users JOIN api_tokens ON api_tokens.user_id = users.id WHERE api_tokens.token_hash=?",
-    [tokenHash]
-  );
+  return (await userFromRequest(request, db)).user;
 }
 
 function parseProfile(row) {
@@ -144,35 +142,14 @@ export async function handleRequest(request, env) {
 
 async function route(method, path, url, request, env) {
   const { db, storage } = env;
+  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && !originAllowed(env, request)) {
+    if (request.headers.get("origin")) return json({ error: "origin not allowed" }, 403);
+  }
+  const authResponse = await handleAuth(method, path, url, request, env);
+  if (authResponse) return authResponse;
+
   if (method === "GET" && path === "/health") {
     return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver });
-  }
-
-  if (method === "POST" && path === "/api/auth/register") {
-    const body = await readJson(request);
-    const username = String(body.username || "").trim().toLowerCase();
-    const password = String(body.password || "");
-    if (username.length < 3 || password.length < 6) {
-      throw new ValidationError("Username 3+ chars, password 6+ chars.");
-    }
-    const result = await db.run("INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)", [
-      username,
-      await hashPassword(password),
-      nowIso(),
-    ]);
-    const user = await db.one("SELECT * FROM users WHERE username=?", [username]);
-    const token = await mintToken(db, user.id, "session");
-    return json({ user: { id: user.id, username }, token, lastRowId: result.lastRowId });
-  }
-
-  if (method === "POST" && path === "/api/auth/login") {
-    const body = await readJson(request);
-    const user = await db.one("SELECT * FROM users WHERE username=?", [String(body.username || "").trim().toLowerCase()]);
-    if (!user || !(await verifyPassword(String(body.password || ""), user.password_hash))) {
-      return json({ error: "Unknown user or password." }, 401);
-    }
-    const token = await mintToken(db, user.id, "session");
-    return json({ user: { id: user.id, username: user.username }, token });
   }
 
   if (method === "GET" && path === "/api/me") {
@@ -180,7 +157,23 @@ async function route(method, path, url, request, env) {
     if (!user) return json({ error: "sign in required" }, 401);
     const tokens = await db.all("SELECT id, name, created_at FROM api_tokens WHERE user_id=?", [user.id]);
     const entitlements = await db.all("SELECT * FROM entitlements WHERE user_id=?", [user.id]);
-    return json({ user: { id: user.id, username: user.username }, tokens, entitlements, disclosure: DISCLOSURE });
+    const sessions = await db.all(
+      "SELECT id, created_at, expires_at, revoked_at, user_agent FROM sessions WHERE user_id=?",
+      [user.id]
+    );
+    return json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email || null,
+        email_verified: Boolean(Number(user.email_verified)),
+        role: user.role || "user",
+      },
+      tokens,
+      entitlements,
+      sessions,
+      disclosure: DISCLOSURE,
+    });
   }
 
   if (method === "POST" && path === "/api/me/tokens") {
@@ -207,6 +200,11 @@ async function route(method, path, url, request, env) {
         tags: profile.tags,
         pricing: profile.pricing,
         stages: profile.stages?.length || 0,
+        stage_list: (profile.stages || []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          duration_days: s.duration_days,
+        })),
       }))
     );
   }
@@ -231,6 +229,7 @@ async function route(method, path, url, request, env) {
   if (method === "POST" && path === "/api/profiles") {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
+    requireVerified(user);
     const profile = validateProfile(await readJson(request));
     profile.author = user.username;
     await upsertProfile(db, profile, user.id);
@@ -241,6 +240,7 @@ async function route(method, path, url, request, env) {
   if (rateMatch && method === "POST") {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
+    requireVerified(user);
     const body = await readJson(request);
     const stars = Number(body.stars);
     if (stars < 1 || stars > 5) throw new ValidationError("stars must be 1-5");
@@ -259,6 +259,7 @@ async function route(method, path, url, request, env) {
   if (forkMatch && method === "POST") {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
+    requireVerified(user);
     const source = await requireProfile(db, decodeURIComponent(forkMatch[1]));
     if (!(await canRead(db, user, source))) return json({ error: "purchase required" }, 402);
     const forked = structuredClone(source);
@@ -281,6 +282,7 @@ async function route(method, path, url, request, env) {
   if (reportMatch && method === "POST") {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
+    requireVerified(user);
     const profileId = decodeURIComponent(reportMatch[1]);
     await requireProfile(db, profileId);
     const body = await readJson(request);
@@ -312,6 +314,7 @@ async function route(method, path, url, request, env) {
   if (checkoutMatch && method === "POST") {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
+    requireVerified(user);
     const profile = await requireProfile(db, decodeURIComponent(checkoutMatch[1]));
     if (isPsilocybin(profile)) {
       throw new ValidationError("Psilocybin pack is free-only. Card processors cannot be attached.");

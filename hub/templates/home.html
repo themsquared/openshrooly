@@ -1,24 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Hub · OpenShrooly{% endblock %}
+{% block title %}Fleet · OpenShrooly Hub{% endblock %}
 {% block content %}
-<h1>Local hub</h1>
-<p>Works with Shrooly devices running OpenShrooly on your LAN, using the stock firmware web API. No cloud required.</p>
+<section class="hero">
+  <h1>Chambers at home</h1>
+  <p>Devices on this LAN. Apply a stage here; each chamber still works from its own glass-front dashboard if this hub is down.</p>
+</section>
 <div class="cards">
-  <article class="card"><h2>{{ devices|length }}</h2><p>Devices</p></article>
-  <article class="card"><h2>{{ profile_count }}</h2><p>Profiles in library</p></article>
-  <article class="card"><h2>{{ grows|length }}</h2><p>Active grows</p></article>
+  <article class="card"><div class="stat">{{ devices|length }}</div><p>Devices</p></article>
+  <article class="card"><div class="stat">{{ profile_count }}</div><p>Profiles in library</p></article>
+  <article class="card"><div class="stat">{{ grows|length }}</div><p>Active grows</p></article>
 </div>
-<h2>Devices</h2>
+<h2>Chambers</h2>
 <div class="cards">
   {% for device in devices %}
   <article class="card">
+    <p class="{% if device.online %}ok live{% else %}bad{% endif %}">{% if device.online %}Online{% else %}Offline{% endif %}</p>
     <h3><a href="/devices/{{ device.id }}">{{ device.name }}</a></h3>
     <p class="muted">{{ device.host }}:{{ device.port }}</p>
-    <p class="{% if device.online %}ok{% else %}bad{% endif %}">{% if device.online %}Online{% else %}Offline / last poll{% endif %}</p>
-    {% if device.current_profile_id %}<p>{{ device.current_profile_id }} · {{ device.current_stage_id }}</p>{% endif %}
+    {% if device.reading %}
+    <div class="gauge-row">
+      <div class="gauge-tile"><strong>{{ device.reading.humidity or "—" }}</strong><span class="muted">% RH</span></div>
+      <div class="gauge-tile"><strong>{{ device.reading.temperature or "—" }}</strong><span class="muted">°C</span></div>
+      <div class="gauge-tile"><strong>{{ device.reading.water or "—" }}</strong><span class="muted">water</span></div>
+    </div>
+    {% endif %}
+    {% if device.current_profile_id %}
+    <p><span class="chip">{{ device.current_profile_id }}</span> {{ device.current_stage_id }}</p>
+    {% endif %}
   </article>
   {% else %}
   <p>No devices yet. <a href="/devices">Add one by IP</a>.</p>
   {% endfor %}
 </div>
+{% if grows %}
+<h2>Active grow timelines</h2>
+<div class="cards">
+  {% for grow in grows %}
+  <article class="card">
+    <h3>{{ grow.device_name }}</h3>
+    <p class="muted">{{ grow.profile_id }} · started {{ grow.started_at }}</p>
+    <p><span class="chip">{{ grow.current_stage_id }}</span></p>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

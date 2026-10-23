@@ -8,19 +8,25 @@
   <script src="/js/config.js"></script>
 </head>
 <body data-page="publish">
-  <header>
-    <strong><a href="/">Shroom Labs</a></strong>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
     <nav><a href="/">Catalog</a> <span id="session-nav"></span></nav>
   </header>
-  <main>
+  <main id="main">
     <h1>Publish a profile</h1>
-    <p>Paste schema version 1 JSON. Psilocybin profiles must stay free and cannot include affiliate links or payment providers.</p>
+    <p>Paste schema version 1 JSON. A verified email is required. Psilocybin profiles must stay free and cannot include affiliate links or payment providers.</p>
     <p id="error" class="notice hidden"></p>
-    <form id="form" class="card">
+    <form id="form" class="card" style="padding:1.2rem">
       <textarea id="document" rows="16" required></textarea>
-      <button type="submit">Validate and publish</button>
+      <p><button type="submit">Validate and publish</button></p>
     </form>
   </main>
+  <footer class="site-footer">Publishing is audited. Creators who sell need TOTP or a passkey.</footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

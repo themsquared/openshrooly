@@ -3,13 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shroom Labs</title>
+  <title>Shroom Labs — mushroom profiles for OpenShrooly</title>
+  <meta name="description" content="Browse, fork, and apply researched mushroom grow profiles. Local-first. Works with Shrooly devices running OpenShrooly.">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="home">
-  <header>
-    <strong><a href="/">Shroom Labs</a></strong>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
     <nav>
       <a href="/?pack=culinary">Culinary</a>
       <a href="/?pack=psilocybin">Restricted pack</a>
@@ -17,17 +23,34 @@
       <span id="session-nav"></span>
     </nav>
   </header>
-  <main>
-    <h1 id="pack-label">Shared mushroom profiles</h1>
+  <main id="main">
+    <section class="hero" aria-label="Shroom Labs">
+      <canvas id="mycelium" aria-hidden="true"></canvas>
+      <div class="hero-copy">
+        <p class="eyebrow" id="pack-label">Culinary library</p>
+        <h1>Recipes for the chamber at home.</h1>
+        <p class="lede">Humidity, light, and air — written as stages you can watch through the glass. Apply from a hub on your LAN. The device stays yours, offline-first.</p>
+        <form class="search-bar" method="get" role="search">
+          <input type="hidden" name="pack" id="pack" value="culinary">
+          <label>Search the library
+            <input name="q" id="q" placeholder="lion’s mane, oyster, shiitake" autocomplete="off">
+          </label>
+          <button type="submit">Search</button>
+        </form>
+      </div>
+    </section>
     <p id="legal" class="legal hidden">Legality of cultivating Psilocybe species varies by jurisdiction. These cards are free environmental setpoints only. They are never sold and never carry affiliate links.</p>
-    <form class="card row" method="get">
-      <input type="hidden" name="pack" id="pack" value="culinary">
-      <label>Search <input name="q" id="q" placeholder="lion's mane, oyster, shiitake"></label>
-      <p><button type="submit">Search</button></p>
-    </form>
     <div id="cards" class="cards"></div>
-    <section id="supplies">
-      <h2>Supplies</h2>
+    <section class="how" aria-label="How it works">
+      <h2 class="display" style="font-size:1.8rem">How a profile reaches the chamber</h2>
+      <div class="cards">
+        <article class="card" style="padding:1.2rem"><p class="chip">01</p><h3>Browse</h3><p class="muted">Pick a researched variety. Each card is a window onto stages, not a shop SKU.</p></article>
+        <article class="card" style="padding:1.2rem"><p class="chip">02</p><h3>Pull to the hub</h3><p class="muted">Your Pi or home computer syncs the JSON. No cloud is required to grow.</p></article>
+        <article class="card" style="padding:1.2rem"><p class="chip">03</p><h3>Apply a stage</h3><p class="muted">The hub talks to OpenShrooly over the LAN. You watch the flush at home.</p></article>
+      </div>
+    </section>
+    <section id="supplies" class="supplies">
+      <h2 class="display" style="font-size:1.8rem">Supplies</h2>
       <p class="muted">Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.</p>
       <ul>
         <li>Hardwood pellets — example affiliate on culinary profile pages</li>
@@ -35,7 +58,7 @@
       </ul>
     </section>
   </main>
-  <footer>Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</footer>
+  <footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

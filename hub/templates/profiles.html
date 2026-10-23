@@ -16,10 +16,15 @@
 <div class="cards">
   {% for profile in profiles %}
   <article class="card">
+    <p><span class="chip">{{ profile.pack }}</span>{% if profile.pricing.kind == "paid" %}<span class="chip">paid</span>{% else %}<span class="chip">free</span>{% endif %}</p>
     <h3><a href="/profiles/{{ profile.id }}">{{ profile.name }}</a></h3>
     <p class="muted">{{ profile.species }}{% if profile.strain %} · {{ profile.strain }}{% endif %}</p>
     <p>{{ profile.summary }}</p>
-    <p>{{ profile.stages|length }} stages · {{ profile.total_days() }} days · {{ profile.pricing.kind }}</p>
+    <ul class="timeline">
+      {% for stage in profile.stages %}
+      <li>{{ stage.name }}<br><span class="muted">{{ stage.duration_days }} d · {{ stage.humidity_percent }}% · {{ stage.temperature_c }}°</span></li>
+      {% endfor %}
+    </ul>
     {% if profile.is_psilocybin %}<p class="notice">Restricted pack</p>{% endif %}
   </article>
   {% endfor %}

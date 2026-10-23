@@ -3,24 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Register · Shroom Labs</title>
+  <title>Create account · Shroom Labs</title>
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="register">
-  <header>
-    <strong><a href="/">Shroom Labs</a></strong>
-    <nav><span id="session-nav"></span></nav>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
+    <nav><a href="/login.html">Sign in</a><span id="session-nav"></span></nav>
   </header>
-  <main>
-    <h1>Register</h1>
-    <p id="error" class="notice hidden"></p>
-    <form id="form" class="card">
-      <label>Username <input name="username" required autocomplete="username"></label>
-      <label>Password <input name="password" type="password" required autocomplete="new-password"></label>
-      <button type="submit">Create account</button>
-    </form>
+  <main id="main">
+    <section class="card auth-panel">
+      <h1>Create account</h1>
+      <p class="muted">No password. Enter your email and we’ll send a magic link. Publishing, buying, and claiming devices require a verified address.</p>
+      <p id="error" class="notice hidden"></p>
+      <form id="form">
+        <label>Email <input name="email" type="email" required autocomplete="email"></label>
+        <button type="submit">Send magic link</button>
+      </form>
+    </section>
   </main>
+  <footer class="site-footer">Turnstile and OIDC keys are documented in docs/AUTH.md.</footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

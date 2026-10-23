@@ -3,24 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Log in · Shroom Labs</title>
+  <title>Sign in · Shroom Labs</title>
+  <meta name="description" content="Passwordless sign in for Shroom Labs — passkey, Google, Apple, or email code.">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="login">
-  <header>
-    <strong><a href="/">Shroom Labs</a></strong>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
     <nav><span id="session-nav"></span></nav>
   </header>
-  <main>
-    <h1>Log in</h1>
-    <p id="error" class="notice hidden"></p>
-    <form id="form" class="card">
-      <label>Username <input name="username" required autocomplete="username"></label>
-      <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
-      <button type="submit">Log in</button>
-    </form>
+  <main id="main">
+    <section class="card auth-panel">
+      <p class="eyebrow">Account</p>
+      <h1>Sign in</h1>
+      <p class="muted">Passwordless by default. We’ll email a one-time link, or you can use a passkey / Google / Apple once Mike adds those keys.</p>
+      <p id="error" class="notice hidden"></p>
+      <form id="form">
+        <label>Email <input name="email" type="email" required autocomplete="username email"></label>
+        <button type="submit">Email me a sign-in link</button>
+      </form>
+      <div class="auth-actions">
+        <a class="button secondary" href="#" id="google">Continue with Google</a>
+        <a class="button secondary" href="#" id="apple">Continue with Apple</a>
+        <button type="button" class="ghost" id="passkey">Use a passkey</button>
+      </div>
+      <p class="muted">Need an account? The email link creates one if you’re new. <a href="/register.html">More options</a></p>
+    </section>
   </main>
+  <footer class="site-footer">Sessions use httpOnly cookies on api.shroomlabs.io. Hub tokens stay Bearer.</footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

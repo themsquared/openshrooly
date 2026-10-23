@@ -1,0 +1,14 @@
+{
+  "name": "shroom-labs-mobile",
+  "private": true,
+  "main": "App.tsx",
+  "scripts": {
+    "start": "echo \"Scaffold only. Install Expo when you are ready: npx expo start\"",
+    "ios": "echo \"Scaffold only — no App Store submission.\""
+  },
+  "dependencies": {
+    "expo": "^52.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.0"
+  }
+}

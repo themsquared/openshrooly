@@ -16,6 +16,8 @@
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 https://cdn.shroomlabs.io; img-src 'self' data: https://cdn.shroomlabs.io; style-src 'self'; script-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.shroomlabs.io http://127.0.0.1:8787"
 
 [[redirects]]
   from = "/profiles/:id"

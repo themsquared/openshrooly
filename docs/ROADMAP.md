@@ -199,6 +199,16 @@ This is not a forecast. The firmware stays free and MIT-licensed regardless.
 
 ## Phased plan
 
+### Phase 0b — UI system + passwordless auth (this follow-up)
+
+- [x] Shared tokens (`design/`) — dark mycelial / bioluminescent
+- [x] shroomlabs.io overhaul (hero canvas, Fraunces + Atkinson self-hosted, species SVG cards, grow timelines)
+- [x] Hub restyle (same identity)
+- [x] On-device lightweight dashboard (gauges, light timeline, profile strip; no webfonts/CDN)
+- [x] Passwordless auth (magic link, Google/Apple OIDC+PKCE, passkeys, session cookies, refresh rotation)
+- [x] SECURITY.md + docs/UX.md + docs/AUTH.md
+- [ ] Expo iOS scaffold (`mobile/`) — planned screens, no App Store
+
 ### Phase 0 — this PR
 
 - [x] Profile schema, import/export, apply-mapping
@@ -234,6 +244,10 @@ This is not a forecast. The firmware stays free and MIT-licensed regardless.
 ### Phase 4 — maybe BTCPay
 
 - After legal review; pack stays free until then
+
+### Phase 5 — Expo iOS app (scaffold only)
+
+See `mobile/ROADMAP.md`. Talks to `api.shroomlabs.io` and the local hub. Same tokens. Push notifications planned. No App Store submission in this pass.
 
 ## What works / what's stubbed (this PR)
 

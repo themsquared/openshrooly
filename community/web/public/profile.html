@@ -4,44 +4,52 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Profile · Shroom Labs</title>
+  <meta name="description" content="Mushroom grow profile with stages, setpoints, and community reports.">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="profile">
-  <header>
-    <strong><a href="/">Shroom Labs</a></strong>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
     <nav>
       <a href="/">Catalog</a>
       <span id="session-nav"></span>
     </nav>
   </header>
-  <main>
+  <main id="main">
+    <div id="art" class="card" style="padding:0;margin-bottom:1rem;overflow:hidden"></div>
+    <p><span id="chips"></span></p>
     <h1 id="title">Profile</h1>
     <p id="meta" class="muted"></p>
     <p id="legal" class="legal hidden"></p>
     <p id="summary"></p>
-    <section id="locked" class="hidden">
-      <p class="notice">Paid culinary recipe: <span id="price"></span>. Sign in, then complete the Stripe stub checkout (no live charge).</p>
+    <section id="locked" class="hidden card" style="padding:1.2rem">
+      <p class="notice">Paid culinary recipe: <span id="price"></span>. Sign in with a verified email, then complete the Stripe stub checkout (no live charge).</p>
       <button type="button" id="buy">Stub checkout</button>
     </section>
     <section id="full" class="hidden">
       <p><a id="json-link" href="#">Download JSON</a></p>
       <p id="notes"></p>
       <p id="chamber" class="muted"></p>
-      <h2>Stages</h2>
-      <div id="stages"></div>
+      <h2>Grow timeline</h2>
+      <ol id="stages" class="grow-timeline"></ol>
       <h2>Sources</h2>
       <ul id="sources"></ul>
       <div id="affiliates"></div>
       <p><button type="button" id="fork" class="secondary">Fork</button></p>
       <h2>Rate</h2>
-      <form id="rate" class="card">
+      <form id="rate" class="card" style="padding:1.2rem">
         <label>Stars <input name="stars" type="number" min="1" max="5" value="5"></label>
         <label>Comment <input name="comment"></label>
         <button type="submit">Save rating</button>
       </form>
       <h2>Grow report</h2>
-      <form id="report" class="card">
+      <form id="report" class="card" style="padding:1.2rem">
         <label>Outcome
           <select name="outcome">
             <option value="success">success</option>
@@ -61,7 +69,7 @@
     <h2>Grow reports</h2>
     <ul id="reports"></ul>
   </main>
-  <footer>Grow photos are served from cdn.shroomlabs.io (Cloudflare R2). Restricted-pack cards stay free and never show affiliate links.</footer>
+  <footer class="site-footer">Grow photos are served from cdn.shroomlabs.io (Cloudflare R2). Restricted-pack cards stay free and never show affiliate links.</footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

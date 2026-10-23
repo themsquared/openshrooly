@@ -2,19 +2,18 @@
 {% block title %}History · Hub{% endblock %}
 {% block content %}
 <h1>Grow history</h1>
-<h2>Grows</h2>
-<table>
-  <tr><th>Device</th><th>Profile</th><th>Started</th><th>Stage</th><th>Ended</th></tr>
+<h2>Timelines</h2>
+<div class="cards">
   {% for grow in grows %}
-  <tr>
-    <td>{{ grow.device_name }}</td>
-    <td>{{ grow.profile_id }}</td>
-    <td>{{ grow.started_at }}</td>
-    <td>{{ grow.current_stage_id }}</td>
-    <td>{{ grow.ended_at or "active" }}</td>
-  </tr>
+  <article class="card">
+    <h3>{{ grow.device_name }}</h3>
+    <p class="muted">{{ grow.profile_id }} · {{ grow.started_at }}{% if grow.ended_at %} → {{ grow.ended_at }}{% endif %}</p>
+    <p><span class="chip">{{ grow.current_stage_id }}</span>{% if not grow.ended_at %} <span class="ok">active</span>{% endif %}</p>
+  </article>
+  {% else %}
+  <p class="muted">No grows logged yet. Apply a profile to a device to start one.</p>
   {% endfor %}
-</table>
+</div>
 <h2>Events</h2>
 <table>
   <tr><th>Time</th><th>Kind</th><th>Detail</th></tr>

@@ -1,14 +1,22 @@
 {% extends "base.html" %}
 {% block title %}{{ device.name }} · Hub{% endblock %}
 {% block content %}
+<p class="{% if status.online %}ok live{% else %}bad{% endif %}">{% if status.online %}Reachable{% else %}Not reachable on this poll{% endif %}</p>
 <h1>{{ device.name }}</h1>
 <p class="muted">{{ device.host }}:{{ device.port }} · last seen {{ device.last_seen or "never" }}</p>
-<p class="{% if status.online %}ok{% else %}bad{% endif %}">{% if status.online %}Reachable{% else %}Not reachable on this poll{% endif %}</p>
-<div class="cards">
-  {% for key, payload in status.entities.items() %}
-  <article class="card"><strong>{{ key }}</strong><p>{{ payload.value if payload.value is defined else payload.state }}</p></article>
-  {% endfor %}
+<div class="gauge-row">
+  <article class="card gauge-tile"><strong>{{ reading.humidity if reading and reading.humidity is not none else "—" }}</strong><span class="muted">% RH</span></article>
+  <article class="card gauge-tile"><strong>{{ reading.temperature if reading and reading.temperature is not none else "—" }}</strong><span class="muted">°C</span></article>
+  <article class="card gauge-tile"><strong>{{ reading.water if reading and reading.water is not none else "—" }}</strong><span class="muted">water</span></article>
 </div>
+<details>
+  <summary class="muted">All entities</summary>
+  <div class="cards">
+    {% for key, payload in status.entities.items() %}
+    <article class="card"><strong>{{ key }}</strong><p>{{ payload.value if payload.value is defined else payload.state }}</p></article>
+    {% endfor %}
+  </div>
+</details>
 <form method="post" action="/devices/{{ device.id }}/refresh"><button class="secondary" type="submit">Refresh now</button></form>
 <h2>Apply a profile</h2>
 <form class="card" method="post" action="/devices/{{ device.id }}/apply">

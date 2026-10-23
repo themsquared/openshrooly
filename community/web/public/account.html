@@ -8,16 +8,26 @@
   <script src="/js/config.js"></script>
 </head>
 <body data-page="account">
-  <header>
-    <strong><a href="/">Shroom Labs</a></strong>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
     <nav><span id="session-nav"></span></nav>
   </header>
-  <main>
+  <main id="main">
     <h1>Account</h1>
     <p>Signed in as <strong id="who"></strong></p>
+    <p id="verified" class="muted"></p>
+    <h2>Sessions</h2>
+    <p class="muted">Browser sessions are httpOnly cookies with rotation. Sign out everywhere revokes them.</p>
+    <ul id="sessions"></ul>
+    <p><button type="button" class="secondary" id="signout-all">Sign out everywhere</button></p>
     <h2>Hub API token</h2>
     <p>Mint a token and set it as <code>COMMUNITY_TOKEN</code> on your local hub. The hub calls <code>https://api.shroomlabs.io</code> with <code>Authorization: Bearer</code>.</p>
-    <form id="mint" class="card">
+    <form id="mint" class="card" style="padding:1.2rem">
       <label>Name <input name="name" value="home-hub"></label>
       <button type="submit">Mint token</button>
     </form>
@@ -26,6 +36,7 @@
     <h2>Purchases</h2>
     <ul id="ents"></ul>
   </main>
+  <footer class="site-footer">2FA is required for creators who sell and for admins.</footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

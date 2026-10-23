@@ -2,13 +2,11 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { api } from '../lib/esphome-api'
-
-interface EntityState {
-  [key: string]: {
-    value: number | string | boolean
-    state: string
-  }
-}
+import LiveGauge from './components/LiveGauge'
+import LightTimeline from './components/LightTimeline'
+import ProfileStrip from './components/ProfileStrip'
+import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
+import type { EntityState } from './entity-types'
 
 interface ModalState {
   type: 'humidity' | 'temperature' | 'air' | 'light' | 'water' | 'settings' | 'calibrate' | null
@@ -39,6 +37,7 @@ export default function Dashboard() {
   const [otaProgress, setOtaProgress] = useState<number>(0)
   const [otaStatus, setOtaStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
   const [otaMessage, setOtaMessage] = useState<string>('')
+  const [demoMode, setDemoMode] = useState(false)
 
   // Track humidity values during drag to avoid stale state issues
   const humidityDragValues = useRef<{ target: number; hysteresis: number }>({ target: 70, hysteresis: 2 })
@@ -46,6 +45,14 @@ export default function Dashboard() {
   const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({})
 
   useEffect(() => {
+    const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('demo')
+    if (isDemo) {
+      setDemoMode(true)
+      setEntities(DEMO_ENTITIES)
+      setLoading(false)
+      return
+    }
+
     const fetchData = async () => {
       try {
         const numbers = await api.getAllNumbers()
@@ -563,7 +570,7 @@ export default function Dashboard() {
     return (
       <div className="loading-screen">
         <div className="spinner"></div>
-        <div>Connecting to OpenShrooly...</div>
+        <div>Connecting to chamber…</div>
       </div>
     )
   }
@@ -581,6 +588,12 @@ export default function Dashboard() {
   const humidity = parseFloat((getSensor('humidity') || getSensor('current_humidity') || 0) as string) || 0
   const waterLevel = parseFloat((getSensor('water_level_percent') || getSensor('water_level') || 0) as string) || 0
   const targetHumidity = parseFloat((getNumber('target_humidity') || 0) as string) || 0
+  const co2Raw = getSensor('co2') ?? getSensor('co2_ppm') ?? getSensor('carbon_dioxide')
+  const co2 = co2Raw == null || co2Raw === '' ? null : parseFloat(co2Raw as string)
+  const profileName = String(entities['text_sensor-current_profile']?.state || entities['text_sensor-current_profile']?.value || '')
+  const stageName = String(entities['text_sensor-current_stage']?.state || entities['text_sensor-current_stage']?.value || '')
+  const growDay = parseFloat((getSensor('grow_day') || '') as string)
+  const stageDays = parseFloat((getSensor('stage_days') || '') as string)
 
   // Temperature control values
   const tempControlEnabled = entities['switch-temperature_control_enabled']?.state === 'ON' || entities['switch-temperature_control_enabled']?.value === true
@@ -641,15 +654,19 @@ export default function Dashboard() {
               </g>
             </g>
           </svg>
-          <span style={{ fontWeight: 'bold' }}>Open</span>
-          <span style={{ fontWeight: '300' }}>Shrooly</span>
+          <span>
+            <span style={{ fontWeight: 'bold' }}>Open</span>
+            <span style={{ fontWeight: '300' }}>Shrooly</span>
+            <span className="brand-sub">Shroom Labs chamber</span>
+          </span>
         </h1>
         <div className="header-right">
+          {demoMode && <span className="demo-chip">Demo</span>}
+          <span className="live-dot" aria-hidden="true" />
           <div className="header-time">{lastUpdate.toLocaleTimeString()}</div>
         </div>
       </div>
 
-      {/* Alerts Banner */}
       {alerts.length > 0 && (
         <div className="alerts-banner">
           {alerts.map((alert) => (
@@ -660,7 +677,69 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Main Grid - 2 rows of 3 */}
+      <div className="hero-gauges">
+        <LiveGauge
+          label="Humidity"
+          value={humidity}
+          unit="%"
+          min={40}
+          max={100}
+          color="var(--sl-humid)"
+          target={targetHumidity}
+          badge={humidifierOn ? 'humidifying' : undefined}
+          onClick={() => setModal({ type: 'humidity' })}
+        />
+        <LiveGauge
+          label="Temperature"
+          value={temp}
+          unit="°C"
+          min={10}
+          max={35}
+          color="var(--sl-heat)"
+          target={tempControlEnabled ? tempTarget : undefined}
+          badge={heatRequested ? 'heating' : undefined}
+          onClick={() => setModal({ type: 'temperature' })}
+        />
+        {co2 != null && !Number.isNaN(co2) ? (
+          <LiveGauge
+            label="CO₂"
+            value={co2}
+            unit="ppm"
+            min={400}
+            max={2000}
+            color="var(--sl-co2)"
+            detail="if sensor present"
+          />
+        ) : (
+          <LiveGauge
+            label="Water"
+            value={waterLevel}
+            unit="%"
+            min={0}
+            max={100}
+            color="var(--sl-spore)"
+            badge={!isWaterCalibrated ? 'calibrate' : undefined}
+            onClick={() => setModal({ type: 'water' })}
+          />
+        )}
+      </div>
+
+      <ProfileStrip
+        profile={profileName || undefined}
+        stage={stageName || undefined}
+        day={Number.isFinite(growDay) ? growDay : undefined}
+        stageDays={Number.isFinite(stageDays) ? stageDays : undefined}
+        stages={demoMode || profileName ? DEMO_STAGES : []}
+      />
+
+      <LightTimeline
+        sunrise={lightSunrise}
+        sunset={lightSunset}
+        nowHour={currentHour}
+        lightsOn={lightsOn}
+        onClick={() => setModal({ type: 'light' })}
+      />
+
       <div className="main-grid">
         {/* Row 1 */}
         <div className="card card-temp" onClick={() => setModal({ type: 'temperature' })}>
@@ -749,7 +828,7 @@ export default function Dashboard() {
           Powered by ESPHome
         </a>
         <span className="footer-separator">•</span>
-        <span className="footer-text">No Warranty</span>
+        <span className="footer-text">Works with Shroom Labs · No Warranty</span>
       </div>
 
       {/* Modals */}

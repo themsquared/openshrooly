@@ -1,4 +1,6 @@
-import { api, apiBase, getToken, isSignedIn, setToken } from "./api.js";
+import { api, apiBase, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
+import { speciesArt } from "./species-art.js";
+import { startHero } from "./hero.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -24,37 +26,60 @@ function renderNav() {
   const nav = $("#session-nav");
   if (!nav) return;
   if (isSignedIn()) {
-    nav.innerHTML = `<a href="/account.html">Account</a> <button class="link" id="logout">Log out</button>`;
-    $("#logout")?.addEventListener("click", () => {
+    nav.innerHTML = `<a href="/account.html">Account</a> <button class="link" id="logout" type="button">Log out</button>`;
+    $("#logout")?.addEventListener("click", async () => {
+      try {
+        await api("/api/auth/logout", { method: "POST", jsonBody: {} });
+      } catch {
+        /* still clear local token */
+      }
       setToken("");
       location.href = "/";
     });
   } else {
-    nav.innerHTML = `<a href="/login.html">Log in</a> <a href="/register.html">Register</a>`;
+    nav.innerHTML = `<a href="/login.html">Sign in</a>`;
   }
 }
 
+function stageDots(stages = []) {
+  if (!stages.length) return "";
+  return `<ol class="mini-timeline" aria-label="Stage timeline">${stages
+    .map((s, i) => `<li class="${i === 0 ? "is-on" : ""}" title="${escapeHtml(s.name || s.id)} · ${s.duration_days || 0}d"></li>`)
+    .join("")}</ol>`;
+}
+
 async function renderHome() {
+  const canvas = $("#mycelium");
+  if (canvas) startHero(canvas);
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
-  $("#pack-label").textContent = pack === "psilocybin" ? "Restricted pack" : "Shared mushroom profiles";
+  $("#pack-label").textContent = pack === "psilocybin" ? "Restricted pack" : "Culinary library";
   $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
   $("#q").value = q;
   $("#pack").value = pack;
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
-  $("#cards").innerHTML = profiles
-    .map(
-      (p) => `
-    <article class="card">
-      <h2><a href="/profile.html?id=${encodeURIComponent(p.id)}">${escapeHtml(p.name)}</a></h2>
-      <p class="muted">${escapeHtml(p.species)}${p.strain ? " · " + escapeHtml(p.strain) : ""}</p>
-      <p>${escapeHtml(p.summary || "")}</p>
-      ${p.pricing?.kind === "paid" ? `<p class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</p>` : "<p>Free</p>"}
-    </article>`
-    )
-    .join("") || "<p>No profiles match.</p>";
+  $("#cards").innerHTML =
+    profiles
+      .map(
+        (p) => `
+    <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
+      <div class="profile-art">${speciesArt(p.species, p.strain)}</div>
+      <div class="profile-body">
+        <p><span class="chip">${escapeHtml(p.pack)}</span>${
+          p.pricing?.kind === "paid"
+            ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
+            : `<span class="chip">free</span>`
+        }</p>
+        <h2>${escapeHtml(p.name)}</h2>
+        <p class="muted">${escapeHtml(p.species)}${p.strain ? " · " + escapeHtml(p.strain) : ""}</p>
+        <p>${escapeHtml(p.summary || "")}</p>
+        ${stageDots(p.stage_list || [])}
+      </div>
+    </a>`
+      )
+      .join("") || "<p>No profiles match.</p>";
 }
 
 async function renderProfile() {
@@ -65,6 +90,8 @@ async function renderProfile() {
   $("#title").textContent = p.name;
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${p.pack}`;
   $("#summary").textContent = p.summary || "";
+  $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack || "")}</span>`;
+  $("#art").innerHTML = speciesArt(p.species, p.strain);
   if (p.legal_notice) {
     $("#legal").textContent = p.legal_notice;
     $("#legal").classList.remove("hidden");
@@ -83,11 +110,16 @@ async function renderProfile() {
   $("#notes").textContent = p.notes || "";
   $("#chamber").textContent = p.chamber_notes || "";
   $("#json-link").href = `${apiBase()}/api/profiles/${id}`;
-  $("#stages").innerHTML = (p.stages || [])
+  const stages = p.stages || [];
+  const total = stages.reduce((sum, s) => sum + Number(s.duration_days || 0), 0) || 1;
+  $("#stages").innerHTML = stages
     .map(
-      (s) => `<article class="card"><h3>${escapeHtml(s.name)} <span class="muted">${s.duration_days} d</span></h3>
-      <p>${s.humidity_percent}% RH · ${s.temperature_c} °C · ${s.light?.duration_hours || 0} h light · fan ${s.fan?.speed_percent || 0}%</p>
-      <p>${escapeHtml(s.notes || "")}</p></article>`
+      (s) => `<li>
+        <strong>${escapeHtml(s.name)}</strong>
+        <span class="muted"> ${s.duration_days} d · ${s.humidity_percent}% RH · ${s.temperature_c} °C · ${s.light?.duration_hours || 0} h light · fan ${s.fan?.speed_percent || 0}%</span>
+        <p>${escapeHtml(s.notes || "")}</p>
+        <div class="viz" aria-hidden="true"><span style="width:${Math.max(8, (Number(s.duration_days) / total) * 100)}%"></span></div>
+      </li>`
     )
     .join("");
   $("#sources").innerHTML = (p.source_notes || [])
@@ -97,10 +129,7 @@ async function renderProfile() {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
       data.links
-        .map(
-          (l) =>
-            `<li><a href="${apiBase()}/api/go/${id}/${l.id}">${escapeHtml(l.label)}</a></li>`
-        )
+        .map((l) => `<li><a href="${apiBase()}/api/go/${id}/${l.id}">${escapeHtml(l.label)}</a></li>`)
         .join("") +
       "</ul>";
   }
@@ -150,21 +179,59 @@ async function renderProfile() {
 }
 
 async function renderAuth(mode) {
-  $("#form").addEventListener("submit", async (ev) => {
+  $("#google")?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    location.href = oidcStart("google");
+  });
+  $("#apple")?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    location.href = oidcStart("apple");
+  });
+  $("#passkey")?.addEventListener("click", async () => {
+    $("#error").textContent = "Passkey login needs a registered authenticator on this account.";
+    $("#error").classList.remove("hidden");
+  });
+  $("#form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
     try {
-      const data = await api(`/api/auth/${mode}`, {
+      const email = String(fd.get("email") || fd.get("username") || "").trim();
+      const data = await api("/api/auth/magic/start", {
         method: "POST",
-        jsonBody: { username: fd.get("username"), password: fd.get("password") },
+        jsonBody: { email, turnstile: fd.get("cf-turnstile-response") || "" },
       });
-      setToken(data.token);
-      location.href = "/account.html";
+      $("#error").textContent = data.message || "Check your email for a sign-in link.";
+      $("#error").classList.remove("hidden");
+      if (data.debug_token) {
+        location.href = `/auth/callback.html?token=${encodeURIComponent(data.debug_token)}`;
+      }
     } catch (err) {
       $("#error").textContent = err.message;
       $("#error").classList.remove("hidden");
     }
   });
+}
+
+async function renderCallback() {
+  const token = params().get("token");
+  const code = params().get("code");
+  try {
+    if (token) {
+      const data = await api("/api/auth/magic/complete", { method: "POST", jsonBody: { token } });
+      if (data.access_token) setToken(data.access_token);
+      location.href = "/account.html";
+      return;
+    }
+    if (code) {
+      $("#status").textContent = "OIDC finished on the API host. You can close this if you were redirected.";
+      return;
+    }
+    $("#error").textContent = "Missing token.";
+    $("#error").classList.remove("hidden");
+  } catch (err) {
+    $("#error").textContent = err.message;
+    $("#error").classList.remove("hidden");
+  }
 }
 
 async function renderAccount() {
@@ -173,11 +240,24 @@ async function renderAccount() {
     return;
   }
   const me = await api("/api/me");
-  $("#who").textContent = me.user.username;
+  $("#who").textContent = me.user.email || me.user.username;
+  $("#verified").textContent = me.user.email_verified
+    ? "Email verified — you can publish, buy, and claim devices."
+    : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
   $("#ents").innerHTML =
     me.entitlements.map((e) => `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`).join("") ||
     "<li class='muted'>No paid items yet.</li>";
+  if (me.sessions) {
+    $("#sessions").innerHTML = me.sessions
+      .map((s) => `<li>${escapeHtml(s.created_at)} · expires ${escapeHtml(s.expires_at)}${s.current ? " · this device" : ""}</li>`)
+      .join("");
+  }
+  $("#signout-all")?.addEventListener("click", async () => {
+    await api("/api/auth/logout-all", { method: "POST", jsonBody: {} });
+    setToken("");
+    location.href = "/";
+  });
   $("#mint").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
@@ -225,7 +305,7 @@ renderNav();
 const page = document.body.dataset.page;
 if (page === "home") renderHome().catch((err) => ($("#cards").textContent = err.message));
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));
-if (page === "login") renderAuth("login");
-if (page === "register") renderAuth("register");
+if (page === "login" || page === "register") renderAuth(page);
+if (page === "callback") renderCallback();
 if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
 if (page === "publish") renderPublish();

@@ -70,7 +70,8 @@ Production CORS on the Worker is `https://shroomlabs.io` and `https://www.shroom
 
 ## Auth and CORS
 
-- Browser and hub authenticate with `Authorization: Bearer <token>` (not cross-site cookies).
+- Browser sessions: httpOnly `__Host-sl_session` cookie on `api.shroomlabs.io` plus optional Bearer access token. Hub tokens stay `Authorization: Bearer`.
+- Passwordless: magic link, Google/Apple OIDC (PKCE), passkeys. See [`docs/AUTH.md`](../docs/AUTH.md) and [`SECURITY.md`](../SECURITY.md).
 - `Access-Control-Allow-Origin` reflects an origin from `CORS_ORIGIN` (never `*` in production).
 - `Access-Control-Allow-Headers` includes `authorization, content-type`.
 - Grow photos are stored in R2 and served from `https://cdn.shroomlabs.io/<key>`. `/api/media/...` remains a local fallback.

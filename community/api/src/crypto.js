@@ -1,6 +1,8 @@
 /** Web Crypto helpers — work on Cloudflare Workers and Node 20+. */
 
 const te = new TextEncoder();
+const PBKDF2_ITERS = 600000;
+const LEGACY_ITERS = 200000;
 
 export function hex(bytes) {
   return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -12,15 +14,25 @@ export function fromHex(value) {
   return out;
 }
 
+export function base64url(bytes) {
+  let bin = "";
+  for (const b of new Uint8Array(bytes)) bin += String.fromCharCode(b);
+  return btoa(bin).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+export function randomBase64Url(n = 32) {
+  return base64url(crypto.getRandomValues(new Uint8Array(n)));
+}
+
 export async function sha256Hex(value) {
-  const digest = await crypto.subtle.digest("SHA-256", te.encode(value));
+  const digest = await crypto.subtle.digest("SHA-256", typeof value === "string" ? te.encode(value) : value);
   return hex(digest);
 }
 
-async function pbkdf2(password, saltBytes) {
+async function pbkdf2(password, saltBytes, iterations) {
   const key = await crypto.subtle.importKey("raw", te.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations: 200000 },
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
     key,
     256
   );
@@ -29,15 +41,22 @@ async function pbkdf2(password, saltBytes) {
 
 export async function hashPassword(password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const digest = await pbkdf2(password, salt);
-  return `pbkdf2$${hex(salt)}${digest}`;
+  const digest = await pbkdf2(password, salt, PBKDF2_ITERS);
+  return `pbkdf2$${PBKDF2_ITERS}$${hex(salt)}$${digest}`;
 }
 
 export async function verifyPassword(password, stored) {
-  const parts = String(stored).split("$");
-  if (parts.length !== 3 || parts[0] !== "pbkdf2") return false;
-  const digest = await pbkdf2(password, fromHex(parts[1]));
-  return digest === parts[2];
+  const parts = String(stored || "").split("$");
+  if (parts[0] !== "pbkdf2") return false;
+  if (parts.length === 3) {
+    const digest = await pbkdf2(password, fromHex(parts[1]), LEGACY_ITERS);
+    return digest === parts[2];
+  }
+  if (parts.length === 4) {
+    const digest = await pbkdf2(password, fromHex(parts[2]), Number(parts[1]) || PBKDF2_ITERS);
+    return digest === parts[3];
+  }
+  return false;
 }
 
 export function randomToken() {
@@ -46,5 +65,18 @@ export function randomToken() {
 }
 
 export function nowIso() {
-  return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  return new Date().toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+export function laterIso(ms) {
+  return new Date(Date.now() + ms).toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+export function timingSafeEqual(a, b) {
+  const left = te.encode(String(a));
+  const right = te.encode(String(b));
+  if (left.length !== right.length) return false;
+  let out = 0;
+  for (let i = 0; i < left.length; i += 1) out |= left[i] ^ right[i];
+  return out === 0;
 }
