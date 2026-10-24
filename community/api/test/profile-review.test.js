@@ -264,6 +264,124 @@ test("pending community profiles are not indexable on sitemap or llms.txt", () =
   assert.doesNotMatch(llms, /pending-fake/);
 });
 
+test("private drafts are hidden on fork, rate, grow report, checkout, and affiliate go", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "vis-owner@example.com");
+  const stranger = await register(ctx, "vis-stranger@example.com");
+  const doc = draftFrom(pearl, "hidden-oyster");
+  await call(ctx, "POST", "/api/profiles", { token: owner.token, body: doc });
+  const fork = await call(ctx, "POST", "/api/profiles/hidden-oyster/fork", { token: stranger.token, body: {} });
+  assert.equal(fork.status, 404);
+  const rate = await call(ctx, "POST", "/api/profiles/hidden-oyster/rate", { token: stranger.token, body: { stars: 5 } });
+  assert.equal(rate.status, 404);
+  const report = await call(ctx, "POST", "/api/profiles/hidden-oyster/reports", {
+    token: stranger.token,
+    body: { outcome: "success" },
+  });
+  assert.equal(report.status, 404);
+  const checkout = await call(ctx, "POST", "/api/profiles/hidden-oyster/checkout", { token: stranger.token, body: {} });
+  assert.equal(checkout.status, 404);
+  const go = await call(ctx, "GET", "/api/go/hidden-oyster/missing");
+  assert.equal(go.status, 404);
+  const flagged = await call(ctx, "POST", "/api/profiles/hidden-oyster/moderation-report", {
+    token: stranger.token,
+    body: { reason: "spam" },
+  });
+  assert.equal(flagged.status, 404);
+});
+
+test("export json serves the approved snapshot, not unreviewed edits", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "snap-owner@example.com");
+  const stranger = await register(ctx, "snap-stranger@example.com");
+  const mod = await makeModerator(ctx, "snap-mod@example.com");
+  const doc = draftFrom(pearl, "snap-oyster");
+  await call(ctx, "POST", "/api/profiles", { token: owner.token, body: doc });
+  await call(ctx, "POST", "/api/profiles/snap-oyster/photos", {
+    token: owner.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/snap-oyster/publish", {
+    token: owner.token,
+    body: { title: "Snap oyster", description: "First public text" },
+  });
+  await call(ctx, "POST", "/api/moderation/snap-oyster/approve", { token: mod.token, body: {} });
+  const edited = structuredClone(doc);
+  edited.name = "Secret edit";
+  edited.summary = "Should stay private until approved";
+  await call(ctx, "PUT", "/api/profiles/snap-oyster", { token: owner.token, body: edited });
+  const exported = await call(ctx, "GET", "/api/profiles/snap-oyster.json", { token: stranger.token });
+  assert.equal(exported.status, 200);
+  assert.notEqual(exported.data.name, "Secret edit");
+  assert.match(exported.data.name, /Pearl Oyster/);
+  const ownerExport = await call(ctx, "GET", "/api/profiles/snap-oyster.json", { token: owner.token });
+  assert.equal(ownerExport.data.name, "Secret edit");
+  const publicGet = await call(ctx, "GET", "/api/profiles/snap-oyster");
+  assert.equal(publicGet.status, 200);
+  assert.notEqual(publicGet.data.profile.name, "Secret edit");
+  const fork = await call(ctx, "POST", "/api/profiles/snap-oyster/fork", { token: stranger.token, body: {} });
+  assert.equal(fork.status, 201);
+  assert.notEqual(fork.data.name, "Secret edit (fork)");
+  assert.match(fork.data.name, /Pearl Oyster/);
+});
+
+test("takedown removes a live profile from lists, export, and public photos", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "td-owner@example.com");
+  const mod = await makeModerator(ctx, "td-mod@example.com");
+  const doc = draftFrom(pearl, "takedown-oyster");
+  await call(ctx, "POST", "/api/profiles", { token: owner.token, body: doc });
+  await call(ctx, "POST", "/api/profiles/takedown-oyster/photos", {
+    token: owner.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/takedown-oyster/publish", {
+    token: owner.token,
+    body: { title: "Take me down", description: "Then hide me" },
+  });
+  await call(ctx, "POST", "/api/moderation/takedown-oyster/approve", { token: mod.token, body: {} });
+  const missing = await call(ctx, "POST", "/api/moderation/takedown-oyster/takedown", { token: mod.token, body: {} });
+  assert.equal(missing.status, 400);
+  const down = await call(ctx, "POST", "/api/moderation/takedown-oyster/takedown", {
+    token: mod.token,
+    body: { reason: "Reported photos" },
+  });
+  assert.equal(down.status, 200, JSON.stringify(down.data));
+  assert.equal(down.data.review.status, "rejected");
+  assert.equal(down.data.review.published_live, false);
+  const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(list.data.some((p) => p.id === "takedown-oyster"), false);
+  const publicGet = await call(ctx, "GET", "/api/profiles/takedown-oyster");
+  assert.equal(publicGet.status, 404);
+  const photo = await ctx.db.one("SELECT * FROM profile_photos WHERE profile_id=?", ["takedown-oyster"]);
+  const media = await call(ctx, "GET", `/api/media/${encodeURIComponent(photo.object_key)}`);
+  assert.equal(media.status, 404);
+  const log = await call(ctx, "GET", "/api/moderation/takedown-oyster/log", { token: mod.token });
+  assert.equal(log.data.log.some((row) => row.action === "takedown"), true);
+  assert.equal(isIndexableProfile({ id: "takedown-oyster" }, { status: "rejected", published_live: 0 }), false);
+});
+
+test("a stranger cannot delete another user's profile photo", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "ph-owner@example.com");
+  const stranger = await register(ctx, "ph-stranger@example.com");
+  const other = draftFrom(pearl, "other-photo");
+  await call(ctx, "POST", "/api/profiles", { token: stranger.token, body: other });
+  const doc = draftFrom(pearl, "photo-idor");
+  await call(ctx, "POST", "/api/profiles", { token: owner.token, body: doc });
+  const photo = await call(ctx, "POST", "/api/profiles/photo-idor/photos", {
+    token: owner.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  const id = photo.data.photo.id;
+  const cross = await call(ctx, "DELETE", `/api/profiles/other-photo/photos/${id}`, { token: stranger.token });
+  assert.equal(cross.status, 404);
+  const direct = await call(ctx, "DELETE", `/api/profiles/photo-idor/photos/${id}`, { token: stranger.token });
+  assert.equal(direct.status, 403);
+  const still = await ctx.db.one("SELECT * FROM profile_photos WHERE id=?", [id]);
+  assert.equal(Number(still.withdrawn), 0);
+});
+
 test("miniflare R2 stores processed photos", async () => {
   const mf = new Miniflare({
     modules: true,

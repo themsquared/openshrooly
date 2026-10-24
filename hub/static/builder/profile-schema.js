@@ -20,6 +20,78 @@ export const STAGE_CATALOG = [
   { id: "browning", name: "Browning" },
 ];
 
+export const STAGE_IDS = new Set(STAGE_CATALOG.map((s) => s.id));
+export const STAGE_ID_RE = /^[a-z][a-z0-9_]{0,31}$/;
+
+export function isStageId(id) {
+  return typeof id === "string" && STAGE_ID_RE.test(id) && STAGE_IDS.has(id);
+}
+
+export function isHttpsSourceUrl(url) {
+  if (url == null || String(url).trim() === "") return true;
+  try {
+    const parsed = new URL(String(url).trim());
+    return parsed.protocol === "https:" && Boolean(parsed.host);
+  } catch {
+    return false;
+  }
+}
+
+export function httpsSourceHref(url) {
+  if (!isHttpsSourceUrl(url) || url == null || String(url).trim() === "") return "";
+  return new URL(String(url).trim()).href;
+}
+
+const OFFMENU_GENERA = ["psilocybe"];
+const OFFMENU_BINOMIALS = [
+  "psilocybe cubensis",
+  "psilocybe semilanceata",
+  "psilocybe cyanescens",
+  "psilocybe natalensis",
+  "panaeolus cyanescens",
+  "copelandia cyanescens",
+  "gymnopilus junonius",
+  "gymnopilus spectabilis",
+  "pluteus salicinus",
+  "inocybe aeruginascens",
+  "conocybe cyanopus",
+  "panaeolus tropicalis",
+  "panaeolus cambodginiensis",
+];
+const OFFMENU_COMMON = [
+  "golden teacher",
+  "penis envy",
+  "albino penis envy",
+  "blue meanie",
+  "liberty cap",
+  "wavy cap",
+  "flying saucer",
+  "b+",
+];
+
+export function normalizeTaxonText(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u00a0\u2000-\u200b]/g, " ")
+    .replace(/[^a-z0-9+ ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function detectsRestrictedTaxon(profile) {
+  const hay = normalizeTaxonText(
+    [profile?.name, profile?.species, profile?.strain, profile?.variety_group, ...(profile?.tags || [])].join(" ")
+  );
+  if (!hay) return false;
+  const words = hay.split(" ");
+  if (OFFMENU_GENERA.some((genus) => words.includes(genus) || hay.startsWith(`${genus} `))) return true;
+  if (OFFMENU_BINOMIALS.some((name) => hay.includes(name))) return true;
+  if (OFFMENU_COMMON.some((name) => hay.includes(name))) return true;
+  return false;
+}
+
 export const RANGES = {
   humidity_percent: { min: 30, max: 100, unit: "%" },
   temperature_c: { min: 10, max: 35, unit: "C" },
@@ -56,6 +128,7 @@ function require(condition, message) {
 
 export function isPsilocybin(profile) {
   return (
+    detectsRestrictedTaxon(profile) ||
     profile.pack === "psilocybin" ||
     Boolean(profile.restricted) ||
     (profile.tags || []).includes("psilocybin")
@@ -264,7 +337,9 @@ export function collectProfileIssues(profile) {
   const seen = new Set();
   for (const stage of Array.isArray(profile.stages) ? profile.stages : []) {
     const label = stage.name || stage.id || "phase";
-    if (!stage.id) addIssue(issues, `stages.${stage.id || "unknown"}.id`, `${label} needs an id.`);
+    if (!isStageId(stage.id)) {
+      addIssue(issues, `stages.${isStageId(stage.id) ? stage.id : "unknown"}.id`, `${label} needs a known phase id.`);
+    }
     if (seen.has(stage.id)) addIssue(issues, `stages.${stage.id}`, `Two phases use the id ${stage.id}.`);
     seen.add(stage.id);
     if (!(Number(stage.duration_days) > 0)) {
@@ -356,6 +431,9 @@ export function collectLightRecipeIssues(recipe) {
   for (const [i, note] of (recipe.sources || []).entries()) {
     if (!String(note.title || "").trim()) addIssue(issues, `light_recipe.sources.${i}.title`, "Each source needs a title.");
     if (!String(note.detail || "").trim()) addIssue(issues, `light_recipe.sources.${i}.detail`, "Each source needs a short note.");
+    if (!isHttpsSourceUrl(note.url)) {
+      addIssue(issues, `light_recipe.sources.${i}.url`, "Source links must use https.");
+    }
   }
   const phases = recipe.phases || {};
   if (!phases.colonization) addIssue(issues, "light_recipe.phases.colonization", "Add a colonization light mix.");
@@ -377,9 +455,10 @@ export function collectLightRecipeIssues(recipe) {
 }
 
 export function validateProfile(profile) {
-  const issues = collectProfileIssues(profile);
+  const normalized = applyPackRules(profile);
+  const issues = collectProfileIssues(normalized);
   if (issues.length) throw new ValidationError(issues[0].message);
-  return profile;
+  return normalized;
 }
 
 export function validateLightRecipe(recipe) {

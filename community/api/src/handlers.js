@@ -21,7 +21,17 @@ import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 import { handleAlerts } from "./alerts/http.js";
 import { handleReview } from "./review-http.js";
-import { getReview, isPublicProfile, photoIsPublic, publicDocument, reviewView, saveDraftReview } from "./review.js";
+import {
+  canSeeProfile,
+  getReview,
+  isModerator,
+  isPublicProfile,
+  photoIsPublic,
+  publicDocument,
+  requireVisibleRow,
+  reviewView,
+  saveDraftReview,
+} from "./review.js";
 
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
@@ -126,7 +136,8 @@ async function listProfiles(db, env, pack, q) {
     if (!(await isPublicProfile(db, row))) continue;
     const review = await getReview(db, row.id);
     const working = parseProfile(row);
-    const profile = publicDocument(row, review, working) || working;
+    const profile = publicDocument(row, review, working);
+    if (!profile) continue;
     if (pack === "culinary" && isPsilocybin(profile)) continue;
     if (pack === "psilocybin" && !isPsilocybin(profile)) continue;
     if (isPsilocybin(profile) && !showPsi(env)) continue;
@@ -330,7 +341,8 @@ async function route(method, path, url, request, env) {
     const body = await readJson(request);
     const stars = Number(body.stars);
     if (stars < 1 || stars > 5) throw new ValidationError("stars must be 1-5");
-    await requireProfile(db, decodeURIComponent(rateMatch[1]));
+    const rateRow = await requireVisibleRow(db, user, decodeURIComponent(rateMatch[1]));
+    await requireProfile(db, rateRow.id);
     await db.run("INSERT OR REPLACE INTO ratings (user_id, profile_id, stars, comment, created_at) VALUES (?, ?, ?, ?, ?)", [
       user.id,
       decodeURIComponent(rateMatch[1]),
@@ -346,7 +358,12 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
-    const source = await requireProfile(db, decodeURIComponent(forkMatch[1]));
+    const forkRow = await requireVisibleRow(db, user, decodeURIComponent(forkMatch[1]));
+    const forkReview = await getReview(db, forkRow.id);
+    const forkWorking = parseProfile(forkRow);
+    const staff = isModerator(user) || Number(user.id) === Number(forkRow.author_id);
+    const source = staff ? forkWorking : publicDocument(forkRow, forkReview, forkWorking);
+    if (!source) throw new ValidationError("not found", 404);
     if (!(await canRead(db, user, source))) return json({ error: "purchase required" }, 402);
     const forked = structuredClone(source);
     forked.id = `${source.id}-fork-${user.username}`;
@@ -371,7 +388,7 @@ async function route(method, path, url, request, env) {
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
     const profileId = decodeURIComponent(reportMatch[1]);
-    await requireProfile(db, profileId);
+    await requireVisibleRow(db, user, profileId);
     const body = await readJson(request);
     if (!["success", "partial", "fail"].includes(body.outcome)) throw new ValidationError("bad outcome");
     let photoKey = null;
@@ -407,7 +424,8 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
-    const profile = await requireProfile(db, decodeURIComponent(checkoutMatch[1]));
+    const checkoutRow = await requireVisibleRow(db, user, decodeURIComponent(checkoutMatch[1]));
+    const profile = await requireProfile(db, checkoutRow.id);
     if (isPsilocybin(profile)) {
       throw new ValidationError("Psilocybin pack is free-only. Card processors cannot be attached.");
     }
@@ -454,11 +472,12 @@ async function route(method, path, url, request, env) {
 
   const goMatch = path.match(/^\/api\/go\/([^/]+)\/([^/]+)$/);
   if (goMatch && method === "GET") {
-    const profile = await requireProfile(db, decodeURIComponent(goMatch[1]));
+    const user = await userFromAuth(request, db);
+    const goRow = await requireVisibleRow(db, user, decodeURIComponent(goMatch[1]));
+    const profile = await requireProfile(db, goRow.id);
     const link = affiliateLinksFor(profile).find((item) => item.id === decodeURIComponent(goMatch[2]));
     if (!link) return json({ error: "no affiliate link" }, 404);
     assertAffiliateAllowed(profile, link);
-    const user = await userFromAuth(request, db);
     await db.run(
       "INSERT INTO affiliate_clicks (link_id, profile_id, user_id, destination, created_at) VALUES (?, ?, ?, ?, ?)",
       [link.id, profile.id, user?.id || null, link.url, nowIso()]
@@ -512,7 +531,7 @@ async function route(method, path, url, request, env) {
     }
     for (const report of payload.grow_reports || []) {
       const exists = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
-      if (!exists) continue;
+      if (!exists || !(await canSeeProfile(db, user, exists))) continue;
       await db.run(
         "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
@@ -639,12 +658,14 @@ async function showProfile(request, db, env, profileId) {
 }
 
 async function exportProfile(request, db, env, profileId) {
-  const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
-  if (!row) throw new ValidationError("profile not found", 404);
   const user = await userFromAuth(request, db);
+  const row = await requireVisibleRow(db, user, profileId);
   const owner = user && Number(user.id) === Number(row.author_id);
-  if (!(await isPublicProfile(db, row)) && !owner) return json({ error: "not found" }, 404);
-  const profile = parseProfile(row);
+  const review = await getReview(db, profileId);
+  const working = parseProfile(row);
+  const staff = owner || isModerator(user);
+  const profile = staff ? working : publicDocument(row, review, working);
+  if (!profile) return json({ error: "not found" }, 404);
   if (isPsilocybin(profile) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
   if (!(await canRead(db, user, profile))) return json({ error: "purchase required" }, 402);
   await db.run("UPDATE profiles SET downloads=downloads+1 WHERE id=?", [profileId]);

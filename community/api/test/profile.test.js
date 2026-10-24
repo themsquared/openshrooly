@@ -15,7 +15,9 @@ function load(rel) {
 test("api and web share one profile schema file", () => {
   const api = readFileSync(new URL("../src/profile-schema.js", import.meta.url), "utf8");
   const web = readFileSync(new URL("../../web/public/js/profile-schema.js", import.meta.url), "utf8");
+  const hub = readFileSync(new URL("../../../hub/static/builder/profile-schema.js", import.meta.url), "utf8");
   assert.equal(web, api);
+  assert.equal(hub, api);
 });
 
 test("culinary seed profiles validate", () => {
@@ -74,6 +76,38 @@ test("light recipe validation rejects bad ranges and missing sources", () => {
   }
 });
 
+test("a culinary label cannot hide a restricted species", () => {
+  const sneak = structuredClone(load("data/profiles/culinary/pearl-oyster.json"));
+  sneak.id = "sneaky-teacher";
+  sneak.name = "Garden mix";
+  sneak.species = "Psilocybe cubensis";
+  sneak.pack = "culinary";
+  sneak.restricted = false;
+  sneak.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  sneak.allowed_payment_providers = ["stripe"];
+  sneak.affiliates_allowed = true;
+  const forced = validateProfile(sneak);
+  assert.equal(forced.pack, "psilocybin");
+  assert.equal(forced.restricted, true);
+  assert.equal(forced.affiliates_allowed, false);
+  assert.equal(forced.pricing.kind, "free");
+  for (const species of [
+    "Panaeolus cyanescens",
+    "Gymnopilus junonius",
+    "Pluteus salicinus",
+    "Inocybe aeruginascens",
+    "Conocybe cyanopus",
+  ]) {
+    const labeled = structuredClone(load("data/profiles/culinary/pearl-oyster.json"));
+    labeled.id = "taxon-check";
+    labeled.name = "Garden mix";
+    labeled.species = species;
+    labeled.pack = "culinary";
+    labeled.restricted = false;
+    assert.equal(validateProfile(labeled).pack, "psilocybin", species);
+  }
+});
+
 test("psilocybin pack rejects payments and affiliates", () => {
   const gt = load("data/profiles/psilocybin/golden-teacher.json");
   validateProfile(gt);
@@ -82,9 +116,13 @@ test("psilocybin pack rejects payments and affiliates", () => {
   const paid = structuredClone(gt);
   paid.pricing = { kind: "paid", amount_cents: 199, currency: "USD" };
   paid.allowed_payment_providers = ["stripe"];
-  assert.throws(() => validateProfile(paid), ValidationError);
+  const forcedPaid = validateProfile(paid);
+  assert.equal(forcedPaid.pricing.kind, "free");
+  assert.deepEqual(forcedPaid.allowed_payment_providers, []);
   const aff = structuredClone(gt);
   aff.affiliate_links = [{ id: "x", label: "x", merchant: "x", url: "https://example.com" }];
-  aff.affiliates_allowed = false;
-  assert.throws(() => validateProfile(aff), ValidationError);
+  aff.affiliates_allowed = true;
+  const forcedAff = validateProfile(aff);
+  assert.equal(forcedAff.affiliates_allowed, false);
+  assert.deepEqual(forcedAff.affiliate_links, []);
 });

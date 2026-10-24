@@ -45,6 +45,53 @@ test("sniffs jpeg png webp and rejects svg or markup", () => {
   assert.throws(() => assertSafeImage(new TextEncoder().encode("GIF89a............")));
 });
 
+test("jpeg rewrite drops trailing HTML after EOI", () => {
+  const clean = jpeg();
+  const html = new TextEncoder().encode("<html><body>payload</body></html>");
+  const poly = new Uint8Array(clean.length + html.length);
+  poly.set(clean);
+  poly.set(html, clean.length);
+  const out = processPhoto(poly);
+  const text = new TextDecoder("latin1").decode(out.bytes);
+  assert.doesNotMatch(text, /<html>|payload/);
+  assert.equal(out.bytes[out.bytes.length - 2], 0xff);
+  assert.equal(out.bytes[out.bytes.length - 1], 0xd9);
+});
+
+test("webp rewrite drops unknown extra chunks", () => {
+  const payload = "VP8L";
+  const vp8l = new Uint8Array(20);
+  vp8l.set([0x56, 0x50, 0x38, 0x4c]);
+  vp8l[4] = 8;
+  vp8l[8] = 0x2f;
+  const bits = (7) | (7 << 14);
+  vp8l[9] = bits & 255;
+  vp8l[10] = (bits >> 8) & 255;
+  vp8l[11] = (bits >> 16) & 255;
+  vp8l[12] = (bits >> 24) & 255;
+  const extra = new TextEncoder().encode("HTML");
+  const extraChunk = new Uint8Array(8 + extra.length);
+  extraChunk.set([0x48, 0x54, 0x4d, 0x4c]);
+  extraChunk[4] = extra.length;
+  extraChunk.set(extra, 8);
+  const body = new Uint8Array(vp8l.length + extraChunk.length);
+  body.set(vp8l);
+  body.set(extraChunk, vp8l.length);
+  const bytes = new Uint8Array(12 + body.length);
+  bytes.set([0x52, 0x49, 0x46, 0x46]);
+  const size = body.length + 4;
+  bytes[4] = size & 255;
+  bytes[5] = (size >> 8) & 255;
+  bytes.set([0x57, 0x45, 0x42, 0x50], 8);
+  bytes.set(body, 12);
+  const out = processPhoto(bytes);
+  const text = new TextDecoder("latin1").decode(out.bytes);
+  assert.doesNotMatch(text, /HTML/);
+  assert.equal(sniffImage(out.bytes), "webp");
+  assert.equal(out.width, 8);
+  assert.equal(out.height, 8);
+});
+
 test("rejects polyglot html-plus-jpeg and wrong magic bytes", () => {
   const jpegBytes = jpeg();
   const poly = new Uint8Array(8 + jpegBytes.length);

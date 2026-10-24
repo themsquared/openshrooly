@@ -47,7 +47,9 @@ export function dispatchReview(tables, ids, q, params) {
     return tables.profile_photos.filter((r) => r.object_key === p[0]);
   }
   if (q.startsWith("SELECT * FROM profile_photos WHERE id=")) {
-    return tables.profile_photos.filter((r) => Number(r.id) === Number(p[0]));
+    return tables.profile_photos.filter(
+      (r) => Number(r.id) === Number(p[0]) && (p[1] == null || r.profile_id === p[1])
+    );
   }
   if (q.startsWith("INSERT INTO profile_photos")) {
     const literalWithdrawn = /VALUES \(.*, 0, \?, \?\)$/.test(q) || q.includes(", 0, ?, ?)");
@@ -66,6 +68,14 @@ export function dispatchReview(tables, ids, q, params) {
     });
     return ok(1);
   }
+  if (q.includes("SET status='pending', withdrawn=1")) {
+    for (const row of tables.profile_photos.filter((r) => r.profile_id === p[1])) {
+      row.status = "pending";
+      row.withdrawn = 1;
+      row.updated_at = p[0];
+    }
+    return ok(1);
+  }
   if (q.startsWith("UPDATE profile_photos SET status=")) {
     for (const row of tables.profile_photos.filter((r) => r.profile_id === p[1] && Number(r.withdrawn) === 0)) {
       row.status = "approved";
@@ -74,7 +84,9 @@ export function dispatchReview(tables, ids, q, params) {
     return ok(1);
   }
   if (q.startsWith("UPDATE profile_photos SET withdrawn=")) {
-    const row = tables.profile_photos.find((r) => Number(r.id) === Number(p[1]));
+    const row = tables.profile_photos.find(
+      (r) => Number(r.id) === Number(p[1]) && (p[2] == null || r.profile_id === p[2])
+    );
     if (row) {
       row.withdrawn = 1;
       row.updated_at = p[0];

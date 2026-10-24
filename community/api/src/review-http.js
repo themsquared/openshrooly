@@ -15,6 +15,8 @@ import {
   rejectReview,
   reportProfile,
   requireModerator,
+  requireVisibleRow,
+  takedownReview,
   reviewView,
   saveDraftReview,
   storePhoto,
@@ -94,10 +96,17 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
     const profileId = decodeURIComponent(photoMatch[1]);
+    const photoId = decodeURIComponent(photoMatch[2]);
     const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
-    if (!row) return json({ error: "profile not found" }, 404);
+    if (!row) return json({ error: "not found" }, 404);
     if (Number(row.author_id) !== Number(user.id) && !isModerator(user)) return json({ error: "forbidden" }, 403);
-    await db.run("UPDATE profile_photos SET withdrawn=1, updated_at=? WHERE id=?", [new Date().toISOString(), decodeURIComponent(photoMatch[2])]);
+    const photo = await db.one("SELECT * FROM profile_photos WHERE id=? AND profile_id=?", [photoId, profileId]);
+    if (!photo) return json({ error: "not found" }, 404);
+    await db.run("UPDATE profile_photos SET withdrawn=1, updated_at=? WHERE id=? AND profile_id=?", [
+      new Date().toISOString(),
+      photoId,
+      profileId,
+    ]);
     return json({ ok: true });
   }
 
@@ -146,8 +155,7 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
     const profileId = decodeURIComponent(reportMatch[1]);
-    const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
-    if (!row) return json({ error: "profile not found" }, 404);
+    const row = await requireVisibleRow(db, user, profileId);
     const body = await readJson(request);
     const review = await reportProfile(db, { profileId, user, reason: body.reason || "reported" });
     return json({ review: reviewView(review) }, 201);
@@ -160,6 +168,18 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const profile = await requireProfile(db, decodeURIComponent(approveMatch[1]));
     const row = await db.one("SELECT * FROM users WHERE id=?", [(await db.one("SELECT * FROM profiles WHERE id=?", [profile.id])).author_id]);
     const review = await approveReview(db, env, request, { profile, user, row });
+    return json({ review: reviewView(review) });
+  }
+
+  const takedownMatch = path.match(/^\/api\/moderation\/([^/]+)\/takedown$/);
+  if (takedownMatch && method === "POST") {
+    const user = await userOf(request, db);
+    requireModerator(user);
+    const profile = await requireProfile(db, decodeURIComponent(takedownMatch[1]));
+    const author = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
+    const row = await db.one("SELECT * FROM users WHERE id=?", [author.author_id]);
+    const body = await readJson(request);
+    const review = await takedownReview(db, env, request, { profile, user, row, reason: body.reason });
     return json({ review: reviewView(review) });
   }
 

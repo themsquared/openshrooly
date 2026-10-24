@@ -94,6 +94,19 @@ export async function isPublicProfile(db, row) {
   return Number(review.published_live) === 1;
 }
 
+export async function canSeeProfile(db, user, row) {
+  if (!row) return false;
+  if (isModerator(user)) return true;
+  if (user && Number(user.id) === Number(row.author_id)) return true;
+  return isPublicProfile(db, row);
+}
+
+export async function requireVisibleRow(db, user, profileId) {
+  const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
+  if (!row || !(await canSeeProfile(db, user, row))) throw new ValidationError("not found", 404);
+  return row;
+}
+
 export async function listPublicProfiles(db) {
   const rows = await db.all("SELECT * FROM profiles");
   const out = [];
@@ -183,6 +196,32 @@ export async function rejectReview(db, env, request, { profile, user, row, reaso
     reason: String(reason).trim(),
   });
   await notifyOwner(db, env, request, row, changes ? "changes" : "rejected", String(reason).trim());
+  return getReview(db, profile.id);
+}
+
+export async function takedownReview(db, env, request, { profile, user, row, reason }) {
+  if (!String(reason || "").trim()) throw new ValidationError("Add a reason for the owner.");
+  const review = await getReview(db, profile.id);
+  if (!review) throw new ValidationError("This profile is not waiting for review.");
+  const ts = nowIso();
+  await db.run("UPDATE profiles SET published=0, updated_at=? WHERE id=?", [ts, profile.id]);
+  await upsertReview(db, {
+    ...review,
+    status: REVIEW_REJECTED,
+    reason: String(reason).trim(),
+    published_live: 0,
+  });
+  await db.run("UPDATE profile_photos SET status='pending', withdrawn=1, updated_at=? WHERE profile_id=?", [
+    ts,
+    profile.id,
+  ]);
+  await logModeration(db, {
+    profileId: profile.id,
+    actorId: user.id,
+    action: "takedown",
+    reason: String(reason).trim(),
+  });
+  await notifyOwner(db, env, request, row, "rejected", String(reason).trim());
   return getReview(db, profile.id);
 }
 

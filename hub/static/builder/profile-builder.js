@@ -21,18 +21,30 @@ import {
   defaultStage,
   defaultLightPhase,
   isPsilocybin,
+  isStageId,
+  isHttpsSourceUrl,
 } from "./profile-schema.js";
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+function fieldId(path) {
+  return `pb-${String(path).replace(/[^a-zA-Z0-9._-]/g, "")}`;
 }
 
-function fieldId(path) {
-  return `pb-${path.replaceAll(".", "-")}`;
+function h(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") node.className = String(value);
+    else if (key === "dataset") Object.assign(node.dataset, value);
+    else if (key === "style" && value && typeof value === "object") Object.assign(node.style, value);
+    else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2).toLowerCase(), value);
+    else if (key === "checked" || key === "selected" || key === "disabled") node[key] = Boolean(value);
+    else node.setAttribute(key, String(value));
+  }
+  for (const child of children.flat()) {
+    if (child == null || child === false) continue;
+    node.append(typeof child === "string" || typeof child === "number" ? document.createTextNode(String(child)) : child);
+  }
+  return node;
 }
 
 export class ProfileBuilder extends HTMLElement {
@@ -51,7 +63,7 @@ export class ProfileBuilder extends HTMLElement {
 
   connectedCallback() {
     this.mode = this.getAttribute("mode") || "hub";
-    this.setAttribute("class", `${this.getAttribute("class") || ""} pb`.trim());
+    this.classList.add("pb");
     this.render();
   }
 
@@ -74,7 +86,8 @@ export class ProfileBuilder extends HTMLElement {
     this.locked = Boolean(locked);
     this.profile = applyPackRules(structuredClone(doc));
     this.profile.light_recipe = this.profile.light_recipe || blankProfile().light_recipe;
-    this.activeStage = this.profile.stages?.[0]?.id || "colonization";
+    const first = (this.profile.stages || []).find((s) => isStageId(s.id));
+    this.activeStage = first?.id || "colonization";
     this.render();
   }
 
@@ -106,283 +119,323 @@ export class ProfileBuilder extends HTMLElement {
     const issues = collectProfileIssues(this.profile);
     const off = isPsilocybin(this.profile);
     const state = PUBLISH_STATES[this.publish.status] || PUBLISH_STATES.draft;
-    const stage = this.profile.stages.find((s) => s.id === this.activeStage) || this.profile.stages[0];
-    if (stage && stage.id !== this.activeStage) this.activeStage = stage.id;
+    const stage = (this.profile.stages || []).find((s) => s.id === this.activeStage && isStageId(s.id)) || this.profile.stages[0];
+    if (stage && isStageId(stage.id) && stage.id !== this.activeStage) this.activeStage = stage.id;
 
-    this.innerHTML = `
-      ${this.mode === "community" ? this.renderState(state) : ""}
-      <section class="pb-panel">
-        <h2>Profile</h2>
-        ${this.locked ? `<p class="notice">This paid recipe keeps its numbers locked. Clone it after you buy it, or start from a free profile.</p>` : ""}
-        ${this.renderStartFrom()}
-        <div class="pb-row pb-row-2">
-          ${this.textField("name", "Name", this.profile.name, issues)}
-          ${this.textField("species", "Species", this.profile.species, issues)}
-          ${this.textField("strain", "Strain", this.profile.strain || "", issues)}
-          ${this.textField("id", "Id", this.profile.id, issues, { hint: "lowercase-hyphens" })}
-        </div>
-        ${this.areaField("notes", "Notes", this.profile.notes || "", issues)}
-        ${this.renderSources(issues)}
-        ${this.renderPack(off)}
-      </section>
-      <section class="pb-panel">
-        <div class="pb-banner">
-          <h2>Phases</h2>
-          ${this.renderUnitToggle()}
-        </div>
-        ${this.renderTabs()}
-        ${stage && !this.locked ? this.renderStage(stage, issues) : this.locked ? `<p class="muted">Phase numbers stay hidden on a locked paid profile.</p>` : ""}
-      </section>
-      <section class="pb-panel">
-        <h2>Light recipe</h2>
-        <p class="muted">${escapeHtml(STRIP_APPROX_NOTE)} ${escapeHtml(WAVELENGTH_NOTE)}</p>
-        ${this.locked ? `<p class="muted">Hours, brightness, and the RGB mix unlock after purchase.</p>` : this.renderLight(issues)}
-      </section>
-      <section class="pb-panel">
-        <h2>Grow timeline</h2>
-        ${this.renderTimeline()}
-      </section>
-      ${this.mode === "community" ? this.renderPublish(issues) : ""}
-      <details class="pb-panel pb-advanced">
-        <summary>Advanced: import or export a profile file</summary>
-        <p class="muted">For people who already have a profile document. This round-trips the same fields the API stores.</p>
-        <textarea id="pb-import" aria-label="Profile document">${escapeHtml(exportProfileDocument(this.profile))}</textarea>
-        <div class="pb-actions">
-          <button type="button" class="secondary" data-act="import">Load document</button>
-          <button type="button" class="secondary" data-act="export">Copy document</button>
-        </div>
-        <p class="pb-error" id="pb-import-error"></p>
-      </details>
-    `;
+    const root = [];
+    if (this.mode === "community") root.push(this.renderState(state));
+    root.push(
+      h("section", { class: "pb-panel" },
+        h("h2", {}, "Profile"),
+        this.locked ? h("p", { class: "notice" }, "This paid recipe keeps its numbers locked. Clone it after you buy it, or start from a free profile.") : null,
+        this.renderStartFrom(),
+        h("div", { class: "pb-row pb-row-2" },
+          this.textField("name", "Name", this.profile.name, issues),
+          this.textField("species", "Species", this.profile.species, issues),
+          this.textField("strain", "Strain", this.profile.strain || "", issues),
+          this.textField("id", "Id", this.profile.id, issues, { hint: "lowercase-hyphens" })
+        ),
+        this.areaField("notes", "Notes", this.profile.notes || "", issues),
+        this.renderSources(issues),
+        this.renderPack(off)
+      ),
+      h("section", { class: "pb-panel" },
+        h("div", { class: "pb-banner" }, h("h2", {}, "Phases"), this.renderUnitToggle()),
+        this.renderTabs(),
+        stage && !this.locked
+          ? this.renderStage(stage, issues)
+          : this.locked
+            ? h("p", { class: "muted" }, "Phase numbers stay hidden on a locked paid profile.")
+            : null
+      ),
+      h("section", { class: "pb-panel" },
+        h("h2", {}, "Light recipe"),
+        h("p", { class: "muted" }, `${STRIP_APPROX_NOTE} ${WAVELENGTH_NOTE}`),
+        this.locked ? h("p", { class: "muted" }, "Hours, brightness, and the RGB mix unlock after purchase.") : this.renderLight(issues)
+      ),
+      h("section", { class: "pb-panel" }, h("h2", {}, "Grow timeline"), this.renderTimeline())
+    );
+    if (this.mode === "community") root.push(this.renderPublish());
+    const importBox = h("textarea", { id: "pb-import", "aria-label": "Profile document" });
+    importBox.value = exportProfileDocument(this.profile);
+    root.push(
+      h("details", { class: "pb-panel pb-advanced" },
+        h("summary", {}, "Advanced: import or export a profile file"),
+        h("p", { class: "muted" }, "For people who already have a profile document. This round-trips the same fields the API stores."),
+        importBox,
+        h("div", { class: "pb-actions" },
+          h("button", { type: "button", class: "secondary", dataset: { act: "import" } }, "Load document"),
+          h("button", { type: "button", class: "secondary", dataset: { act: "export" } }, "Copy document")
+        ),
+        h("p", { class: "pb-error", id: "pb-import-error" })
+      )
+    );
+    this.replaceChildren(...root.filter(Boolean));
     this.bind();
   }
 
   renderState(state) {
-    const reason = this.publish.reason ? `<p class="notice">${escapeHtml(this.publish.reason)}</p>` : "";
-    return `<section class="pb-panel pb-state" data-state="${escapeHtml(this.publish.status)}" aria-live="polite">
-      <span class="pb-state-label">${escapeHtml(state.label)}</span>
-      <p class="muted" style="margin:0">${escapeHtml(state.hint)}</p>
-      ${reason}
-    </section>`;
+    return h("section", { class: "pb-panel pb-state", dataset: { state: this.publish.status }, "aria-live": "polite" },
+      h("span", { class: "pb-state-label" }, state.label),
+      h("p", { class: "muted", style: { margin: "0" } }, state.hint),
+      this.publish.reason ? h("p", { class: "notice" }, this.publish.reason) : null
+    );
   }
 
   renderStartFrom() {
+    const select = h("select", { id: "pb-clone" }, h("option", { value: "" }, "Blank profile"));
     const groups = [
       ["Built-in", this.catalog.filter((p) => !p.author)],
       ["Your profiles", this.ownProfiles],
       ["Library", this.catalog.filter((p) => p.author)],
     ];
-    const options = groups
-      .map(([label, items]) => {
-        if (!items.length) return "";
-        return `<optgroup label="${escapeHtml(label)}">${items
-          .map((p) => {
-            const full = canCloneFull(p, { unlocked: Boolean(p.unlocked) });
-            return `<option value="${escapeHtml(p.id)}" ${full ? "" : "data-locked=1"}>${escapeHtml(p.name)}${full ? "" : " (numbers locked)"}</option>`;
-          })
-          .join("")}</optgroup>`;
-      })
-      .join("");
-    return `<label>Start from an existing profile
-      <select id="pb-clone">
-        <option value="">Blank profile</option>
-        ${options}
-      </select>
-    </label>`;
+    for (const [label, items] of groups) {
+      if (!items.length) continue;
+      const group = h("optgroup", { label });
+      for (const p of items) {
+        const full = canCloneFull(p, { unlocked: Boolean(p.unlocked) });
+        const option = h("option", { value: p.id }, full ? p.name : `${p.name} (numbers locked)`);
+        group.append(option);
+      }
+      select.append(group);
+    }
+    return h("label", {}, "Start from an existing profile", select);
   }
 
   renderPack(off) {
-    return `<fieldset>
-      <legend>Pack</legend>
-      <div class="pb-unit-toggle" role="group" aria-label="Pack">
-        <button type="button" data-pack="culinary" aria-pressed="${off ? "false" : "true"}">Culinary</button>
-        <button type="button" data-pack="psilocybin" aria-pressed="${off ? "true" : "false"}">Off-menu</button>
-      </div>
-      ${
-        off
-          ? `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSILOCYBIN_LEGAL_NOTICE)}</p><p>Off-menu profiles stay free. No payments, no affiliate links, and Grow Coach does not cover them.</p></aside>`
-          : ""
-      }
-    </fieldset>`;
+    return h("fieldset", {},
+      h("legend", {}, "Pack"),
+      h("div", { class: "pb-unit-toggle", role: "group", "aria-label": "Pack" },
+        h("button", { type: "button", dataset: { pack: "culinary" }, "aria-pressed": off ? "false" : "true" }, "Culinary"),
+        h("button", { type: "button", dataset: { pack: "psilocybin" }, "aria-pressed": off ? "true" : "false" }, "Off-menu")
+      ),
+      off
+        ? h("aside", { class: "legal legal-prominent", role: "note" },
+            h("p", {}, PSILOCYBIN_LEGAL_NOTICE),
+            h("p", {}, "Off-menu profiles stay free. No payments, no affiliate links, and Grow Coach does not cover them.")
+          )
+        : null
+    );
   }
 
   renderUnitToggle() {
-    return `<div class="pb-unit-toggle" role="group" aria-label="Temperature unit">
-      <button type="button" data-unit="C" aria-pressed="${this.unit === "C" ? "true" : "false"}">C</button>
-      <button type="button" data-unit="F" aria-pressed="${this.unit === "F" ? "true" : "false"}">F</button>
-    </div>`;
+    return h("div", { class: "pb-unit-toggle", role: "group", "aria-label": "Temperature unit" },
+      h("button", { type: "button", dataset: { unit: "C" }, "aria-pressed": this.unit === "C" ? "true" : "false" }, "C"),
+      h("button", { type: "button", dataset: { unit: "F" }, "aria-pressed": this.unit === "F" ? "true" : "false" }, "F")
+    );
   }
 
   renderTabs() {
     const unused = STAGE_CATALOG.filter((s) => !this.profile.stages.some((p) => p.id === s.id));
-    return `<div class="pb-tabs" role="tablist" aria-label="Grow phases">
-      ${this.profile.stages
-        .map(
-          (s) =>
-            `<button type="button" role="tab" id="tab-${s.id}" aria-selected="${s.id === this.activeStage ? "true" : "false"}" aria-controls="panel-${s.id}" data-stage="${s.id}">${escapeHtml(s.name)}</button>`
-        )
-        .join("")}
-    </div>
-    <div class="pb-tab-actions">
-      ${
-        unused.length
-          ? `<label>Add phase <select id="pb-add-stage">${unused
-              .map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`)
-              .join("")}</select></label><button type="button" class="secondary" data-act="add-stage">Add</button>`
-          : ""
-      }
-      ${this.profile.stages.length > 1 ? `<button type="button" class="secondary" data-act="remove-stage">Remove this phase</button>` : ""}
-    </div>`;
+    const tabs = h("div", { class: "pb-tabs", role: "tablist", "aria-label": "Grow phases" });
+    for (const s of this.profile.stages) {
+      if (!isStageId(s.id)) continue;
+      tabs.append(
+        h("button", {
+          type: "button",
+          role: "tab",
+          id: `tab-${s.id}`,
+          "aria-selected": s.id === this.activeStage ? "true" : "false",
+          "aria-controls": `panel-${s.id}`,
+          dataset: { stage: s.id },
+        }, s.name)
+      );
+    }
+    const actions = h("div", { class: "pb-tab-actions" });
+    if (unused.length) {
+      const select = h("select", { id: "pb-add-stage" });
+      for (const s of unused) select.append(h("option", { value: s.id }, s.name));
+      actions.append(h("label", {}, "Add phase ", select), h("button", { type: "button", class: "secondary", dataset: { act: "add-stage" } }, "Add"));
+    }
+    if (this.profile.stages.length > 1) {
+      actions.append(h("button", { type: "button", class: "secondary", dataset: { act: "remove-stage" } }, "Remove this phase"));
+    }
+    return h("div", {}, tabs, actions);
   }
 
   renderStage(stage, issues) {
+    if (!isStageId(stage.id)) return h("p", { class: "notice" }, "This phase id is not allowed.");
     const temp = this.unit === "F" ? Math.round(cToF(stage.temperature_c) * 10) / 10 : stage.temperature_c;
     const tempRange = this.unit === "F" ? { min: Math.round(cToF(10)), max: Math.round(cToF(35)), unit: "F" } : { ...RANGES.temperature_c, unit: "C" };
-    return `<div id="panel-${stage.id}" role="tabpanel" aria-labelledby="tab-${stage.id}">
-      ${this.slider("duration_days", "Duration", stage.duration_days, { min: 1, max: 45, step: 1, unit: "days" }, `stages.${stage.id}.duration_days`, issues)}
-      ${this.slider("humidity_percent", "Humidity", stage.humidity_percent, { ...RANGES.humidity_percent, step: 1 }, `stages.${stage.id}.humidity_percent`, issues)}
-      ${this.slider("temperature", `Temperature (${tempRange.unit})`, temp, { ...tempRange, step: 0.5 }, `stages.${stage.id}.temperature_c`, issues)}
-      ${this.slider("fan_speed", "Fresh air", stage.fan?.speed_percent ?? 30, { ...RANGES.fan_speed_percent, step: 1 }, `stages.${stage.id}.fan.speed_percent`, issues)}
-      <div class="pb-row pb-row-2">
-        ${this.slider("fan_period", "Fan period", stage.fan?.period_min ?? 15, { ...RANGES.fan_period_min, step: 1 }, `stages.${stage.id}.fan.period_min`, issues)}
-        ${this.slider("fan_run", "Fan run time", stage.fan?.run_duration_s ?? 30, { ...RANGES.fan_run_duration_s, step: 1 }, `stages.${stage.id}.fan.run_duration_s`, issues)}
-      </div>
-      ${this.areaField(`stage-notes`, "Phase notes", stage.notes || "", issues, `stages.${stage.id}.notes`)}
-    </div>`;
+    return h("div", { id: `panel-${stage.id}`, role: "tabpanel", "aria-labelledby": `tab-${stage.id}` },
+      this.slider("duration_days", "Duration", stage.duration_days, { min: 1, max: 45, step: 1, unit: "days" }, `stages.${stage.id}.duration_days`, issues),
+      this.slider("humidity_percent", "Humidity", stage.humidity_percent, { ...RANGES.humidity_percent, step: 1 }, `stages.${stage.id}.humidity_percent`, issues),
+      this.slider("temperature", `Temperature (${tempRange.unit})`, temp, { ...tempRange, step: 0.5 }, `stages.${stage.id}.temperature_c`, issues),
+      this.slider("fan_speed", "Fresh air", stage.fan?.speed_percent ?? 30, { ...RANGES.fan_speed_percent, step: 1 }, `stages.${stage.id}.fan.speed_percent`, issues),
+      h("div", { class: "pb-row pb-row-2" },
+        this.slider("fan_period", "Fan period", stage.fan?.period_min ?? 15, { ...RANGES.fan_period_min, step: 1 }, `stages.${stage.id}.fan.period_min`, issues),
+        this.slider("fan_run", "Fan run time", stage.fan?.run_duration_s ?? 30, { ...RANGES.fan_run_duration_s, step: 1 }, `stages.${stage.id}.fan.run_duration_s`, issues)
+      ),
+      this.areaField("stage-notes", "Phase notes", stage.notes || "", issues, `stages.${stage.id}.notes`)
+    );
   }
 
   renderLight(issues) {
     const recipe = this.profile.light_recipe;
-    const name = this.activeStage;
+    const name = isStageId(this.activeStage) ? this.activeStage : "colonization";
     const phase = recipe.phases[name] || (["pinning", "fruiting", "flush"].includes(name) ? recipe.phases.fruiting : recipe.phases.colonization);
     if (!recipe.phases[name]) recipe.phases[name] = structuredClone(phase || defaultLightPhase(name));
     const current = recipe.phases[name];
     const rgb = `rgb(${Math.round((current.red_percent / 100) * 255)}, ${Math.round((current.green_percent / 100) * 255)}, ${Math.round((current.blue_percent / 100) * 255)})`;
-    const left = 0;
     const width = (Number(current.photoperiod_hours) / 24) * 100;
-    return `
-      ${this.textField("light_recipe.why", "Why this mix", recipe.why || "", issues)}
-      <p class="muted">${escapeHtml(recipe.wavelength_note || WAVELENGTH_NOTE)}</p>
-      ${this.slider("photoperiod", "Hours on", current.photoperiod_hours, { ...RANGES.photoperiod_hours, step: 0.5 }, `light_recipe.phases.${name}.photoperiod_hours`, issues)}
-      <div class="pb-clock" aria-hidden="true"><span style="left:${left}%;width:${width}%"></span></div>
-      ${this.slider("white", "White brightness", current.white_brightness_percent, { ...RANGES.white_brightness_percent, step: 1 }, `light_recipe.phases.${name}.white_brightness_percent`, issues)}
-      <div class="pb-row pb-row-3">
-        ${this.slider("red", "Red", current.red_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.red_percent`, issues)}
-        ${this.slider("green", "Green", current.green_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.green_percent`, issues)}
-        ${this.slider("blue", "Blue", current.blue_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.blue_percent`, issues)}
-      </div>
-      <div class="pb-field">
-        <span>Live color swatch</span>
-        <div class="pb-swatch" style="background:${rgb}" aria-label="Approximate strip color"></div>
-      </div>
-      ${this.renderLightSources(issues)}
-    `;
+    return h("div", {},
+      this.textField("light_recipe.why", "Why this mix", recipe.why || "", issues),
+      h("p", { class: "muted" }, recipe.wavelength_note || WAVELENGTH_NOTE),
+      this.slider("photoperiod", "Hours on", current.photoperiod_hours, { ...RANGES.photoperiod_hours, step: 0.5 }, `light_recipe.phases.${name}.photoperiod_hours`, issues),
+      h("div", { class: "pb-clock", "aria-hidden": "true" }, h("span", { style: { left: "0%", width: `${width}%` } })),
+      this.slider("white", "White brightness", current.white_brightness_percent, { ...RANGES.white_brightness_percent, step: 1 }, `light_recipe.phases.${name}.white_brightness_percent`, issues),
+      h("div", { class: "pb-row pb-row-3" },
+        this.slider("red", "Red", current.red_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.red_percent`, issues),
+        this.slider("green", "Green", current.green_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.green_percent`, issues),
+        this.slider("blue", "Blue", current.blue_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.blue_percent`, issues)
+      ),
+      h("div", { class: "pb-field" },
+        h("span", {}, "Live color swatch"),
+        h("div", { class: "pb-swatch", style: { background: rgb }, "aria-label": "Approximate strip color" })
+      ),
+      this.renderLightSources(issues)
+    );
   }
 
   renderLightSources(issues) {
     const sources = this.profile.light_recipe.sources || [];
-    return `<fieldset>
-      <legend>Light sources</legend>
-      ${sources
-        .map(
-          (note, i) => `<div class="pb-row pb-row-2">
-            ${this.textField(`light_recipe.sources.${i}.title`, "Title", note.title || "", issues)}
-            ${this.textField(`light_recipe.sources.${i}.detail`, "Detail", note.detail || "", issues)}
-          </div>`
-        )
-        .join("")}
-      <button type="button" class="secondary" data-act="add-light-source">Add source</button>
-    </fieldset>`;
+    const box = h("fieldset", {}, h("legend", {}, "Light sources"));
+    sources.forEach((note, i) => {
+      box.append(
+        h("div", { class: "pb-row pb-row-2" },
+          this.textField(`light_recipe.sources.${i}.title`, "Title", note.title || "", issues),
+          this.textField(`light_recipe.sources.${i}.detail`, "Detail", note.detail || "", issues)
+        ),
+        this.textField(`light_recipe.sources.${i}.url`, "Source link", note.url || "", issues, { hint: "https only" })
+      );
+    });
+    box.append(h("button", { type: "button", class: "secondary", dataset: { act: "add-light-source" } }, "Add source"));
+    return box;
   }
 
   renderSources(issues) {
     const notes = this.profile.source_notes || [];
-    return `<fieldset>
-      <legend>Sources</legend>
-      ${notes
-        .map(
-          (note, i) => `<div class="pb-row pb-row-2">
-            ${this.textField(`source_notes.${i}.title`, "Title", note.title || "", issues)}
-            ${this.textField(`source_notes.${i}.detail`, "Detail", note.detail || "", issues)}
-          </div>`
+    const box = h("fieldset", {}, h("legend", {}, "Sources"));
+    notes.forEach((note, i) => {
+      box.append(
+        h("div", { class: "pb-row pb-row-2" },
+          this.textField(`source_notes.${i}.title`, "Title", note.title || "", issues),
+          this.textField(`source_notes.${i}.detail`, "Detail", note.detail || "", issues)
         )
-        .join("")}
-      <button type="button" class="secondary" data-act="add-source">Add source</button>
-    </fieldset>`;
+      );
+    });
+    box.append(h("button", { type: "button", class: "secondary", dataset: { act: "add-source" } }, "Add source"));
+    return box;
   }
 
   renderTimeline() {
     const stages = this.profile.stages || [];
     const total = stages.reduce((sum, s) => sum + Number(s.duration_days || 0), 0) || 1;
-    return `<ol class="pb-timeline" aria-label="Whole grow">
-      ${stages
-        .map((s) => {
-          const days = Number(s.duration_days || 0);
-          return `<li style="flex-grow:${Math.max(1, days)}">
-            <strong>${escapeHtml(s.name)}</strong><br>
-            ${days} d · ${this.locked ? "locked" : `${this.unit === "F" ? Math.round(cToF(s.temperature_c)) + " F" : s.temperature_c + " C"} · ${s.humidity_percent}%`}
-          </li>`;
-        })
-        .join("")}
-    </ol>
-    <p class="muted">${total} days from start to the last phase.</p>`;
+    const list = h("ol", { class: "pb-timeline", "aria-label": "Whole grow" });
+    for (const s of stages) {
+      const days = Number(s.duration_days || 0);
+      const detail = this.locked
+        ? "locked"
+        : `${this.unit === "F" ? Math.round(cToF(s.temperature_c)) + " F" : s.temperature_c + " C"} · ${s.humidity_percent}%`;
+      const item = h("li", { style: { flexGrow: String(Math.max(1, days)) } },
+        h("strong", {}, s.name),
+        document.createTextNode(` ${days} d · ${detail}`)
+      );
+      list.append(item);
+    }
+    return h("div", {}, list, h("p", { class: "muted" }, `${total} days from start to the last phase.`));
   }
 
   renderPublish() {
     const extras = publishReadyIssues(this.publish);
-    return `<section class="pb-panel" id="publish-community">
-      <h2>Share with the community</h2>
-      <p>A private profile is ready for your chambers right away. Publishing needs a photo, a title, and a description, then a moderator looks at it.</p>
-      ${this.textField("publish.title", "Library title", this.publish.title || "", extras)}
-      ${this.areaField("publish.description", "Library description", this.publish.description || "", extras)}
-      <div class="pb-field">
-        <label for="pb-photos">Photos (one to four)</label>
-        <input id="pb-photos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
-        <p class="pb-error" id="${fieldId("publish.photos")}">${escapeHtml(firstIssue(extras, "publish.photos"))}</p>
-        <div class="pb-photos">
-          ${(this.publish.photos || [])
-            .map(
-              (p, i) => `<figure class="pb-photo">
-                <img src="${escapeHtml(p.preview || p.url)}" alt="${escapeHtml(p.name || "Profile photo")}">
-                <button type="button" class="secondary" data-remove-photo="${i}">Remove</button>
-              </figure>`
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>`;
+    const photos = h("div", { class: "pb-photos" });
+    (this.publish.photos || []).forEach((p, i) => {
+      const img = h("img", { alt: p.name || "Profile photo" });
+      if (p.preview || p.url) img.setAttribute("src", p.preview || p.url);
+      photos.append(
+        h("figure", { class: "pb-photo" },
+          img,
+          h("button", { type: "button", class: "secondary", dataset: { removePhoto: String(i) } }, "Remove")
+        )
+      );
+    });
+    return h("section", { class: "pb-panel", id: "publish-community" },
+      h("h2", {}, "Share with the community"),
+      h("p", {}, "A private profile is ready for your chambers right away. Publishing needs a photo, a title, and a description, then a moderator looks at it."),
+      this.textField("publish.title", "Library title", this.publish.title || "", extras),
+      this.areaField("publish.description", "Library description", this.publish.description || "", extras),
+      h("div", { class: "pb-field" },
+        h("label", { for: "pb-photos" }, "Photos (one to four)"),
+        h("input", { id: "pb-photos", type: "file", accept: "image/jpeg,image/png,image/webp", multiple: true }),
+        h("p", { class: "pb-error", id: fieldId("publish.photos") }, firstIssue(extras, "publish.photos")),
+        photos
+      )
+    );
   }
 
   textField(path, label, value, issues, { hint } = {}) {
     const id = fieldId(path);
     const err = firstIssue(issues, path);
-    return `<label class="pb-field" for="${id}">${escapeHtml(label)}
-      <input id="${id}" data-path="${escapeHtml(path)}" value="${escapeHtml(value)}" ${err ? `aria-invalid="true" aria-describedby="${id}-err"` : ""}>
-      ${hint ? `<span class="muted">${escapeHtml(hint)}</span>` : ""}
-      <span class="pb-error" id="${id}-err">${escapeHtml(err)}</span>
-    </label>`;
+    const input = h("input", { id, dataset: { path } });
+    input.value = value ?? "";
+    if (err) {
+      input.setAttribute("aria-invalid", "true");
+      input.setAttribute("aria-describedby", `${id}-err`);
+    }
+    return h("label", { class: "pb-field", for: id },
+      label,
+      input,
+      hint ? h("span", { class: "muted" }, hint) : null,
+      h("span", { class: "pb-error", id: `${id}-err` }, err)
+    );
   }
 
   areaField(path, label, value, issues, issuePath = path) {
     const id = fieldId(path);
     const err = firstIssue(issues, issuePath);
-    return `<label class="pb-field" for="${id}">${escapeHtml(label)}
-      <textarea id="${id}" data-path="${escapeHtml(issuePath)}" rows="3" ${err ? `aria-invalid="true" aria-describedby="${id}-err"` : ""}>${escapeHtml(value)}</textarea>
-      <span class="pb-error" id="${id}-err">${escapeHtml(err)}</span>
-    </label>`;
+    const box = h("textarea", { id, dataset: { path: issuePath }, rows: "3" });
+    box.value = value ?? "";
+    if (err) {
+      box.setAttribute("aria-invalid", "true");
+      box.setAttribute("aria-describedby", `${id}-err`);
+    }
+    return h("label", { class: "pb-field", for: id },
+      label,
+      box,
+      h("span", { class: "pb-error", id: `${id}-err` }, err)
+    );
   }
 
   slider(name, label, value, range, path, issues) {
     const id = fieldId(path);
     const err = firstIssue(issues, path);
-    return `<div class="pb-field">
-      <label for="${id}">${escapeHtml(label)} <span class="pb-unit">${escapeHtml(range.unit || "")}</span></label>
-      <div class="pb-control">
-        <input id="${id}" type="range" min="${range.min}" max="${range.max}" step="${range.step || 1}" value="${value}" data-path="${escapeHtml(path)}" ${err ? `aria-invalid="true" aria-describedby="${id}-err"` : ""}>
-        <input type="number" min="${range.min}" max="${range.max}" step="${range.step || 1}" value="${value}" data-path="${escapeHtml(path)}" aria-label="${escapeHtml(label)} number">
-      </div>
-      <span class="pb-error" id="${id}-err">${escapeHtml(err)}</span>
-    </div>`;
+    const rangeEl = h("input", {
+      id,
+      type: "range",
+      min: String(range.min),
+      max: String(range.max),
+      step: String(range.step || 1),
+      dataset: { path },
+    });
+    rangeEl.value = String(value ?? range.min);
+    const numberEl = h("input", {
+      type: "number",
+      min: String(range.min),
+      max: String(range.max),
+      step: String(range.step || 1),
+      dataset: { path },
+      "aria-label": `${label} number`,
+    });
+    numberEl.value = String(value ?? range.min);
+    if (err) {
+      rangeEl.setAttribute("aria-invalid", "true");
+      rangeEl.setAttribute("aria-describedby", `${id}-err`);
+    }
+    return h("div", { class: "pb-field" },
+      h("label", { for: id }, label, " ", h("span", { class: "pb-unit" }, range.unit || "")),
+      h("div", { class: "pb-control" }, rangeEl, numberEl),
+      h("span", { class: "pb-error", id: `${id}-err` }, err)
+    );
   }
 
   bind() {
@@ -406,13 +459,14 @@ export class ProfileBuilder extends HTMLElement {
     );
     this.querySelectorAll("[data-stage]").forEach((btn) =>
       btn.addEventListener("click", () => {
+        if (!isStageId(btn.dataset.stage)) return;
         this.activeStage = btn.dataset.stage;
         this.render();
       })
     );
     this.querySelector("[data-act=add-stage]")?.addEventListener("click", () => {
       const id = this.querySelector("#pb-add-stage")?.value;
-      if (!id) return;
+      if (!isStageId(id)) return;
       this.profile.stages.push(defaultStage(id));
       this.profile.light_recipe.phases[id] = this.profile.light_recipe.phases[id] || defaultLightPhase(id);
       this.activeStage = id;
@@ -430,7 +484,7 @@ export class ProfileBuilder extends HTMLElement {
       this.render();
     });
     this.querySelector("[data-act=add-light-source]")?.addEventListener("click", () => {
-      this.profile.light_recipe.sources.push({ title: "", detail: "" });
+      this.profile.light_recipe.sources.push({ title: "", detail: "", url: "" });
       this.render();
     });
     this.querySelector("[data-act=import]")?.addEventListener("click", () => {
@@ -477,7 +531,9 @@ export class ProfileBuilder extends HTMLElement {
     }
     if (path.startsWith("light_recipe.sources.")) {
       const parts = path.split(".");
-      this.profile.light_recipe.sources[Number(parts[2])][parts[3]] = raw;
+      const key = parts[3];
+      const value = key === "url" && raw && !isHttpsSourceUrl(raw) ? raw : raw;
+      this.profile.light_recipe.sources[Number(parts[2])][key] = value;
       this.refreshErrors();
       return;
     }
@@ -489,11 +545,13 @@ export class ProfileBuilder extends HTMLElement {
     if (path === "name") {
       this.profile.name = raw;
       if (!this.profile.id || this.profile.id === slugify(this.profile.name.slice(0, -1))) this.profile.id = slugify(raw);
+      this.profile = applyPackRules(this.profile);
       this.refreshErrors();
       return;
     }
     if (path === "species" || path === "strain" || path === "id" || path === "notes") {
       this.profile[path] = raw;
+      this.profile = applyPackRules(this.profile);
       this.refreshErrors();
       return;
     }
@@ -509,6 +567,7 @@ export class ProfileBuilder extends HTMLElement {
     else if (path.includes("light_recipe.phases.")) {
       const key = path.split(".").pop();
       const id = path.split(".")[2];
+      if (!isStageId(id)) return;
       this.profile.light_recipe.phases[id][key] = Number(raw);
       this.profile = syncStageLightFromRecipe(this.profile);
     }
@@ -517,12 +576,13 @@ export class ProfileBuilder extends HTMLElement {
   }
 
   syncPair(path, raw) {
-    const inputs = this.querySelectorAll(`[data-path="${path}"]`);
+    const inputs = this.querySelectorAll("[data-path]");
     for (const el of inputs) {
-      if (el.value !== String(raw)) el.value = raw;
+      if (el.dataset.path === path && el.value !== String(raw)) el.value = raw;
     }
     if (path.includes("light_recipe.phases.")) {
       const id = path.split(".")[2];
+      if (!isStageId(id)) return;
       const phase = this.profile.light_recipe.phases[id];
       const swatch = this.querySelector(".pb-swatch");
       if (swatch && phase) {
@@ -578,3 +638,5 @@ export class ProfileBuilder extends HTMLElement {
 if (!customElements.get("profile-builder")) {
   customElements.define("profile-builder", ProfileBuilder);
 }
+
+export { h, fieldId };

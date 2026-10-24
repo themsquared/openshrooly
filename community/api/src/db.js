@@ -561,7 +561,7 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("UPDATE profiles SET published=")) {
     const row = tables.profiles.find((p) => p.id === params[1]);
     if (row) {
-      row.published = Number(String(q).includes("published=1") ? 1 : params[0]);
+      row.published = String(q).includes("published=1") ? 1 : 0;
       row.updated_at = params[0];
     }
     return {};

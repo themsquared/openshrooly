@@ -8,7 +8,10 @@ import {
   canCloneFull,
   cloneProfile,
   collectProfileIssues,
+  detectsRestrictedTaxon,
   exportProfileDocument,
+  isHttpsSourceUrl,
+  isStageId,
   parseProfileDocument,
   publishReadyIssues,
   redactLockedProfile,
@@ -33,7 +36,50 @@ function seeds() {
 test("web and api ship the same profile schema module", () => {
   const api = readFileSync(new URL("../../api/src/profile-schema.js", import.meta.url), "utf8");
   const web = readFileSync(new URL("../public/js/profile-schema.js", import.meta.url), "utf8");
+  const hub = readFileSync(new URL("../../../hub/static/builder/profile-schema.js", import.meta.url), "utf8");
   assert.equal(web, api);
+  assert.equal(hub, api);
+});
+
+test("builder copies match and stage ids are written with setAttribute", async () => {
+  const web = readFileSync(new URL("../public/js/profile-builder.js", import.meta.url), "utf8");
+  const hub = readFileSync(new URL("../../../hub/static/builder/profile-builder.js", import.meta.url), "utf8");
+  assert.equal(hub, web);
+  globalThis.HTMLElement = class {};
+  globalThis.customElements = { get() { return undefined; }, define() {} };
+  globalThis.localStorage = { getItem() { return null; }, setItem() {} };
+  class FakeNode {
+    constructor(tag) {
+      this.tagName = String(tag).toUpperCase();
+      this.attrs = {};
+      this.children = [];
+      this.className = "";
+      this.dataset = {};
+      this.style = {};
+    }
+    setAttribute(key, value) {
+      this.attrs[key] = String(value);
+    }
+    append(...nodes) {
+      this.children.push(...nodes);
+    }
+    addEventListener() {}
+  }
+  globalThis.document = {
+    createElement(tag) {
+      return new FakeNode(tag);
+    },
+    createTextNode(text) {
+      return { textContent: String(text) };
+    },
+  };
+  const { h } = await import("../public/js/profile-builder.js");
+  const evil = `fruiting"><img src=x onerror=alert(1)>`;
+  const node = h("button", { id: `tab-${evil}`, "aria-controls": `panel-${evil}` }, evil);
+  assert.equal(node.attrs.id, `tab-${evil}`);
+  assert.equal(node.attrs["aria-controls"], `panel-${evil}`);
+  assert.equal(node.children[0].textContent, evil);
+  assert.equal(Object.keys(node.attrs).join(","), "id,aria-controls");
 });
 
 test("every built-in profile round-trips through the builder schema", () => {
@@ -90,6 +136,43 @@ test("temperature unit helpers round trip", () => {
   assert.equal(Math.round(cToF(20)), 68);
   assert.equal(Math.round(fToC(68)), 20);
   assert.equal(slugify("Pearl Oyster"), "pearl-oyster");
+});
+
+test("stage ids must be known grow phases and source urls must be https", () => {
+  assert.equal(isStageId("colonization"), true);
+  assert.equal(isStageId(`fruiting"><img src=x onerror=alert(1)>`), false);
+  const bad = blankProfile({ id: "xss-oyster", name: "Xss oyster", pack: "culinary" });
+  bad.species = "Pleurotus ostreatus";
+  bad.stages[0].id = `fruiting"><img src=x>`;
+  assert.ok(collectProfileIssues(bad).some((i) => i.path.includes("id")));
+  assert.equal(isHttpsSourceUrl("https://doi.org/10.1111/j.1751-1097.1987.tb07888.x"), true);
+  assert.equal(isHttpsSourceUrl("http://example.com/paper"), false);
+  assert.equal(isHttpsSourceUrl("javascript:alert(1)"), false);
+});
+
+test("scientific and common names force Off-menu even when labeled culinary", () => {
+  const labeled = blankProfile({ id: "sneaky-teacher", name: "Garden mix", pack: "culinary" });
+  labeled.species = "Psilocybe\u00a0cubensis";
+  labeled.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  labeled.allowed_payment_providers = ["stripe"];
+  labeled.affiliates_allowed = true;
+  assert.equal(detectsRestrictedTaxon(labeled), true);
+  const forced = validateProfile(labeled);
+  assert.equal(forced.pack, "psilocybin");
+  assert.equal(forced.restricted, true);
+  assert.equal(forced.affiliates_allowed, false);
+  assert.equal(forced.pricing.kind, "free");
+  const common = blankProfile({ id: "gt-common", name: "Golden Teacher", pack: "culinary" });
+  common.species = "Unknown garden mushroom";
+  assert.equal(detectsRestrictedTaxon(common), true);
+  const oyster = blankProfile({ id: "still-oyster", name: "Pearl Oyster", pack: "culinary" });
+  oyster.species = "Pleurotus ostreatus";
+  assert.equal(detectsRestrictedTaxon(oyster), false);
+  for (const species of ["Panaeolus cyanescens", "Gymnopilus junonius", "Pluteus salicinus"]) {
+    const labeled = blankProfile({ id: "taxon-check", name: "Garden mix", pack: "culinary" });
+    labeled.species = species;
+    assert.equal(detectsRestrictedTaxon(labeled), true, species);
+  }
 });
 
 test("list summaries with a stage count do not crash validation or clone", () => {

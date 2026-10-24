@@ -38,17 +38,17 @@ export function sniffImage(bytes) {
 
 function looksLikeMarkup(bytes) {
   const head = new TextDecoder("latin1").decode(bytes.slice(0, 64)).trimStart().toLowerCase();
-  return head.startsWith("<") || head.startsWith("<?xml") || head.includes("<svg") || head.includes("<html") || head.includes("<!doctype");
+  return head.startsWith("<") || head.startsWith("<?xml");
 }
 
 export function assertSafeImage(bytes) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   if (b.byteLength < 16) throw new ValidationError("That photo is too small to be a real image.");
   if (b.byteLength > PHOTO_MAX_BYTES) throw new ValidationError("Photos must be 5 MB or smaller.");
-  if (looksLikeMarkup(b)) throw new ValidationError("Only JPEG, PNG, or WebP photos are allowed.");
   const kind = sniffImage(b);
-  if (!kind) throw new ValidationError("Only JPEG, PNG, or WebP photos are allowed.");
-  return kind;
+  if (kind) return kind;
+  if (looksLikeMarkup(b)) throw new ValidationError("Only JPEG, PNG, or WebP photos are allowed.");
+  throw new ValidationError("Only JPEG, PNG, or WebP photos are allowed.");
 }
 
 function readU16(bytes, offset, le = false) {
@@ -86,7 +86,23 @@ export function stripJpeg(bytes) {
       break;
     }
     if (marker === 0xda) {
-      out.push(bytes.slice(i));
+      const headerLen = 2 + readU16(bytes, i + 2);
+      if (headerLen < 8 || i + headerLen >= bytes.length) throw new ValidationError("That JPEG is damaged.");
+      let j = i + headerLen;
+      let found = false;
+      while (j < bytes.length - 1) {
+        if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
+          out.push(bytes.slice(i, j + 2));
+          found = true;
+          break;
+        }
+        if (bytes[j] === 0xff && bytes[j + 1] === 0x00) {
+          j += 2;
+          continue;
+        }
+        j += 1;
+      }
+      if (!found) throw new ValidationError("That JPEG is damaged.");
       break;
     }
     if (marker === 0xd0 || marker === 0xd1 || marker === 0xd2 || marker === 0xd3 || marker === 0xd4 || marker === 0xd5 || marker === 0xd6 || marker === 0xd7 || marker === 0x01) {
@@ -153,15 +169,16 @@ export function stripWebp(bytes) {
     const start = i;
     const dataEnd = i + 8 + len;
     const end = dataEnd + (len % 2);
-    if (type === "EXIF" || type === "XMP " || type === "XML ") {
+    const keep = new Set(["VP8 ", "VP8L", "VP8X", "ALPH"]);
+    if (!keep.has(type)) {
       i = end;
       continue;
     }
     if (type === "VP8X") {
       width = 1 + (bytes[i + 12] | (bytes[i + 13] << 8) | (bytes[i + 14] << 16));
       height = 1 + (bytes[i + 15] | (bytes[i + 16] << 8) | (bytes[i + 17] << 16));
-      const flags = bytes[i + 8] & ~0x08;
-      const copy = bytes.slice(start, end);
+      const flags = bytes[i + 8] & ~0x08 & ~0x10;
+      const copy = bytes.slice(start, Math.min(end, bytes.length));
       copy[8] = flags;
       chunks.push(copy);
     } else {
