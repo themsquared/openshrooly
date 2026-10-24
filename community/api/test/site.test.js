@@ -61,6 +61,12 @@ test("claim page explains pairing and hides the code form until a code or flag",
   assert.match(html, /id="claim-form"[^>]*class="[^"]*\bhidden\b/);
   assert.doesNotMatch(main, /Cloud is opt-in/);
   assert.doesNotMatch(html, />Claim device</);
+  const home = read("index.html");
+  assert.match(home, /href="\/claim.html">How linking works</);
+  assert.doesNotMatch(home, /Claim a chamber|Claim device/);
+  const app = readFileSync(join(PUBLIC, "js/app.js"), "utf8");
+  assert.match(app, /Email verified\. You can publish and buy\./);
+  assert.doesNotMatch(app, /claim devices/);
 });
 
 test("every page has the same header, nav, and footer", () => {
