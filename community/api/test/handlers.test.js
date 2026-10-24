@@ -114,6 +114,37 @@ test("refresh rotation and logout-everywhere", async () => {
   assert.equal(me.status, 200);
 });
 
+test("firmware verify refuses unsigned OTA and accepts a signed checksum", async () => {
+  const pair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
+  const spki = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
+  const toPem = (type, bytes) =>
+    `-----BEGIN ${type}-----\n${btoa(String.fromCharCode(...bytes))}\n-----END ${type}-----\n`;
+  const { checksumLines, signChecksums } = await import("../src/firmware-sign.js");
+  const sums = await checksumLines([{ name: "openshrooly.ota.bin", bytes: Buffer.from("ota") }]);
+  const sig = await signChecksums(sums, toPem("PRIVATE KEY", pkcs8));
+  const closed = env();
+  const refused = await call(closed, "POST", "/api/firmware/verify", {
+    body: { checksums: sums, signature: sig, filename: "openshrooly.ota.bin" },
+  });
+  assert.equal(refused.status, 400);
+  assert.equal(refused.data.error, "unsigned firmware rejected");
+  const latest = await call(closed, "GET", "/api/firmware/latest");
+  assert.equal(latest.status, 200);
+  assert.match(latest.data.manifest_url, /grahamsz\/openshrooly/);
+  const ctx = env();
+  ctx.FIRMWARE_SIGNING_PUB = toPem("PUBLIC KEY", spki);
+  const ok = await call(ctx, "POST", "/api/firmware/verify", {
+    body: { checksums: sums, signature: sig, filename: "openshrooly.ota.bin" },
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(ok.data.ok, true);
+  const badName = await call(ctx, "POST", "/api/firmware/verify", {
+    body: { checksums: sums, signature: sig, filename: "other.ota.bin" },
+  });
+  assert.equal(badName.status, 400);
+});
+
 test("unverified email cannot publish (blocked when email_verified=0)", async () => {
   const ctx = env();
   const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "new@example.com", turnstile: "ok" } });

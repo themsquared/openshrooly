@@ -20,6 +20,11 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 https://cdn.shroomlabs.io https://challenges.cloudflare.com; img-src 'self' data: https://cdn.shroomlabs.io; style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; font-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.shroomlabs.io http://127.0.0.1:8787"
 
+[[headers]]
+  for = "/install.html"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 https://cdn.shroomlabs.io https://github.com https://objects.githubusercontent.com https://release-assets.githubusercontent.com https://api.github.com https://unpkg.com; img-src 'self' data: https://cdn.shroomlabs.io; style-src 'self' 'unsafe-inline'; script-src 'self' https://unpkg.com; worker-src 'self' blob: https://unpkg.com; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
 [[redirects]]
   from = "/profiles/:id"
   to = "/profile.html?id=:id"

@@ -94,6 +94,11 @@ api:
 ota:
   platform: esphome
 
+# Listed deviations from grahamsz/openshrooly: recovery after a bad OTA,
+# and USB serial Wi-Fi provisioning for the browser installer.
+safe_mode:
+
+improv_serial:
 
 external_components:
   - source:

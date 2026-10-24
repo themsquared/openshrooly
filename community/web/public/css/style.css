@@ -454,6 +454,8 @@ button.nav-toggle {
   margin: 1.5rem auto;
   padding: 1.4rem;
 }
+.install-panel { max-width: 36rem; }
+.install-panel esp-web-install-button { display: block; margin: 1rem 0; }
 #code {
   font-size: 1.6rem;
   letter-spacing: 0.28em;

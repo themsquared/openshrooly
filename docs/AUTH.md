@@ -98,6 +98,8 @@ cd community/api && npm run db:seed:remote
 
 Device mTLS secrets (optional until chambers are linked): `CF_API_TOKEN`, `CF_ZONE_ID`. See [`docs/DEVICES.md`](DEVICES.md).
 
+Signed OTA (optional): `FIRMWARE_SIGNING_PUB` on the Worker, `FIRMWARE_SIGNING_KEY` in GitHub Actions. See [`docs/INSTALL.md`](INSTALL.md). USB factory flash does not need them.
+
 `ALTER TABLE` lines fail safely if a column already exists — run the `CREATE TABLE` section if needed.
 
 ## Expo / mobile

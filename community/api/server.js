@@ -38,6 +38,10 @@ const env = {
   DEVICE_CA_CERT: process.env.DEVICE_CA_CERT,
   GROW_COACH_STUB: process.env.GROW_COACH_STUB || "1",
   GROW_COACH_PROVIDER: process.env.GROW_COACH_PROVIDER || "stub",
+  FIRMWARE_SIGNING_PUB: process.env.FIRMWARE_SIGNING_PUB,
+  FIRMWARE_MANIFEST_URL: process.env.FIRMWARE_MANIFEST_URL,
+  FIRMWARE_CHECKSUMS_URL: process.env.FIRMWARE_CHECKSUMS_URL,
+  FIRMWARE_SIGNATURE_URL: process.env.FIRMWARE_SIGNATURE_URL,
 };
 
 const server = createServer(async (req, res) => {

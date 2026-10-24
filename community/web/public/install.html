@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install OpenShrooly · Shroom Labs</title>
+  <meta name="description" content="Flash OpenShrooly over USB from Chrome or Edge. Same ESP Web Tools installer as openshrooly.com.">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="install">
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
+    <nav>
+      <a href="/">Catalog</a>
+      <a href="/install.html" aria-current="page">Install</a>
+      <span id="session-nav"></span>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="card auth-panel install-panel">
+      <p class="eyebrow">USB installer</p>
+      <h1>Flash the chamber from the browser</h1>
+      <p class="muted">This is the same ESP Web Tools flow as <a href="https://openshrooly.com">openshrooly.com</a>. Use Chrome or Edge on a computer. Hold BOOT if the port does not appear.</p>
+      <p id="status" class="muted">Loading the signed release manifest…</p>
+      <p id="error" class="notice hidden" role="alert"></p>
+      <esp-web-install-button id="install-button" class="hidden"></esp-web-install-button>
+      <ol class="muted">
+        <li>Plug the chamber in over USB-C.</li>
+        <li>Click Install and pick the USB serial port.</li>
+        <li>After reboot, join <strong>OpenShrooly</strong> and open <code>http://192.168.4.1/app/</code>.</li>
+      </ol>
+      <p class="muted">OTA files on this page are checksummed and Ed25519-signed when the release includes <code>SHA256SUMS</code> + <code>SHA256SUMS.sig</code>. <code>POST /api/firmware/verify</code> refuses an unsigned <code>.ota.bin</code> when the Worker has <code>FIRMWARE_SIGNING_PUB</code>.</p>
+    </section>
+  </main>
+  <footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly.</footer>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/install.js"></script>
+</body>
+</html>

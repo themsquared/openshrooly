@@ -15,6 +15,7 @@ import { handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
+import { latestFirmwareMeta, refuseUnsignedOta, validateManifest } from "./firmware-sign.js";
 import { originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
@@ -165,6 +166,25 @@ async function route(method, path, url, request, env) {
 
   if (method === "GET" && path === "/api/capabilities") {
     return json(capabilities(env, request));
+  }
+
+  if (method === "GET" && path === "/api/firmware/latest") {
+    return json(latestFirmwareMeta(env));
+  }
+
+  if (method === "POST" && path === "/api/firmware/verify") {
+    const body = await readJson(request);
+    if (body.manifest) {
+      const manifest = validateManifest(body.manifest);
+      if (!manifest.ok) return json(manifest, 400);
+    }
+    const result = await refuseUnsignedOta({
+      checksums: body.checksums,
+      signature: body.signature,
+      publicPem: env.FIRMWARE_SIGNING_PUB,
+      filename: body.filename,
+    });
+    return json(result, result.ok ? 200 : 400);
   }
 
   if (method === "GET" && path === "/api/me") {

@@ -278,6 +278,7 @@ Threat model, ESP32-S3 heap/flash (~22–42 KB heap TLS, ~155 KB flash if mbedTL
 - [x] Hub restyle (same identity)
 - [x] On-device lightweight dashboard (gauges, light timeline, profile strip; no webfonts/CDN)
 - [x] On-device first-run / empty-grow / unreachable surfaces (Ship 5b; `docs/device-web.md`)
+- [x] USB installer + signed OTA checksums (Ship 5c; `docs/INSTALL.md`)
 - [x] Passwordless auth (magic link, Google/Apple OIDC+PKCE, passkeys, session cookies, refresh rotation)
 - [x] SECURITY.md + docs/UX.md + docs/AUTH.md
 - [ ] Expo iOS scaffold (`mobile/`) — planned screens, no App Store

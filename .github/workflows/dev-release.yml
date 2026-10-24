@@ -139,6 +139,23 @@ jobs:
           release-summary: "Dev build from ${{ github.ref }} @ ${{ github.sha }}"
           version: "${{ env.VERSION }}"
 
+      - name: Checksum firmware and sign when FIRMWARE_SIGNING_KEY is set
+        env:
+          FIRMWARE_SIGNING_KEY: ${{ secrets.FIRMWARE_SIGNING_KEY }}
+        run: |
+          BUILD_DIR="${{ steps.build.outputs.name }}"
+          (
+            cd "${BUILD_DIR}"
+            sha256sum *.factory.bin *.ota.bin | sort > SHA256SUMS
+          )
+          echo "RELEASE_SIG=" >> "$GITHUB_ENV"
+          if [[ -n "${FIRMWARE_SIGNING_KEY}" ]]; then
+            node community/api/scripts/sign-firmware.js "${BUILD_DIR}/SHA256SUMS"
+            echo "RELEASE_SIG=${BUILD_DIR}/SHA256SUMS.sig" >> "$GITHUB_ENV"
+          else
+            echo "FIRMWARE_SIGNING_KEY unset; publishing unsigned SHA256SUMS"
+          fi
+
       # ----- Dev "latest" moving tag -----
       - name: Tag dev-latest
         if: env.SHOULD_PUBLISH_DEV == 'true'
@@ -171,6 +188,8 @@ jobs:
             ${{ steps.build.outputs.name }}/${{ steps.build.outputs.name }}.factory.bin
             ${{ steps.build.outputs.name }}/${{ steps.build.outputs.name }}.ota.bin
             ${{ steps.build.outputs.name }}/manifest.json
+            ${{ steps.build.outputs.name }}/SHA256SUMS
+            ${{ env.RELEASE_SIG }}
 
        # Dated dev prerelease
       - name: Publish dated dev prerelease
@@ -186,6 +205,8 @@ jobs:
             ${{ steps.build.outputs.name }}/${{ steps.build.outputs.name }}.factory.bin
             ${{ steps.build.outputs.name }}/${{ steps.build.outputs.name }}.ota.bin
             ${{ steps.build.outputs.name }}/manifest.json
+            ${{ steps.build.outputs.name }}/SHA256SUMS
+            ${{ env.RELEASE_SIG }}
       
       # Proper release for pushed tags (e.g., 0.1.0)
       - name: Publish release for version tag
@@ -202,6 +223,8 @@ jobs:
             ${{ steps.build.outputs.name }}/${{ steps.build.outputs.name }}.factory.bin
             ${{ steps.build.outputs.name }}/${{ steps.build.outputs.name }}.ota.bin
             ${{ steps.build.outputs.name }}/manifest.json
+            ${{ steps.build.outputs.name }}/SHA256SUMS
+            ${{ env.RELEASE_SIG }}
 
 
       # ----- Actions artifacts (handy for CI consumption) -----
