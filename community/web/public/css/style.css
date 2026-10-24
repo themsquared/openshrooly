@@ -366,7 +366,34 @@ h1, .display {
     padding-block: 0;
   }
 }
+.filter-chip.off-menu.is-on,
+.pack-toggle a.off-menu.is-on,
+.pack-toggle button.off-menu.is-on,
+.pack-toggle button.off-menu[aria-pressed="true"] {
+  background: linear-gradient(180deg, #8a6a3a, #4a3820);
+  color: #fff6e8;
+  box-shadow: 0 0 16px rgba(201, 164, 92, 0.18);
+}
 .pack-hint { margin: 0; color: var(--sl-muted); font-size: 13px; max-width: 36rem; }
+.resources {
+  margin: 1.6rem 0;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--sl-line);
+  border-radius: 16px;
+  background: rgba(7, 17, 14, 0.4);
+}
+.resources h2 { font-family: var(--display); font-size: 1.45rem; margin: 0 0 0.6rem; }
+.resources ul { padding-left: 1.2rem; margin: 0.6rem 0 0; }
+.resources a { color: var(--sl-mycelium); }
+.egg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--sl-muted);
+  font-size: 12px;
+}
+.egg-mark { opacity: 0.7; }
 .empty-library {
   grid-column: 1 / -1;
   text-align: center;

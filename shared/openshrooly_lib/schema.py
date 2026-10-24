@@ -17,9 +17,10 @@ KNOWN_STAGE_IDS = {
     "browning",
 }
 PSILOCYBIN_LEGAL_NOTICE = (
-    "Legality of cultivating Psilocybe species varies by jurisdiction. "
-    "This pack is informational environmental setpoints for a fruiting chamber "
-    "and is disabled by default. You are responsible for following local law."
+    "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries "
+    "and under US federal law. This information is published for "
+    "educational, research and harm-reduction purposes only. Check the laws where "
+    "you live. Shroom Labs does not sell spores, cultures or psilocybin products."
 )
 
 # Card networks and mainstream affiliate programs prohibit these items.

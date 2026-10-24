@@ -12,9 +12,9 @@
     "oyster"
   ],
   "restricted": false,
-  "summary": "Thick-stem oyster. Cooler, slightly drier, and less FAE than cluster oysters.",
+  "summary": "Thick-stem oyster. Cooler, slightly drier, and less fresh air than cluster oysters.",
   "notes": "",
-  "chamber_notes": "High humidity + high FAE makes skinny kings. Keep RH a bit lower once pins set.",
+  "chamber_notes": "High humidity plus lots of fresh air makes skinny kings. Keep humidity a bit lower once pins set.",
   "legal_notice": null,
   "source_notes": [
     {
@@ -23,7 +23,7 @@
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). King oyster cards commonly list 80 to 85% RH to thicken stems."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). King oyster cards commonly list 80 to 85% humidity to thicken stems."
     }
   ],
   "stages": [

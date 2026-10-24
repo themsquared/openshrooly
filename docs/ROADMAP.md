@@ -279,6 +279,7 @@ Threat model, ESP32-S3 heap/flash (~22–42 KB heap TLS, ~155 KB flash if mbedTL
 - [x] On-device lightweight dashboard (gauges, light timeline, profile strip; no webfonts/CDN)
 - [x] On-device first-run / empty-grow / unreachable surfaces (Ship 5b; `docs/device-web.md`)
 - [x] Shared Community chrome, FAQ/docs, and indexed profile pages (Ship 6; `docs/BRAND.md`)
+- [x] Off-menu pack label, legal notice above parameters, microscopy resources, no em/en dashes (Ship 7)
 - [x] USB installer (signed releases only) + signed one-click OTA on the device (Ship 5c; `docs/INSTALL.md`)
 - [x] Passwordless auth (magic link, Google/Apple OIDC+PKCE, passkeys, session cookies, refresh rotation)
 - [x] SECURITY.md + docs/UX.md + docs/AUTH.md
@@ -333,6 +334,21 @@ Until that ship, the chamber stays as upstream: open AP, unencrypted API, open O
 ### Phase 5 — Expo iOS app (scaffold only)
 
 See `mobile/ROADMAP.md`. Talks to `api.shroomlabs.io` and the local hub. Same tokens. Push notifications planned. No App Store submission in this pass.
+
+### Phase 6 — alerts, email first (after device mTLS + 5b/5c)
+
+**Plan only. Do not implement until Ships 5b (device web UI) and 5c (USB / signed OTA) have landed.** Full spec: [`docs/ALERTS.md`](ALERTS.md).
+
+Depends on opted-in `POST /api/devices/:id/telemetry` and `last_seen_at` from Phase 0c / PR `#9`. Push is a later **channel** on the same pipeline, shipped with the Expo app, not a rewrite.
+
+- [ ] Channel interface (`email` now; `expo` and `web_push` stubs)
+- [ ] Events from upstream OpenShrooly fields: temp / humidity out of band (hold + hysteresis), water low, device offline, phase change, harvest window, firmware available
+- [ ] Per-user and per-device prefs, quiet hours in the account timezone, instant vs daily digest, minimal defaults
+- [ ] Dedupe, backoff, per-device rate limit, one resolved follow-up
+- [ ] Resend via existing `RESEND_API_KEY`, List-Unsubscribe, verified email only
+- [ ] Hub SMTP path so local alerts work with no cloud
+- [ ] Cron every 5 min + D1 (Queues are free as of 2026-02-04 but not required; free cron is 10 ms CPU)
+- [ ] Tests for dedupe, quiet hours, resolved; prod curl checklist in `docs/ALERTS.md`
 
 ## What works / what's stubbed (this PR)
 

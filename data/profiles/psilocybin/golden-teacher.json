@@ -12,18 +12,18 @@
     "beginner"
   ],
   "restricted": true,
-  "summary": "Common cubensis strain. Standard monotub-style climate mapped onto Shrooly setpoints.",
+  "summary": "Common cubensis strain. Reference conditions for research and education only.",
   "notes": "Informational climate only. Not a cultivation guide for illegal activity.",
-  "chamber_notes": "Cubensis typically uses a tub/casing workflow the Shrooly does not replace. This only applies RH, temp, light, and FAE.",
-  "legal_notice": "Legality of cultivating Psilocybe species varies by jurisdiction. This pack is informational environmental setpoints for a fruiting chamber and is disabled by default. You are responsible for following local law.",
+  "chamber_notes": "Cubensis typically uses a tub/casing workflow the Shrooly does not replace. This only covers humidity, temperature, light, and fresh air.",
+  "legal_notice": "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
   "source_notes": [
     {
       "title": "Chamber consensus",
-      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. P. cubensis colonizes ~24 to 27 \u00b0C; pins and fruits ~21 to 24 \u00b0C at high RH with 12/12 light."
+      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. P. cubensis colonizes ~24 to 27 \u00b0C; pins and fruits ~21 to 24 \u00b0C at high humidity with 12/12 light."
     },
     {
       "title": "Practice",
-      "detail": "FAE is increased at pinning. Surface should be fine droplets, not standing water."
+      "detail": "Fresh air is increased at pinning. Surface should be fine droplets, not standing water."
     }
   ],
   "stages": [
@@ -52,7 +52,7 @@
         "run_duration_s": 15,
         "speed_percent": 20
       },
-      "notes": "Dark, still. Do not introduce FAE early."
+      "notes": "Dark, still. Do not add fresh air early."
     },
     {
       "id": "pinning",

@@ -16,6 +16,7 @@ import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
 import { corsAllowlist, originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
+import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 
@@ -92,7 +93,14 @@ async function userFromAuth(request, db) {
   return (await userFromRequest(request, db)).user;
 }
 
+const SEED_DOCS = new Map(seeds.map((profile) => [profile.id, profile]));
+
+/**
+ * Built-in profiles (seeded rows, no author) are served from the bundled seeds, so copy
+ * fixes in data/profiles ship with the Worker. D1 rows are never rewritten for that.
+ */
 function parseProfile(row) {
+  if (row.author_id === null && SEED_DOCS.has(row.id)) return structuredClone(SEED_DOCS.get(row.id));
   return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
 }
 
@@ -108,7 +116,7 @@ async function canRead(db, user, profile) {
 }
 
 async function listProfiles(db, env, pack, q) {
-  const rows = await db.all("SELECT document FROM profiles WHERE published=1");
+  const rows = await db.all("SELECT * FROM profiles WHERE published=1");
   const query = (q || "").toLowerCase();
   return rows
     .map((row) => parseProfile(row))
@@ -252,6 +260,7 @@ async function route(method, path, url, request, env) {
         species: profile.species,
         strain: profile.strain,
         pack: profile.pack,
+        pack_label: packLabel(profile.pack),
         restricted: profile.restricted,
         summary: profile.summary,
         tags: profile.tags,
@@ -562,14 +571,22 @@ async function showProfile(request, db, env, profileId) {
         pack: profile.pack,
         stages: profile.stages.map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
       };
+  const offMenu = isOffMenu(profile) || isPsilocybin(profile);
   return json({
-    profile: publicDoc,
+    profile: {
+      ...publicDoc,
+      pack_label: packLabel(profile.pack),
+      legal_notice: offMenu ? PSI_LEGAL_NOTICE : publicDoc.legal_notice,
+    },
     unlocked,
     ratings,
     avg: avgRow?.a ?? null,
     reports,
-    links: unlocked ? affiliateLinksFor(profile) : [],
-    disclosure: DISCLOSURE,
+    links: offMenu ? [] : unlocked ? affiliateLinksFor(profile) : [],
+    disclosure: offMenu ? "" : DISCLOSURE,
+    resources: offMenu
+      ? { disclaimer: PSI_RESOURCE_DISCLAIMER, spore_law: PSI_SPORE_LAW, links: PSI_RESOURCES }
+      : null,
   });
 }
 

@@ -117,6 +117,9 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
         if (node["@type"] === "HowTo") node.step.forEach((step, i) => assert.equal(step.position, i + 1));
       }
     }
+    const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+    assert.doesNotMatch(header, /Restricted|psilocybin|Off-menu/i);
+    assert.match(html, /off the printed menu/);
   }
   assert.deepEqual([...seen].sort(), Object.keys(required).sort());
   const faq = jsonLdBlocks(read("faq.html")).flatMap(nodes).find((n) => n["@type"] === "FAQPage");
@@ -159,7 +162,7 @@ test("paid profile pages keep setpoints locked, like the API", () => {
     for (const stage of profile.stages) {
       if (stage.notes) assert.ok(!html.includes(stage.notes), `${profile.id} leaks stage notes`);
     }
-    assert.doesNotMatch(html, /°C|% RH|HowTo/);
+    assert.doesNotMatch(html, /°C|% humidity|% RH|HowTo/);
     assert.doesNotMatch(read("llms.txt"), new RegExp(`${profile.id}\\.html\\): [^\\n]*°C`));
     assert.doesNotMatch(read("faq.html"), new RegExp(`${profile.id}\\.html">[^<]*</a>[^<]*°C`));
   }
