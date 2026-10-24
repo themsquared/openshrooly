@@ -7,6 +7,7 @@
   # Production defaults. Override in the Netlify UI if needed.
   API_BASE_URL = "https://api.shroomlabs.io"
   MEDIA_BASE_URL = "https://cdn.shroomlabs.io"
+  TURNSTILE_SITE_KEY = "0x4AAAAAAFjd0Rzec6mAd5y6"
 
 # Custom domain: shroomlabs.io (and www.shroomlabs.io → apex) in the Netlify UI.
 
@@ -17,7 +18,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 https://cdn.shroomlabs.io; img-src 'self' data: https://cdn.shroomlabs.io; style-src 'self'; script-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.shroomlabs.io http://127.0.0.1:8787"
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 https://cdn.shroomlabs.io https://challenges.cloudflare.com; img-src 'self' data: https://cdn.shroomlabs.io; style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; font-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.shroomlabs.io http://127.0.0.1:8787"
 
 [[redirects]]
   from = "/profiles/:id"

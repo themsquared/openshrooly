@@ -339,9 +339,18 @@ export async function handleCoach(method, path, url, request, env) {
   return null;
 }
 
-export async function activateCoachSub(db, userId) {
-  const periodEnd = laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
+export async function activateCoachSub(db, userId, { replaySafe = false } = {}) {
   const existing = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [userId]);
+  if (replaySafe && existing && existing.status === "active" && existing.period_end >= nowIso()) {
+    await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
+      userId,
+      COACH_ITEM,
+      "subscription",
+      nowIso(),
+    ]);
+    return existing.period_end;
+  }
+  const periodEnd = laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
   if (existing) {
     await db.run("UPDATE coach_subs SET status=?, period_end=? WHERE user_id=?", ["active", periodEnd, userId]);
   } else {

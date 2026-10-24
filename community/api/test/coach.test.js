@@ -9,7 +9,7 @@ import {
   refuseRestrictedPack,
   suggestSetpoints,
 } from "../src/coach-learn.js";
-import { call, register, signedWebhook, testEnv } from "./helpers.js";
+import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 function env() {
   return testEnv({ GROW_COACH_STUB: "1" });
@@ -19,12 +19,14 @@ async function subscribe(ctx, token) {
   const session = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
   assert.equal(session.status, 200, JSON.stringify(session.data));
   const me = await call(ctx, "GET", "/api/me", { token });
-  const paid = await signedWebhook(ctx, {
-    session_id: session.data.id,
-    item_id: session.data.item_id,
-    user_id: me.data.user.id,
-    item_type: "subscription",
-  });
+  const paid = await signedWebhook(
+    ctx,
+    stripeCheckoutEvent({
+      sessionId: session.data.id,
+      itemId: session.data.item_id,
+      userId: me.data.user.id,
+    })
+  );
   assert.equal(paid.status, 200, JSON.stringify(paid.data));
   return paid;
 }

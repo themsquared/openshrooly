@@ -72,7 +72,7 @@ Create a widget for `shroomlabs.io` + `www.shroomlabs.io` + localhost.
 npx wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
-Netlify env: `TURNSTILE_SITE_KEY` (public, for the login form widget later).
+Netlify env: `TURNSTILE_SITE_KEY` (public). `community/web/scripts/write-config.js` writes it onto login and register as `turnstileSiteKey`. Production site key: `0x4AAAAAAFjd0Rzec6mAd5y6`.
 
 Also enable **Cloudflare Rate Limiting** on `api.shroomlabs.io/api/auth/*` (e.g. 20 req / 1 min / IP) in the dashboard. The Worker has an application-level limiter too.
 

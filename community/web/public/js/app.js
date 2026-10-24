@@ -182,7 +182,20 @@ async function renderProfile() {
   });
 }
 
+function mountTurnstile() {
+  const host = $("#turnstile");
+  const key = String(cfg().turnstileSiteKey || "");
+  if (!host || !key || host.dataset.mounted === "1") return;
+  host.dataset.sitekey = key;
+  host.dataset.mounted = "1";
+  const script = document.createElement("script");
+  script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+  script.async = true;
+  document.head.appendChild(script);
+}
+
 async function renderAuth(mode) {
+  mountTurnstile();
   $("#google")?.addEventListener("click", (ev) => {
     ev.preventDefault();
     location.href = oidcStart("google");

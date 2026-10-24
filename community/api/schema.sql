@@ -215,3 +215,15 @@ CREATE TABLE IF NOT EXISTS coach_cache (
     value TEXT NOT NULL,
     expires_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS totp_pending (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS payment_events (
+    event_id TEXT PRIMARY KEY,
+    checkout_id TEXT,
+    type TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);

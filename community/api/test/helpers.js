@@ -43,6 +43,26 @@ export async function register(ctx, email = "grower@example.com") {
   return { ...res.data, token: res.data.access_token, user: res.data.user };
 }
 
+export function stripeCheckoutEvent({ sessionId, userId, itemId, eventId = `evt_${sessionId}`, type = "checkout.session.completed" }) {
+  return {
+    id: eventId,
+    object: "event",
+    type,
+    data: {
+      object: {
+        id: sessionId,
+        object: "checkout.session",
+        client_reference_id: userId != null ? String(userId) : undefined,
+        metadata: {
+          user_id: userId != null ? String(userId) : undefined,
+          item_id: itemId,
+        },
+        mode: itemId === "grow-coach" ? "subscription" : "payment",
+      },
+    },
+  };
+}
+
 export async function signedWebhook(ctx, payload, { secret = TEST_WEBHOOK_SECRET, signature } = {}) {
   const raw = JSON.stringify(payload);
   const t = String(Math.floor(Date.now() / 1000));
