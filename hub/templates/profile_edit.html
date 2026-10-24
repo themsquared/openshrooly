@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ profile.name }} · Hub{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/builder/profile-builder.css">
+<script type="module" src="/static/builder/hub-builder.js"></script>
+{% endblock %}
+{% block content %}
+<h1>Edit {{ profile.name }}</h1>
+{% if error %}<p class="notice">{{ error }}</p>{% endif %}
+<form class="card" id="builder-form" method="post" action="/profiles/import">
+  <p id="builder-error" class="notice" hidden></p>
+  <profile-builder id="builder" mode="hub"></profile-builder>
+  <input type="hidden" name="document" id="document">
+  <p><button type="submit">Validate and save</button></p>
+</form>
+<script type="application/json" id="profile-catalog">{{ catalog_json | safe }}</script>
+<script type="application/json" id="profile-preset">{{ profile_json | safe }}</script>
+{% endblock %}

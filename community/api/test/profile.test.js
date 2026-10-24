@@ -12,6 +12,12 @@ function load(rel) {
   return JSON.parse(readFileSync(join(root, rel), "utf8"));
 }
 
+test("api and web share one profile schema file", () => {
+  const api = readFileSync(new URL("../src/profile-schema.js", import.meta.url), "utf8");
+  const web = readFileSync(new URL("../../web/public/js/profile-schema.js", import.meta.url), "utf8");
+  assert.equal(web, api);
+});
+
 test("culinary seed profiles validate", () => {
   const pearl = load("data/profiles/culinary/pearl-oyster.json");
   const profile = validateProfile(pearl);

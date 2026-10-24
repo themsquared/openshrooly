@@ -337,9 +337,27 @@ def apply_profile(
     return RedirectResponse(f"/devices/{device_id}", status_code=303)
 
 
+def catalog_payload(conn):
+    return json_dumps([p.to_dict() for p in all_profiles(conn)])
+
+
 @app.get("/profiles", response_class=HTMLResponse)
 def profiles_page(request: Request):
-    return page(request, "profiles.html", profiles=all_profiles(request.app.state.conn), error=None)
+    profiles = all_profiles(request.app.state.conn)
+    return page(request, "profiles.html", profiles=profiles, error=None, catalog_json=json_dumps([p.to_dict() for p in profiles]))
+
+
+@app.get("/profiles/{profile_id}/edit", response_class=HTMLResponse)
+def profile_edit(request: Request, profile_id: str):
+    profile = get_profile(request.app.state.conn, profile_id)
+    return page(
+        request,
+        "profile_edit.html",
+        profile=profile,
+        profile_json=json_dumps(profile.to_dict()),
+        catalog_json=catalog_payload(request.app.state.conn),
+        error=None,
+    )
 
 
 @app.get("/profiles/{profile_id}", response_class=HTMLResponse)
@@ -368,7 +386,8 @@ async def import_profile(request: Request, document: str = Form(...)):
             raise ValidationError("Psilocybin pack is disabled. Set HUB_ENABLE_PSILOCYBIN=1 to import it.")
         db.upsert_profile(conn, profile.id, profile.to_dict(), "import")
     except (json.JSONDecodeError, ValidationError, KeyError) as exc:
-        return page(request, "profiles.html", profiles=all_profiles(conn), error=str(exc))
+        profiles = all_profiles(conn)
+        return page(request, "profiles.html", profiles=profiles, error=str(exc), catalog_json=json_dumps([p.to_dict() for p in profiles]))
     return RedirectResponse(f"/profiles/{profile.id}", status_code=303)
 
 

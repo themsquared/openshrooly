@@ -7,9 +7,12 @@ binding = "DB"
 database_name = "shroomlabs"
 database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
 
-# R2 is not enabled on the account yet. Do not bind PHOTOS until:
+# R2 is not enabled on the account yet. Photo uploads for community review
+# need this bucket before you deploy. Create it first:
 #   npx wrangler r2 bucket create shroomlabs-media
-# Then uncomment and attach cdn.shroomlabs.io in the dashboard.
+# Then uncomment the binding and attach cdn.shroomlabs.io in the dashboard.
+# Until then, local/dev uses miniflare R2 or in-memory storage, and production
+# photo routes return 503.
 # [[r2_buckets]]
 # binding = "PHOTOS"
 # bucket_name = "shroomlabs-media"

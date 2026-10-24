@@ -2,6 +2,7 @@
 
 import { nowIso } from "./crypto.js";
 import { dispatchAlerts } from "./alerts/memory.js";
+import { dispatchReview } from "./review-memory.js";
 
 export function createMemoryDb() {
   const tables = {
@@ -33,6 +34,10 @@ export function createMemoryDb() {
     coach_cache: [],
     totp_pending: [],
     payment_events: [],
+    profile_review: [],
+    profile_photos: [],
+    moderation_log: [],
+    profile_reports: [],
   };
   let ids = {
     users: 1,
@@ -50,6 +55,9 @@ export function createMemoryDb() {
     device_certs: 1,
     device_commands: 1,
     device_telemetry: 1,
+    profile_photos: 1,
+    moderation_log: 1,
+    profile_reports: 1,
   };
 
   return {
@@ -109,6 +117,8 @@ function dispatch(mode, tables, ids, sql, params) {
   const q = sql.replace(/\s+/g, " ").trim();
   const alertResult = dispatchAlerts(tables, ids, q, params);
   if (alertResult !== undefined) return alertResult;
+  const reviewResult = dispatchReview(tables, ids, q, params);
+  if (reviewResult !== undefined) return reviewResult;
   if (q.startsWith("INSERT INTO users")) {
     const row =
       params.length >= 7
@@ -150,6 +160,11 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("SELECT * FROM users WHERE id=")) {
     return tables.users.filter((u) => u.id === Number(params[0]));
+  }
+  if (q.startsWith("UPDATE users SET role=")) {
+    const row = tables.users.find((u) => Number(u.id) === Number(params[1]));
+    if (row) row.role = params[0];
+    return {};
   }
   if (q.startsWith("UPDATE users SET email_verified=")) {
     const row = tables.users.find((u) => u.id === Number(params[1]));
@@ -490,18 +505,25 @@ function dispatch(mode, tables, ids, sql, params) {
     return {};
   }
   if (q.startsWith("INSERT INTO profiles") || q.startsWith("INSERT OR REPLACE INTO profiles")) {
+    const publishedLiteral = /VALUES \(\?, \?, \?, 1,/.test(q);
     const row = {
       id: params[0],
       document: params[1],
       author_id: params[2],
-      published: 1,
-      created_at: params[3],
-      updated_at: params[4],
+      published: publishedLiteral ? 1 : Number(params[3] ?? 1),
+      created_at: publishedLiteral ? params[3] : params[4],
+      updated_at: publishedLiteral ? params[4] : params[5],
       downloads: 0,
     };
     const idx = tables.profiles.findIndex((p) => p.id === row.id);
     if (idx >= 0) {
-      tables.profiles[idx] = { ...tables.profiles[idx], document: row.document, updated_at: row.updated_at };
+      tables.profiles[idx] = {
+        ...tables.profiles[idx],
+        document: row.document,
+        updated_at: row.updated_at,
+        published: Number.isFinite(row.published) ? row.published : tables.profiles[idx].published,
+        author_id: row.author_id ?? tables.profiles[idx].author_id,
+      };
     } else {
       tables.profiles.push(row);
     }
@@ -510,8 +532,39 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM profiles WHERE id=")) {
     return tables.profiles.filter((p) => p.id === params[0]);
   }
+  if (q.startsWith("SELECT * FROM profiles WHERE author_id=")) {
+    return tables.profiles.filter((p) => Number(p.author_id) === Number(params[0]));
+  }
+  if (q === "SELECT * FROM profiles" || q.startsWith("SELECT * FROM profiles ORDER")) {
+    return tables.profiles;
+  }
   if (q.startsWith("SELECT document FROM profiles") || q.startsWith("SELECT * FROM profiles WHERE published")) {
     return tables.profiles.filter((p) => p.published);
+  }
+  if (q.startsWith("UPDATE profiles SET published=?, document=?")) {
+    const row = tables.profiles.find((p) => p.id === params[3]);
+    if (row) {
+      row.published = Number(params[0]);
+      row.document = params[1];
+      row.updated_at = params[2];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE profiles SET document=?")) {
+    const row = tables.profiles.find((p) => p.id === params[2]);
+    if (row) {
+      row.document = params[0];
+      row.updated_at = params[1];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE profiles SET published=")) {
+    const row = tables.profiles.find((p) => p.id === params[1]);
+    if (row) {
+      row.published = Number(String(q).includes("published=1") ? 1 : params[0]);
+      row.updated_at = params[0];
+    }
+    return {};
   }
   if (q.startsWith("UPDATE profiles SET downloads")) {
     const row = tables.profiles.find((p) => p.id === params[0]);

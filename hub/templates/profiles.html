@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Profiles · Hub{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/builder/profile-builder.css">
+<script type="module" src="/static/builder/hub-builder.js"></script>
+{% endblock %}
 {% block content %}
 <h1>Mushroom profiles</h1>
 {% if error %}<p class="notice">{{ error }}</p>{% endif %}
@@ -8,11 +12,15 @@
   <form method="post" action="/sync/push"><button type="submit">Push library + grow reports</button></form>
 </div>
 <p class="muted">Shroom Labs sync needs <code>COMMUNITY_URL</code> (default local API, or <code>https://api.shroomlabs.io</code>) and <code>COMMUNITY_TOKEN</code>.</p>
-<form class="card" method="post" action="/profiles/import">
-  <h2>Import JSON</h2>
-  <textarea name="document" rows="8" placeholder='{"schema_version":1,"id":"..."}'></textarea>
-  <button type="submit">Validate and save</button>
+<form class="card" id="builder-form" method="post" action="/profiles/import">
+  <h2>Build a profile</h2>
+  <p class="muted">Private to this hub until you push to Shroom Labs. Sharing there needs review.</p>
+  <p id="builder-error" class="notice" hidden></p>
+  <profile-builder id="builder" mode="hub"></profile-builder>
+  <input type="hidden" name="document" id="document">
+  <p><button type="submit">Validate and save</button></p>
 </form>
+<script type="application/json" id="profile-catalog">{{ catalog_json | safe }}</script>
 <div class="cards">
   {% for profile in profiles %}
   <article class="card has-art">

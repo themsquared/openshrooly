@@ -33,7 +33,8 @@ function renderNav() {
       <summary>Account</summary>
       <div class="account-menu-links">
         <a href="/account.html">Account</a>
-        <a href="/publish.html">Publish</a>
+        <a href="/publish.html">Build a profile</a>
+        <a href="/moderate.html" id="nav-moderate" class="hidden">Review queue</a>
         <button class="link" id="logout" type="button">Log out</button>
       </div>
     </details>`;
@@ -287,8 +288,17 @@ async function renderProfile() {
   });
   $("#fork")?.addEventListener("click", async () => {
     const forked = await api(`/api/profiles/${id}/fork`, { method: "POST", jsonBody: {} });
-    location.href = `/profile.html?id=${encodeURIComponent(forked.id)}`;
+    location.href = `/publish.html?id=${encodeURIComponent(forked.id)}`;
   });
+  if (data.unlocked) {
+    $("#flag-box")?.classList.remove("hidden");
+    $("#flag")?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      await api(`/api/profiles/${id}/moderation-report`, { method: "POST", jsonBody: { reason: fd.get("reason") } });
+      location.reload();
+    });
+  }
 }
 
 function mountTurnstile() {
@@ -391,6 +401,17 @@ async function renderAccount() {
   $("#ents").innerHTML =
     me.entitlements.map((e) => `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`).join("") ||
     "<li class='muted'>No paid items yet.</li>";
+  if (me.user.role === "moderator" || me.user.role === "admin") {
+    $("#nav-moderate")?.classList.remove("hidden");
+  }
+  const mine = await api("/api/me/profiles").catch(() => ({ profiles: [] }));
+  const stateLabel = { draft: "Draft", pending: "In review", published: "Published", rejected: "Not approved", changes_requested: "Not approved" };
+  $("#my-profiles").innerHTML =
+    (mine.profiles || [])
+      .map(
+        (item) => `<li><a href="/publish.html?id=${encodeURIComponent(item.profile.id)}">${escapeHtml(item.profile.name)}</a> · ${escapeHtml(stateLabel[item.review?.status] || "Draft")}${item.review?.reason ? ` · ${escapeHtml(item.review.reason)}` : ""}</li>`
+      )
+      .join("") || "<li class='muted'>No profiles yet.</li>";
   if ($("#coach-account") && me.grow_coach) {
     $("#coach-account").textContent = me.grow_coach.entitled
       ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
@@ -439,28 +460,6 @@ async function renderAccount() {
   });
 }
 
-async function renderPublish() {
-  $("#form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    try {
-      const doc = JSON.parse($("#document").value);
-      const saved = await api("/api/profiles", { method: "POST", jsonBody: doc });
-      location.href = `/profile.html?id=${encodeURIComponent(saved.id)}`;
-    } catch (err) {
-      $("#error").textContent = err.message;
-      $("#error").classList.remove("hidden");
-    }
-  });
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -471,6 +470,158 @@ function fileToBase64(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+async function loadBuilderSources(builder) {
+  const [library, mine] = await Promise.all([
+    api("/api/profiles?pack=culinary").catch(() => []),
+    api("/api/me/profiles").catch(() => ({ profiles: [] })),
+  ]);
+  const off = await api("/api/profiles?pack=psilocybin").catch(() => []);
+  builder.setCatalog([...(library || []), ...(off || [])]);
+  builder.setOwnProfiles((mine.profiles || []).map((item) => ({ ...item.profile, unlocked: true, author: item.profile.author || "you" })));
+}
+
+async function renderPublish() {
+  const builder = $("#builder");
+  if (!builder) return;
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  await customElements.whenDefined("profile-builder").catch(() => {});
+  await loadBuilderSources(builder);
+  const id = params().get("id");
+  if (id) {
+    try {
+      const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
+      builder.setProfile(data.profile, { locked: Boolean(data.profile.locked) || !data.unlocked });
+      if (data.review) {
+        builder.setPublishState({
+          status: data.review.status || "draft",
+          reason: data.review.reason || "",
+          title: data.review.title || data.profile.name,
+          description: data.review.description || data.profile.summary || "",
+        });
+      }
+    } catch (err) {
+      $("#error").textContent = err.message;
+      $("#error").classList.remove("hidden");
+    }
+  }
+  const showErr = (err) => {
+    $("#error").textContent = err.message || String(err);
+    $("#error").classList.remove("hidden");
+  };
+  $("#save-private")?.addEventListener("click", async () => {
+    const built = builder.getDocument();
+    if (!built.ok) {
+      showErr(new Error(built.issues[0]?.message || "Fix the marked fields first."));
+      return;
+    }
+    try {
+      const existing = params().get("id");
+      const saved = existing
+        ? await api(`/api/profiles/${encodeURIComponent(existing)}`, { method: "PUT", jsonBody: built.profile })
+        : await api("/api/profiles", { method: "POST", jsonBody: built.profile });
+      const nextId = saved.id || built.profile.id;
+      location.href = `/publish.html?id=${encodeURIComponent(nextId)}`;
+    } catch (err) {
+      showErr(err);
+    }
+  });
+  $("#submit-review")?.addEventListener("click", async () => {
+    const built = builder.getPublishPayload();
+    if (!built.ok) {
+      showErr(new Error(built.issues[0]?.message || "Fix the marked fields first."));
+      return;
+    }
+    if (built.publishIssues.length) {
+      showErr(new Error(built.publishIssues[0].message));
+      return;
+    }
+    try {
+      const existing = params().get("id");
+      const saved = existing
+        ? await api(`/api/profiles/${encodeURIComponent(existing)}`, { method: "PUT", jsonBody: built.profile })
+        : await api("/api/profiles", { method: "POST", jsonBody: built.profile });
+      const nextId = saved.id || built.profile.id;
+      for (const photo of built.publish.photos || []) {
+        if (!photo.file) continue;
+        await api(`/api/profiles/${encodeURIComponent(nextId)}/photos`, {
+          method: "POST",
+          jsonBody: {
+            photo_base64: await fileToBase64(photo.file),
+            photo_type: photo.file.type,
+          },
+        });
+      }
+      await api(`/api/profiles/${encodeURIComponent(nextId)}/publish`, {
+        method: "POST",
+        jsonBody: { title: built.publish.title, description: built.publish.description },
+      });
+      location.href = `/publish.html?id=${encodeURIComponent(nextId)}`;
+    } catch (err) {
+      showErr(err);
+    }
+  });
+}
+
+async function renderModerate() {
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  try {
+    const data = await api("/api/moderation/queue");
+    const box = $("#queue");
+    box.innerHTML = (data.items || []).length
+      ? data.items
+          .map((item) => {
+            const p = item.profile;
+            const r = item.review || {};
+            return `<article class="card" style="padding:1.1rem">
+              <p><span class="chip">${escapeHtml(p.pack === "psilocybin" ? "Off-menu" : "Culinary")}</span>${r.offmenu_flag ? `<span class="chip">Off-menu flag</span>` : ""}${r.blocklist_hit ? `<span class="chip">Text flag</span>` : ""}</p>
+              <h2>${escapeHtml(r.title || p.name)}</h2>
+              <p>${escapeHtml(r.description || p.summary || "")}</p>
+              <p class="muted">${escapeHtml(p.species || "")}</p>
+              <label>Reason <input id="reason-${escapeHtml(p.id)}" placeholder="Required to reject or ask for changes"></label>
+              <p class="pb-actions">
+                <button type="button" data-mod="approve" data-id="${escapeHtml(p.id)}">Approve</button>
+                <button type="button" class="secondary" data-mod="request-changes" data-id="${escapeHtml(p.id)}">Ask for changes</button>
+                <button type="button" class="secondary" data-mod="reject" data-id="${escapeHtml(p.id)}">Reject</button>
+              </p>
+            </article>`;
+          })
+          .join("")
+      : `<p class="muted">Nothing waiting.</p>`;
+    box.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-mod]");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const action = btn.dataset.mod;
+      const reason = document.getElementById(`reason-${id}`)?.value || "";
+      try {
+        if (action === "approve") await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: {} });
+        else await api(`/api/moderation/${encodeURIComponent(id)}/${action}`, { method: "POST", jsonBody: { reason } });
+        location.reload();
+      } catch (err) {
+        $("#error").textContent = err.message;
+        $("#error").classList.remove("hidden");
+      }
+    });
+  } catch (err) {
+    $("#error").textContent = err.status === 403 ? "This page is for moderators." : err.message;
+    $("#error").classList.remove("hidden");
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 bindMobileNav();
@@ -495,6 +646,7 @@ if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
 if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
 if (page === "publish") renderPublish();
+if (page === "moderate") renderModerate();
 if (page === "device") renderDevice().catch((err) => {
   if (err.status === 401) {
     location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
