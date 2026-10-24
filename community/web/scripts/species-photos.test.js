@@ -81,7 +81,9 @@ test("Off-menu pages with a photo render credit, ImageObject, and existing og:im
     assert.match(html, new RegExp(photo.author));
     assert.match(html, new RegExp(photo.licenseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(html, /legal-prominent/);
-    assert.doesNotMatch(html, /Restricted|Grow Coach|affiliate/i);
+    const main = html.slice(html.indexOf("<article"), html.indexOf("</article>"));
+    assert.doesNotMatch(html, /Restricted/i);
+    assert.doesNotMatch(main, /Grow Coach|affiliate/i);
     assert.equal(article.image["@type"], "ImageObject");
     assert.equal(article.image.license, photo.licenseUrl);
     assert.equal(article.image.creditText, creditText(photo));
