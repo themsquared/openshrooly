@@ -34,6 +34,8 @@ export function dispatchReview(tables, ids, q, params) {
       published_live: p[8],
       created_at: p[9],
       updated_at: p[10],
+      confirmed_culinary_at: p[11] ?? null,
+      confirmed_by: p[12] ?? null,
     };
     const idx = tables.profile_review.findIndex((r) => r.profile_id === row.profile_id);
     if (idx >= 0) tables.profile_review[idx] = { ...tables.profile_review[idx], ...row };

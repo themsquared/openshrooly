@@ -5,7 +5,7 @@ import { requireVerified, userFromRequest } from "./auth.js";
 import { ValidationError, isPsilocybin } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
 import { comingSoonBody, capabilities, devStubsEnabled, paymentsConfigured } from "./providers.js";
-import { bytesToBase64, decodePhotoBase64, sanitizeGrowPhoto } from "./image.js";
+import { bytesToBase64, decodePhotoBase64, sanitizeGrowPhoto } from "./photos.js";
 import { readJsonLimited } from "./http-body.js";
 import { insertMedia, pendingPhotoKey } from "./media-acl.js";
 import {

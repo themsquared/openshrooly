@@ -3,6 +3,7 @@ import { handleRequest, withCors } from "./handlers.js";
 import { SCHEMA_SQL } from "./schema.js";
 import { createOptionalStorage } from "./storage.js";
 import { runAlerts } from "./alerts/cron.js";
+import { reclassifyUnconfirmedLegacyBatch } from "./review.js";
 
 async function envContext(env) {
   if (!env._ctx) {
@@ -11,11 +12,6 @@ async function envContext(env) {
       await db.exec(SCHEMA_SQL);
     } catch {
       // Local/minimal D1 may not support exec of a batch; `npm run db:init` applies schema.sql.
-    }
-    try {
-      await db.exec("ALTER TABLE grow_reports ADD COLUMN photo_status TEXT NOT NULL DEFAULT 'approved'");
-    } catch {
-      // Column already exists on newer D1 / memory schemas.
     }
     env._ctx = {
       db,
@@ -73,7 +69,10 @@ export default {
   async scheduled(event, env, executionCtx) {
     const ctx = await envContext(env);
     const work = runAlerts(ctx, { now: Number(event?.scheduledTime) || Date.now() })
-      .then((summary) => console.log(JSON.stringify({ level: "info", event: "alerts_cron", ...summary })))
+      .then(async (summary) => {
+        const reclass = await reclassifyUnconfirmedLegacyBatch(ctx.db, { limit: 25 });
+        console.log(JSON.stringify({ level: "info", event: "alerts_cron", ...summary, reclass }));
+      })
       .catch((err) => console.log(JSON.stringify({ level: "error", event: "alerts_cron_failed", message: String(err?.message || err).slice(0, 200) })));
     executionCtx.waitUntil(work);
     await work;

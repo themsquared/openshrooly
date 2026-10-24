@@ -311,8 +311,8 @@ test("moderator culinary confirm rewrites pack fields and is refused on force-ma
   cube.restricted = true;
   assert.throws(() => applyPackRules(cube, { moderatorPack: "culinary" }), /cannot be confirmed as culinary/);
   const heldOff = applyPackRules(morel);
-  assert.equal(heldOff.pack, "psilocybin");
-  assert.equal(heldOff.legal_notice, PSILOCYBIN_LEGAL_NOTICE);
+  assert.equal(heldOff.pack, "culinary");
+  assert.equal(heldOff.legal_notice, null);
   const sneak = applyTaxonCase(pearl, { field: "species", value: "Agaricus cubensis" });
   sneak.pack = "culinary";
   sneak.restricted = false;

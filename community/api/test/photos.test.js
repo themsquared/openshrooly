@@ -310,7 +310,7 @@ test("strips DQT padding, rejects a second SOF, and checks the first SOF size", 
   oversizedFirst.set([0xff, 0xd8]);
   oversizedFirst.set(huge, 2);
   oversizedFirst.set(sos, 2 + huge.length);
-  assert.throws(() => processPhoto(oversizedFirst), /4096/);
+  assert.throws(() => processPhoto(oversizedFirst), /8192/);
 });
 
 test("rejects short DQT, overrun DHT, oversized DRI, and padded SOF or SOS", () => {

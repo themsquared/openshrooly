@@ -70,6 +70,7 @@ const PSYCHOACTIVE_GENERA = new Set([
   "conocybe",
   "pluteus",
   "inocybe",
+  "amanita",
 ]);
 const CULINARY_GENERA = new Set([
   "gyroporus",
@@ -88,7 +89,30 @@ const CULINARY_GENERA = new Set([
   "pholiota",
   "cordyceps",
   "auricularia",
+  "morchella",
+  "tremella",
+  "volvariella",
+  "coprinus",
+  "laetiporus",
+  "sparassis",
+  "inonotus",
+  "agrocybe",
+  "kuehneromyces",
+  "fomitopsis",
 ]);
+const SYSTEM_TAGS = new Set(["culinary", "psilocybin"]);
+const CONFUSABLE_TO_LATIN = {
+  а: "a",
+  е: "e",
+  о: "o",
+  р: "p",
+  с: "c",
+  у: "y",
+  х: "x",
+  і: "i",
+  ѕ: "s",
+  ј: "j",
+};
 const OFFMENU_EPITHETS = new Set([
   "cubensis",
   "cyanescens",
@@ -172,6 +196,10 @@ export function stripAccents(value) {
     .replace(/\p{M}/gu, "");
 }
 
+export function foldConfusables(value) {
+  return String(value || "").replace(/[аеорсухіѕјАЕОРСУХІЅЈ]/g, (ch) => CONFUSABLE_TO_LATIN[ch.toLowerCase()] || ch);
+}
+
 export function isLatinLetterSafe(value) {
   if (value == null || String(value).trim() === "") return true;
   const letters = stripAccents(value).match(/\p{L}/gu) || [];
@@ -179,7 +207,7 @@ export function isLatinLetterSafe(value) {
 }
 
 export function normalizeTaxonText(value) {
-  return stripAccents(value)
+  return foldConfusables(stripAccents(value))
     .normalize("NFKC")
     .replace(/\p{Cf}/gu, "")
     .toLowerCase()
@@ -187,6 +215,84 @@ export function normalizeTaxonText(value) {
     .replace(/[^a-z0-9+]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function foldTaxonToken(value) {
+  return normalizeTaxonText(value).replace(/ /g, "").replace(/z/g, "s").replace(/y/g, "i");
+}
+
+export function foldEpithetToken(value) {
+  return foldTaxonToken(value).replace(/(us|a)$/, "");
+}
+
+export function editDistance(a, b) {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (Math.abs(m - n) > 2) return 99;
+  const prev = new Array(n + 1);
+  const cur = new Array(n + 1);
+  for (let j = 0; j <= n; j += 1) prev[j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j <= n; j += 1) prev[j] = cur[j];
+  }
+  return prev[n];
+}
+
+function nearMissToken(word, candidates, { fold = foldTaxonToken, maxDist = 1, minLen = 5 } = {}) {
+  const folded = fold(word);
+  if (!folded || folded.length < minLen) return false;
+  for (const cand of candidates) {
+    const cf = fold(cand);
+    if (folded === cf) return true;
+    if (Math.abs(folded.length - cf.length) > maxDist) continue;
+    if (editDistance(folded, cf) <= maxDist) return true;
+  }
+  return false;
+}
+
+export function isPsychoactiveGenus(word) {
+  const n = normalizeTaxonText(word).replace(/ /g, "");
+  if (PSYCHOACTIVE_GENERA.has(n)) return true;
+  return nearMissToken(word, PSYCHOACTIVE_GENERA, { fold: foldTaxonToken, maxDist: 1, minLen: 5 });
+}
+
+export function restrictedEpithetKind(word) {
+  const compact = normalizeTaxonText(word).replace(/ /g, "");
+  if (!compact) return null;
+  if (OFFMENU_EPITHETS.has(compact)) return "exact";
+  const folded = foldEpithetToken(compact);
+  if (folded.length >= 6) {
+    for (const epithet of OFFMENU_EPITHETS) {
+      if (foldEpithetToken(epithet) === folded) return "fold";
+    }
+  }
+  if (nearMissToken(compact, OFFMENU_EPITHETS, { fold: foldEpithetToken, maxDist: 2, minLen: 6 })) return "near";
+  return null;
+}
+
+export function taxonKey(profile) {
+  return ["id", "name", "species", "strain", "variety_group"].map((key) => normalizeTaxonText(profile?.[key])).join("|");
+}
+
+export function reviewConfirmExtra(review, profile) {
+  if (!review?.confirmed_culinary_at) return {};
+  if (!profile) return { confirmedCulinary: true };
+  let live = null;
+  if (review.live_document) {
+    try {
+      live = typeof review.live_document === "string" ? JSON.parse(review.live_document) : review.live_document;
+    } catch {
+      live = null;
+    }
+  }
+  if (live && taxonKey(live) !== taxonKey(profile)) return {};
+  return { confirmedCulinary: true };
 }
 
 export function collectTaxonFields(profile, extra = {}) {
@@ -200,7 +306,7 @@ export function collectTaxonFields(profile, extra = {}) {
     profile?.summary,
     profile?.notes,
     profile?.chamber_notes,
-    ...(Array.isArray(profile?.tags) ? profile.tags : []),
+    ...(Array.isArray(profile?.tags) ? profile.tags.filter((tag) => !SYSTEM_TAGS.has(normalizeTaxonText(tag))) : []),
   ];
   for (const stage of Array.isArray(profile?.stages) ? profile.stages : []) {
     if (stage && typeof stage === "object") fields.push(stage.name, stage.notes);
@@ -232,15 +338,56 @@ function parseSpeciesParts(species) {
   return { genus, epithet, words };
 }
 
-function identityFields(profile) {
-  return [profile?.id, profile?.name, profile?.species, profile?.strain, profile?.variety_group].filter(
+function identityFields(profile, extra = {}) {
+  return [profile?.id, profile?.name, profile?.species, profile?.strain, profile?.variety_group, extra.title].filter(
     (value) => value != null && String(value).trim() !== ""
   );
 }
 
 function proseFields(profile, extra = {}) {
-  const identity = new Set(identityFields(profile).map((value) => String(value)));
-  return collectTaxonFields(profile, extra).filter((value) => !identity.has(value));
+  const identity = new Set(identityFields(profile, extra).map((value) => String(value)));
+  return collectTaxonFields(profile, extra).filter((value) => !identity.has(value) && !SYSTEM_TAGS.has(normalizeTaxonText(value)));
+}
+
+function fieldRestrictedKind(raw) {
+  const parsed = parseSpeciesParts(raw);
+  const kinds = [];
+  for (const word of parsed.words) {
+    const kind = restrictedEpithetKind(word);
+    if (kind) kinds.push(kind);
+  }
+  const epithetCompact = parsed.words.slice(1).join("");
+  const compactKind = epithetCompact ? restrictedEpithetKind(epithetCompact) : null;
+  if (compactKind) kinds.push(compactKind);
+  if (kinds.includes("exact")) return "exact";
+  if (kinds.includes("fold")) return "fold";
+  if (kinds.includes("near")) return "near";
+  return null;
+}
+
+function identityHasUnvettedRestricted(profile, extra = {}) {
+  for (const raw of identityFields(profile, extra)) {
+    const kind = fieldRestrictedKind(raw);
+    if (!kind) continue;
+    if (isVettedCulinaryPair(parseSpeciesParts(raw))) continue;
+    return true;
+  }
+  return false;
+}
+
+function identityHasPsychoactiveGenus(profile, extra = {}) {
+  for (const raw of identityFields(profile, extra)) {
+    const parsed = parseSpeciesParts(raw);
+    if (parsed.genus && isPsychoactiveGenus(parsed.genus)) return true;
+    if (parsed.words.some((word) => isPsychoactiveGenus(word))) return true;
+  }
+  return false;
+}
+
+export function taxonLatinOk(profile, extra = {}) {
+  return [profile?.species, profile?.strain, profile?.name, profile?.variety_group, profile?.id, extra.title].every((value) =>
+    isLatinLetterSafe(value)
+  );
 }
 
 function looksLikeCubeStrain(value) {
@@ -303,34 +450,54 @@ function isVettedCulinaryPair(parsed) {
 }
 
 export function classifyTaxon(profile, extra = {}) {
-  const identity = identityFields(profile);
+  const identity = identityFields(profile, extra);
   const parsed = parseSpeciesParts(profile?.species);
   const hasSpecies = Boolean(String(profile?.species || "").trim());
   const culinaryGenus = CULINARY_GENERA.has(parsed.genus);
-  const restrictedEpithets = offmenuEpithetsIn(parsed);
-  const hasRestrictedEpithet = restrictedEpithets.length > 0;
-  const vettedPair = hasRestrictedEpithet && culinaryGenus && isVettedCulinaryPair(parsed);
+  const speciesRestricted = fieldRestrictedKind(profile?.species);
+  const unvettedRestricted = identityHasUnvettedRestricted(profile, extra);
+  const vettedPair = Boolean(speciesRestricted) && culinaryGenus && isVettedCulinaryPair(parsed) && !unvettedRestricted;
   const identityForce = hasForceMatch(identity);
   const unknownGenus = Boolean(parsed.genus) && !culinaryGenus && !OFFMENU_EPITHETS.has(parsed.genus);
-  const force = identityForce || (hasRestrictedEpithet && unknownGenus && hasSpecies);
-  const latinOk = isLatinLetterSafe(profile?.species) && isLatinLetterSafe(profile?.strain);
+  const force = identityForce || (Boolean(speciesRestricted) && speciesRestricted !== "near" && unknownGenus && hasSpecies);
+  const latinOk = taxonLatinOk(profile, extra);
   const realEpithet = Boolean(parsed.epithet) && !PLACEHOLDER_EPITHETS.has(parsed.epithet);
-  const culinary = !force && culinaryGenus && realEpithet && latinOk && (!hasRestrictedEpithet || vettedPair);
+  const nearGenus = Boolean(parsed.genus) && !culinaryGenus && isPsychoactiveGenus(parsed.genus);
+  const culinary =
+    !force &&
+    culinaryGenus &&
+    realEpithet &&
+    latinOk &&
+    !unvettedRestricted &&
+    !nearGenus &&
+    (!speciesRestricted || vettedPair);
   const hold = !force && !culinary && hasSpecies;
   const identityStrainFlag = looksLikeCubeStrain(profile?.strain) || looksLikeCubeStrain(profile?.name);
   const proseFlag = hasProseFlag(proseFields(profile, extra)) || (culinary && identityStrainFlag);
   const reasons = [];
   if (identityForce || (force && !culinaryGenus)) reasons.push("High-confidence restricted taxon.");
-  if (hold && culinaryGenus && hasRestrictedEpithet) {
+  if (hold && (unvettedRestricted || (culinaryGenus && speciesRestricted))) {
     reasons.push("Culinary genus with a restricted epithet. Confirm only if this is a known edible pair.");
   }
   if (hold && !latinOk) reasons.push("Species or strain is not plain Latin letters.");
-  if (hold && hasSpecies && !culinaryGenus && !hasRestrictedEpithet) {
+  if (hold && hasSpecies && !culinaryGenus && !unvettedRestricted) {
     reasons.push("Genus is not on the culinary allowlist.");
   }
-  if (hold && culinaryGenus && !realEpithet) reasons.push("Species uses a placeholder epithet such as sp.");
+  if (hold && culinaryGenus && !realEpithet && !unvettedRestricted) reasons.push("Species uses a placeholder epithet such as sp.");
   if (proseFlag) reasons.push("Summary, notes, or tags mention a restricted name.");
   return { force, hold, culinary, proseFlag, reasons };
+}
+
+export function canConfirmCulinary(profile, extra = {}) {
+  const classified = classifyTaxon(profile, extra);
+  if (classified.force) return false;
+  if (!taxonLatinOk(profile, extra)) return false;
+  const parsed = parseSpeciesParts(profile?.species);
+  if (!CULINARY_GENERA.has(parsed.genus)) return false;
+  if (isPsychoactiveGenus(parsed.genus)) return false;
+  if (identityHasPsychoactiveGenus(profile, extra)) return false;
+  if (identityHasUnvettedRestricted(profile, extra)) return false;
+  return classified.hold || classified.culinary;
 }
 
 export function needsOffmenuFlag(profile, extra = {}) {
@@ -380,9 +547,9 @@ function require(condition, message) {
 export function isPsilocybin(profile, extra = {}) {
   const classified = classifyTaxon(profile, extra);
   if (classified.force) return true;
-  if (extra.moderatorPack === "culinary") return false;
+  if (extra.confirmedCulinary) return false;
+  if (extra.moderatorPack === "culinary" && canConfirmCulinary(profile, extra)) return false;
   if (classified.culinary) return false;
-  if (profile?.pack === "culinary" && !profile?.restricted) return false;
   return classified.hold || profile?.pack === "psilocybin" || Boolean(profile?.restricted);
 }
 
@@ -497,10 +664,10 @@ export function applyPackRules(profile, extra = {}) {
   if (!Array.isArray(next.tags)) next.tags = [];
   if (!Array.isArray(next.stages)) next.stages = blankProfile().stages;
   const classified = classifyTaxon(next, extra);
-  if (extra.moderatorPack === "culinary" && classified.force) {
+  if (extra.moderatorPack === "culinary" && !canConfirmCulinary(next, extra)) {
     throw new ValidationError("This taxon cannot be confirmed as culinary.", 400);
   }
-  const confirmedCulinary = extra.moderatorPack === "culinary" && !classified.force;
+  const confirmedCulinary = extra.moderatorPack === "culinary" || Boolean(extra.confirmedCulinary);
   const offMenu =
     extra.moderatorPack === "psilocybin" ||
     (!confirmedCulinary && (classified.force || classified.hold || next.pack === "psilocybin" || Boolean(next.restricted)));
@@ -508,10 +675,12 @@ export function applyPackRules(profile, extra = {}) {
     next.pack = "psilocybin";
     next.restricted = true;
     if (!next.tags.includes("psilocybin")) next.tags = [...next.tags, "psilocybin"];
-    next.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
-    next.allowed_payment_providers = [];
-    next.affiliates_allowed = false;
-    next.affiliate_links = [];
+    if (!canConfirmCulinary(next, extra)) {
+      next.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
+      next.allowed_payment_providers = [];
+      next.affiliates_allowed = false;
+      next.affiliate_links = [];
+    }
     next.legal_notice = PSILOCYBIN_LEGAL_NOTICE;
   } else if (confirmedCulinary) {
     next.pack = "culinary";
@@ -597,7 +766,7 @@ function inRange(value, min, max) {
   return Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max;
 }
 
-export function collectProfileIssues(profile) {
+export function collectProfileIssues(profile, extra = {}) {
   const issues = [];
   if (!profile || typeof profile !== "object") {
     addIssue(issues, "document", "This is not a usable profile.");
@@ -683,7 +852,7 @@ export function collectProfileIssues(profile) {
     addIssue(issues, "pricing.amount_cents", "Free profiles must have a price of $0.");
   }
 
-  if (isPsilocybin(profile)) {
+  if (isPsilocybin(profile, extra)) {
     if (profile.pack !== "psilocybin") addIssue(issues, "pack", "Off-menu profiles must use the Off-menu pack.");
     if (!profile.restricted) addIssue(issues, "restricted", "Off-menu profiles must stay restricted.");
     if (!isFree(profile)) addIssue(issues, "pricing.kind", "Off-menu profiles must stay free.");
@@ -749,7 +918,7 @@ export function collectLightRecipeIssues(recipe) {
 
 export function validateProfile(profile, extra = {}) {
   const normalized = applyPackRules(profile, extra);
-  const issues = collectProfileIssues(normalized);
+  const issues = collectProfileIssues(normalized, extra);
   if (issues.length) throw new ValidationError(issues[0].message);
   return normalized;
 }

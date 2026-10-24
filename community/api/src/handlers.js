@@ -10,6 +10,7 @@ import {
   validateProfile,
   ValidationError,
 } from "./profile.js";
+import { reviewConfirmExtra } from "./profile-schema.js";
 import { decodeBase64Photo, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES } from "./photos.js";
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
@@ -123,8 +124,24 @@ const SEED_DOCS = new Map(seeds.map((profile) => [profile.id, profile]));
  * fixes in data/profiles ship with the Worker. D1 rows are never rewritten for that.
  */
 function parseProfile(row) {
-  if (row.author_id === null && SEED_DOCS.has(row.id)) return structuredClone(SEED_DOCS.get(row.id));
-  return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  try {
+    if (row.author_id === null && SEED_DOCS.has(row.id)) return structuredClone(SEED_DOCS.get(row.id));
+    return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  } catch (err) {
+    console.log(
+      JSON.stringify({
+        level: "warn",
+        event: "malformed_profile_document",
+        id: row?.id,
+        message: String(err?.message || err).slice(0, 200),
+      })
+    );
+    return null;
+  }
+}
+
+function serveExtra(review, profile) {
+  return reviewConfirmExtra(review, profile);
 }
 
 function showPsi(env) {
@@ -146,11 +163,13 @@ async function listProfiles(db, env, pack, q) {
     if (!(await isPublicProfile(db, row))) continue;
     const review = await getReview(db, row.id);
     const working = parseProfile(row);
-    const profile = serveProfileDocument(publicDocument(row, review, working));
+    if (!working) continue;
+    const extra = serveExtra(review, working);
+    const profile = serveProfileDocument(publicDocument(row, review, working), extra);
     if (!profile) continue;
-    if (pack === "culinary" && isPsilocybin(profile)) continue;
-    if (pack === "psilocybin" && !isPsilocybin(profile)) continue;
-    if (isPsilocybin(profile) && !showPsi(env)) continue;
+    if (pack === "culinary" && isPsilocybin(profile, extra)) continue;
+    if (pack === "psilocybin" && !isPsilocybin(profile, extra)) continue;
+    if (isPsilocybin(profile, extra) && !showPsi(env)) continue;
     if (query) {
       const blob = `${profile.name} ${profile.species} ${profile.strain} ${profile.summary} ${(profile.tags || []).join(" ")}`.toLowerCase();
       if (!blob.includes(query)) continue;
@@ -375,6 +394,7 @@ async function route(method, path, url, request, env) {
     const forkRow = await requireVisibleRow(db, user, decodeURIComponent(forkMatch[1]));
     const forkReview = await getReview(db, forkRow.id);
     const forkWorking = parseProfile(forkRow);
+    if (!forkWorking) throw new ValidationError("not found", 404);
     const staff = isModerator(user) || Number(user.id) === Number(forkRow.author_id);
     const source = staff ? forkWorking : publicDocument(forkRow, forkReview, forkWorking);
     if (!source) throw new ValidationError("not found", 404);
@@ -446,7 +466,8 @@ async function route(method, path, url, request, env) {
     requireVerified(user);
     const checkoutRow = await requireVisibleRow(db, user, decodeURIComponent(checkoutMatch[1]));
     const profile = await profileForAction(db, user, checkoutRow);
-    if (isPsilocybin(profile)) {
+    const checkoutReview = await getReview(db, checkoutRow.id);
+    if (isPsilocybin(profile, serveExtra(checkoutReview, profile))) {
       throw new ValidationError("Psilocybin pack is free-only. Card processors cannot be attached.");
     }
     if (isFree(profile)) throw new ValidationError("free items do not go through checkout");
@@ -495,7 +516,9 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     const goRow = await requireVisibleRow(db, user, decodeURIComponent(goMatch[1]));
     const profile = await profileForAction(db, user, goRow);
-    const link = affiliateLinksFor(profile).find((item) => item.id === decodeURIComponent(goMatch[2]));
+    const goReview = await getReview(db, goRow.id);
+    const goExtra = serveExtra(goReview, profile);
+    const link = affiliateLinksFor(profile, goExtra).find((item) => item.id === decodeURIComponent(goMatch[2]));
     if (!link) return json({ error: "no affiliate link" }, 404);
     assertAffiliateAllowed(profile, link);
     await db.run(
@@ -550,6 +573,7 @@ async function route(method, path, url, request, env) {
     const mine = await db.all("SELECT * FROM profiles WHERE author_id=?", [user.id]);
     for (const row of mine) {
       const profile = parseProfile(row);
+      if (!profile) continue;
       if (!exported.some((p) => p.id === profile.id)) exported.push(profile);
     }
     return json({ profiles: exported, hub_user: user.username });
@@ -685,23 +709,28 @@ async function upsertProfile(db, profile, user, { published = 0 } = {}) {
 
 async function profileForAction(db, user, row) {
   const working = parseProfile(row);
+  if (!working) throw new ValidationError("not found", 404);
   const review = await getReview(db, row.id);
   const staff = isModerator(user) || (user && Number(user.id) === Number(row.author_id));
   const doc = staff ? working : publicDocument(row, review, working);
   if (!doc) throw new ValidationError("not found", 404);
-  return validateProfile(doc);
+  return validateProfile(doc, serveExtra(review, working));
 }
 
 async function requireProfile(db, profileId) {
   const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
   if (!row) throw new ValidationError("profile not found", 404);
-  return validateProfile(parseProfile(row));
+  const working = parseProfile(row);
+  if (!working) throw new ValidationError("profile not found", 404);
+  const review = await getReview(db, profileId);
+  return validateProfile(working, serveExtra(review, working));
 }
 
 async function showProfile(request, db, env, profileId) {
   const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
   if (!row) throw new ValidationError("profile not found", 404);
   const working = parseProfile(row);
+  if (!working) throw new ValidationError("profile not found", 404);
   const review = await getReview(db, profileId);
   const user = await userFromAuth(request, db);
   const owner = user && Number(user.id) === Number(row.author_id);
@@ -710,8 +739,9 @@ async function showProfile(request, db, env, profileId) {
     return json({ error: "not found" }, 404);
   }
   const raw = owner || (user && (user.role === "moderator" || user.role === "admin")) ? working : publicDoc;
-  const profile = serveProfileDocument(raw);
-  if (isPsilocybin(profile) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
+  const extra = serveExtra(review, raw);
+  const profile = serveProfileDocument(raw, extra);
+  if (isPsilocybin(profile, extra) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
   const unlocked = await canRead(db, user, profile);
   const ratings = await db.all(
     "SELECT ratings.*, users.username FROM ratings JOIN users ON users.id = ratings.user_id WHERE profile_id=?",
@@ -744,7 +774,7 @@ async function showProfile(request, db, env, profileId) {
         stages: (Array.isArray(profile.stages) ? profile.stages : []).map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
         locked: true,
       };
-  const offMenu = isOffMenu(profile) || isPsilocybin(profile);
+  const offMenu = isOffMenu(profile) || isPsilocybin(profile, extra);
   const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profileId]);
   return json({
     profile: {
@@ -757,7 +787,7 @@ async function showProfile(request, db, env, profileId) {
     ratings,
     avg: avgRow?.a ?? null,
     reports,
-    links: offMenu ? [] : unlocked ? affiliateLinksFor(profile) : [],
+    links: offMenu ? [] : unlocked ? affiliateLinksFor(profile, extra) : [],
     disclosure: offMenu ? "" : DISCLOSURE,
     resources: offMenu
       ? { disclaimer: PSI_RESOURCE_DISCLAIMER, spore_law: PSI_SPORE_LAW, links: PSI_RESOURCES }
@@ -771,11 +801,13 @@ async function exportProfile(request, db, env, profileId) {
   const owner = user && Number(user.id) === Number(row.author_id);
   const review = await getReview(db, profileId);
   const working = parseProfile(row);
+  if (!working) return json({ error: "not found" }, 404);
   const staff = owner || isModerator(user);
   const raw = staff ? working : publicDocument(row, review, working);
   if (!raw) return json({ error: "not found" }, 404);
-  const profile = serveProfileDocument(raw);
-  if (isPsilocybin(profile) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
+  const extra = serveExtra(review, raw);
+  const profile = serveProfileDocument(raw, extra);
+  if (isPsilocybin(profile, extra) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
   if (!staff && !(await canRead(db, user, profile))) return json({ error: "purchase required" }, 402);
   await db.run("UPDATE profiles SET downloads=downloads+1 WHERE id=?", [profileId]);
   return json(profile);

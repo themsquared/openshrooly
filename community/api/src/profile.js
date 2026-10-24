@@ -18,13 +18,13 @@ export {
 
 import { isPsilocybin, ValidationError } from "./profile-schema.js";
 
-export function affiliateLinksFor(profile) {
-  if (isPsilocybin(profile) || profile.affiliates_allowed === false) return [];
+export function affiliateLinksFor(profile, extra = {}) {
+  if (isPsilocybin(profile, extra) || profile.affiliates_allowed === false) return [];
   return profile.affiliate_links || [];
 }
 
-export function assertAffiliateAllowed(profile, link) {
-  if (profile && (isPsilocybin(profile) || profile.affiliates_allowed === false)) {
+export function assertAffiliateAllowed(profile, link, extra = {}) {
+  if (profile && (isPsilocybin(profile, extra) || profile.affiliates_allowed === false)) {
     throw new ValidationError(
       "Affiliate links cannot be attached to the psilocybin pack (payment processors and affiliate programs prohibit it).",
       403

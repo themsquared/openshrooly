@@ -3,8 +3,10 @@
 import { randomToken } from "./crypto.js";
 import { ValidationError } from "./profile-schema.js";
 
-export const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
-export const PHOTO_MAX_EDGE = 4096;
+export const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
+export const PHOTO_MAX_EDGE = 8192;
+export const PHOTO_CLIENT_MAX_EDGE = 2048;
+export const MAX_PHOTO_BASE64_CHARS = Math.ceil(PHOTO_MAX_BYTES / 3) * 4;
 export const PHOTO_MIN_COUNT = 1;
 export const PHOTO_MAX_COUNT = 4;
 export const PHOTO_TYPES = {
@@ -55,7 +57,7 @@ function looksLikeMarkup(bytes) {
 export function assertSafeImage(bytes) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   if (b.byteLength < 16) throw new ValidationError("That photo is too small to be a real image.");
-  if (b.byteLength > PHOTO_MAX_BYTES) throw new ValidationError("Photos must be 5 MB or smaller.");
+  if (b.byteLength > PHOTO_MAX_BYTES) throw new ValidationError("Photos must be 8 MB or smaller.");
   const kind = sniffImage(b);
   if (kind) return kind;
   if (looksLikeMarkup(b)) throw new ValidationError("Only JPEG, PNG, or WebP photos are allowed.");
@@ -150,9 +152,70 @@ function rewriteDht(bytes, start, end) {
   });
 }
 
+function readJpegOrientation(bytes) {
+  let i = 2;
+  while (i + 4 <= bytes.length) {
+    if (bytes[i] !== 0xff) break;
+    while (i + 1 < bytes.length && bytes[i] === 0xff && bytes[i + 1] === 0xff) i += 1;
+    if (i + 1 >= bytes.length) break;
+    const marker = bytes[i + 1];
+    if (marker === 0xda || marker === 0xd9) break;
+    if (i + 4 > bytes.length) break;
+    const len = readU16(bytes, i + 2);
+    const end = i + 2 + len;
+    if (end > bytes.length) break;
+    if (marker === 0xe1) {
+      const start = i + 4;
+      if (start + 6 <= end && bytes[start] === 0x45 && bytes[start + 1] === 0x78 && bytes[start + 2] === 0x69 && bytes[start + 3] === 0x66) {
+        const tiff = start + 6;
+        const le = bytes[tiff] === 0x49 && bytes[tiff + 1] === 0x49;
+        const offset = readU32(bytes, tiff + 4, le);
+        const ifd = tiff + offset;
+        if (ifd + 2 <= end) {
+          const count = readU16(bytes, ifd, le);
+          for (let n = 0; n < count; n += 1) {
+            const entry = ifd + 2 + n * 12;
+            if (entry + 12 > end) break;
+            if (readU16(bytes, entry, le) === 0x0112) {
+              return readU16(bytes, entry + 8, le);
+            }
+          }
+        }
+      }
+    }
+    i = end;
+  }
+  return 1;
+}
+
+function orientationApp1(orientation) {
+  const out = new Uint8Array(36);
+  out[0] = 0xff;
+  out[1] = 0xe1;
+  out[2] = 0x00;
+  out[3] = 0x22;
+  out.set([0x45, 0x78, 0x69, 0x66, 0x00, 0x00], 4);
+  out.set([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00], 10);
+  out[18] = 0x01;
+  out[19] = 0x00;
+  out[20] = 0x12;
+  out[21] = 0x01;
+  out[22] = 0x03;
+  out[23] = 0x00;
+  out[24] = 0x01;
+  out[25] = 0x00;
+  out[26] = 0x00;
+  out[27] = 0x00;
+  out[28] = orientation & 255;
+  out[29] = 0x00;
+  return out;
+}
+
 export function stripJpeg(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new ValidationError("That JPEG is damaged.");
+  const orientation = readJpegOrientation(bytes);
   const out = [new Uint8Array([0xff, 0xd8])];
+  if (orientation >= 2 && orientation <= 8) out.push(orientationApp1(orientation));
   let i = 2;
   let width = 0;
   let height = 0;
@@ -225,12 +288,17 @@ export function stripJpeg(bytes) {
     throw new ValidationError(`Photos must be ${PHOTO_MAX_EDGE} pixels or smaller on each side.`);
   }
   if (!width || !height) throw new ValidationError("That JPEG is damaged.");
+  if (orientation >= 5 && orientation <= 8) {
+    const swap = width;
+    width = height;
+    height = swap;
+  }
   return { bytes: concat(out), width, height, contentType: PHOTO_TYPES.jpeg };
 }
 
 export function stripPng(bytes) {
   if (![...PNG].every((v, i) => bytes[i] === v)) throw new ValidationError("That PNG is damaged.");
-  const keep = new Set(["IHDR", "PLTE", "IDAT", "IEND"]);
+  const keep = new Set(["IHDR", "PLTE", "IDAT", "IEND", "tRNS"]);
   const out = [bytes.slice(0, 8)];
   let i = 8;
   let width = 0;
@@ -348,4 +416,33 @@ export function decodeBase64Photo(raw) {
   } catch {
     throw new ValidationError("That photo could not be read.");
   }
+}
+
+export function decodePhotoBase64(value) {
+  if (typeof value !== "string") throw new ValidationError("invalid photo encoding");
+  if (value.length > MAX_PHOTO_BASE64_CHARS) throw new ValidationError("photo too large");
+  try {
+    if (typeof Uint8Array.fromBase64 === "function") return Uint8Array.fromBase64(value);
+    return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+  } catch {
+    throw new ValidationError("invalid photo encoding");
+  }
+}
+
+export function bytesToBase64(bytes) {
+  const raw = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (typeof Buffer !== "undefined") return Buffer.from(raw).toString("base64");
+  let bin = "";
+  for (let i = 0; i < raw.length; i += 1) bin += String.fromCharCode(raw[i]);
+  return btoa(bin);
+}
+
+export function sanitizeGrowPhoto(input) {
+  const processed = processPhoto(input);
+  const kind = sniffImage(processed.bytes);
+  return {
+    ...processed,
+    kind,
+    ext: extForContentType(processed.contentType),
+  };
 }

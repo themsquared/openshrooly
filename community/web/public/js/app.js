@@ -628,7 +628,7 @@ async function renderModerate() {
               <label>Reason <input id="reason-${escapeHtml(p.id)}" placeholder="Required to reject or ask for changes"></label>
               <p class="pb-actions">
                 <button type="button" data-mod="approve" data-id="${escapeHtml(p.id)}">Approve</button>
-                <button type="button" class="secondary" data-mod="confirm-culinary" data-id="${escapeHtml(p.id)}">Confirm culinary</button>
+                ${r.can_confirm_culinary ? `<button type="button" class="secondary" data-mod="confirm-culinary" data-id="${escapeHtml(p.id)}">Confirm culinary</button>` : ""}
                 <button type="button" class="secondary" data-mod="request-changes" data-id="${escapeHtml(p.id)}">Ask for changes</button>
                 <button type="button" class="secondary" data-mod="reject" data-id="${escapeHtml(p.id)}">Reject</button>
                 <button type="button" class="secondary" data-mod="takedown" data-id="${escapeHtml(p.id)}">Take down</button>

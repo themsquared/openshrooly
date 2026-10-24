@@ -2,7 +2,7 @@
 
 import { requireVerified, userFromRequest } from "./auth.js";
 import { stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
-import { classifyTaxon } from "./profile-schema.js";
+import { canConfirmCulinary, classifyTaxon, reviewConfirmExtra } from "./profile-schema.js";
 import {
   approveReportPhoto,
   approveReview,
@@ -44,8 +44,20 @@ async function readJson(request) {
 }
 
 function parseProfile(row, seeds) {
-  if (row.author_id === null && seeds?.has(row.id)) return structuredClone(seeds.get(row.id));
-  return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  try {
+    if (row.author_id === null && seeds?.has(row.id)) return structuredClone(seeds.get(row.id));
+    return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  } catch (err) {
+    console.log(
+      JSON.stringify({
+        level: "warn",
+        event: "malformed_profile_document",
+        id: row?.id,
+        message: String(err?.message || err).slice(0, 200),
+      })
+    );
+    return null;
+  }
 }
 
 async function userOf(request, db) {
@@ -62,6 +74,7 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const out = [];
     for (const row of rows) {
       const profile = parseProfileRow(row);
+      if (!profile) continue;
       const review = await getReview(db, row.id);
       const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [row.id]);
       out.push({
@@ -83,12 +96,18 @@ export async function handleReview(method, path, url, request, env, { seeds, par
       if (!row) continue;
       const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [review.profile_id]);
       const queued = parseProfileRow(row);
-      const classified = classifyTaxon(queued, { title: review.title, description: review.description });
+      if (!queued) continue;
+      const extra = { title: review.title, description: review.description };
+      const classified = classifyTaxon(queued, extra);
       items.push({
         kind: "profile",
         id: review.profile_id,
         profile: queued,
-        review: { ...reviewView(review, photos), offmenu_reasons: classified.reasons },
+        review: {
+          ...reviewView(review, photos),
+          offmenu_reasons: classified.reasons,
+          can_confirm_culinary: Boolean(classified.hold && canConfirmCulinary(queued, extra)),
+        },
         affiliate_links: (queued.affiliate_links || []).map((link) => ({
           id: link.id,
           label: link.label,
@@ -267,7 +286,9 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const existing = await db.one("SELECT * FROM profiles WHERE id=?", [id]);
     if (!existing) return json({ error: "profile not found" }, 404);
     if (Number(existing.author_id) !== Number(user.id)) return json({ error: "forbidden" }, 403);
-    const profile = validateProfile(stripCommunityAffiliates(await readJson(request)));
+    const incoming = stripCommunityAffiliates(await readJson(request));
+    const priorReview = await getReview(db, id);
+    const profile = validateProfile(incoming, reviewConfirmExtra(priorReview, incoming));
     if (profile.id !== id) throw new ValidationError("profile id cannot change");
     profile.author = user.username;
     const priorRow = { ...existing, document: existing.document };

@@ -39,6 +39,7 @@ export function createMemoryDb() {
     profile_photos: [],
     moderation_log: [],
     profile_reports: [],
+    maintenance_state: [],
   };
   let ids = {
     users: 1,
@@ -562,9 +563,28 @@ function dispatch(mode, tables, ids, sql, params) {
     return tables.profiles;
   }
   if (q.startsWith("SELECT document FROM profiles") || q.startsWith("SELECT * FROM profiles WHERE published")) {
-    const rows = tables.profiles.filter((p) => p.published);
-    if (q.includes("author_id IS NOT NULL")) return rows.filter((p) => p.author_id != null);
+    let rows = tables.profiles.filter((p) => p.published);
+    if (q.includes("author_id IS NOT NULL")) rows = rows.filter((p) => p.author_id != null);
+    if (q.includes("id > ?")) rows = rows.filter((p) => String(p.id) > String(params[0] ?? ""));
+    if (q.includes("ORDER BY id")) rows = rows.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    if (q.includes("LIMIT ?")) rows = rows.slice(0, Number(params[params.length - 1]) || rows.length);
     return rows;
+  }
+  if (q.startsWith("SELECT * FROM maintenance_state WHERE key=")) {
+    return (tables.maintenance_state || []).filter((r) => r.key === params[0]);
+  }
+  if (q.startsWith("INSERT INTO maintenance_state")) {
+    tables.maintenance_state ||= [];
+    tables.maintenance_state.push({ key: params[0], value: params[1], updated_at: params[2] });
+    return { changes: 1, meta: { changes: 1 } };
+  }
+  if (q.startsWith("UPDATE maintenance_state SET value=")) {
+    const row = (tables.maintenance_state || []).find((r) => r.key === params[2]);
+    if (row) {
+      row.value = params[0];
+      row.updated_at = params[1];
+    }
+    return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
   }
   if (q.startsWith("UPDATE profiles SET published=?, document=?")) {
     const row = tables.profiles.find((p) => p.id === params[3]);

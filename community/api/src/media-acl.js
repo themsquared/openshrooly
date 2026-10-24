@@ -43,3 +43,8 @@ export async function insertMedia(db, { photo_key, owner_id, status, kind }) {
 export async function getMedia(db, photoKey) {
   return db.one("SELECT * FROM uploaded_media WHERE photo_key=?", [photoKey]);
 }
+
+export async function setMediaStatus(db, photoKey, status) {
+  if (!photoKey) return;
+  await db.run("UPDATE uploaded_media SET status=? WHERE photo_key=?", [status, photoKey]);
+}

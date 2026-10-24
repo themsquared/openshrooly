@@ -1,10 +1,18 @@
 /** Profile review, photos, reports, and moderator actions. Additive tables only. */
 
-import { nowIso, randomToken } from "./crypto.js";
+import { nowIso } from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { layout, button, escapeHtml } from "./email-layout.js";
-import { applyPackRules, classifyTaxon, needsOffmenuFlag, ValidationError } from "./profile-schema.js";
+import {
+  applyPackRules,
+  canConfirmCulinary,
+  classifyTaxon,
+  needsOffmenuFlag,
+  reviewConfirmExtra,
+  ValidationError,
+} from "./profile-schema.js";
 import { PHOTO_MAX_COUNT, extForContentType, photoObjectKey, prescreenImage, processPhoto } from "./photos.js";
+import { insertMedia, pendingPhotoKey, setMediaStatus } from "./media-acl.js";
 import { rateLimit, rateLimitClient } from "./security.js";
 
 export const REVIEW_DRAFT = "draft";
@@ -48,10 +56,19 @@ export async function getReview(db, profileId) {
   return db.one("SELECT * FROM profile_review WHERE profile_id=?", [profileId]);
 }
 
+function confirmFields(existing, profile, { confirm = false, actorId = null, at = null } = {}) {
+  if (confirm) return { confirmed_culinary_at: at || nowIso(), confirmed_by: actorId };
+  if (!existing?.confirmed_culinary_at) return { confirmed_culinary_at: null, confirmed_by: null };
+  if (profile && !reviewConfirmExtra(existing, profile).confirmedCulinary) {
+    return { confirmed_culinary_at: null, confirmed_by: null };
+  }
+  return { confirmed_culinary_at: existing.confirmed_culinary_at, confirmed_by: existing.confirmed_by ?? null };
+}
+
 export async function upsertReview(db, row) {
   const ts = nowIso();
   await db.run(
-    "INSERT INTO profile_review (profile_id, status, reason, title, description, live_document, blocklist_hit, offmenu_flag, published_live, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(profile_id) DO UPDATE SET status=excluded.status, reason=excluded.reason, title=excluded.title, description=excluded.description, live_document=excluded.live_document, blocklist_hit=excluded.blocklist_hit, offmenu_flag=excluded.offmenu_flag, published_live=excluded.published_live, updated_at=excluded.updated_at",
+    "INSERT INTO profile_review (profile_id, status, reason, title, description, live_document, blocklist_hit, offmenu_flag, published_live, created_at, updated_at, confirmed_culinary_at, confirmed_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(profile_id) DO UPDATE SET status=excluded.status, reason=excluded.reason, title=excluded.title, description=excluded.description, live_document=excluded.live_document, blocklist_hit=excluded.blocklist_hit, offmenu_flag=excluded.offmenu_flag, published_live=excluded.published_live, updated_at=excluded.updated_at, confirmed_culinary_at=excluded.confirmed_culinary_at, confirmed_by=excluded.confirmed_by",
     [
       row.profile_id,
       row.status,
@@ -64,6 +81,8 @@ export async function upsertReview(db, row) {
       row.published_live ? 1 : 0,
       row.created_at || ts,
       ts,
+      row.confirmed_culinary_at ?? null,
+      row.confirmed_by ?? null,
     ]
   );
 }
@@ -134,6 +153,7 @@ export async function saveDraftReview(db, profile, { title = "", description = "
     offmenu_flag: needsOffmenuFlag(profile, { title, description }),
     published_live: Number(existing?.published_live) === 1 || legacyLive,
     created_at: existing?.created_at,
+    ...confirmFields(existing, profile),
   });
 }
 
@@ -162,6 +182,7 @@ export async function submitForReview(db, env, request, { profile, user, title, 
     offmenu_flag: needsOffmenuFlag(normalized, extra),
     published_live: Number(existing?.published_live) === 1,
     created_at: existing?.created_at,
+    ...confirmFields(existing, normalized),
   });
   await logModeration(db, {
     profileId: profile.id,
@@ -177,8 +198,7 @@ export async function approveReview(db, env, request, { profile, user, row, pack
   if (!review || review.status !== REVIEW_PENDING) throw new ValidationError("This profile is not waiting for review.");
   const extra = { title: review.title, description: review.description };
   if (pack === "culinary" || pack === "psilocybin") extra.moderatorPack = pack;
-  const classified = classifyTaxon(profile, extra);
-  if (extra.moderatorPack === "culinary" && classified.force) {
+  if (extra.moderatorPack === "culinary" && !canConfirmCulinary(profile, extra)) {
     throw new ValidationError("This taxon cannot be confirmed as culinary.", 400);
   }
   const normalized = applyPackRules(profile, extra);
@@ -192,6 +212,7 @@ export async function approveReview(db, env, request, { profile, user, row, pack
     live_document: JSON.stringify(normalized),
     offmenu_flag: extra.moderatorPack === "culinary" ? false : needsOffmenuFlag(normalized, extra),
     published_live: 1,
+    ...confirmFields(review, normalized, { confirm: extra.moderatorPack === "culinary", actorId: user.id, at: ts }),
   });
   await db.run("UPDATE profile_photos SET status='approved', updated_at=? WHERE profile_id=? AND withdrawn=0", [
     nowIso(),
@@ -252,6 +273,7 @@ export async function takedownReview(db, env, request, { profile, user, row, rea
     if (!report.photo_key || report.photo_status !== "approved") continue;
     if (env?.storage?.delete) await env.storage.delete(report.photo_key);
     await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["rejected", report.id]);
+    await setMediaStatus(db, report.photo_key, "rejected");
   }
   await logModeration(db, {
     profileId: profile.id,
@@ -285,6 +307,7 @@ export async function maybeResetOnPublicEdit(db, profile, { title, description }
     description: description != null ? String(description) : review.description,
     offmenu_flag: needsOffmenuFlag(profile, { title, description }),
     reason: "Waiting for review of an edit.",
+    ...confirmFields(review, profile),
   });
   await logModeration(db, { profileId: profile.id, actorId: null, action: "edit_resubmit", reason: "body" });
   return getReview(db, profile.id);
@@ -315,9 +338,10 @@ export async function storeReportPhoto(db, env, request, { profileId, user, raw 
   const limited = await rateLimit(db, `report-photo:${user.id}:${rateLimitClient(request)}`, 10, 3600);
   if (!limited.ok) throw new ValidationError("Too many photo uploads this hour.", 429);
   const processed = processPhoto(raw);
-  const pendingKey = `reports/${profileId}/${randomToken()}.${extForContentType(processed.contentType)}`;
+  const pendingKey = pendingPhotoKey("reports", profileId, extForContentType(processed.contentType));
   const stored = await env.storage.put(pendingKey, processed.bytes, processed.contentType);
   if (!stored) throw new ValidationError("Photo storage is not enabled yet. See the deploy note for the media bucket.", 503);
+  await insertMedia(db, { photo_key: pendingKey, owner_id: user.id, status: "pending", kind: "report" });
   return { photoKey: pendingKey, photoStatus: "pending" };
 }
 
@@ -334,43 +358,63 @@ export async function listPendingReportPhotos(db) {
 
 function shouldReclassifyLive(profile) {
   const classified = classifyTaxon(profile);
-  if (classified.force) return true;
-  const confirmed = profile?.pack === "culinary" && !profile?.restricted;
-  return classified.hold && !confirmed;
+  return classified.force || classified.hold;
 }
 
-export async function backfillLegacyReviews(db) {
-  const rows = await db.all("SELECT * FROM profiles WHERE published = 1 AND author_id IS NOT NULL");
+function parseLegacyDocument(row) {
+  try {
+    return JSON.parse(row.document);
+  } catch (err) {
+    console.log(
+      JSON.stringify({
+        level: "warn",
+        event: "malformed_legacy_document",
+        id: row.id,
+        message: String(err?.message || err).slice(0, 200),
+      })
+    );
+    return null;
+  }
+}
+
+export async function reclassifyUnconfirmedLegacyBatch(db, { limit = 25, afterId = "" } = {}) {
+  const done = await db.one("SELECT * FROM maintenance_state WHERE key=?", ["legacy_reclassify"]);
+  if (done?.value === "done") return { scanned: 0, rewritten: 0, lastId: afterId, done: true };
+  const cursor = afterId || (done?.value && done.value !== "done" ? done.value : "");
+  const rows = await db.all(
+    "SELECT * FROM profiles WHERE published = 1 AND author_id IS NOT NULL AND id > ? ORDER BY id LIMIT ?",
+    [cursor, limit]
+  );
+  let scanned = 0;
+  let rewritten = 0;
+  let lastId = cursor;
   for (const row of rows) {
-    let doc;
-    try {
-      doc = JSON.parse(row.document);
-    } catch {
-      continue;
-    }
+    scanned += 1;
+    lastId = row.id;
+    const doc = parseLegacyDocument(row);
+    if (!doc) continue;
     const existing = await getReview(db, row.id);
+    if (existing?.confirmed_culinary_at) continue;
+    if (!shouldReclassifyLive(doc) && existing) continue;
+    const normalized = applyPackRules(doc);
+    const nextDoc = JSON.stringify(normalized);
+    if (nextDoc !== row.document) {
+      await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [nextDoc, nowIso(), row.id]);
+      rewritten += 1;
+    }
     if (!existing) {
-      const normalized = applyPackRules(doc);
-      if (JSON.stringify(normalized) !== row.document) {
-        await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), nowIso(), row.id]);
-      }
       await upsertReview(db, {
         profile_id: row.id,
         status: REVIEW_PUBLISHED,
         reason: "",
         title: normalized.name || "",
         description: normalized.summary || "",
-        live_document: JSON.stringify(normalized),
+        live_document: nextDoc,
         offmenu_flag: needsOffmenuFlag(normalized),
         published_live: 1,
         created_at: row.created_at,
       });
       continue;
-    }
-    if (!shouldReclassifyLive(doc)) continue;
-    const normalized = applyPackRules(doc);
-    if (JSON.stringify(normalized) !== row.document) {
-      await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), nowIso(), row.id]);
     }
     let live = normalized;
     if (existing.live_document) {
@@ -381,17 +425,28 @@ export async function backfillLegacyReviews(db) {
       }
     }
     if (shouldReclassifyLive(live)) live = applyPackRules(live);
+    const liveJson = JSON.stringify(live);
+    const flag = needsOffmenuFlag(live) ? 1 : 0;
+    if (liveJson === existing.live_document && Number(existing.offmenu_flag) === flag) continue;
     await upsertReview(db, {
       ...existing,
-      live_document: JSON.stringify(live),
-      offmenu_flag: needsOffmenuFlag(live),
+      live_document: liveJson,
+      offmenu_flag: flag,
+      ...confirmFields(existing, live),
     });
   }
+  const finished = rows.length < limit;
+  const value = finished ? "done" : lastId;
+  const ts = nowIso();
+  if (done) await db.run("UPDATE maintenance_state SET value=?, updated_at=? WHERE key=?", [value, ts, "legacy_reclassify"]);
+  else await db.run("INSERT INTO maintenance_state (key, value, updated_at) VALUES (?, ?, ?)", ["legacy_reclassify", value, ts]);
+  return { scanned, rewritten, lastId, done: finished };
 }
 
 export async function approveReportPhoto(db, { report, user }) {
   if (!report || report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
   await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["approved", report.id]);
+  if (report.photo_key) await setMediaStatus(db, report.photo_key, "approved");
   await logModeration(db, {
     profileId: report.profile_id,
     actorId: user.id,
@@ -407,6 +462,7 @@ export async function rejectReportPhoto(db, env, { report, user, reason }) {
   }
   if (report.photo_key && env?.storage?.delete) await env.storage.delete(report.photo_key);
   await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["rejected", report.id]);
+  if (report.photo_key) await setMediaStatus(db, report.photo_key, "rejected");
   await logModeration(db, {
     profileId: report.profile_id,
     actorId: user.id,

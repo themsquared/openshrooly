@@ -306,7 +306,9 @@ CREATE TABLE IF NOT EXISTS profile_review (
     offmenu_flag INTEGER NOT NULL DEFAULT 0,
     published_live INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    confirmed_culinary_at TEXT,
+    confirmed_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_profile_review_status ON profile_review(status, updated_at);
 CREATE TABLE IF NOT EXISTS profile_photos (
@@ -334,7 +336,8 @@ CREATE TABLE IF NOT EXISTS moderation_log (
 CREATE INDEX IF NOT EXISTS idx_moderation_log_profile ON moderation_log(profile_id, id);
 INSERT OR IGNORE INTO profile_review (
     profile_id, status, reason, title, description, live_document,
-    blocklist_hit, offmenu_flag, published_live, created_at, updated_at
+    blocklist_hit, offmenu_flag, published_live, created_at, updated_at,
+    confirmed_culinary_at, confirmed_by
 )
 SELECT
     id,
@@ -347,9 +350,16 @@ SELECT
     0,
     1,
     created_at,
-    updated_at
+    updated_at,
+    NULL,
+    NULL
 FROM profiles
 WHERE published = 1 AND author_id IS NOT NULL AND json_valid(document);
+CREATE TABLE IF NOT EXISTS maintenance_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS profile_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

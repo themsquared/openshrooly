@@ -983,8 +983,8 @@ test("moderator culinary confirm rewrites held edibles and refuses force-match t
   });
   assert.equal(approved.status, 200, JSON.stringify(approved.data));
   const heldLive = await call(ctx, "GET", "/api/profiles/m-tremella");
-  assert.equal(heldLive.data.profile.pack, "psilocybin");
-  assert.ok(heldLive.data.profile.legal_notice);
+  assert.equal(heldLive.data.profile.pack, "culinary");
+  assert.equal(heldLive.data.profile.legal_notice, null);
 });
 
 test("legacy culinary-labeled psilocybin JSON is reclassified on backfill", async () => {
@@ -1018,7 +1018,7 @@ test("moderator queue shows flag reasons and the UI can confirm culinary", async
   const alice = await register(ctx, "a6-alice@example.com");
   const mod = await makeModerator(ctx, "a6-mod@example.com");
   const doc = draftFrom(pearl, "a6-morel");
-  doc.species = "Morchella esculenta";
+  doc.species = "Agaricus sp.";
   await call(ctx, "POST", "/api/profiles", { token: alice.token, body: doc });
   await call(ctx, "POST", "/api/profiles/a6-morel/photos", {
     token: alice.token,
@@ -1026,16 +1026,18 @@ test("moderator queue shows flag reasons and the UI can confirm culinary", async
   });
   await call(ctx, "POST", "/api/profiles/a6-morel/publish", {
     token: alice.token,
-    body: { title: "Morel", description: "Held edible" },
+    body: { title: "Agaricus", description: "Held edible" },
   });
   const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
   const item = queue.data.items.find((entry) => entry.id === "a6-morel");
   assert.ok(item);
   assert.equal(item.review.offmenu_flag, true);
   assert.ok(Array.isArray(item.review.offmenu_reasons));
-  assert.ok(item.review.offmenu_reasons.some((reason) => /allowlist|restricted|genus/i.test(reason)));
+  assert.ok(item.review.offmenu_reasons.some((reason) => /allowlist|restricted|genus|placeholder/i.test(reason)));
+  assert.equal(item.review.can_confirm_culinary, true);
   const app = readFileSync(join(root, "community/web/public/js/app.js"), "utf8");
   assert.match(app, /Confirm culinary/);
+  assert.match(app, /can_confirm_culinary/);
   assert.match(app, /pack:\s*["']culinary["']/);
 });
 
