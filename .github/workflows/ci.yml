@@ -91,6 +91,11 @@ jobs:
           echo "NEXT_BUILD_ID=$NEXT_BUILD_ID"
           npm run build
 
+      - name: Dashboard and signed update tests
+        run: |
+          (cd webapp && npm test)
+          python3 scripts/test_signed_update.py
+
       - name: Verify embedded assets are current
         run: |
           python3 esphome/external_components/web_server/embed_static_files.py \
