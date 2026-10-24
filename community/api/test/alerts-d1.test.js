@@ -20,8 +20,11 @@ function baseSchema() {
   try {
     return execFileSync("git", ["show", "0edd16e:community/api/schema.sql"], { cwd: root, encoding: "utf8" });
   } catch {
-    // Without git history, strip this change's tables from the current schema.
-    return readFileSync(new URL("schema.sql", root), "utf8").split("-- Grow alerts")[0];
+    // Shallow clones (CI) lack that commit: drop every statement of this migration from the current schema.
+    const norm = (s) => s.replace(/\s+/g, " ");
+    const added = new Set(statements(MIGRATION).map(norm));
+    const kept = statements(readFileSync(new URL("schema.sql", root), "utf8")).filter((s) => !added.has(norm(s)));
+    return kept.join(";\n") + ";\n";
   }
 }
 
