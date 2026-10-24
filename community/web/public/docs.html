@@ -36,7 +36,7 @@
   <header class="site-header" data-chrome="header">
     <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html" aria-current="page">Docs</a><span id="session-nav"></span></nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html">Grow Coach</a><a href="/docs.html" aria-current="page">Docs</a><span id="session-nav"></span></nav>
   </header>
   <!--/CHROME_HEADER-->
   <main id="main">
@@ -46,14 +46,14 @@
       <p class="lede answer-first">Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.</p>
       <h2>Profiles</h2>
       <p>A Profile is a chamber recipe: humidity, temperature, fresh air, light, and days for each stage. Browse Profiles on this site, then pull one to your Hub.</p>
-      <h2>Hub</h2>
+      <h2 id="hub">Hub</h2>
       <p>Hub is the local app on your network. It stores Profiles and sends each stage's temperature, humidity, light, and fresh air settings to a chamber. Growing does not need the cloud.</p>
       <h2>Grow Coach</h2>
       <p>Grow Coach is a culinary subscription, coming soon at $3.99 per month. It will use your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later.</p>
       <h2>Community</h2>
       <p>Community is this site: the public catalog, ratings, grow reports, and forks. Works with Shrooly devices running OpenShrooly.</p>
-      <h2>Claim a chamber</h2>
-      <p>Optional. The device shows a short code. Claiming binds it to your account for cloud tools. Local controls still win if the cloud is down.</p>
+      <h2 id="claim">Link a chamber</h2>
+      <p>Optional, and it needs a firmware update that is not out yet. When it ships, you turn on Connect to Shroom Labs on the chamber's local page, then scan the QR or type the 6-character code on the <a href="/claim.html">link page</a>. Until then, growing stays on your network. Local controls still win if the cloud is down.</p>
       <h2>Install and updates</h2>
       <p>Put OpenShrooly on a Shrooly from Chrome or Edge with a USB-C cable on the <a href="/install.html">install page</a>. Later versions install over Wi-Fi when you press Check for updates on your Shrooly's page. Only releases signed by Shroom Labs are accepted, and your Shrooly keeps its current version if anything looks wrong.</p>
       <p class="actions"><a class="button" href="/">Browse Profiles</a> <a class="button secondary" href="/faq.html">Read the FAQ</a></p>
@@ -62,7 +62,7 @@
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">
     <p>Works with Shrooly devices running OpenShrooly.</p>
-    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a></nav>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html">Grow Coach</a><a href="/docs.html">Docs</a></nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>
