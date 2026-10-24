@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS grow_reports (
     flushes INTEGER,
     device_name TEXT,
     photo_key TEXT,
+    photo_status TEXT NOT NULL DEFAULT 'approved',
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS entitlements (

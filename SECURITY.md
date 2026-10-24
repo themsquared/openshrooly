@@ -10,7 +10,7 @@ Shroom Labs and OpenShrooly treat **security and UX as non-negotiable**. If a ch
 | Local hub | LAN attacker applying a profile | Hub binds to the home network; no cloud required; optional community token is a hashed Bearer secret |
 | Shroom Labs accounts | Credential stuffing, phishing, session theft | Passwordless default (magic link, OIDC, passkeys); httpOnly `Secure; SameSite=None` host cookies; refresh rotation; verified email before publish/buy/claim |
 | Paid culinary items | Charge without entitlement | Checkout stub + entitlement row; psilocybin pack cannot take payments |
-| Grow photos | Public object leak | R2 keys, no secrets in git, least-privilege Worker bindings |
+| Grow photos | Public object leak, XSS via SVG/HTML, EXIF/GPS | Magic-byte sniff (JPEG/PNG/WebP only), metadata strip, size/dimension caps, `/api/media` nosniff + `Content-Disposition: inline` + `default-src 'none'`. New grow-report photos stay pending (owner/staff only) until approved. Missing: moderator queue, approve/reject API, and staff UI — approval is a D1 `photo_status='approved'` write. R2 is unbound in production, so there are no stored grow-report objects to reprocess. |
 | Psilocybin pack | Commerce / affiliate ToS | Validators hard-block paid + affiliates |
 | Device identity | Stolen chamber / cloned cert / malicious cloud apply | On-device P-256 key; short-lived client certs; revoke + re-claim; local setpoints win |
 | Grow Coach | Unpaid inference, prompt leak of another chamber, restricted-pack coaching | Entitlement + daily caps; device ownership check; culinary-only refusal; slim grounding (no raw telemetry dump); approve or opt-in auto-tune inside hard bounds |
