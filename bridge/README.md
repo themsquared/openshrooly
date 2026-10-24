@@ -14,7 +14,7 @@ npm ci
 MATTER_STORAGE_PATH="$HOME/shroom-labs-bridge" HUB_URL=http://127.0.0.1:8090 node src/index.js
 ```
 
-Keep that directory. It holds the fabric and the pairing identity. Open the hub at http://127.0.0.1:8090/smart-home for the QR and the 11-digit code.
+Keep that directory. It holds the fabric and the pairing identity. Sign in on the hub, then open http://127.0.0.1:8090/smart-home for the QR and the 11-digit code. The status HTTP port is 127.0.0.1:8091 only.
 
 ## Docker (Linux)
 

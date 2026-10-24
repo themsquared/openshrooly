@@ -15,7 +15,7 @@ Works with Shrooly devices running OpenShrooly. The firmware stays offline-first
 
 It does **not** flash firmware or replace the on-device dashboard.
 
-The optional Matter sidecar (`bridge/`) makes chambers show up in Apple Home and Google Home. Pairing lives on **Smart Home** in this hub. See [`docs/SMART_HOME.md`](../docs/SMART_HOME.md).
+The optional Matter sidecar (`bridge/`) makes chambers show up in Apple Home and Google Home. Pairing lives on **Smart Home** and needs the hub admin login. See [`docs/SMART_HOME.md`](../docs/SMART_HOME.md).
 
 ## Requirements
 
@@ -44,7 +44,7 @@ docker run --rm -p 8090:8090 \
   openshrooly-hub
 ```
 
-On a Pi, `--network host` makes mDNS discovery more reliable.
+On a Pi, `--network host` makes mDNS discovery more reliable. `docker-compose.yml` uses host networking for both the hub and the Matter bridge so the pairing status server can stay on `127.0.0.1`.
 
 ## Configuration
 
@@ -56,8 +56,11 @@ On a Pi, `--network host` makes mDNS discovery more reliable.
 | `COMMUNITY_URL` | `http://127.0.0.1:8787` | Shroom Labs API (`https://api.shroomlabs.io` in production) |
 | `COMMUNITY_TOKEN` | empty | Hub API token from a Shroom Labs account |
 | `HUB_POLL_SECONDS` | `60` | Sensor history interval |
-| `BRIDGE_STATUS_URL` | `http://127.0.0.1:8091` | Matter sidecar status (pairing codes) |
+| `BRIDGE_STATUS_URL` | `http://127.0.0.1:8091` | Matter sidecar status HTTP (loopback only) |
+| `BRIDGE_STATUS_FILE` | empty | Optional shared file the sidecar writes (`/shared/status.json` in compose) |
 | `HUB_NEEDS_WATER_PCT` | `15` | Water percent that maps to the Home "needs water" contact |
+| `HUB_ADMIN_PASSWORD` | empty | Hub admin password. If empty, the hub writes one to `admin.json` |
+| `HUB_SECRET` | dev default | Signs the hub session cookie. Set your own on a real hub |
 
 The psilocybin pack is **off** unless you opt in. Even then, those profiles stay free and never carry affiliate links.
 

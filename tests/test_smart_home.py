@@ -113,13 +113,27 @@ def test_pairing_qr_svg_from_matter_payload():
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("HUB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("HUB_ADMIN_PASSWORD", "test-admin-9x")
     from hub import config
 
     config.DB_PATH = tmp_path / "hub.sqlite"
     config.ENABLE_PSILOCYBIN = False
+    config.ADMIN_PASSWORD = "test-admin-9x"
     config.BRIDGE_STATUS_URL = "http://127.0.0.1:1"
+    config.BRIDGE_STATUS_FILE = ""
     with TestClient(app) as test_client:
         yield test_client
+
+
+def _login(client):
+    client.get("/login")
+    token = client.cookies.get("hub_csrf")
+    return client.post(
+        "/login",
+        data={"username": "admin", "password": "test-admin-9x", "csrf": token, "next": "/smart-home"},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
 
 
 def test_api_smart_home_state_empty(client):
@@ -145,14 +159,23 @@ def test_api_smart_home_state_from_saved_device(client):
 
 
 def test_pairing_endpoint_is_503_when_bridge_is_down(client):
+    assert _login(client).status_code == 303
     response = client.get("/api/smart-home/pairing")
     assert response.status_code == 503
     assert response.json()["reachable"] is False
 
 
 def test_smart_home_page_names_missing_bridge(client):
+    assert _login(client).status_code == 303
     page = client.get("/smart-home")
     assert page.status_code == 200
     assert b"Matter bridge is not running" in page.content
     assert b"Apple Home" in page.content
     assert b"Google Home" in page.content
+
+
+def test_pairing_without_login_is_refused(client):
+    response = client.get("/api/smart-home/pairing")
+    assert response.status_code == 401
+    page = client.get("/smart-home", follow_redirects=False)
+    assert page.status_code == 303

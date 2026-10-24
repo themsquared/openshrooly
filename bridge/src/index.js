@@ -2,11 +2,14 @@ import { mkdirSync } from "node:fs";
 
 import { loadOrCreateIdentity } from "./identity.js";
 import { createMatterBridge, pairingStatus, pollHub } from "./matter-bridge.js";
-import { startStatusServer } from "./status-http.js";
+import { writeStatusFile } from "./status-file.js";
+import { defaultStatusBinds, startStatusServer } from "./status-http.js";
 
 const storagePath = process.env.MATTER_STORAGE_PATH || "./data";
 const hubUrl = process.env.HUB_URL || "http://127.0.0.1:8090";
 const statusPort = Number(process.env.BRIDGE_STATUS_PORT || 8091);
+const statusFile = process.env.BRIDGE_STATUS_FILE || "";
+const statusBinds = defaultStatusBinds();
 const matterPort = Number(process.env.MATTER_PORT || 5540);
 const pollMs = Number(process.env.BRIDGE_POLL_MS || 10_000);
 const logLevel = process.env.MATTER_LOG_LEVEL || "warn";
@@ -38,10 +41,18 @@ const { server, aggregator } = await createMatterBridge({
 let chamberCount = 0;
 
 await server.start();
-const statusServer = await startStatusServer(statusPort, () => pairingStatus(server, chamberCount));
+
+function currentStatus() {
+  const body = pairingStatus(server, chamberCount);
+  writeStatusFile(statusFile, body);
+  return body;
+}
+
+const statusServer = await startStatusServer(statusPort, currentStatus, statusBinds);
+currentStatus();
 
 console.log(`Matter bridge online on port ${matterPort}. Pairing codes are on the hub Smart Home page.`);
-console.log(`Status HTTP on 127.0.0.1:${statusPort}. Hub URL ${hubUrl}.`);
+console.log(`Status HTTP on ${statusServer.addresses.join(", ")}. Hub URL ${hubUrl}.`);
 
 async function tick() {
   try {

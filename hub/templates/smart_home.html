@@ -15,14 +15,16 @@
 <div class="cards">
   <article class="card pairing-card">
     <h2>Pairing code</h2>
-    <p class="muted">Shown only on this local page. Do not send it to shroomlabs.io or paste it into a chat.</p>
+    <p class="muted">Shown after you sign in on this hub. Hidden after the first pair. Do not send it to shroomlabs.io or paste it into a chat.</p>
     {% if qr_svg %}
     <div class="pairing-qr" role="img" aria-label="Matter pairing QR code">{{ qr_svg|safe }}</div>
     {% endif %}
     {% if bridge.manual_code %}
     <p class="pairing-code">{{ bridge.manual_code }}</p>
+    {% elif bridge.commissioned %}
+    <p>This hub is already paired. The setup code is hidden. Use Turn On Pairing Mode in Apple Home if you need to add Google Home.</p>
     {% else %}
-    <p>This hub is already paired. Use Pair another app on the Home hub settings if you need a fresh code (later step).</p>
+    <p>No pairing code from the bridge yet.</p>
     {% endif %}
     <p class="muted">Test vendor {{ bridge.vendor_id or "0xFFF1" }} / product {{ bridge.product_id or "0x8000" }}. Apple and Google will call this an uncertified accessory.</p>
   </article>

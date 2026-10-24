@@ -26,6 +26,7 @@ from openshrooly_lib.schema import ValidationError, validate_profile  # noqa: E4
 from openshrooly_lib.sync import build_push  # noqa: E402
 from openshrooly_lib.webutil import json_dumps  # noqa: E402
 
+from . import auth  # noqa: E402
 from . import config  # noqa: E402
 from . import db  # noqa: E402
 from .discover import discover_esphome  # noqa: E402
@@ -189,6 +190,7 @@ def page(request: Request, name: str, **context):
         {
             "enable_psilocybin": config.ENABLE_PSILOCYBIN,
             "community_url": config.COMMUNITY_URL,
+            "admin_signed_in": auth.is_authenticated(request),
         }
     )
     return templates.TemplateResponse(request, name, context)
@@ -467,8 +469,31 @@ def api_devices(request: Request):
     return [dict(row) for row in request.app.state.conn.execute("SELECT * FROM devices")]
 
 
+def _status_from_payload(payload) -> dict:
+    if not isinstance(payload, dict):
+        return {"ok": False, "reachable": False}
+    payload["ok"] = True
+    payload["reachable"] = True
+    return payload
+
+
+def read_bridge_status_file() -> dict | None:
+    path = config.BRIDGE_STATUS_FILE
+    if not path:
+        return None
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    return _status_from_payload(payload)
+
+
 def fetch_bridge_status() -> dict:
     """Ask the Matter sidecar for pairing state. Never log the body."""
+    from_file = read_bridge_status_file()
+    if from_file and from_file.get("reachable"):
+        return from_file
+
     import urllib.error
     import urllib.request
 
@@ -479,11 +504,55 @@ def fetch_bridge_status() -> dict:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
         return {"ok": False, "reachable": False}
-    if not isinstance(payload, dict):
-        return {"ok": False, "reachable": False}
-    payload["ok"] = True
-    payload["reachable"] = True
-    return payload
+    return _status_from_payload(payload)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, next: str = "/smart-home"):
+    token = auth.new_csrf()
+    response = page(request, "login.html", error=None, next_path=next, csrf=token)
+    response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
+    return response
+
+
+@app.post("/login")
+def login_submit(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+    csrf: str = Form(""),
+    next: str = Form("/smart-home"),
+):
+    blocked = auth.require_write_guard(request, csrf)
+    if blocked:
+        return blocked
+    if username != auth.ADMIN_USER or not auth.passwords_match(password, auth.admin_password()):
+        token = auth.new_csrf()
+        response = page(request, "login.html", error="Wrong user name or password.", next_path=next, csrf=token)
+        response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
+        return response
+    target = next if next.startswith("/") else "/smart-home"
+    response = RedirectResponse(target, status_code=303)
+    response.set_cookie(
+        auth.SESSION_COOKIE,
+        auth.session_token(),
+        httponly=True,
+        samesite="lax",
+        path="/",
+        max_age=auth.SESSION_TTL_S,
+    )
+    response.set_cookie(auth.CSRF_COOKIE, auth.new_csrf(), httponly=True, samesite="lax", path="/")
+    return response
+
+
+@app.post("/logout")
+def logout(request: Request, csrf: str = Form("")):
+    blocked = auth.require_write_guard(request, csrf)
+    if blocked:
+        return blocked
+    response = RedirectResponse("/", status_code=303)
+    response.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return response
 
 
 @app.get("/api/smart-home/state")
@@ -493,32 +562,29 @@ def api_smart_home_state(request: Request):
 
 
 @app.get("/api/smart-home/pairing")
-def api_smart_home_pairing():
+def api_smart_home_pairing(request: Request):
+    denied = auth.require_admin(request)
+    if denied:
+        return denied
     status = fetch_bridge_status()
     if not status.get("reachable"):
         return JSONResponse({"ok": False, "reachable": False}, status_code=503)
-    return {
-        "ok": True,
-        "reachable": True,
-        "commissioned": bool(status.get("commissioned")),
-        "fabrics": status.get("fabrics", 0),
-        "qr": status.get("qr"),
-        "manual_code": status.get("manual_code"),
-        "vendor_id": status.get("vendor_id"),
-        "product_id": status.get("product_id"),
-        "chambers": status.get("chambers"),
-    }
+    return auth.public_pairing(status)
 
 
 @app.get("/smart-home", response_class=HTMLResponse)
 def smart_home_page(request: Request):
-    status = fetch_bridge_status()
+    denied = auth.require_admin(request)
+    if denied:
+        return denied
+    status = auth.public_pairing(fetch_bridge_status())
     qr_payload = status.get("qr") if status.get("reachable") else None
     return page(
         request,
         "smart_home.html",
         bridge=status,
         qr_svg=pairing_qr_svg(qr_payload) if qr_payload else None,
+        csrf=request.cookies.get(auth.CSRF_COOKIE) or "",
     )
 
 

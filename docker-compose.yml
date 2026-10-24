@@ -1,22 +1,24 @@
 # Local hub and the Matter bridge sidecar.
-# The bridge needs host networking for mDNS and IPv6 multicast.
-# On a Mac mini, run the bridge with Node on the host instead. See docs/SMART_HOME.md.
+# Both use host networking so the hub can reach the status server on 127.0.0.1.
+# The status server also writes /shared/status.json on a volume the hub can read
+# if someone runs the hub without host networking. It does not listen on the LAN.
+# On a Mac mini, run the bridge with Node on the host. See docs/SMART_HOME.md.
 services:
   hub:
     build:
       context: .
       dockerfile: hub/Dockerfile
-    ports:
-      - "8090:8090"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    network_mode: host
     environment:
       HUB_ENABLE_PSILOCYBIN: "0"
       COMMUNITY_URL: ${COMMUNITY_URL:-https://api.shroomlabs.io}
       COMMUNITY_TOKEN: ${COMMUNITY_TOKEN:-}
-      BRIDGE_STATUS_URL: ${BRIDGE_STATUS_URL:-http://host.docker.internal:8091}
+      HUB_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:-}
+      BRIDGE_STATUS_URL: http://127.0.0.1:8091
+      BRIDGE_STATUS_FILE: /shared/status.json
     volumes:
       - hub-data:/app/hub/data
+      - bridge-status:/shared:ro
 
   bridge:
     build:
@@ -26,13 +28,17 @@ services:
     environment:
       HUB_URL: ${HUB_URL:-http://127.0.0.1:8090}
       BRIDGE_STATUS_PORT: "8091"
+      BRIDGE_STATUS_BIND: "127.0.0.1"
+      BRIDGE_STATUS_FILE: /shared/status.json
       MATTER_STORAGE_PATH: /data
       MATTER_LOG_LEVEL: warn
     volumes:
       - bridge-data:/data
+      - bridge-status:/shared
     depends_on:
       - hub
 
 volumes:
   hub-data:
   bridge-data:
+  bridge-status:

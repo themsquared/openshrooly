@@ -19,6 +19,7 @@ esphome/data/www/_next/static/
 .venv/
 hub/data/*.sqlite
 hub/data/*.sqlite-*
+hub/data/admin.json
 community/api/node_modules/
 community/web/node_modules/
 bridge/node_modules/

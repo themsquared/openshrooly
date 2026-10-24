@@ -22,7 +22,9 @@ The bridge talks only to the hub (`GET /api/smart-home/state`). It never opens a
 
 ## How to pair
 
-The pairing code is a secret. It lives on the hub volume / bridge data directory. The hub Smart Home page shows it. It is not written to logs and is not sent to shroomlabs.io.
+The pairing code is a secret. It lives on the hub volume / bridge data directory. The hub Smart Home page shows it only after you sign in as `admin`, and only before the first pair. It is not written to logs and is not sent to shroomlabs.io.
+
+Sign in at `http://<hub-host>:8090/login`. The password is `HUB_ADMIN_PASSWORD`, or the generated value in the hub data file `admin.json`. Scripts can use HTTP Basic `admin:<password>`, same as the chamber. Writes (sign in, sign out) need a CSRF token and must come from this hub's own page.
 
 ### Once, for Google Home
 
@@ -34,7 +36,7 @@ Without that project, Google Home will not finish pairing a test-VID bridge.
 
 ### Apple Home (iPhone)
 
-1. Open the hub on the LAN: `http://<hub-host>:8090/smart-home`. Leave the QR on screen.
+1. Open the hub on the LAN, sign in, then open `http://<hub-host>:8090/smart-home`. Leave the QR on screen.
 2. Home app: **+**, **Add Accessory**, scan the QR. Or type the 11-digit code.
 3. Tap **Add Anyway** at Uncertified Accessory.
 4. Pick a room. Each chamber should show temperature, humidity, and water.
@@ -53,11 +55,12 @@ Matter advertises over mDNS (IPv4 and IPv6 multicast) on UDP port 5540. A Docker
 
 On Linux (a Pi or a Linux box):
 
-- The `bridge` service in `docker-compose.yml` uses `network_mode: host`.
-- Keep it that way. Do not put the bridge on a user-defined bridge network.
-- The hub can stay on a published port. It reaches the sidecar at `http://host.docker.internal:8091`.
+- `docker-compose.yml` gives **both** the hub and the bridge `network_mode: host`.
+- The status server listens on `127.0.0.1:8091` only. It does not listen on Wi-Fi or Ethernet.
+- The hub reads `http://127.0.0.1:8091/status`. Because both processes share the host network, that loopback address works.
+- The sidecar also writes `/shared/status.json` on a compose volume. The hub reads that file if HTTP is down.
 
-The hub itself does not need host networking for pairing. mDNS discovery of chambers is more reliable with host networking, same as before.
+Do not publish port 8091. Do not bind the status server to `0.0.0.0`.
 
 ## Mac mini notes
 
@@ -73,7 +76,7 @@ npm ci
 MATTER_STORAGE_PATH="$HOME/shroom-labs-bridge" HUB_URL=http://127.0.0.1:8090 node src/index.js
 ```
 
-The hub can stay in Docker (`8090:8090`) or also run on the Mac. Point `HUB_URL` at `http://127.0.0.1:8090`. Point `BRIDGE_STATUS_URL` at `http://127.0.0.1:8091` if the hub is not in Docker.
+Run the hub on the Mac as well (or with host networking). Point `HUB_URL` at `http://127.0.0.1:8090` and `BRIDGE_STATUS_URL` at `http://127.0.0.1:8091`. A hub container on Docker Desktop's VM network cannot reach a status server that is bound only to the Mac's loopback.
 
 Keep `$HOME/shroom-labs-bridge`. That directory is the fabric. Deleting it unpairs every home app.
 
@@ -104,7 +107,7 @@ The Mac and the iPhone / Google Home speaker must be on the same LAN. Client iso
 
 `needs_water` is true when `water_pct` is below 15, the same empty / S0 band as the chamber banner and `docs/ALERTS.md`. Offline chambers keep last readings and set `needs_water` / `light_on` to null.
 
-`GET /api/smart-home/pairing` proxies the sidecar. It is 503 when the bridge is down. The Smart Home page uses it for the QR.
+`GET /api/smart-home/pairing` and `GET /smart-home` need the hub admin login. They return no QR or manual code until you sign in, and they hide both after the first pair. Pairing is 503 when the bridge is down. The Smart Home page uses it for the QR.
 
 ## Ships
 
@@ -121,7 +124,7 @@ Native Matter on the chamber, HAP-python, and Google cloud-to-cloud stay out of 
 ## Tests
 
 ```bash
-PYTHONPATH=shared:. python -m pytest -q tests/test_smart_home.py
+PYTHONPATH=shared:. python -m pytest -q tests/test_smart_home.py tests/test_hub_auth.py tests/test_bridge_status_reachability.py
 cd bridge && npm test
 ```
 
