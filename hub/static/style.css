@@ -195,3 +195,21 @@ pre { white-space: pre-wrap; background: #06100c; color: var(--sl-ink); padding:
 .gauge-tile strong { display: block; font-size: 1.8rem; letter-spacing: -0.04em; }
 footer { color: var(--sl-muted); }
 .hero p { max-width: 42rem; color: var(--sl-ink-dim); }
+.pairing-card { max-width: 28rem; }
+.pairing-qr {
+  background: #fff;
+  color: #111;
+  padding: 12px;
+  border-radius: 12px;
+  width: min(100%, 220px);
+  margin: 0.8rem 0;
+}
+.pairing-qr svg { display: block; width: 100%; height: auto; }
+.pairing-code {
+  font-family: "Fraunces", var(--sl-font);
+  font-size: 1.8rem;
+  letter-spacing: 0.08em;
+  margin: 0.4rem 0 0.8rem;
+}
+.plain-list { max-width: 42rem; padding-left: 1.2rem; }
+.plain-list li { margin: 0.35rem 0; }

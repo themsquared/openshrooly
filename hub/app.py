@@ -29,6 +29,7 @@ from openshrooly_lib.webutil import json_dumps  # noqa: E402
 from . import config  # noqa: E402
 from . import db  # noqa: E402
 from .discover import discover_esphome  # noqa: E402
+from .smart_home import pairing_qr_svg, smart_home_state  # noqa: E402
 from .species_art import species_photo  # noqa: E402
 
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
@@ -464,6 +465,61 @@ def sync_pull(request: Request):
 @app.get("/api/devices")
 def api_devices(request: Request):
     return [dict(row) for row in request.app.state.conn.execute("SELECT * FROM devices")]
+
+
+def fetch_bridge_status() -> dict:
+    """Ask the Matter sidecar for pairing state. Never log the body."""
+    import urllib.error
+    import urllib.request
+
+    url = config.BRIDGE_STATUS_URL.rstrip("/") + "/status"
+    request = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        return {"ok": False, "reachable": False}
+    if not isinstance(payload, dict):
+        return {"ok": False, "reachable": False}
+    payload["ok"] = True
+    payload["reachable"] = True
+    return payload
+
+
+@app.get("/api/smart-home/state")
+def api_smart_home_state(request: Request):
+    rows = request.app.state.conn.execute("SELECT * FROM devices ORDER BY name").fetchall()
+    return smart_home_state(rows, config.NEEDS_WATER_THRESHOLD_PCT)
+
+
+@app.get("/api/smart-home/pairing")
+def api_smart_home_pairing():
+    status = fetch_bridge_status()
+    if not status.get("reachable"):
+        return JSONResponse({"ok": False, "reachable": False}, status_code=503)
+    return {
+        "ok": True,
+        "reachable": True,
+        "commissioned": bool(status.get("commissioned")),
+        "fabrics": status.get("fabrics", 0),
+        "qr": status.get("qr"),
+        "manual_code": status.get("manual_code"),
+        "vendor_id": status.get("vendor_id"),
+        "product_id": status.get("product_id"),
+        "chambers": status.get("chambers"),
+    }
+
+
+@app.get("/smart-home", response_class=HTMLResponse)
+def smart_home_page(request: Request):
+    status = fetch_bridge_status()
+    qr_payload = status.get("qr") if status.get("reachable") else None
+    return page(
+        request,
+        "smart_home.html",
+        bridge=status,
+        qr_svg=pairing_qr_svg(qr_payload) if qr_payload else None,
+    )
 
 
 @app.get("/api/profiles")

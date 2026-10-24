@@ -28,6 +28,7 @@ STATUS_ENTITIES: dict[str, tuple[str, str, ...]] = {
     "light_status": ("text_sensor", "light_status",),
     "target_humidity": ("number", "target_humidity",),
     "temperature_target": ("number", "temperature_target", "temperature__target"),
+    "grow_lights": ("binary_sensor", "grow_lights", "grow_lights_on"),
 }
 
 

@@ -1,5 +1,6 @@
-# Local hub + (optional) community API/web are usually run with Python/Node.
-# This file is the Pi-friendly hub container only.
+# Local hub and the Matter bridge sidecar.
+# The bridge needs host networking for mDNS and IPv6 multicast.
+# On a Mac mini, run the bridge with Node on the host instead. See docs/SMART_HOME.md.
 services:
   hub:
     build:
@@ -7,11 +8,31 @@ services:
       dockerfile: hub/Dockerfile
     ports:
       - "8090:8090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       HUB_ENABLE_PSILOCYBIN: "0"
       COMMUNITY_URL: ${COMMUNITY_URL:-https://api.shroomlabs.io}
       COMMUNITY_TOKEN: ${COMMUNITY_TOKEN:-}
+      BRIDGE_STATUS_URL: ${BRIDGE_STATUS_URL:-http://host.docker.internal:8091}
     volumes:
       - hub-data:/app/hub/data
+
+  bridge:
+    build:
+      context: .
+      dockerfile: bridge/Dockerfile
+    network_mode: host
+    environment:
+      HUB_URL: ${HUB_URL:-http://127.0.0.1:8090}
+      BRIDGE_STATUS_PORT: "8091"
+      MATTER_STORAGE_PATH: /data
+      MATTER_LOG_LEVEL: warn
+    volumes:
+      - bridge-data:/data
+    depends_on:
+      - hub
+
 volumes:
   hub-data:
+  bridge-data:

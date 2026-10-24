@@ -17,6 +17,7 @@ Mike's fork adds a **local hub** and **[Shroom Labs](https://shroomlabs.io)** on
 - Architecture, data model, sync, monetization, Grow Coach, and hosting costs: [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/COACH.md`](docs/COACH.md)
 - Profile JSON (culinary + optional restricted pack): [`data/profiles/`](data/profiles/)
 - Local hub (Pi / Docker): [`hub/README.md`](hub/README.md)
+- Matter bridge (Apple Home / Google Home): [`docs/SMART_HOME.md`](docs/SMART_HOME.md) · [`bridge/README.md`](bridge/README.md)
 - Shroom Labs (shroomlabs.io frontend, api.shroomlabs.io, cdn.shroomlabs.io): [`community/README.md`](community/README.md)
 - Design system: [`design/`](design/) · UX: [`docs/UX.md`](docs/UX.md) · Security: [`SECURITY.md`](SECURITY.md) · Auth keys: [`docs/AUTH.md`](docs/AUTH.md)
 - Expo iOS scaffold: [`mobile/`](mobile/)

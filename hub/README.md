@@ -15,6 +15,8 @@ Works with Shrooly devices running OpenShrooly. The firmware stays offline-first
 
 It does **not** flash firmware or replace the on-device dashboard.
 
+The optional Matter sidecar (`bridge/`) makes chambers show up in Apple Home and Google Home. Pairing lives on **Smart Home** in this hub. See [`docs/SMART_HOME.md`](../docs/SMART_HOME.md).
+
 ## Requirements
 
 - Python 3.11+
@@ -54,6 +56,8 @@ On a Pi, `--network host` makes mDNS discovery more reliable.
 | `COMMUNITY_URL` | `http://127.0.0.1:8787` | Shroom Labs API (`https://api.shroomlabs.io` in production) |
 | `COMMUNITY_TOKEN` | empty | Hub API token from a Shroom Labs account |
 | `HUB_POLL_SECONDS` | `60` | Sensor history interval |
+| `BRIDGE_STATUS_URL` | `http://127.0.0.1:8091` | Matter sidecar status (pairing codes) |
+| `HUB_NEEDS_WATER_PCT` | `15` | Water percent that maps to the Home "needs water" contact |
 
 The psilocybin pack is **off** unless you opt in. Even then, those profiles stay free and never carry affiliate links.
 
