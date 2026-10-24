@@ -677,6 +677,31 @@ test("official profile report photos reach the queue and can be rejected", async
   assert.equal(live.status, 200);
 });
 
+test("report-photo reject requires a non-empty reason", async () => {
+  const ctx = testEnv();
+  const mallory = await register(ctx, "empty-reason-rep@example.com");
+  const mod = await makeModerator(ctx, "empty-reason-mod@example.com");
+  const report = await call(ctx, "POST", "/api/profiles/chestnut/reports", {
+    token: mallory.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.profile_id === "chestnut");
+  const empty = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/reject`, {
+    token: mod.token,
+    body: { reason: "   " },
+  });
+  assert.equal(empty.status, 400);
+  const missing = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/reject`, {
+    token: mod.token,
+    body: {},
+  });
+  assert.equal(missing.status, 400);
+  const still = await ctx.db.one("SELECT photo_status FROM grow_reports WHERE id=?", [item.report_id]);
+  assert.equal(still.photo_status, "pending");
+});
+
 test("report photo uploads have their own rate limit and text reports are limited", async () => {
   const ctx = testEnv();
   const user = await register(ctx, "rate-rep@example.com");

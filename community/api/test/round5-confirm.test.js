@@ -76,6 +76,20 @@ const IDENTITY_PSYCHO = [
   { id: "r6-galerina", species: "Pleurotus galerina" },
 ];
 
+const CUBE_IDENTITY = [
+  { id: "r7-gt-name", species: "Pleurotus ostreatus", name: "Golden Teacher" },
+  { id: "r7-pe-strain", species: "Pleurotus ostreatus", strain: "Penis Envy" },
+  { id: "r7-bplus", species: "Pleurotus ostreatus", strain: "B+" },
+  { id: "r7-b-plus", species: "Pleurotus ostreatus", strain: "B Plus" },
+  { id: "r7-gt-title", species: "Agaricus bisporus", title: "Golden Teacher" },
+  { id: "r7-gt-near", species: "Pleurotus ostreatus", name: "Golden Teachr" },
+];
+
+const CULINARY_STAY = [
+  { id: "r7-blue-oyster", species: "Pleurotus ostreatus", name: "Blue Oyster" },
+  { id: "r7-golden-oyster", species: "Pleurotus citrinopileatus", name: "Golden Oyster" },
+];
+
 const IDENTITY_HOLD = [
   { id: "i-strain", species: "Agaricus bisporus", strain: "cubensis" },
   { id: "i-vg", species: "Agaricus bisporus", variety_group: "cubensis" },
@@ -149,6 +163,55 @@ test("R6 identity fields classify off-menu even when species is on the allowlist
     assert.equal(live.data.profile.pack, "psilocybin", row.id);
     const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
     assert.equal(culinary.data.some((p) => p.id === row.id), false, row.id);
+  }
+});
+
+test("cube strain names on a culinary species classify off-menu, free, with the legal notice", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "r7-cube-alice@example.com");
+  const mod = await makeModerator(ctx, "r7-cube-mod@example.com");
+  for (const row of CUBE_IDENTITY) {
+    const extra = row.title ? { title: row.title } : {};
+    const doc = draftFrom(pearl, row.id);
+    doc.species = row.species;
+    if (row.strain) doc.strain = row.strain;
+    if (row.name) doc.name = row.name;
+    doc.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+    doc.allowed_payment_providers = ["stripe"];
+    const classified = classifyTaxon(doc, extra);
+    assert.equal(classified.culinary, false, JSON.stringify(row));
+    assert.equal(classified.hold || classified.force, true, JSON.stringify(row));
+    assert.equal(canConfirmCulinary(doc, extra), false, JSON.stringify(row));
+    const normalized = applyPackRules(doc, extra);
+    assert.equal(normalized.pack, "psilocybin", JSON.stringify(row));
+    assert.equal(normalized.pricing.kind, "free", JSON.stringify(row));
+    assert.equal(normalized.legal_notice, PSILOCYBIN_LEGAL_NOTICE, JSON.stringify(row));
+    await queueProfile(ctx, { token: alice.token, doc, title: row.title || doc.name });
+    const approved = await call(ctx, "POST", `/api/moderation/${row.id}/approve`, { token: mod.token, body: {} });
+    assert.equal(approved.status, 200, JSON.stringify({ row, data: approved.data }));
+    const live = await call(ctx, "GET", `/api/profiles/${row.id}`);
+    assert.equal(live.data.profile.pack, "psilocybin", row.id);
+    assert.equal(live.data.profile.pricing.kind, "free", row.id);
+    assert.equal(live.data.profile.legal_notice, PSILOCYBIN_LEGAL_NOTICE, row.id);
+    const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+    assert.equal(culinary.data.some((p) => p.id === row.id), false, row.id);
+  }
+});
+
+test("plain Blue Oyster and Golden Oyster stay culinary", () => {
+  for (const row of CULINARY_STAY) {
+    const doc = draftFrom(pearl, row.id);
+    doc.species = row.species;
+    doc.name = row.name;
+    doc.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+    doc.allowed_payment_providers = ["stripe"];
+    const classified = classifyTaxon(doc);
+    assert.equal(classified.culinary, true, JSON.stringify(row));
+    assert.equal(classified.hold, false, JSON.stringify(row));
+    const normalized = applyPackRules(doc);
+    assert.equal(normalized.pack, "culinary", JSON.stringify(row));
+    assert.equal(normalized.pricing.kind, "paid", JSON.stringify(row));
+    assert.equal(normalized.legal_notice, null, JSON.stringify(row));
   }
 });
 
@@ -287,40 +350,42 @@ test("M3 confirm writes the marker and owner edits keep culinary unless the taxo
   assert.equal(put2.data.profile.pack, "psilocybin");
 });
 
-test("R6 reclass cursor version reruns after a v1 done marker", async () => {
+test("R7 reclass cursor version reruns after a v2 done marker", async () => {
   const ctx = testEnv();
-  const alice = await register(ctx, "r6-reclass@example.com");
-  const doc = draftFrom(pearl, "r6-magic-legacy");
+  const alice = await register(ctx, "r7-reclass@example.com");
+  const doc = draftFrom(pearl, "r7-gt-legacy");
   doc.species = "Pleurotus ostreatus";
-  doc.name = "Magic mushrooms";
+  doc.name = "Golden Teacher";
   doc.pack = "culinary";
   doc.restricted = false;
   const stamped = "2024-01-01T00:00:00.000Z";
   await ctx.db.run(
     "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-    ["r6-magic-legacy", JSON.stringify(doc), alice.user.id, 1, stamped, stamped]
+    ["r7-gt-legacy", JSON.stringify(doc), alice.user.id, 1, stamped, stamped]
   );
   await ctx.db.run("INSERT INTO maintenance_state (key, value, updated_at) VALUES (?, ?, ?)", [
-    "legacy_reclassify",
+    "legacy_reclassify_v2",
     "done",
     stamped,
   ]);
-  const clean = draftFrom(pearl, "r6-clean-oyster");
+  const clean = draftFrom(pearl, "r7-clean-oyster");
   clean.species = "Pleurotus ostreatus";
   clean.name = "Pearl Oyster";
   await ctx.db.run(
     "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-    ["r6-clean-oyster", JSON.stringify(clean), alice.user.id, 1, stamped, stamped]
+    ["r7-clean-oyster", JSON.stringify(clean), alice.user.id, 1, stamped, stamped]
   );
   const batch = await reclassifyUnconfirmedLegacyBatch(ctx.db, { limit: 10 });
   assert.equal(batch.done, true);
-  const rewritten = JSON.parse((await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["r6-magic-legacy"])).document);
+  const rewritten = JSON.parse((await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["r7-gt-legacy"])).document);
   assert.equal(rewritten.pack, "psilocybin");
-  const cleanRow = await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["r6-clean-oyster"]);
+  assert.equal(rewritten.legal_notice, PSILOCYBIN_LEGAL_NOTICE);
+  const cleanRow = await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["r7-clean-oyster"]);
   assert.equal(JSON.parse(cleanRow.document).pack, "culinary");
   assert.equal(cleanRow.updated_at, stamped);
   const state = await ctx.db.one("SELECT * FROM maintenance_state WHERE key=?", [RECLASS_STATE_KEY]);
   assert.equal(state.value, "done");
+  assert.equal(RECLASS_STATE_KEY, "legacy_reclassify_v3");
 });
 
 test("M4 request path does not run legacy reclassification", async () => {

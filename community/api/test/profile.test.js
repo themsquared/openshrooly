@@ -135,6 +135,8 @@ const CULINARY_CASES = [
   { field: "species", value: "Auricularia auricula-judae" },
   { field: "species", value: "Cordyceps militaris" },
   { field: "name", value: "Shiitake (椎茸)" },
+  { field: "name", value: "Blue Oyster" },
+  { field: "name", value: "Golden Oyster" },
 ];
 
 test("a culinary label cannot hide a restricted species", () => {

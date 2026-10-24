@@ -32,11 +32,15 @@ function reportPhotoHtml(item, mediaSrc) {
               <p class="muted">${escapeHtml(item.uploader?.username || "unknown")} · ${escapeHtml(item.outcome || "")}</p>
               <p>${escapeHtml(item.notes || "")}</p>
               ${thumb}
-              <label>Reason <input id="reason-report-photo-${escapeHtml(rid)}" placeholder="Required to reject"></label>
+              ${
+                rid
+                  ? `<label>Reason <input id="reason-report-photo-${escapeHtml(rid)}" placeholder="Required to reject"></label>
               <p class="pb-actions">
                 <button type="button" data-mod="report-photo-approve" data-id="${escapeHtml(rid)}">Approve</button>
                 <button type="button" class="secondary" data-mod="report-photo-reject" data-id="${escapeHtml(rid)}">Reject</button>
-              </p>
+              </p>`
+                  : ""
+              }
             </article>`;
 }
 

@@ -33,6 +33,8 @@ test("mixed moderation queue renders report photos and skips a broken item", () 
 
   const broken = queueItemHtml({ kind: "report-photo" });
   assert.match(broken, /Grow report photo/);
+  assert.doesNotMatch(broken, /data-mod="report-photo-approve"/);
+  assert.doesNotMatch(broken, /data-mod="report-photo-reject"/);
   assert.equal(queueItemHtml({ kind: "unknown", profile: { pack: "culinary" } }), "");
   assert.equal(queueItemHtml({ kind: "profile" }), "");
   assert.equal(queueItemHtml(null), "");

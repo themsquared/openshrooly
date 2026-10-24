@@ -356,7 +356,7 @@ export async function listPendingReportPhotos(db) {
   return out;
 }
 
-export const RECLASS_STATE_KEY = "legacy_reclassify_v2";
+export const RECLASS_STATE_KEY = "legacy_reclassify_v3";
 export const RECLASS_BATCH_LIMIT = 10;
 
 function shouldReclassifyLive(profile) {
@@ -475,6 +475,7 @@ export async function rejectReportPhoto(db, env, { report, user, reason }) {
   if (!report || (report.photo_status !== "pending" && report.photo_status !== "approved")) {
     throw new ValidationError("This report photo cannot be removed.");
   }
+  if (!String(reason || "").trim()) throw new ValidationError("Add a reason for the owner.");
   if (report.photo_key && env?.storage?.delete) await env.storage.delete(report.photo_key);
   await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["rejected", report.id]);
   if (report.photo_key) await setMediaStatus(db, report.photo_key, "rejected");

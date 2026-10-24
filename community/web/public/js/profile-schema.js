@@ -407,6 +407,29 @@ function identityHasLookalike(profile, extra = {}) {
 }
 
 const IDENTITY_PROSE_WORDS = new Set(["cubes", "shroom", "shrooms", "mushies"]);
+const CUBE_STRAIN_ALIASES = new Set(["b+", "bplus"]);
+
+function textHasPhraseNearMiss(text, phrases, { maxDist = 1, minLen = 6 } = {}) {
+  if (!text) return false;
+  if (phrases.some((name) => text === name || text.includes(name))) return true;
+  const words = text.split(" ");
+  for (const name of phrases) {
+    const n = name.split(" ").length;
+    if (!n || words.length < n) continue;
+    for (let i = 0; i <= words.length - n; i += 1) {
+      const window = words.slice(i, i + n).join(" ");
+      if (window === name) return true;
+      if (nearMissToken(window, [name], { fold: foldTaxonToken, maxDist, minLen })) return true;
+    }
+  }
+  return false;
+}
+
+function textHasCubeStrain(text) {
+  if (!text) return false;
+  if (textHasPhraseNearMiss(text, CUBE_STRAINS)) return true;
+  return text.split(" ").some((word) => CUBE_STRAIN_ALIASES.has(word));
+}
 
 function identityHasPsychoactiveTerm(profile, extra = {}) {
   if (identityHasPsychoactiveGenus(profile, extra)) return true;
@@ -418,7 +441,8 @@ function identityHasPsychoactiveTerm(profile, extra = {}) {
     text = text.replace(/\bvitamin b\+/g, " ").replace(/\s+/g, " ").trim();
     if (!text) continue;
     const wordSet = new Set(text.split(" "));
-    if (PSYCHOACTIVE_PHRASES.some((name) => text.includes(name))) return true;
+    if (textHasPhraseNearMiss(text, PSYCHOACTIVE_PHRASES)) return true;
+    if (textHasCubeStrain(text)) return true;
     if ([...IDENTITY_PROSE_WORDS].some((word) => wordSet.has(word))) return true;
   }
   return false;

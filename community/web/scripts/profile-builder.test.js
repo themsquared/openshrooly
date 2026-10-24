@@ -166,6 +166,13 @@ test("scientific names force Off-menu; slang in prose only flags", () => {
   const held = blankProfile({ id: "gt-common", name: "Golden Teacher", pack: "culinary" });
   held.species = "Unknown garden mushroom";
   assert.equal(classifyTaxon(held).hold, true);
+  const gtOyster = blankProfile({ id: "gt-oyster", name: "Golden Teacher", pack: "culinary" });
+  gtOyster.species = "Pleurotus ostreatus";
+  assert.equal(classifyTaxon(gtOyster).culinary, false);
+  assert.equal(classifyTaxon(gtOyster).hold, true);
+  const goldenOyster = blankProfile({ id: "golden-oyster", name: "Golden Oyster", pack: "culinary" });
+  goldenOyster.species = "Pleurotus citrinopileatus";
+  assert.equal(classifyTaxon(goldenOyster).culinary, true);
   const oyster = blankProfile({ id: "still-oyster", name: "Pearl Oyster", pack: "culinary" });
   oyster.species = "Pleurotus ostreatus";
   assert.equal(classifyTaxon(oyster).culinary, true);
