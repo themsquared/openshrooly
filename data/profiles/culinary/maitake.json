@@ -72,7 +72,7 @@
         "white_led_lux": 506,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 80
+        "blue_percent": 0
       },
       "fan": {
         "period_min": 25,
@@ -99,7 +99,7 @@
         "white_led_lux": 506,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 80
+        "blue_percent": 0
       },
       "fan": {
         "period_min": 20,
@@ -140,17 +140,17 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Colonization is dark. Fruiting uses 12 h (Kurahashi) and 37% white, mapped from the 500 lux yield optimum. White fluorescent outyielded blue in that trial, so the white channel carries the intensity and blue stays as a modest WS2812 bias.",
+    "why": "Colonization is dark. Fruiting uses 12 h (Kurahashi 2015) and 37% white, mapped from the 500 lux yield optimum in Chi 2008. That trial found white outyielded blue and green, so RGB stays off and the white channel carries the light. Blue is not used because it conflicted with that yield result.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
-        "title": "Oh et al. 2008 maitake",
-        "detail": "Studies on Favorable Light Condition for Artificial Cultivation of Grifola frondosa, Korean J. Mycology 36 (2008). White light outyielded blue and green. Primordia formed best at 200 lux. Yield was best at 500 lux. 500 lux maps to 37% white.",
+        "title": "Chi et al. 2008 maitake",
+        "detail": "Jeong-Hyun Chi et al., Studies on Favorable Light Condition for Artificial Cultivation of Grifola frondosa, Korean J. Mycology 36 (2008). White light outyielded blue and green. Primordia formed best at 200 lux. Yield was best at 500 lux. 500 lux maps to 37% white.",
         "url": "https://doi.org/10.4489/kjm.2008.36.1.031"
       },
       {
-        "title": "Kurahashi et al. 2014",
-        "detail": "A Grifola frondosa fruiting trial used a 12 h light / 12 h dark cycle under white fluorescent light, then compared 463 nm blue LED and near-UV. Dark-grown caps stayed pale and antler-like.",
+        "title": "Kurahashi et al. 2015",
+        "detail": "Atsushi Kurahashi et al., A putative transcription factor Gf.BMR1 in Grifola frondosa, the homolog of BMR1 in Bipolaris oryzae, was strongly induced by near-ultraviolet light and blue light, Mycoscience 56 (2015). Fruiting used a 12 h light / 12 h dark cycle under a white fluorescent lamp, then compared 463 nm blue LED and near-UV. Dark-grown caps stayed pale and antler-like.",
         "url": "https://doi.org/10.1016/j.myc.2014.05.005"
       },
       {
@@ -172,7 +172,7 @@
         "white_brightness_percent": 37,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 80
+        "blue_percent": 0
       }
     }
   }

@@ -1,7 +1,18 @@
 from pathlib import Path
 
 from openshrooly_lib.catalog import load_profile_by_id, load_seed_profiles
-from openshrooly_lib.light_recipes import recipe_for
+from openshrooly_lib.light_recipes import (
+    BAARS_2020,
+    CHI_2008,
+    JOZIFEK_2025,
+    KURAHASHI_2015,
+    LIN_2024,
+    RICHARTZ_1987,
+    WALDBILLIG_2023,
+    XIE_2018,
+    recipe_for,
+)
+from openshrooly_lib.schema import is_https_source_url
 from openshrooly_lib.mapping import (
     apply_recipe_to_profile,
     brightness_percent_to_lux,
@@ -84,3 +95,56 @@ def test_every_seed_recipe_has_a_source_and_matches_catalog():
         assert fruiting.light.duration_hours == phase.photoperiod_hours
         assert fruiting.light.blue_percent == phase.blue_percent
         assert fruiting.light.white_led_lux == brightness_percent_to_lux(phase.white_brightness_percent)
+
+
+def test_source_urls_must_be_https():
+    assert is_https_source_url(None)
+    assert is_https_source_url("https://doi.org/10.3390/molecules25132984")
+    for bad in ("javascript:alert(1)", "data:text/html,hi", "http://example.com/paper"):
+        assert is_https_source_url(bad) is False
+
+
+def test_corrected_citations_match_the_papers():
+    assert "Richartz" in RICHARTZ_1987.detail
+    assert "MacLellan" in RICHARTZ_1987.detail
+    assert "Genomics 110" in XIE_2018.detail
+    assert "Gene 646" not in XIE_2018.detail
+    assert "Jozifek" in JOZIFEK_2025.detail
+    assert "24 h continuous" in JOZIFEK_2025.detail
+    assert "pink stress" in JOZIFEK_2025.detail
+    assert "Lin et al" in LIN_2024.detail
+    assert "compound" in LIN_2024.detail
+    assert "yield" in LIN_2024.detail and "not for a yield" in LIN_2024.detail
+    assert "Baars" in BAARS_2020.detail
+    assert "Kurahashi et al. 2015" in KURAHASHI_2015.title or "2015" in KURAHASHI_2015.detail
+    assert "Waldbillig" in WALDBILLIG_2023.detail
+    assert "Frontiers in Fungal Biology" in WALDBILLIG_2023.detail
+    maitake = recipe_for("maitake")
+    assert maitake.phases["fruiting"].blue_percent == 0
+    assert "outyielded" in CHI_2008.detail
+    shiitake = recipe_for("shiitake")
+    text = " ".join([shiitake.why] + [note.detail for note in shiitake.sources])
+    assert "high-calcium" in text
+    assert "low-calcium" in text
+    assert "incubation" in text
+    catalog = " ".join(
+        f"{note.title} {note.detail} {note.url or ''}"
+        for recipe in (
+            recipe_for("pearl-oyster"),
+            recipe_for("king-oyster"),
+            recipe_for("lions-mane"),
+            recipe_for("cordyceps-militaris"),
+            recipe_for("button-cremini"),
+            recipe_for("maitake"),
+            recipe_for("golden-teacher"),
+        )
+        for note in recipe.sources
+    )
+    assert "Durand" not in catalog
+    assert "Kertesz" not in catalog
+    assert "McKernan" not in catalog
+    assert "Kazda" not in catalog
+    assert "PLOS ONE" not in catalog
+    lions = recipe_for("lions-mane")
+    assert lions.phases["fruiting"].photoperiod_hours == 12
+    assert lions.phases["fruiting"].white_brightness_percent == 37

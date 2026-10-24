@@ -167,22 +167,22 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Colonization and the browning rest stay dark (mycelium grows faster without strong light). Fruiting uses 12 h and the general 20% white / blue mix. Leatham and Kim show light, especially blue, is needed for normal caps. No shiitake-specific lux for this chamber was found.",
+    "why": "Colonization and the browning rest stay dark (mycelium grows faster without strong light). Fruiting uses 12 h and the general 20% white / blue mix. Leatham found blue helped only on high-calcium media and suppressed fruiting on low-calcium media. Kim 2024 applied blue during incubation, not fruiting. No shiitake-specific fruiting lux for this chamber was found.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
         "title": "Leatham and Stahmann 1987",
-        "detail": "Gary F. Leatham and Mark A. Stahmann, Effect of light and aeration on fruiting of Lentinula edodes, Trans. Br. Mycol. Soc. 88 (1987). Light is required for normal fruiting. Blue 400 to 500 nm stimulated fruiting on high-calcium media. Only pigmented primordia expanded.",
-        "url": "https://www.fpl.fs.usda.gov/documnts/pdf1987/leath87a.pdf"
+        "detail": "Gary F. Leatham and Mark A. Stahmann, Effect of light and aeration on fruiting of Lentinula edodes, Trans. Br. Mycol. Soc. 88 (1987). Light is required for normal fruiting. Blue 400 to 500 nm stimulated fruiting on high-calcium media and suppressed fruiting on low-calcium media. Only pigmented primordia expanded.",
+        "url": "https://doi.org/10.1016/s0007-1536(87)80180-8"
       },
       {
         "title": "Kim 2024 shiitake blue light",
-        "detail": "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). Blue light raised yield versus white in two cultivars.",
+        "detail": "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). Blue light was applied during incubation, not during fruiting. Yield and ergothioneine rose versus white in two cultivars. This recipe does not treat that as a fruiting-stage blue mix.",
         "url": "https://doi.org/10.1080/12298093.2024.2430052"
       },
       {
         "title": "Stamets",
-        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
       },
       {
         "title": "Sakamoto 2018",
@@ -191,7 +191,7 @@
       },
       {
         "title": "General default",
-        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h (Stamets) and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
       }
     ],
     "phases": {
