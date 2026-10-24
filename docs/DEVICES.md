@@ -115,13 +115,13 @@ Telemetry and `last_seen_at` are the data source for a later **email alerts** sh
 | mbedTLS client (already common if HTTPS is on) | ~155 KB if newly linked | ~42 KB default, **~22 KB** with `CONFIG_MBEDTLS_DYNAMIC_BUFFER` + free CA/config | Espressif https_request figures |
 | One WSS + TLS |: | ~24 KB idle, ~30 KB under traffic (measured WSS on S2/S3-class) | Keep **one** socket. App-layer proof is one ECDSA sign, not a second handshake |
 | P-256 key + cert in NVS | < 2 KB |: | Ordinary NVS on stock images. Encrypted NVS only when flash encryption is on. USB can dump the key. |
-| This component vs default firmware | ~43 KB flash when compiled in | 16 KB task + ~22 KB QR canvas | Compiled into the default YAML, **off until Connect to Shroom Labs** |
+| This component vs default firmware | ~33 KB flash when compiled in | 16 KB task + ~22 KB QR canvas | Compiled into the default YAML, **off until Connect to Shroom Labs** |
 
 The component is in the default 1.0.x-sl build (`esphome/components/cloud.yaml`) and stays off until the local admin toggle. That costs flash even while unused. The web UI gzip budget is already ~161 KB.
 
 ### Flash layout (proposal, not applied)
 
-The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 96.8% full (~58 KB free). OTA still fits. The next feature of this size will not.
+The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 96.3% full (~68 KB free). OTA still fits. The next feature of this size will not.
 
 Do not flash a new table from this pairing ship. A later layout change should keep OTA and rollback working for chambers already in the field:
 
