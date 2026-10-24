@@ -77,6 +77,8 @@ The device's own **Install from a file on this computer** upload and ESPHome's n
 accept unsigned images from the home network. They are recovery tools for someone who already
 has the device on their LAN and are labelled as such in the UI.
 
+For USB recovery and full flash backups with esptool, see `docs/RECOVERY.md`.
+
 ## Publishing a release
 
 ```bash
