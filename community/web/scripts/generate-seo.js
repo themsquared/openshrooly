@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NAV_ITEMS, POSITIONING, PRODUCT, SITE, TAGLINE, renderFooter, renderHeader } from "../public/js/chrome.js";
 import { speciesArt } from "../public/js/species-art.js";
+import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
@@ -20,7 +21,7 @@ export function escapeHtml(value) {
 }
 
 export function isPsi(profile) {
-  return profile?.pack === "psilocybin" || profile?.restricted || (profile?.tags || []).includes("psilocybin");
+  return isOffMenu(profile);
 }
 
 export function loadProfiles() {
@@ -43,11 +44,12 @@ function daysToFruit(profile) {
   return (profile.stages || []).reduce((sum, s) => sum + Number(s.duration_days || 0), 0);
 }
 
-function faeLabel(stage) {
+/** Fresh air exchange in plain words, from the stage fan speed. */
+function freshAirLabel(stage) {
   const speed = Number(stage.fan?.speed_percent || 0);
-  if (speed >= 50) return "high FAE";
-  if (speed >= 25) return "moderate FAE";
-  return "low FAE";
+  if (speed >= 50) return "plenty of fresh air";
+  if (speed >= 25) return "moderate fresh air";
+  return "little fresh air";
 }
 
 export function isPaid(profile) {
@@ -58,12 +60,12 @@ function price(profile) {
   return `$${(Number(profile.pricing?.amount_cents || 0) / 100).toFixed(2)}`;
 }
 
-/** One plain line of setpoints. Paid recipes keep their setpoints behind the unlock, same as the API. */
+/** One plain line of fruiting conditions. Paid recipes keep their numbers behind the unlock, same as the API. */
 export function setpointLine(profile) {
   if (isPaid(profile)) return `Paid culinary Profile, ${price(profile)}. About ${daysToFruit(profile)} days from start to fruit.`;
   const stage = fruiting(profile);
   const light = stage.light?.duration_hours ?? 0;
-  return `${profile.name} fruits at ${stage.temperature_c ?? ""} °C and ${stage.humidity_percent ?? ""}% RH with ${faeLabel(stage)} and ${light} h light. About ${daysToFruit(profile)} days from start to fruit.`;
+  return `${profile.name} fruits at ${stage.temperature_c ?? ""} °C and ${stage.humidity_percent ?? ""}% humidity with ${freshAirLabel(stage)} and ${light} h light. About ${daysToFruit(profile)} days from start to fruit.`;
 }
 
 export function answerFirst(profile) {
@@ -139,7 +141,7 @@ export function profileJsonLd(profile) {
         "@type": "HowToStep",
         position: i + 1,
         name: s.name,
-        text: `${s.duration_days} days at ${s.temperature_c} °C and ${s.humidity_percent}% RH.${s.notes ? " " + s.notes : ""}`,
+        text: `${s.duration_days} days at ${s.temperature_c} °C and ${s.humidity_percent}% humidity.${s.notes ? " " + s.notes : ""}`,
       })),
     });
   }
@@ -154,11 +156,11 @@ export const FAQ = [
   },
   {
     q: "What is the Hub?",
-    a: "Hub is the local app that stores Profiles and sends setpoints to a chamber. It runs on a computer on your network.",
+    a: "Hub is the local app that stores Profiles and sends each stage's temperature, humidity, light, and fresh air settings to a chamber. It runs on a computer on your network.",
   },
   {
     q: "What is Grow Coach?",
-    a: "Grow Coach is a $3.99 per month culinary subscription. It learns one chamber from its readings and past flushes, then suggests safer humidity and temperature.",
+    a: "Grow Coach is a culinary subscription, coming soon at $3.99 per month. It uses your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later.",
   },
   {
     q: "Does this work with a Shrooly device?",
@@ -170,11 +172,11 @@ export const FAQ = [
   },
   {
     q: "How long does pearl oyster take?",
-    a: "Pearl Oyster is about 29 days from start to fruit at cool, wet setpoints with high fresh air once pins form.",
+    a: "Pearl Oyster is about 29 days from start to fruit in cool, humid conditions with plenty of fresh air once pins form.",
   },
   {
     q: "Why do lion's mane spines turn yellow?",
-    a: "Too much fresh air or low humidity. Lion's Mane wants moderate FAE, high RH, and cool fruiting.",
+    a: "Usually too much fresh air or too little humidity. Lion's Mane fruits best around 17 °C and 90% humidity with moderate fresh air.",
   },
   {
     q: "What humidity does shiitake want?",
@@ -182,9 +184,25 @@ export const FAQ = [
   },
   {
     q: "Where are Golden Teacher and other Psilocybe climate recipes?",
-    a: "They are Off-menu Profiles, fully indexed on this site. Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
+    a: `They are Off-menu Profiles. Each has its own page on this site with reference conditions for research and education only, and they stay out of the main catalog unless you choose Off-menu. ${PSI_LEGAL_NOTICE}`,
   },
 ];
+
+function resourceList() {
+  return PSI_RESOURCES.map(
+    (r) =>
+      `<li><a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${escapeHtml(r.name)}</a>. ${escapeHtml(r.note)}</li>`
+  ).join("");
+}
+
+export function microscopySection() {
+  return `<section class="resources" aria-labelledby="microscopy-heading">
+    <h2 id="microscopy-heading">Microscopy and research resources</h2>
+    <p class="muted">${escapeHtml(PSI_RESOURCE_DISCLAIMER)}</p>
+    <p>${escapeHtml(PSI_SPORE_LAW)}</p>
+    <ul>${resourceList()}</ul>
+  </section>`;
+}
 
 export function siteJsonLd() {
   return {
@@ -276,13 +294,13 @@ export function renderProfilePage(profile) {
     .map((s) =>
       paid
         ? `<li><strong>${escapeHtml(s.name)}</strong><span class="muted"> ${s.duration_days} days</span></li>`
-        : `<li><strong>${escapeHtml(s.name)}</strong><span class="muted"> ${s.duration_days} days, ${s.temperature_c} °C, ${s.humidity_percent}% RH</span>${
+        : `<li><strong>${escapeHtml(s.name)}</strong><span class="muted"> ${s.duration_days} days, ${s.temperature_c} °C, ${s.humidity_percent}% humidity</span>${
             s.notes ? `<p>${escapeHtml(s.notes)}</p>` : ""
           }</li>`
     )
     .join("");
-  const legal = psi && profile.legal_notice
-    ? `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(profile.legal_notice)}</p></aside>`
+  const legal = psi
+    ? `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside>`
     : "";
   const tools = `/profile.html?id=${encodeURIComponent(profile.id)}`;
   const cta = paid
@@ -299,8 +317,9 @@ export function renderProfilePage(profile) {
       ${profile.summary ? `<p>${escapeHtml(profile.summary)}</p>` : ""}
       <h2>${paid ? "Stages" : "Grow parameters"}</h2>
       <ol class="grow-timeline">${stages}</ol>
-      ${paid ? `<p class="muted">Setpoints and notes unlock after purchase.</p>` : ""}
+      ${paid ? `<p class="muted">Temperatures, humidity, and notes unlock after purchase.</p>` : ""}
       ${cta}
+      ${psi ? microscopySection() : ""}
     </article>`;
   return shell({
     head: {
@@ -326,7 +345,7 @@ export function renderFaqPage(profiles = []) {
   return shell({
     head: PAGES["faq.html"],
     activeId: "faq",
-    body: `<article class="profile-page"><p class="eyebrow">FAQ</p><h1>Answers, then the chamber.</h1>${items}<h2>Culinary Profiles</h2>${linkList(culinary)}<h2>Off-menu Profiles</h2>${linkList(off)}</article>`,
+    body: `<article class="profile-page"><p class="eyebrow">FAQ</p><h1>Answers, then the chamber.</h1>${items}<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside><h2>Culinary Profiles</h2>${linkList(culinary)}<h2>Off-menu Profiles</h2>${linkList(off)}</article>`,
   });
 }
 
@@ -355,11 +374,19 @@ ${culinary.map(line).join("\n")}
 
 ## Off-menu Profiles
 
-Educational climate recipes. Indexed for search. Not sold. Grow Coach does not cover these.
+Reference conditions for research and education only. Not sold. Grow Coach does not cover these.
 
-Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.
+${PSI_LEGAL_NOTICE}
 
 ${off.map(line).join("\n")}
+
+## Microscopy and research resources
+
+${PSI_RESOURCE_DISCLAIMER}
+
+${PSI_SPORE_LAW}
+
+${PSI_RESOURCES.map((r) => `- [${r.name}](${r.url}). ${r.note}`).join("\n")}
 
 ## Product
 
@@ -456,7 +483,7 @@ export const PAGES = {
   "register.html": { active: "", path: "/register.html", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and claim a chamber. No password." },
   "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs sessions, home hub, claimed chambers, Grow Coach, and purchases." },
   "publish.html": { active: "", path: "/publish.html", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Publish a mushroom grow profile to the Shroom Labs library." },
-  "profile.html": { active: "profiles", path: "/profile.html", robots: PRIVATE, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, setpoints, and grow reports." },
+  "profile.html": { active: "profiles", path: "/profile.html", robots: PRIVATE, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
   "legacy-preview.html": { active: "", path: "/legacy-preview.html", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
   "auth/callback.html": { active: "", path: "/auth/callback.html", robots: "noindex,nofollow", title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
 };

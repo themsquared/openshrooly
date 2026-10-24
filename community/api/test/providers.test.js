@@ -66,7 +66,7 @@ test("stubs are inert in a prod-like config even when leftover stub flags are se
   const coach = await call(ctx, "GET", "/api/coach", { host });
   assert.equal(coach.status, 200);
   assert.equal(coach.data.waitlist, true);
-  assert.match(coach.data.marketing, /preview/i);
+  assert.match(coach.data.marketing, /coming soon/i);
 
   const authed = testEnv();
   const { token } = await register(authed, "buyer@example.com");

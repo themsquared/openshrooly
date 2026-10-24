@@ -12,14 +12,14 @@
     "advanced"
   ],
   "restricted": false,
-  "summary": "Antlers under high CO2, then consoles when FAE increases.",
+  "summary": "Antlers under high CO2, then consoles when fresh air increases.",
   "notes": "",
-  "chamber_notes": "Original Shrooly reishi LUA used a very long quiet fan period. Match that for antlers; raise FAE for kidney-shaped consoles.",
+  "chamber_notes": "Original Shrooly reishi LUA used a very long quiet fan period. Match that for antlers; raise fresh air for kidney-shaped consoles.",
   "legal_notice": null,
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). G. lucidum colonizes warm (24 to 30 \u00b0C). Antlers form in still, humid air; consoles need more FAE and light."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). G. lucidum colonizes warm (24 to 30 \u00b0C). Antlers form in still, humid air; consoles need more fresh air and light."
     },
     {
       "title": "Stock firmware",
@@ -79,7 +79,7 @@
         "run_duration_s": 20,
         "speed_percent": 20
       },
-      "notes": "Low FAE keeps growth as antlers."
+      "notes": "Little fresh air keeps growth as antlers."
     },
     {
       "id": "fruiting",
@@ -106,7 +106,7 @@
         "run_duration_s": 30,
         "speed_percent": 30
       },
-      "notes": "Increase FAE and light to flatten antlers into consoles."
+      "notes": "Increase fresh air and light to flatten antlers into consoles."
     }
   ],
   "pricing": {

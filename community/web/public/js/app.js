@@ -3,6 +3,7 @@ import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
 import { INDEXED_PROFILES } from "./indexed-profiles.js";
+import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -71,6 +72,27 @@ function profileHref(id) {
   return INDEXED_PROFILES.has(id) ? `/profiles/${encodeURIComponent(id)}.html` : `/profile.html?id=${encodeURIComponent(id)}`;
 }
 
+function renderResources(el, resources) {
+  if (!el || !resources) return;
+  const links = resources.links || PSI_RESOURCES;
+  el.hidden = false;
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <h2 id="microscopy-heading">Microscopy and research resources</h2>
+    <p class="muted">${escapeHtml(resources.disclaimer || PSI_RESOURCE_DISCLAIMER)}</p>
+    <p>${escapeHtml(resources.spore_law || PSI_SPORE_LAW)}</p>
+    <ul>${links
+      .map(
+        (r) =>
+          `<li><a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${escapeHtml(r.name)}</a>. ${escapeHtml(r.note)}</li>`
+      )
+      .join("")}</ul>`;
+}
+
+function profileIdFromLocation() {
+  return profileIdFromUrl(location.href);
+}
+
 async function renderHome() {
   const canvas = $("#mycelium");
   if (canvas && !canvas.dataset.hero) {
@@ -100,7 +122,7 @@ async function renderHome() {
     <a class="profile-card" href="${profileHref(p.id)}">
       <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack, { priority: index === 0 })}</div>
       <div class="profile-body">
-        <p><span class="chip">${escapeHtml(off ? "Off-menu" : "Culinary")}</span>${
+        <p><span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>${
           p.pricing?.kind === "paid"
             ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
             : `<span class="chip">free</span>`
@@ -122,20 +144,28 @@ async function renderHome() {
 }
 
 async function renderProfile() {
-  const id = params().get("id");
+  const id = profileIdFromLocation();
   if (!id) return;
   const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
   const p = data.profile;
+  const off = isOffMenu(p);
+  const label = p.pack_label || packLabel(p.pack);
   $("#title").textContent = p.name;
-  $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${p.pack}`;
+  $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
-  $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack || "")}</span>`;
+  $("#chips").innerHTML = `<span class="chip">${escapeHtml(label)}</span>`;
   $("#art").innerHTML = speciesArt(p.species, p.strain, p.name, p.pack);
-  if (p.legal_notice) {
-    $("#legal").textContent = p.legal_notice;
-    $("#legal").classList.remove("hidden");
+  const legal = $("#legal");
+  if (legal && (off || p.legal_notice)) {
+    legal.textContent = off ? PSI_LEGAL_NOTICE : p.legal_notice;
+    legal.classList.remove("hidden");
+    legal.classList.add("legal-prominent");
   }
-  for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", p.pack === "psilocybin");
+  if (off) {
+    $("#affiliates")?.replaceChildren();
+    renderResources($("#resources"), data.resources || { links: PSI_RESOURCES });
+  }
+  for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", off);
   const caps = await capabilities();
   if (!caps.photos) {
     document.querySelector('input[name="photo"]')?.closest("label")?.classList.add("hidden");
@@ -167,7 +197,7 @@ async function renderProfile() {
     .map(
       (s) => `<li>
         <strong>${escapeHtml(s.name)}</strong>
-        <span class="muted"> ${s.duration_days} d · ${s.humidity_percent}% RH · ${s.temperature_c} °C · ${s.light?.duration_hours || 0} h light · fan ${s.fan?.speed_percent || 0}%</span>
+        <span class="muted"> ${s.duration_days} d · ${s.temperature_c} °C · ${s.humidity_percent}% humidity · ${s.light?.duration_hours || 0} h light · fan ${s.fan?.speed_percent || 0}%</span>
         <p>${escapeHtml(s.notes || "")}</p>
         <div class="viz" aria-hidden="true"><span style="width:${Math.max(8, (Number(s.duration_days) / total) * 100)}%"></span></div>
       </li>`
@@ -176,7 +206,7 @@ async function renderProfile() {
   $("#sources").innerHTML = (p.source_notes || [])
     .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
     .join("");
-  if (data.links?.length) {
+  if (!off && data.links?.length) {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
       data.links
@@ -185,7 +215,7 @@ async function renderProfile() {
       "</ul>";
   }
   $("#ratings").innerHTML =
-    data.ratings.map((r) => `<li>${escapeHtml(r.username)}, ${r.stars}/5. ${escapeHtml(r.comment || "")}</li>`).join("") ||
+    data.ratings.map((r) => `<li>${escapeHtml(r.username)} · ${r.stars}/5 · ${escapeHtml(r.comment || "")}</li>`).join("") ||
     "<li class='muted'>No ratings yet.</li>";
   $("#reports").innerHTML =
     data.reports
@@ -497,12 +527,16 @@ async function renderCoach() {
     claimed.map((d) => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name || d.id)}</option>`).join("");
 
   const deviceId = () => $("#device").value || "";
+  const photosOn = Boolean((await capabilities()).photos);
+  $("#photo-panel")?.classList.toggle("hidden", !photosOn);
   $("#auto-tune").checked = Boolean(catalog.auto_tune);
 
   async function refreshUsage() {
     const usage = await api("/api/coach/usage").catch(() => null);
     if (!usage) return;
-    $("#usage").textContent = `${usage.chats}/${usage.caps.chats} chats · ${usage.photos}/${usage.caps.photos} photo checks today`;
+    $("#usage").textContent = photosOn
+      ? `${usage.chats}/${usage.caps.chats} chats · ${usage.photos}/${usage.caps.photos} photo checks today`
+      : `${usage.chats}/${usage.caps.chats} chats today`;
   }
 
   async function refreshModel() {
@@ -511,8 +545,8 @@ async function renderCoach() {
     const m = data.model || {};
     $("#stats").innerHTML = [
       ["Samples", m.sample_count ?? 0, 0],
-      ["RH error", m.humidity_error, 1],
-      ["RH droop", m.humidity_droop, 1],
+      ["Humidity error", m.humidity_error, 1],
+      ["Humidity droop", m.humidity_droop, 1],
       ["Temp offset", m.temperature_offset, 1],
       ["Success rate", m.outcome_success_rate == null ? null : m.outcome_success_rate * 100, 0],
     ]
@@ -524,7 +558,7 @@ async function renderCoach() {
         .join("") || `<li class="info">No alerts right now.</li>`;
     const s = data.suggestion || {};
     $("#suggestion").innerHTML = s.humidity_percent
-      ? `<p>Suggested <strong>${s.humidity_percent}% RH</strong> · <strong>${s.temperature_c} °C</strong> · fan ${s.fan_speed_percent}%. ${
+      ? `<p>Suggested <strong>${s.humidity_percent}% humidity</strong> · <strong>${s.temperature_c} °C</strong> · fan ${s.fan_speed_percent}%. ${
           (s.reasons || []).join(" ") || "No change needed yet."
         }</p>`
       : "<p class='muted'>Need a few more readings from this chamber before I can tune it.</p>";

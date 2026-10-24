@@ -41,8 +41,8 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 
 - Culinary copy only. Price is $3.99/month, said in plain language. Never pair the page with Off-menu.
 - Subscribe is one button (stub checkout). Gated tools stay hidden until paid.
-- Chamber picker, learned stats, alerts, then **Approve & queue setpoints**. Auto-tune is an explicit checkbox with “inside safe bounds” in the label.
-- Chat and photo check show remaining daily caps. Photo result always includes confidence and a next step, not color alone.
+- Chamber picker, learned stats, alerts, then **Approve and send to chamber**. Auto-tune is an explicit checkbox with “inside safe bounds” in the label.
+- Chat shows remaining daily caps. Photo checks stay hidden until the photo provider is on, then show their cap too. Photo result always includes confidence and a next step, not color alone.
 - Errors name the next action (sign in, pay, daily cap, not your device).
 
 ## Cloud claim
@@ -58,4 +58,4 @@ The chamber page must not open on a wall of unlabeled sliders. AP mode names the
 
 ## Copy
 
-Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Off-menu legality notice is always visible on that pack. The pack is not in the main header; owners open it with the library filter.
+Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Off-menu legality notice is always visible on those pages. The pack is not in the main header; owners open it with the quiet library filter.
