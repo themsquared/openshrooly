@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
@@ -25,6 +26,35 @@ static constexpr int64_t CERT_GRACE_MS = 30LL * 24 * 3600 * 1000;
 
 inline bool time_reached(uint32_t now, uint32_t deadline) {
   return static_cast<int32_t>(now - deadline) >= 0;
+}
+
+/** Local admin page. GET reads status. POST with action=connect|refresh|disconnect. */
+inline bool cloud_owns_url(const char *url) { return url != nullptr && std::strcmp(url, "/cloud") == 0; }
+
+/**
+ * The dashboard web_server catch-all claims any path match_url treats as valid:
+ * two or more segments (/domain/id). It registers before our handler, so those
+ * paths never reach us. Single-segment paths such as /cloud are left alone.
+ */
+inline bool dashboard_catchall_claims(const char *url) {
+  if (url == nullptr || url[0] != '/' || url[1] == '\0')
+    return false;
+  return std::strchr(url + 1, '/') != nullptr;
+}
+
+/** First matching handler when the dashboard catch-all is registered first. */
+inline const char *first_local_handler(const char *url) {
+  if (dashboard_catchall_claims(url))
+    return "dashboard";
+  if (cloud_owns_url(url))
+    return "cloud";
+  return "none";
+}
+
+inline bool cloud_action_ok(const char *action) {
+  return action != nullptr &&
+         (std::strcmp(action, "connect") == 0 || std::strcmp(action, "refresh") == 0 ||
+          std::strcmp(action, "disconnect") == 0);
 }
 
 struct HttpResponse {

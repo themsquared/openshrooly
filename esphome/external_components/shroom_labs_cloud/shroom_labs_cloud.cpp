@@ -54,27 +54,29 @@ class CloudPage : public AsyncWebHandler {
   explicit CloudPage(ShroomLabsCloud *c) : cloud_(c) {}
   bool canHandle(AsyncWebServerRequest *request) const override {
     char buf[AsyncWebServerRequest::URL_BUF_SIZE];
-    auto url = request->url_to(buf);
-    return url == "/cloud" || url == "/cloud/connect" || url == "/cloud/refresh" || url == "/cloud/disconnect";
+    return cloud_owns_url(std::string(request->url_to(buf)).c_str());
   }
   void handleRequest(AsyncWebServerRequest *request) override {
-    char buf[AsyncWebServerRequest::URL_BUF_SIZE];
-    auto url = request->url_to(buf);
     const auto method = request->method();
-    if (url == "/cloud" && method == HTTP_GET) {
+    if (method == HTTP_GET) {
       auto *res = request->beginResponse(200, "application/json", this->cloud_->status_json());
       res->addHeader("Cache-Control", "no-store");
       request->send(res);
       return;
     }
-    if (url == "/cloud/connect" && method == HTTP_POST) {
-      this->cloud_->connect();
-    } else if (url == "/cloud/refresh" && method == HTTP_POST) {
-      this->cloud_->refresh();
-    } else if (url == "/cloud/disconnect" && method == HTTP_POST) {
-      this->cloud_->disconnect();
-    } else {
+    if (method != HTTP_POST) {
       request->send(404, "text/plain", "not found");
+      return;
+    }
+    const std::string action = request->arg("action");
+    if (action == "connect")
+      this->cloud_->connect();
+    else if (action == "refresh")
+      this->cloud_->refresh();
+    else if (action == "disconnect")
+      this->cloud_->disconnect();
+    else {
+      request->send(400, "text/plain", "unknown action");
       return;
     }
     auto *res = request->beginResponse(200, "application/json", this->cloud_->status_json());

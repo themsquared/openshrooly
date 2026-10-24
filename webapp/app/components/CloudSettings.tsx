@@ -73,11 +73,16 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
     drawQrModules(canvasRef.current, status.qr, status.qr_size)
   }, [status])
 
-  async function post(path: string) {
+  async function post(action: string) {
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(path, { method: 'POST', credentials: 'same-origin' })
+      const res = await fetch('/cloud', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `action=${action}`,
+      })
       if (res.status === 401) {
         setError('Sign in to manage cloud. User name admin, password on the chamber screen under Menu, System.')
         return
@@ -117,9 +122,9 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
             disabled={busy || demo}
             onChange={(e) => {
               if (e.target.checked)
-                void post('/cloud/connect')
+                void post('connect')
               else
-                void post('/cloud/disconnect')
+                void post('disconnect')
             }}
           />
           <span>Connect to Shroom Labs</span>
@@ -160,7 +165,7 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
             type="button"
             className="charts-button ota-button"
             disabled={busy || demo}
-            onClick={() => void post('/cloud/refresh')}
+            onClick={() => void post('refresh')}
           >
             Refresh
           </button>
@@ -168,7 +173,7 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
             type="button"
             className="charts-button ota-button"
             disabled={busy || demo}
-            onClick={() => void post('/cloud/disconnect')}
+            onClick={() => void post('disconnect')}
           >
             Disconnect
           </button>
