@@ -269,9 +269,9 @@ function dispatch(mode, tables, ids, sql, params) {
     return tables.magic_links.filter((s) => s.token_hash === params[0]);
   }
   if (q.startsWith("UPDATE magic_links SET used_at=")) {
-    const row = tables.magic_links.find((s) => s.token_hash === params[1]);
+    const row = tables.magic_links.find((s) => s.token_hash === params[1] && !s.used_at && s.expires_at > params[2]);
     if (row) row.used_at = params[0];
-    return {};
+    return { meta: { changes: row ? 1 : 0 } };
   }
   if (q.startsWith("INSERT INTO webauthn_challenges")) {
     tables.webauthn_challenges.push({

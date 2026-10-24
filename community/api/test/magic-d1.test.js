@@ -1,0 +1,64 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { Miniflare } from "miniflare";
+import { createD1Db } from "../src/db.js";
+import { call, testEnv } from "./helpers.js";
+import { sha256Hex } from "../src/crypto.js";
+
+// Production D1 declares users.password_hash NOT NULL (schema.sql does not), so mirror production here.
+function prodSchema() {
+  const sql = readFileSync(new URL("../schema.sql", import.meta.url), "utf8");
+  const out = sql.replace(/password_hash TEXT,/, "password_hash TEXT NOT NULL,");
+  assert.notEqual(out, sql, "schema.sql users.password_hash line changed; update this test");
+  return out.replace(/--.*$/gm, "").split(";").map((s) => s.trim()).filter(Boolean);
+}
+
+async function withProdD1(fn) {
+  const mf = new Miniflare({ modules: true, script: "export default { fetch() { return new Response('ok'); } }", d1Databases: ["DB"] });
+  try {
+    const d1 = await mf.getD1Database("DB");
+    for (const s of prodSchema()) await d1.prepare(s).run();
+    await fn(d1, testEnv({ db: createD1Db(d1) }));
+  } finally {
+    await mf.dispose();
+  }
+}
+
+// Dev stubs (Turnstile, debug tokens) are off on D1 by design, so seed the link the way magic/start stores it.
+async function start(d1, email, expiresAt = new Date(Date.now() + 15 * 60000).toISOString().replace(/\.\d+Z$/, "Z")) {
+  const token = `tok-${email}`;
+  await d1.prepare("INSERT INTO magic_links (email, token_hash, purpose, expires_at, created_at) VALUES (?, ?, 'login', ?, ?)")
+    .bind(email, await sha256Hex(token), expiresAt, "2026-01-01T00:00:00Z").run();
+  return token;
+}
+const complete = (ctx, token) => call(ctx, "POST", "/api/auth/magic/complete", { body: { token } });
+
+test("magic link creates a new account on the production schema, once", async () => {
+  await withProdD1(async (d1, ctx) => {
+    const tok = await start(d1, "new@example.com");
+    const done = await complete(ctx, tok);
+    assert.equal(done.status, 200, JSON.stringify(done.data));
+    assert.equal(done.data.user.email, "new@example.com");
+    assert.equal((await complete(ctx, tok)).status, 401);
+    const login = await call(ctx, "POST", "/api/auth/login", { body: { email: "new@example.com", password: "!no-password" } });
+    assert.equal(login.status, 401, "the no-password marker must never work as a password");
+  });
+});
+
+test("concurrent use of one magic link signs in exactly once", async () => {
+  await withProdD1(async (d1, ctx) => {
+    const tok = await start(d1, "race@example.com");
+    const results = await Promise.all([1, 2, 3].map(() => complete(ctx, tok)));
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 401, 401]);
+  });
+});
+
+test("an expired magic link is refused and not consumed", async () => {
+  await withProdD1(async (d1, ctx) => {
+    const tok = await start(d1, "late@example.com", "2000-01-01T00:00:00Z");
+    assert.equal((await complete(ctx, tok)).status, 401);
+    assert.equal((await d1.prepare("SELECT used_at FROM magic_links").first()).used_at, null);
+    assert.equal((await d1.prepare("SELECT COUNT(*) n FROM users").first()).n, 0);
+  });
+});
