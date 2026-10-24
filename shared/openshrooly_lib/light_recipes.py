@@ -14,11 +14,11 @@ from .models import LightPhase, LightRecipe, SourceNote, WAVELENGTH_NOTE
 DARK = LightPhase(0, 0, 0, 0, 0)
 # Penn State oyster rooms: 50 to 300 lux. 20% white is 92 lux on this strip.
 OYSTER_FRUITING = LightPhase(12, 20, 0, 0, 80)
-# 500 lux cited for lion's mane and maitake yield maps to 37% white.
+# 500 lux cited for reishi and maitake yield maps to 37% white.
 LUX_500 = LightPhase(12, 37, 0, 0, 80)
 # Chi 2008: white outyielded blue, so maitake uses white only at that 500 lux.
 MAITAKE_FRUITING = LightPhase(12, 37, 0, 0, 0)
-# 200 lux (inside 50 to 300 and maitake primordia papers) maps to 26% white.
+# 200 lux maps to 26% white. Jozifek 2025 additional tests used 200 lux on a 12 h cycle.
 LUX_200 = LightPhase(12, 26, 0, 0, 80)
 # Cordyceps 1250 lux (cordycepin optimum in Wu 2016) maps to 51% white.
 CORDYCEPS_FRUITING = LightPhase(12, 51, 0, 0, 80)
@@ -113,18 +113,11 @@ KIM_2024_SHIITAKE = _src(
 JOZIFEK_2025 = _src(
     "Jozifek et al. 2025",
     "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, "
-    "Agriculture 15 (2025). The 500 lux treatment was 24 h continuous light and caused "
-    "pink stress coloring. It does not support 12 h at 500 lux, so this recipe does not "
-    "copy that schedule.",
+    "Agriculture 15 (2025). The main cultivation used 500 lux for 24 h continuous light "
+    "and caused pink stress coloring. Additional tests at 200 lux or lower on a 12 h "
+    "cycle produced white basidiocarps. This recipe uses that 200 lux, 12 h schedule. "
+    "200 lux maps to 26% white.",
     "https://doi.org/10.3390/agriculture15050460",
-)
-HERICIUM_12H = _src(
-    "Firth and Blackwood 2025 lion's mane room",
-    "Gavin Firth and Megan Blackwood, International Journal of Pharmacognosy and Life "
-    "Science 6 (2025). A controlled-room Hericium erinaceus study used a 12 h photoperiod "
-    "with 6500 K fluorescent light at 500 lux. That is the hours and lux used here. "
-    "500 lux maps to 37% white.",
-    "https://www.pharmacognosyjournal.com/article/230/7-3-72-360.pdf",
 )
 SAKAMOTO_ENOKI = _src(
     "Sakamoto 2004 enoki",
@@ -278,13 +271,14 @@ RECIPES: dict[str, LightRecipe] = {
     "king-oyster": _king(),
     "king-oyster-thick-stem": _king(),
     "lions-mane": _recipe(
-        "Colonization is dark to limit early pins. Fruiting uses 12 h and 37% white from "
-        "the Firth and Blackwood 500 lux, 12 h room. Jozifek 2025 also used 500 lux, but "
-        "as 24 h continuous light that caused pink stress coloring, so that schedule is "
-        "not used. RGB is the general blue mix; those papers used white fluorescent, not "
-        "a measured blue ratio.",
-        [JOZIFEK_2025, HERICIUM_12H, SAKAMOTO_2018, STAMETS_BOOK],
-        LUX_500,
+        "Colonization is dark to limit early pins. Fruiting uses 12 h and 26% white, "
+        "mapped from Jozifek et al. 2025 additional tests at 200 lux on a 12 h cycle, "
+        "which produced white basidiocarps. Their main 500 lux treatment was 24 h "
+        "continuous light and caused pink stress coloring, so that schedule is not used. "
+        "RGB is the general blue mix; that paper used white fluorescent, not a measured "
+        "blue ratio.",
+        [JOZIFEK_2025, SAKAMOTO_2018, STAMETS_BOOK],
+        LUX_200,
     ),
     "shiitake": _recipe(
         "Colonization and the browning rest stay dark (mycelium grows faster without "
