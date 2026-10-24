@@ -106,7 +106,7 @@ test("authorize redirect carries Services ID, form_post, PKCE S256, state, nonce
   assert.doesNotMatch(s.auth.toString(), /A1B2C3D4E5/);
 });
 
-test("happy path: first Apple sign-in stores the name, treats Hide My Email as verified, mints an ES256 client secret, and sets a Lax session cookie", async () => {
+test("happy path: first Apple sign-in treats Hide My Email as verified, mints an ES256 client secret, and sets a Lax session cookie", async () => {
   const ctx = liveEnv();
   const r = await signIn(ctx);
   assert.equal(r.cb.status, 302);
@@ -131,11 +131,14 @@ test("happy path: first Apple sign-in stores the name, treats Hide My Email as v
   assert.equal(r.done.data.user.email, RELAY_EMAIL);
   assert.equal(r.done.data.user.email_verified, true);
   const row = await ctx.db.one("SELECT * FROM users WHERE email=?", [RELAY_EMAIL]);
-  assert.equal(row.display_name, "Jane Appleseed");
+  assert.notEqual(row.display_name, "Jane Appleseed");
+  assert.equal(row.display_name, row.username);
   assert.match(row.username, /^grower_[0-9a-f]{10}$/);
   assert.doesNotMatch(row.username, /jane|appleseed|grower@/i);
   assert.notEqual(row.username, "grower");
   assert.equal(r.done.data.user.username, row.username);
+  assert.equal(Object.hasOwn(r.done.data.user, "display_name"), false);
+  assert.doesNotMatch(JSON.stringify(r.done.data), /Jane|Appleseed/i);
   const session = r.done.headers.get("set-cookie");
   assert.match(session, /^__Host-sl_session=/);
   assert.match(session, /; HttpOnly/);
@@ -157,7 +160,93 @@ test("Hide My Email does not put the real name or email local part in the public
   assert.doesNotMatch(row.username, /mike|moore|hidden-xyz/i);
   assert.notEqual(row.username, "hidden-xyz");
   assert.equal(r.done.data.user.username, row.username);
-  assert.equal(row.display_name, "Mike Moore");
+  assert.notEqual(row.display_name, "Mike Moore");
+  assert.equal(row.display_name, row.username);
+  assert.equal(Object.hasOwn(r.done.data.user, "display_name"), false);
+  assert.doesNotMatch(JSON.stringify(r.done.data), /Mike|Moore/i);
+});
+
+test("Apple real name is never stored as display_name and never appears on public or owner API surfaces", async () => {
+  const ctx = liveEnv();
+  apple.claims = { email: "hidden-xyz@privaterelay.appleid.com" };
+  const r = await signIn(ctx, {
+    user: JSON.stringify({ name: { firstName: "Jane", lastName: "Appleseed" }, email: "hidden-xyz@privaterelay.appleid.com" }),
+  });
+  assert.equal(r.done.status, 200);
+  const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["hidden-xyz@privaterelay.appleid.com"]);
+  assert.match(row.username, /^grower_[0-9a-f]{10}$/);
+  assert.equal(row.display_name, row.username);
+  assert.doesNotMatch(row.display_name, /jane|appleseed/i);
+
+  const leak = (value, label) => {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    assert.doesNotMatch(text, /Jane|Appleseed/i, label);
+    assert.ok(!text.includes("display_name"), `${label} must not include display_name`);
+  };
+
+  leak(r.done.data, "oidc complete");
+  assert.equal(r.done.data.user.username, row.username);
+
+  const token = r.done.data.access_token;
+  const me = await call(ctx, "GET", "/api/me", { token });
+  assert.equal(me.status, 200);
+  leak(me.data, "/api/me");
+  assert.equal(me.data.user.username, row.username);
+  assert.equal(Object.hasOwn(me.data.user, "display_name"), false);
+
+  const profile = {
+    id: "relay-oyster",
+    name: "Relay Oyster",
+    species: "Pleurotus ostreatus",
+    pack: "culinary",
+    schema_version: 1,
+    stages: [
+      {
+        id: "fruiting",
+        name: "Fruiting",
+        duration_days: 7,
+        humidity_percent: 90,
+        temperature_c: 18,
+        fan: { speed_percent: 30, period_min: 15, run_duration_s: 30 },
+      },
+    ],
+  };
+  const created = await call(ctx, "POST", "/api/profiles", { token, body: profile });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  assert.equal(created.data.author, row.username);
+  leak(created.data, "publish");
+
+  const shown = await call(ctx, "GET", `/api/profiles/${profile.id}`);
+  assert.equal(shown.status, 200);
+  assert.equal(shown.data.profile.author, row.username);
+  leak(shown.data, "profile GET");
+
+  const rated = await call(ctx, "POST", `/api/profiles/${profile.id}/rate`, {
+    token,
+    body: { stars: 5, comment: "worked" },
+  });
+  assert.equal(rated.status, 200);
+  const afterRate = await call(ctx, "GET", `/api/profiles/${profile.id}`);
+  leak(afterRate.data, "ratings");
+  assert.ok(afterRate.data.ratings.some((item) => item.username === row.username));
+  assert.ok(!afterRate.data.ratings.some((item) => item.display_name));
+
+  const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  leak(list.data, "profile list");
+  const search = await call(ctx, "GET", "/api/search?pack=culinary&q=Relay");
+  leak(search.data, "search");
+  const exported = await call(ctx, "GET", `/api/profiles/${profile.id}.json`);
+  leak(exported.data, "profile.json export");
+
+  const hub = await call(ctx, "GET", "/api/hub/pull", { token });
+  assert.equal(hub.status, 200);
+  leak(hub.data, "hub pull");
+  assert.equal(hub.data.hub_user, row.username);
+
+  const passkey = await call(ctx, "POST", "/api/auth/webauthn/register/begin", { token, body: {} });
+  assert.equal(passkey.status, 200);
+  leak(passkey.data, "webauthn begin");
+  assert.equal(passkey.data.user.displayName, row.username);
 });
 
 test("a later Apple sign-in works without the name field and reuses the account", async () => {

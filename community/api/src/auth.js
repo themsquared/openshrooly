@@ -546,19 +546,6 @@ async function callbackParams(request, url) {
   return params;
 }
 
-/** Apple sends name only on the first authorization, as a JSON `user` form field. */
-function appleDisplayName(raw) {
-  if (!raw) return "";
-  try {
-    const parsed = JSON.parse(raw);
-    const first = String(parsed?.name?.firstName || "").trim();
-    const last = String(parsed?.name?.lastName || "").trim();
-    return [first, last].filter(Boolean).join(" ").slice(0, 80);
-  } catch {
-    return "";
-  }
-}
-
 async function finishOidc(env, request, url, provider) {
   const stubs = devStubsEnabled(env, request);
   const clear = oidcCookie("", 0, oidcSameSite(provider));
@@ -618,8 +605,7 @@ async function finishOidc(env, request, url, provider) {
     email = String(verified.claims.email).trim().toLowerCase();
     subject = String(verified.claims.sub);
   }
-  const displayName = provider === "apple" ? appleDisplayName(params.get("user")) : "";
-  const resolved = await resolveOidcUser(env.db, provider, subject, email, request, displayName);
+  const resolved = await resolveOidcUser(env.db, provider, subject, email, request);
   if (!resolved.user) return fail(resolved.reason, resolved.userId);
   const user = resolved.user;
   await audit(env.db, user.id, `oidc_${provider}`, email, request);
@@ -648,7 +634,7 @@ async function finishOidc(env, request, url, provider) {
  *    and it has no other identity from this provider. Unverified accounts are never taken over.
  * 3. Otherwise a new account is created with the provider-verified email.
  */
-async function resolveOidcUser(db, provider, subject, email, request, displayName) {
+async function resolveOidcUser(db, provider, subject, email, request) {
   if (!subject || !email) return { reason: "missing subject or email" };
   const identity = await db.one("SELECT * FROM auth_identities WHERE provider=? AND subject=?", [provider, subject]);
   if (identity) {
@@ -669,12 +655,9 @@ async function resolveOidcUser(db, provider, subject, email, request, displayNam
     await audit(db, existing.id, `oidc_${provider}_link`, "linked to existing verified account", request);
     return { user: existing };
   }
-  // Apple: never use the real name or the email local part as the public username (Hide My Email).
-  const created = await findOrCreateByEmail(db, email, provider === "apple" ? randomHandle() : displayName);
-  if (provider === "apple" && displayName) {
-    await db.run("UPDATE users SET display_name=? WHERE id=?", [displayName, created.id]);
-    created.display_name = displayName;
-  }
+  // Apple: never store the real name or use the email local part. Hide My Email users get a
+  // random handle; display_name stays that same handle so it cannot leak on a later public surface.
+  const created = await findOrCreateByEmail(db, email, provider === "apple" ? randomHandle() : "");
   await db.run("INSERT INTO auth_identities (user_id, provider, subject, created_at) VALUES (?, ?, ?, ?)", [
     created.id,
     provider,

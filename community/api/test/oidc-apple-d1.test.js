@@ -64,7 +64,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-test("D1: Apple sign-up creates a verified Hide My Email account, stores the first-sign-in name, repeat login reuses it", async () => {
+test("D1: Apple sign-up creates a verified Hide My Email account without storing the real name, repeat login reuses it", async () => {
   await withD1(async (d1, ctx) => {
     const first = await signIn(d1, ctx, {
       user: JSON.stringify({ name: { firstName: "Jane", lastName: "Appleseed" }, email: RELAY_EMAIL }),
@@ -75,10 +75,13 @@ test("D1: Apple sign-up creates a verified Hide My Email account, stores the fir
     assert.equal(first.done.data.user.email_verified, true);
     const row = await d1.prepare("SELECT password_hash, display_name, username FROM users WHERE email=?").bind(RELAY_EMAIL).first();
     assert.equal(row.password_hash, "!no-password");
-    assert.equal(row.display_name, "Jane Appleseed");
+    assert.notEqual(row.display_name, "Jane Appleseed");
+    assert.equal(row.display_name, row.username);
     assert.match(row.username, /^grower_[0-9a-f]{10}$/);
     assert.doesNotMatch(row.username, /jane|appleseed/i);
     assert.equal(first.done.data.user.username, row.username);
+    assert.equal(Object.hasOwn(first.done.data.user, "display_name"), false);
+    assert.doesNotMatch(JSON.stringify(first.done.data), /Jane|Appleseed/i);
     const login = await call(ctx, "POST", "/api/auth/login", { body: { email: RELAY_EMAIL, password: "!no-password" } });
     assert.equal(login.status, 401);
     const again = await signIn(d1, ctx);
