@@ -180,8 +180,8 @@ export async function handleCoach(method, path, url, request, env) {
       waitlist: !caps.coach,
       preview: !caps.coach,
       marketing: caps.coach
-        ? "Grow Coach uses your device's readings and your past culinary grows to tailor humidity and temperature advice. Photo checks come later. It is not sold with off-menu varieties."
-        : "Grow Coach is coming soon. Chat and checkout open when it launches.",
+        ? "Culinary chambers only. Not sold with off-menu varieties."
+        : "Coming soon. Chat and checkout open at launch. Not sold with off-menu varieties.",
     });
   }
 

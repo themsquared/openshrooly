@@ -494,6 +494,7 @@ async function renderCoach() {
   $("#coach-status").textContent = catalog.entitled
     ? `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
     : catalog.marketing;
+  if (!catalog.waitlist && $("#coach-eyebrow")) $("#coach-eyebrow").textContent = "Culinary subscription · $3.99 / month";
   if (catalog.waitlist) {
     $("#subscribe-panel")?.classList.add("hidden");
     $("#gated")?.classList.add("hidden");

@@ -160,7 +160,7 @@ export const FAQ = [
   },
   {
     q: "What is Grow Coach?",
-    a: "Grow Coach is a culinary subscription, coming soon at $3.99 per month. It uses your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later.",
+    a: "Grow Coach is a culinary subscription, coming soon at $3.99 per month. It will use your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later.",
   },
   {
     q: "Does this work with a Shrooly device?",
@@ -184,7 +184,7 @@ export const FAQ = [
   },
   {
     q: "Where are Golden Teacher and other Psilocybe climate recipes?",
-    a: `They are Off-menu Profiles. Each has its own page on this site with reference conditions for research and education only, and they stay out of the main catalog unless you choose Off-menu. ${PSI_LEGAL_NOTICE}`,
+    a: `They are Off-menu Profiles. Each has its own page on this site with reference conditions for research and education only, and they stay out of the main catalog unless you choose Off-menu. Psilocybin is illegal in most places, so check the laws where you live first.`,
   },
 ];
 
