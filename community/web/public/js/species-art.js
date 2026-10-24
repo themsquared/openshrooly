@@ -41,8 +41,16 @@ const PHOTOS = [
 ];
 
 const FALLBACK = "/img/species/species-generic.jpg";
+const OFF_MENU = "/img/species/off-menu.svg";
 
-export function speciesPhoto(species, strain = "", name = "") {
+export function isOffMenuArt(species, strain = "", name = "", pack = "") {
+  if (String(pack).toLowerCase() === "psilocybin") return true;
+  const blob = `${species} ${strain} ${name} ${pack}`.toLowerCase();
+  return /\bpsilocybe\b|\bpsilocybin\b/.test(blob);
+}
+
+export function speciesPhoto(species, strain = "", name = "", pack = "") {
+  if (isOffMenuArt(species, strain, name, pack)) return OFF_MENU;
   const blob = `${species} ${strain} ${name}`.toLowerCase();
   for (const row of PHOTOS) {
     if (row.keys.every((key) => blob.includes(key))) return row.src;
@@ -50,9 +58,11 @@ export function speciesPhoto(species, strain = "", name = "") {
   return FALLBACK;
 }
 
-export function speciesArt(species, strain = "", name = "") {
-  const src = speciesPhoto(species, strain, name);
-  const label = [name, species].filter(Boolean).join(" · ") || "mushroom";
+export function speciesArt(species, strain = "", name = "", pack = "") {
+  const src = speciesPhoto(species, strain, name, pack);
+  const label = isOffMenuArt(species, strain, name, pack)
+    ? [name, species].filter(Boolean).join(" · ") || "Off-menu variety"
+    : [name, species].filter(Boolean).join(" · ") || "mushroom";
   return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" loading="lazy" decoding="async">`;
 }
 

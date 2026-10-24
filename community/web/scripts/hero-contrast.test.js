@@ -88,3 +88,48 @@ test("hero canvas stays dark behind the lede at 390 and 1440", async () => {
     }
   });
 });
+
+test("library toolbar sits below the sticky header at 390 and 1440", async () => {
+  const require = createRequire(import.meta.url);
+  let puppeteer;
+  try {
+    puppeteer = require("puppeteer-core");
+  } catch {
+    assert.fail("puppeteer-core is required for the library scroll check");
+  }
+  await withServer(async () => {
+    const browser = await puppeteer.launch({
+      executablePath: CHROME,
+      headless: "new",
+      args: ["--no-sandbox", "--disable-gpu", "--hide-scrollbars"],
+    });
+    try {
+      for (const width of [390, 1440]) {
+        const page = await browser.newPage();
+        await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
+        await page.goto(`http://127.0.0.1:${PORT}/#library`, { waitUntil: "networkidle0", timeout: 20000 });
+        await page.waitForSelector(".site-header");
+        await page.waitForSelector(".library-toolbar");
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const geometry = await page.evaluate(() => {
+          const header = document.querySelector(".site-header");
+          const toolbar = document.querySelector(".library-toolbar");
+          const h = header.getBoundingClientRect();
+          const t = toolbar.getBoundingClientRect();
+          return {
+            headerBottom: h.bottom,
+            toolbarTop: t.top,
+            headerHeight: h.height,
+          };
+        });
+        assert.ok(
+          geometry.toolbarTop + 0.5 >= geometry.headerBottom,
+          `${width}px toolbar top ${geometry.toolbarTop.toFixed(1)} sits under header bottom ${geometry.headerBottom.toFixed(1)}`
+        );
+        await page.close();
+      }
+    } finally {
+      await browser.close();
+    }
+  });
+});

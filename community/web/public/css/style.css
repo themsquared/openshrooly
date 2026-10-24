@@ -35,7 +35,10 @@
 }
 
 * { box-sizing: border-box; }
-html { color-scheme: dark; }
+html {
+  color-scheme: dark;
+  scroll-padding-top: 5.5rem;
+}
 html, body { margin: 0; min-height: 100%; }
 body {
   font: 16px/1.55 var(--sans);
@@ -311,6 +314,7 @@ h1, .display {
 }
 .legal { background: rgba(212, 120, 74, 0.1); }
 .library { margin-bottom: 2rem; }
+#library { scroll-margin-top: 5.5rem; }
 .library-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -537,6 +541,11 @@ button.nav-toggle {
 @media (max-width: 767px) {
   .hero { min-height: 420px; border-radius: 22px; }
   .hero-copy { padding: 2rem 1.2rem 1.6rem; }
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hero-actions .button { width: 100%; }
   .brand small { display: none; }
   .nav-toggle { display: inline-flex; }
   .site-nav {

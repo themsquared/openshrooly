@@ -19,6 +19,7 @@ const BANNED = [
   { name: "token", re: /\btokens?\b/i },
   { name: "CSR", re: /\bCSR\b/ },
   { name: "mTLS", re: /\bmTLS\b/i },
+  { name: "JSON", re: /\bJSON\b/ },
 ];
 
 function visitorFacing(html) {

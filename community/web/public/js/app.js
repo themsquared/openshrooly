@@ -59,8 +59,9 @@ function stageDots(stages = []) {
 function selectPack(pack) {
   const url = new URL(location.href);
   url.searchParams.set("pack", pack);
-  if (!url.hash) url.hash = "library";
+  url.hash = "library";
   history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  document.getElementById("library")?.scrollIntoView();
   return renderHome();
 }
 
@@ -90,7 +91,7 @@ async function renderHome() {
         .map(
           (p) => `
     <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
-      <div class="profile-art">${speciesArt(p.species, p.strain, p.name)}</div>
+      <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack)}</div>
       <div class="profile-body">
         <p><span class="chip">${escapeHtml(p.pack)}</span>${
           p.pricing?.kind === "paid"
@@ -122,7 +123,7 @@ async function renderProfile() {
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${p.pack}`;
   $("#summary").textContent = p.summary || "";
   $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack || "")}</span>`;
-  $("#art").innerHTML = speciesArt(p.species, p.strain, p.name);
+  $("#art").innerHTML = speciesArt(p.species, p.strain, p.name, p.pack);
   if (p.legal_notice) {
     $("#legal").textContent = p.legal_notice;
     $("#legal").classList.remove("hidden");
