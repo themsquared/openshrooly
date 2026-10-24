@@ -307,6 +307,27 @@ int main() {
   expect(!api_url_allowed("http://api.shroomlabs.io/api/devices/enroll", "api.shroomlabs.io"), "url deny http");
   expect(!api_url_allowed("https://api.shroomlabs.io/api/../secret", "api.shroomlabs.io"), "url deny dotdot");
 
+  expect(cloud_owns_url("/cloud"), "cloud owns /cloud");
+  expect(!cloud_owns_url("/cloud/connect"), "cloud does not own two-segment");
+  expect(!dashboard_catchall_claims("/cloud"), "catchall skips /cloud");
+  expect(!dashboard_catchall_claims("/security"), "catchall skips /security");
+  expect(!dashboard_catchall_claims("/update"), "catchall skips /update");
+  expect(!dashboard_catchall_claims("/wifisave"), "catchall skips /wifisave");
+  expect(dashboard_catchall_claims("/cloud/connect"), "catchall claims /cloud/connect");
+  expect(dashboard_catchall_claims("/cloud/refresh"), "catchall claims /cloud/refresh");
+  expect(dashboard_catchall_claims("/cloud/disconnect"), "catchall claims /cloud/disconnect");
+  expect(std::strcmp(first_local_handler("/cloud"), "cloud") == 0, "order /cloud reaches cloud");
+  expect(std::strcmp(first_local_handler("/cloud/connect"), "dashboard") == 0,
+         "order /cloud/connect stolen by catchall");
+  expect(cloud_action_ok("connect") && cloud_action_ok("refresh") && cloud_action_ok("disconnect"),
+         "cloud actions");
+  expect(!cloud_action_ok("wipe") && !cloud_action_ok(""), "cloud action reject");
+  const char *our_routes[] = {"/cloud", "/security", "/update", "/wifisave"};
+  bool stolen = false;
+  for (const char *p : our_routes)
+    stolen = stolen || dashboard_catchall_claims(p);
+  expect(!stolen, "our routes stay single-segment");
+
   std::string enroll = enroll_body_json("aabbccddeeff", jwk.c_str(), "Chamber");
   expect(enroll.find("\"hardware_id\":\"aabbccddeeff\"") != std::string::npos, "enroll hardware");
   expect(enroll.find("\"name\":\"Chamber\"") != std::string::npos, "enroll name");
