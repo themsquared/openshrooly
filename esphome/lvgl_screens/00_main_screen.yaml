@@ -83,7 +83,7 @@
         id: grow_rh_unit
         text: "%"
         align: TOP_LEFT
-        x: 212
+        x: 196
         y: 46
         text_font: font_ui
 
@@ -132,12 +132,11 @@
     # Kept so apply_display_layout can skip it when flipping the panel.
     - label:
         id: main_status_message
-        text: ""
-        align: BOTTOM_LEFT
+        text: "Join OpenShrooly, then 192.168.4.1"
+        align: TOP_LEFT
         x: 5
-        y: -5
+        y: 110
         text_font: font1
-        hidden: true
 
     # Button 4: same size and place as upstream so navigation stays identical.
     - obj:

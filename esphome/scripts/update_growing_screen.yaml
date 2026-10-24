@@ -14,6 +14,27 @@
           }
           return std::string("--:--");
 
+    - lambda: |-
+        // Display-only grow day: 1 + elapsed midnights since grow start.
+        // Does not call climate, humidifier, fan, or light managers.
+        const std::string phase = id(grow_phase).current_option();
+        const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
+        const bool growing = !phase.empty() && phase != "Idle" && total > 0;
+        auto now = id(sntp_time).now();
+        if (!growing) {
+          id(grow_started_ts) = 0;
+        } else if (now.is_valid()) {
+          if (id(grow_started_ts) <= 0) {
+            id(grow_started_ts) = now.timestamp;
+          }
+          int day = 1 + (int) ((now.timestamp - id(grow_started_ts)) / 86400);
+          if (day < 1) day = 1;
+          if (day > total) day = total;
+          if (!id(grow_day).has_state() || (int) id(grow_day).state != day) {
+            id(grow_day).publish_state(day);
+          }
+        }
+
     - lvgl.label.update:
         id: grow_phase_label
         text: !lambda |-
@@ -40,6 +61,12 @@
             return str_sprintf("%.0f", id(humidity).state);
           }
           return std::string("--");
+
+    - lambda: |-
+        // Spleen 16x32 is a fixed 16px cell. Park '%' after the last RH glyph.
+        const char *rh = lv_label_get_text(id(main_humidity_value));
+        const int n = rh ? (int) strlen(rh) : 2;
+        lv_obj_set_x(id(grow_rh_unit), 160 + 16 * n + 4);
 
     - lvgl.label.update:
         id: grow_temp_meta
@@ -182,3 +209,20 @@
         } else {
           lv_obj_add_flag(id(grow_alert_bar), LV_OBJ_FLAG_HIDDEN);
         }
+
+    - lvgl.label.update:
+        id: main_status_message
+        text: !lambda |-
+          if (id(ap_restart_in_progress)) {
+            return std::string("Restarting AP...");
+          }
+          if (wifi::global_wifi_component->is_connected()) {
+            auto addresses = wifi::global_wifi_component->wifi_sta_ip_addresses();
+            if (addresses.empty()) {
+              return std::string("Wi-Fi connected");
+            }
+            char ip[network::IP_ADDRESS_BUFFER_SIZE];
+            addresses[0].str_to(ip);
+            return str_sprintf("Wi-Fi %s", ip);
+          }
+          return std::string("Join OpenShrooly, then 192.168.4.1");

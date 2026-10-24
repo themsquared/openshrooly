@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
-"""Check native 296x128 and 4x preview sizes."""
+"""Check growing-screen previews, fonts, and ESPHome font merge."""
 
 from pathlib import Path
+import os
+import shutil
+import subprocess
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 PREVIEWS = ROOT / "docs" / "device-screen"
+FONTS = ROOT / "esphome" / "fonts"
+DISPLAY = ROOT / "esphome" / "components" / "display.yaml"
+LVGL = ROOT / "esphome" / "components" / "lvgl_config.yaml"
+MAIN = ROOT / "esphome" / "lvgl_screens" / "00_main_screen.yaml"
+RENDER = ROOT / "scripts" / "render_epaper_previews.py"
 STEMS = ("growing-in-range", "growing-alert", "idle", "boot-splash")
+
+
+def assert_hyphen(path: Path) -> None:
+    text = path.read_text(encoding="ascii", errors="replace")
+    assert "ENCODING 45\n" in text, f"{path.name} is missing glyph '-' (ENCODING 45)"
 
 
 def main() -> None:
@@ -18,7 +31,33 @@ def main() -> None:
         assert native.mode == "1", (stem, native.mode)
         assert big.size == (1184, 512), (stem, big.size)
         assert (PREVIEWS / f"{stem}.png").stat().st_size < 20_000
-    print("ok", ", ".join(STEMS))
+
+    display = DISPLAY.read_text(encoding="utf-8")
+    assert "id: font_ui" in display, "font_ui must live in display.yaml so << merge keeps it"
+    assert "id: font_hero" in display, "font_hero must live in display.yaml so << merge keeps it"
+    lvgl = LVGL.read_text(encoding="utf-8")
+    assert "\nfont:" not in f"\n{lvgl}", "lvgl_config.yaml must not define font: (merge drops it or the display.yaml list)"
+
+    main_yaml = MAIN.read_text(encoding="utf-8")
+    assert "id: grow_rh_unit" in main_yaml
+    assert "x: 212" not in main_yaml, "humidity % must not use a fixed x=212"
+    assert "id: main_status_message" in main_yaml
+    assert "hidden: true" not in main_yaml.split("id: main_status_message", 1)[1][:240]
+
+    render = RENDER.read_text(encoding="utf-8")
+    assert '"-:%%/?!,+=-"' in render or "+=-" in render
+    assert "160 + hero.text_width" in render
+    assert "Join OpenShrooly, then 192.168.4.1" in render
+
+    for name in ("spleen-8x16.bdf", "spleen-16x32.bdf"):
+        assert_hyphen(FONTS / name)
+
+    esphome = shutil.which("esphome")
+    if esphome:
+        subprocess.run([esphome, "config", str(ROOT / "esphome" / "openshrooly.yaml")], check=True)
+    elif os.environ.get("REQUIRE_ESPHOME_CONFIG") == "1":
+        raise SystemExit("esphome is required for REQUIRE_ESPHOME_CONFIG=1")
+    print("ok", ", ".join(STEMS), "+ fonts + display.yaml merge")
 
 
 if __name__ == "__main__":

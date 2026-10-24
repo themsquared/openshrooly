@@ -25,7 +25,7 @@ SPLEEN_URL = "https://github.com/fcambus/spleen/archive/refs/tags/2.1.0.tar.gz"
 WIDTH, HEIGHT = 296, 128
 GLYPHS = (
     " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    ".:%/?!,+="
+    ".:%/?!,+=-"
 )
 GLYPH_ORDINALS = {ord(ch) for ch in GLYPHS} | {0x00B0}  # degree
 
@@ -103,10 +103,16 @@ def subset_bdf(src: Path, dest: Path, keep: set[int]) -> None:
     dest.write_text(text, encoding="ascii")
 
 
+def bdf_has_hyphen(path: Path) -> bool:
+    if not path.exists():
+        return False
+    return "ENCODING 45\n" in path.read_text(encoding="ascii", errors="replace")
+
+
 def ensure_fonts() -> None:
     FONTS.mkdir(parents=True, exist_ok=True)
     needed = ["spleen-8x16.bdf", "spleen-16x32.bdf"]
-    if all((FONTS / name).exists() for name in needed):
+    if all(bdf_has_hyphen(FONTS / name) for name in needed):
         return
     archive = Path("/tmp/spleen-2.1.0.tar.gz")
     if not archive.exists():
@@ -233,6 +239,7 @@ def draw_growing(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
     small.draw(img, 8, 66, state["temp_meta"])
     small.draw(img, 160, 66, state["rh_meta"])
     small.draw(img, 5, 78, state["next_event"])
+    small.draw(img, 5, 110, state.get("status", "Join OpenShrooly, then 192.168.4.1"))
     draw_select(img, small)
     return img
 
@@ -251,6 +258,7 @@ def draw_idle(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
     small.draw(img, 8, 66, state["temp_meta"])
     small.draw(img, 160, 66, state["rh_meta"])
     small.draw(img, 5, 78, "No grow running")
+    small.draw(img, 5, 110, state.get("status", "Join OpenShrooly, then 192.168.4.1"))
     draw_select(img, small)
     return img
 
@@ -294,6 +302,7 @@ def main() -> None:
                 "temp_meta": "tgt 24  OK",
                 "rh_meta": "tgt 90  OK",
                 "next_event": "Lights off 19:00",
+                "status": "Wi-Fi 192.168.1.20",
             },
             fonts,
         ),
@@ -312,6 +321,7 @@ def main() -> None:
                 "rh_meta": "tgt 90  DRIFT",
                 "next_event": "FAE in 12m",
                 "alert": "WATER LOW",
+                "status": "Wi-Fi 192.168.1.20",
             },
             fonts,
         ),
@@ -325,6 +335,7 @@ def main() -> None:
                 "rh": "55",
                 "temp_meta": "tgt 22  OK",
                 "rh_meta": "tgt 70  DRIFT",
+                "status": "Join OpenShrooly, then 192.168.4.1",
             },
             fonts,
         ),

@@ -3,10 +3,18 @@
 # E-paper display setup for use with LVGL
 # ========================================================================
 
-# Fonts for display (if needed for non-LVGL components)
+# All LVGL fonts live here. display.yaml is merged before lvgl_config.yaml,
+# so a second font: block there is dropped and font_ui / font_hero go missing.
 font:
   - file: 'fonts/spleen-6x12.bdf'
     id: font1
+    bpp: 1
+  - file: 'fonts/spleen-8x16.bdf'
+    id: font_ui
+    bpp: 1
+  - file: 'fonts/spleen-16x32.bdf'
+    id: font_hero
+    bpp: 1
 
 # Background image (not used with LVGL)
 image:

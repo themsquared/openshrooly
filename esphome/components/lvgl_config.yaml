@@ -10,20 +10,6 @@ color:
   - id: paper_black  # Shows as black on e-paper (actually white in memory)
     hex: "FFFFFF"
 
-# Define the Spleen fonts for LVGL (1-bit, pixel-hinted).
-# font1 matches upstream. font_ui / font_hero are display-only size steps
-# so temperature and humidity stay readable from across the room.
-font:
-  - file: 'fonts/spleen-6x12.bdf'
-    id: font1
-    bpp: 1  # 1 bit per pixel for monochrome
-  - file: 'fonts/spleen-8x16.bdf'
-    id: font_ui
-    bpp: 1
-  - file: 'fonts/spleen-16x32.bdf'
-    id: font_hero
-    bpp: 1
-
 # LVGL Configuration
 lvgl:
   displays:
