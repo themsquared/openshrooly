@@ -677,7 +677,10 @@ export function applyPackRules(profile, extra = {}) {
   }
   const confirmedCulinary = extra.moderatorPack === "culinary" || Boolean(extra.confirmedCulinary);
   const offMenu =
-    extra.moderatorPack === "psilocybin" || classified.force || (!confirmedCulinary && classified.hold);
+    extra.moderatorPack === "psilocybin" ||
+    classified.force ||
+    (!confirmedCulinary && classified.hold) ||
+    (!classified.culinary && !confirmedCulinary && (next.pack === "psilocybin" || Boolean(next.restricted)));
   if (offMenu) {
     if (!next.pricing_before_hold) {
       next.pricing_before_hold = next.pricing;
