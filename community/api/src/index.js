@@ -1,7 +1,7 @@
 import { createD1Db } from "./db.js";
 import { handleRequest, withCors } from "./handlers.js";
 import { SCHEMA_SQL } from "./schema.js";
-import { createR2Storage } from "./storage.js";
+import { createOptionalStorage } from "./storage.js";
 
 async function envContext(env) {
   if (!env._ctx) {
@@ -13,10 +13,7 @@ async function envContext(env) {
     }
     env._ctx = {
       db,
-      storage: env.PHOTOS ? createR2Storage(env.PHOTOS) : createR2Storage({
-        async put() {},
-        async get() { return null; },
-      }),
+      storage: createOptionalStorage(env.PHOTOS),
       CORS_ORIGIN: env.CORS_ORIGIN,
       CDN_BASE_URL: env.CDN_BASE_URL,
       SHOW_PSILOCYBIN: env.SHOW_PSILOCYBIN,
