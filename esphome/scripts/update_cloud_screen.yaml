@@ -20,7 +20,7 @@
         }
         shroom_labs::QrCode qr{};
         const bool have = id(shl_cloud)->fill_qr(&qr);
-        lv_obj_t *canvas = id(claim_qr).obj;
+        lv_obj_t *canvas = id(claim_qr);
         if (canvas == nullptr) {
           return;
         }
