@@ -195,9 +195,23 @@ export function internalError(err, method, path) {
   return json({ error: INTERNAL_ERROR_MESSAGE, request_id: requestId }, 500, { "x-request-id": requestId });
 }
 
+function allowAppleFormPost(path, request) {
+  return (
+    path === "/api/auth/oidc/apple/callback" &&
+    request.method.toUpperCase() === "POST" &&
+    request.headers.get("origin") === "https://appleid.apple.com"
+  );
+}
+
 async function route(method, path, url, request, env) {
   const { db, storage } = env;
-  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && !originAllowed(env, request)) {
+  if (
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS" &&
+    !originAllowed(env, request) &&
+    !allowAppleFormPost(path, request)
+  ) {
     if (request.headers.get("origin")) return json({ error: "origin not allowed" }, 403);
   }
   const authResponse = await handleAuth(method, path, url, request, env);
