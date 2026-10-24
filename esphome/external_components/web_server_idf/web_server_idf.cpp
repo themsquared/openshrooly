@@ -178,8 +178,15 @@ void AsyncWebServer::begin() {
   }
 }
 
+AsyncWebServer::RequestGuard AsyncWebServer::request_guard_ = nullptr;
+
 esp_err_t AsyncWebServer::request_post_handler(httpd_req_t *r) {
   ESP_LOGVV(TAG, "Enter AsyncWebServer::request_post_handler. uri=%s", r->uri);
+  if (request_guard_ != nullptr) {
+    AsyncWebServerRequest guarded(r);
+    if (!request_guard_(&guarded))
+      return ESP_OK;  // reply already sent; the server discards any unread body
+  }
   auto content_type = request_get_header(r, "Content-Type");
 
   if (!request_has_header(r, "Content-Length")) {
@@ -236,6 +243,8 @@ esp_err_t AsyncWebServer::request_post_handler(httpd_req_t *r) {
 esp_err_t AsyncWebServer::request_handler(httpd_req_t *r) {
   ESP_LOGVV(TAG, "Enter AsyncWebServer::request_handler. method=%u, uri=%s", r->method, r->uri);
   AsyncWebServerRequest req(r);
+  if (request_guard_ != nullptr && !request_guard_(&req))
+    return ESP_OK;
   return static_cast<AsyncWebServer *>(r->user_ctx)->request_handler_(&req);
 }
 
@@ -347,6 +356,9 @@ void AsyncWebServerRequest::init_response_(AsyncWebServerResponse *rsp, int code
       break;
     case 401:
       status = HTTPD_401;
+      break;
+    case 403:
+      status = "403 Forbidden";
       break;
     case 404:
       status = HTTPD_404;

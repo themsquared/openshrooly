@@ -54,7 +54,7 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 
 ## On-device first run
 
-The chamber page must not open on a wall of unlabeled sliders. AP mode names the next step (captive portal or `/`). Idle offers culinary presets that write `grow_*` plus the existing setpoint numbers. Unreachable says to use the same Wi-Fi or `192.168.4.1`. See [`docs/device-web.md`](device-web.md).
+The chamber page must not open on a wall of unlabeled sliders. Wi-Fi setup shows its own network name and password on the screen, then names the next step (captive portal or `/`). Idle offers culinary presets that write `grow_*` plus the existing setpoint numbers. Unreachable says to use the same Wi-Fi or `192.168.4.1`. See [`docs/device-web.md`](device-web.md).
 
 ## Copy
 

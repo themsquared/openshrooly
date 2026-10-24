@@ -186,5 +186,55 @@ bool signature_valid(const uint8_t public_key[32], const std::string &msg, const
   return crypto_eddsa_check_equation(sig, public_key, h_ram) == 0;
 }
 
+
+bool parse_lan_trailer(const uint8_t *block, size_t len, LanTrailer *out) {
+  static const char MAGIC[] = "OSSIGNv1";
+  if (block == nullptr || len != LAN_TRAILER_SIZE || std::memcmp(block + len - 8, MAGIC, 8) != 0)
+    return false;
+  const size_t text_cap = len - 8;
+  size_t text_len = 0;
+  while (text_len < text_cap && block[text_len] != 0)
+    text_len++;
+  for (size_t i = text_len; i < text_cap; i++) {
+    if (block[i] != 0)
+      return false;
+  }
+  const std::string text(reinterpret_cast<const char *>(block), text_len);
+  std::string *fields[] = {&out->channel, &out->version, &out->url, &out->signature};
+  static const char *const KEYS[] = {"channel=", "version=", "url=", "sig="};
+  size_t pos = 0;
+  for (int i = 0; i < 4; i++) {
+    const size_t key_len = std::strlen(KEYS[i]);
+    if (text.compare(pos, key_len, KEYS[i]) != 0)
+      return false;
+    const size_t end = text.find('\n', pos + key_len);
+    if (end == std::string::npos || end == pos + key_len)
+      return false;
+    *fields[i] = text.substr(pos + key_len, end - pos - key_len);
+    for (char ch : *fields[i]) {
+      if (ch < 0x21 || ch > 0x7e)
+        return false;
+    }
+    pos = end + 1;
+  }
+  return pos == text.size();
+}
+
+bool lan_image_valid(const uint8_t public_key[32], const std::string &product, const std::string &channel,
+                     const std::string &prefix, const uint8_t *block, size_t len, uint32_t image_size,
+                     const std::string &sha256_hex, std::string *version_out) {
+  LanTrailer t;
+  Version v;
+  if (!parse_lan_trailer(block, len, &t) || t.channel != channel || !parse_version(t.version, &v) ||
+      !url_allowed(t.url, prefix) || !is_sha256_hex(sha256_hex) || image_size == 0)
+    return false;
+  if (!signature_valid(public_key, signed_message(product, t.channel, t.version, image_size, sha256_hex, t.url),
+                       t.signature))
+    return false;
+  if (version_out != nullptr)
+    *version_out = t.version;
+  return true;
+}
+
 }  // namespace signed_update
 }  // namespace esphome

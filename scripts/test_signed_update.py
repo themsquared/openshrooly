@@ -6,6 +6,8 @@
 2. Signs a fake release with scripts/sign_release.mjs using a throwaway key and
    checks the device code accepts it and refuses every tampered field, a wrong
    key, a key stored inside the repo, and a key that does not match the device.
+3. Checks the .signed.bin file for installing from the chamber page: the device
+   code accepts it and refuses unsigned, tampered, wrong-key and USB-signed files.
 """
 import json
 import os
@@ -92,6 +94,31 @@ def main():
         assert not accepted({**m, "signature": m["signature"][:-4]}, pub), "short signature accepted"
         # USB signature can never pass as an OTA release.
         assert not accepted({**m["usb"], "product": "openshrooly"}, pub)
+
+        # File for "Install from file" on the chamber page: image + signature block.
+        import hashlib
+        signed = out / "openshrooly-1.0.3-sl.1.signed.bin"
+        data = signed.read_bytes()
+        image = (tmp / "ota.bin").read_bytes()
+        assert data[:-512] == image and data[-8:] == b"OSSIGNv1", "signed.bin layout"
+
+        def lan_ok(blob, pubhex):
+            f = tmp / "lan.bin"
+            f.write_bytes(blob)
+            sha = hashlib.sha256(blob[:-512]).hexdigest()
+            return sh(str(exe), "lan", pubhex, str(f), sha, ok=False).returncode == 0
+
+        assert lan_ok(data, pub), "good signed file refused"
+        assert not lan_ok(data, wrong_pub), "signed file accepted with the wrong key"
+        assert not lan_ok(image, pub), "unsigned image accepted"
+        assert not lan_ok(image + bytes(512), pub), "blank signature block accepted"
+        tampered = bytearray(data)
+        tampered[100] ^= 1
+        assert not lan_ok(bytes(tampered), pub), "changed image accepted"
+        assert not lan_ok(data.replace(b"version=1.0.3-sl.1", b"version=1.0.3-sl.9"), pub), "changed version accepted"
+        assert not lan_ok(data.replace(b"channel=stable", b"channel=stabl1"), pub), "changed channel accepted"
+        usb_block = data[-512:].replace(m["signature"].encode(), m["usb"]["signature"].encode())
+        assert not lan_ok(image + usb_block, pub), "USB signature accepted for a file install"
 
         r = sign(wrong_key, pub)
         assert r.returncode != 0 and "does not match" in r.stderr, "mismatched key was used"

@@ -224,6 +224,20 @@
           lv_obj_clear_flag(id(grow_next_event), LV_OBJ_FLAG_HIDDEN);
         }
 
+    - lambda: |-
+        auto *sec = id(device_sec);
+        if (sec->in_setup()) {
+          std::string text = "Wi-Fi setup: join this network\n";
+          text += "Name: " + sec->ap_ssid() + "\n";
+          text += "Password: " + sec->ap_password() + "\n";
+          text += "Then open 192.168.4.1\n";
+          text += "Web login: admin / " + sec->web_password();
+          lv_label_set_text(id(setup_overlay_text), text.c_str());
+          lv_obj_clear_flag(id(setup_overlay), LV_OBJ_FLAG_HIDDEN);
+        } else {
+          lv_obj_add_flag(id(setup_overlay), LV_OBJ_FLAG_HIDDEN);
+        }
+
     - lvgl.label.update:
         id: main_status_message
         text: !lambda |-
@@ -239,4 +253,7 @@
             addresses[0].str_to(ip);
             return str_sprintf("Wi-Fi %s", ip);
           }
-          return std::string("Join OpenShrooly, then 192.168.4.1");
+          if (id(device_sec)->in_setup()) {
+            return std::string("Wi-Fi setup is on");
+          }
+          return std::string("No Wi-Fi. Menu, System, Wi-Fi setup");

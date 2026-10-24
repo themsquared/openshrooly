@@ -84,7 +84,7 @@ Create a script to upload files via the ESP32's OTA mechanism (advanced).
 
 Once uploaded, access your dashboard at:
 
-- **When connected to AP mode:** http://192.168.4.1/app/
+- **When joined to the chamber's setup network:** http://192.168.4.1/app/ (changes need the web login, see docs/SECURITY.md)
 - **When connected to WiFi:** http://[your-esp-ip]/app/
 
 The ESPHome interface remains at the root `/` path.

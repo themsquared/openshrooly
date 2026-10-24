@@ -36,5 +36,21 @@ bool base64_decode(const std::string &in, uint8_t *out, size_t out_cap, size_t *
 // Ed25519 (RFC 8032) check of a base64 signature over msg with a 32 byte public key.
 bool signature_valid(const uint8_t public_key[32], const std::string &msg, const std::string &signature_b64);
 
+// Images uploaded on the local network end with a fixed 512 byte block holding the
+// same release signature the manifest carries. Text "channel=..\nversion=..\nurl=..\n
+// sig=..\n", zero padded, then the 8 byte magic "OSSIGNv1". scripts/sign_release.mjs
+// writes it; the bytes before it are the plain OTA image.
+constexpr size_t LAN_TRAILER_SIZE = 512;
+struct LanTrailer {
+  std::string channel, version, url, signature;
+};
+bool parse_lan_trailer(const uint8_t *block, size_t len, LanTrailer *out);
+
+// True only when the block parses and its signature covers this exact image for this
+// product and channel with an allowed download URL.
+bool lan_image_valid(const uint8_t public_key[32], const std::string &product, const std::string &channel,
+                     const std::string &prefix, const uint8_t *block, size_t len, uint32_t image_size,
+                     const std::string &sha256_hex, std::string *version_out);
+
 }  // namespace signed_update
 }  // namespace esphome

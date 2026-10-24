@@ -9,6 +9,15 @@
 #include "esphome/components/captive_portal/captive_portal.h"
 #endif
 
+// Shroom Labs: only images signed with the release key are installed from the local
+// network. The final LAN_TRAILER_SIZE bytes of an upload carry the signature and are
+// held back, so they are never written to flash. USB stays the unrestricted path.
+#include <cstring>
+#include "mbedtls/sha256.h"
+#ifdef USE_SIGNED_UPDATE
+#include "esphome/components/signed_update/signed_update.h"
+#endif
+
 #ifdef USE_ARDUINO
 #if defined(USE_LIBRETINY)
 #include <Update.h>
@@ -65,10 +74,19 @@ class OTARequestHandler : public AsyncWebHandler {
   void schedule_ota_reboot_();
   void ota_init_(const char *filename);
 
+  ota::OTAResponseTypes write_held_back_(const uint8_t *data, size_t len);
+  bool signature_ok_();
+
   uint32_t last_ota_progress_{0};
   uint32_t ota_read_length_{0};
   WebServerOTAComponent *parent_;
   bool ota_success_{false};
+  const char *failure_{nullptr};
+  static constexpr size_t TRAILER_SIZE = 512;
+  uint8_t held_[TRAILER_SIZE];
+  size_t held_len_{0};
+  uint32_t image_len_{0};
+  mbedtls_sha256_context sha_;
 
  private:
   ota::OTABackendPtr ota_backend_{nullptr};
@@ -108,6 +126,66 @@ void OTARequestHandler::ota_init_(const char *filename) {
   ESP_LOGI(TAG, "OTA Update Start: %s", filename);
   this->ota_read_length_ = 0;
   this->ota_success_ = false;
+  this->failure_ = nullptr;
+  this->held_len_ = 0;
+  this->image_len_ = 0;
+  mbedtls_sha256_init(&this->sha_);
+  mbedtls_sha256_starts(&this->sha_, 0);
+}
+
+// Writes everything except the last TRAILER_SIZE bytes seen so far.
+ota::OTAResponseTypes OTARequestHandler::write_held_back_(const uint8_t *data, size_t len) {
+  const size_t total = this->held_len_ + len;
+  if (total <= TRAILER_SIZE) {
+    std::memcpy(this->held_ + this->held_len_, data, len);
+    this->held_len_ = total;
+    return ota::OTA_RESPONSE_OK;
+  }
+  size_t flush = total - TRAILER_SIZE;
+  const size_t from_held = flush < this->held_len_ ? flush : this->held_len_;
+  if (from_held > 0) {
+    auto err = this->ota_backend_->write(this->held_, from_held);
+    if (err != ota::OTA_RESPONSE_OK)
+      return err;
+    mbedtls_sha256_update(&this->sha_, this->held_, from_held);
+    std::memmove(this->held_, this->held_ + from_held, this->held_len_ - from_held);
+    this->held_len_ -= from_held;
+  }
+  const size_t from_data = flush - from_held;
+  if (from_data > 0) {
+    auto err = this->ota_backend_->write(const_cast<uint8_t *>(data), from_data);
+    if (err != ota::OTA_RESPONSE_OK)
+      return err;
+    mbedtls_sha256_update(&this->sha_, data, from_data);
+  }
+  std::memcpy(this->held_ + this->held_len_, data + from_data, len - from_data);
+  this->held_len_ += len - from_data;
+  this->image_len_ += flush;
+  return ota::OTA_RESPONSE_OK;
+}
+
+bool OTARequestHandler::signature_ok_() {
+  uint8_t digest[32];
+  mbedtls_sha256_finish(&this->sha_, digest);
+  mbedtls_sha256_free(&this->sha_);
+  if (this->held_len_ != TRAILER_SIZE) {
+    this->failure_ = "Refused: this file is not a signed OpenShrooly release.";
+    return false;
+  }
+#ifdef USE_SIGNED_UPDATE
+  char hex[65];
+  for (int i = 0; i < 32; i++)
+    snprintf(hex + i * 2, 3, "%02x", digest[i]);
+  std::string version;
+  if (signed_update::global_signed_update != nullptr &&
+      signed_update::global_signed_update->lan_image_valid(this->held_, TRAILER_SIZE, this->image_len_, hex,
+                                                           &version)) {
+    ESP_LOGI(TAG, "Signed release %s accepted", version.c_str());
+    return true;
+  }
+#endif
+  this->failure_ = "Refused: this file is not a signed OpenShrooly release.";
+  return false;
 }
 
 void OTARequestHandler::handleUpload(AsyncWebServerRequest *request, const PlatformString &filename, size_t index,
@@ -180,7 +258,7 @@ void OTARequestHandler::handleUpload(AsyncWebServerRequest *request, const Platf
 
   // Process data
   if (len > 0) {
-    error_code = this->ota_backend_->write(data, len);
+    error_code = this->write_held_back_(data, len);
     if (error_code != ota::OTA_RESPONSE_OK) {
       ESP_LOGE(TAG, "OTA write failed: %d", error_code);
       this->ota_backend_->abort();
@@ -202,6 +280,16 @@ void OTARequestHandler::handleUpload(AsyncWebServerRequest *request, const Platf
     // For Arduino framework, the Update library tracks expected size from firmware header
     // If we haven't received enough data, calling end() will fail
     // This can happen if the upload is interrupted or the client disconnects
+    if (!this->signature_ok_()) {
+      ESP_LOGW(TAG, "Upload refused: no valid release signature");
+      this->ota_backend_->abort();
+      this->ota_backend_.reset();
+#ifdef USE_OTA_STATE_LISTENER
+      this->parent_->notify_state_deferred_(ota::OTA_ERROR, 0.0f,
+                                            static_cast<uint8_t>(ota::OTA_RESPONSE_ERROR_UNKNOWN));
+#endif
+      return;
+    }
     error_code = this->ota_backend_->end();
     if (error_code == ota::OTA_RESPONSE_OK) {
       this->ota_success_ = true;
@@ -233,8 +321,10 @@ void OTARequestHandler::handleRequest(AsyncWebServerRequest *request) {
   response = request->beginResponse_P(200, TEXT_PLAIN, msg);
   response->addHeader(CONNECTION_STR, CLOSE_STR);
 #else
-  const char *msg = this->ota_success_ ? "Update Successful!" : "Update Failed!";
-  response = request->beginResponse(200, "text/plain", msg);
+  const char *msg = this->ota_success_ ? "Update Successful!"
+                    : this->failure_ != nullptr ? this->failure_
+                                                : "Update Failed!";
+  response = request->beginResponse(this->ota_success_ ? 200 : 400, "text/plain", msg);
   response->addHeader("Connection", "close");
 #endif
   request->send(response);

@@ -14,6 +14,7 @@ python3 scripts/render_epaper_previews.py
 | `growing-alert.png` | Same grow, LOW shown inverted, water-low banner |
 | `idle.png` | No grow; climate numbers still shown |
 | `boot-splash.png` | 64px filled mushroom mark, OpenShrooly wordmark, by Shroom Labs |
+| `wifi-setup.png` | Wi-Fi setup on: network name, password, 192.168.4.1, web login (example values) |
 
 Each has a `@4x.png` sibling.
 
@@ -39,7 +40,7 @@ Idle is the default. Starting a non-Idle phase with a total day count stamps `gr
 
 Type hierarchy: **24×48** temperature and humidity (two side by side), **12×24** clock, **6×12** stage + day, the `target N  OK` lines (LOW / HIGH inverted, from target ± hysteresis), and the Wi-Fi / AP line. A 4px bar under the header shows day / total. The header carries a 15×16 mark; the splash shows the 63×64 mark, the wordmark, and `by Shroom Labs`.
 
-The bottom-left line is Wi-Fi state plus IP, or `Join OpenShrooly, then 192.168.4.1` in AP mode, so first-time setup stays readable from the panel.
+The bottom-left line is Wi-Fi state plus IP, or `No Wi-Fi. Menu, System, Wi-Fi setup` when the chamber is offline. While Wi-Fi setup is on, a box over the readings shows the setup network name, its password, `192.168.4.1` and the web login (`wifi-setup@4x.png`, example values). Menu, System shows the web password and turns Wi-Fi setup on or off. See [`../SECURITY.md`](../SECURITY.md).
 
 ## Deviations from grahamsz/openshrooly
 

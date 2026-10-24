@@ -71,11 +71,18 @@ failed the safety check and was not installed. Your Shrooly is still on version 
 - Browsers without WebCrypto Ed25519 are told to update; the page does not fall back to
   installing without a check.
 
-### Local recovery paths (unsigned, on purpose)
+### Install from a file (signed, from 1.0.3-sl.2)
 
-The device's own **Install from a file on this computer** upload and ESPHome's native OTA still
-accept unsigned images from the home network. They are recovery tools for someone who already
-has the device on their LAN and are labelled as such in the UI.
+The device's own **Install from a file on this computer** upload (and the same upload on the
+setup network) only installs `openshrooly-<version>.signed.bin`: the OTA image followed by a
+512 byte block holding the channel, version, download URL and the OTA entry's signature
+(`channel=`, `version=`, `url=`, `sig=` lines, `OSSIGNv1` in the last 8 bytes). The chamber
+holds back the last 512 bytes, hashes the rest as it writes, and switches only if the block's
+signature covers that size and hash under the compiled-in key. Otherwise it answers 400
+"Refused: this file is not a signed OpenShrooly release." and keeps the running version. The
+upload needs the web login (`docs/SECURITY.md`). ESPHome's native OTA is turned off.
+
+USB stays unrestricted on purpose: it needs the chamber in hand.
 
 For USB recovery and full flash backups with esptool, see `docs/RECOVERY.md`.
 
@@ -89,9 +96,10 @@ B=.esphome/build/openshrooly/build
 
 # 2. Sign into the site's firmware folder (never commit these files)
 node ../scripts/sign_release.mjs --key /workspace/secrets/firmware-signing.key.pem \
-  --version 1.0.3-sl.1 --ota $B/firmware.ota.bin --factory $B/firmware.factory.bin \
+  --version 1.0.3-sl.2 --ota $B/firmware.ota.bin --factory $B/firmware.factory.bin \
   --out ../community/web/public/firmware/stable
 
+# The signer also writes openshrooly-<version>.signed.bin for Install from a file.
 # 3. Check and deploy the site
 cd ../community/web && npm test && npm run deploy
 ```

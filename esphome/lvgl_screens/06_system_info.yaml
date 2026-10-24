@@ -54,27 +54,34 @@
         text_font: font1
 
     - label:
-        text: "Voltage"
+        id: system_setup_marker
+        text: " "
+        align: TOP_LEFT
+        x: 5
+        y: 56
+        text_font: font1
+    - label:
+        text: "Wi-Fi setup"
         align: TOP_LEFT
         x: 17
         y: 56
         text_font: font1
     - label:
-        id: system_voltage_value
-        text: "--.--V"
+        id: system_setup_value
+        text: "Off"
         align: TOP_RIGHT
         x: -10
         y: 56
         text_font: font1
 
     - label:
-        text: "WiFi"
+        text: "IP"
         align: TOP_LEFT
         x: 17
         y: 74
         text_font: font1
     - label:
-        id: system_ssid_value
+        id: system_ip_value
         text: "--"
         align: TOP_RIGHT
         x: -10
@@ -82,13 +89,13 @@
         text_font: font1
 
     - label:
-        text: "IP"
+        text: "Web password"
         align: TOP_LEFT
         x: 17
         y: 90
         text_font: font1
     - label:
-        id: system_ip_value
+        id: system_web_password_value
         text: "--"
         align: TOP_RIGHT
         x: -10

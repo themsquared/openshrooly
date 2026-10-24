@@ -25,7 +25,7 @@ export default function FirstRun({ state, applying, onApply, error }: Props) {
         {error ? <p className="first-run-error" role="alert">{error}</p> : null}
         {state === 'first-run-wifi' ? (
           <ol className="first-run-steps">
-            <li>On your phone, join the Wi-Fi network named OpenShrooly</li>
+            <li>On your phone, join the Wi-Fi network shown on the chamber screen, with the password shown there</li>
             <li>Open 192.168.4.1 and choose your home Wi-Fi</li>
             <li>Come back to this page on your home Wi-Fi and start a grow</li>
           </ol>

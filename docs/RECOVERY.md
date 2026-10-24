@@ -84,5 +84,5 @@ esptool.py --port $P --before default_reset --after hard_reset write_flash 0 <ba
 ```
 
 This replaces everything, including Wi-Fi settings and grow settings saved at the time
-of the backup. For a firmware-only fix, prefer the device's own Install from a file page
+of the backup. For a firmware-only fix, prefer the device's own Install from a file page with the signed `.signed.bin` file
 or the signed USB installer (`docs/INSTALL.md`).
