@@ -47,3 +47,12 @@ def test_rejects_psilocybin_when_disabled(client):
     page = client.post("/profiles/import", data={"document": raw})
     assert page.status_code == 200
     assert b"disabled" in page.content
+
+
+def test_species_photo_picks_specific_harvest_shots():
+    from hub.species_art import species_photo
+
+    assert species_photo("Pleurotus ostreatus var. columbinus", "Blue", "Blue Oyster").endswith("species-blue-oyster.jpg")
+    assert species_photo("Hypsizygus tessulatus", "Brown beech", "Beech / Buna Shimeji").endswith("species-beech.jpg")
+    assert species_photo("Agaricus bisporus", "Brown cremini", "Button / Cremini").endswith("species-cremini.jpg")
+    assert species_photo("Unknownia fictionalis", "", "Mystery").endswith("species-generic.jpg")

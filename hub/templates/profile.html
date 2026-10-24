@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ profile.name }} · Hub{% endblock %}
 {% block content %}
+<figure class="profile-hero">
+  <img src="{{ species_photo(profile.species, profile.strain, profile.name) }}" alt="{{ profile.name }}" width="960" height="540">
+</figure>
 <p><span class="chip">{{ profile.pack }}</span> <span class="chip">{{ profile.pricing.kind }}</span></p>
 <h1>{{ profile.name }}</h1>
 <p class="muted">{{ profile.species }}{% if profile.strain %} · {{ profile.strain }}{% endif %}</p>

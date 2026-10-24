@@ -197,7 +197,14 @@ h1, .display {
   border-color: var(--sl-line-strong);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4), 0 0 24px rgba(125, 255, 179, 0.08);
 }
-.profile-art { height: 168px; background: #0c1410; }
+.profile-art { height: 176px; background: #0c1410; }
+.profile-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#art img {
+  width: 100%;
+  height: min(42vw, 340px);
+  object-fit: cover;
+  display: block;
+}
 .how { margin: 2.4rem 0; }
 .how h3 { font-family: var(--display); font-size: 1.35rem; margin: 0.2rem 0 0.35rem; }
 .profile-art svg { width: 100%; height: 100%; display: block; }

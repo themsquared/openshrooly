@@ -29,8 +29,10 @@ from openshrooly_lib.webutil import json_dumps  # noqa: E402
 from . import config  # noqa: E402
 from . import db  # noqa: E402
 from .discover import discover_esphome  # noqa: E402
+from .species_art import species_photo  # noqa: E402
 
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
+templates.env.globals["species_photo"] = species_photo
 _poll_stop = threading.Event()
 
 

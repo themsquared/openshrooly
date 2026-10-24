@@ -15,7 +15,10 @@
 </form>
 <div class="cards">
   {% for profile in profiles %}
-  <article class="card">
+  <article class="card has-art">
+    <div class="profile-art">
+      <img src="{{ species_photo(profile.species, profile.strain, profile.name) }}" alt="{{ profile.name }}" width="960" height="540" loading="lazy" decoding="async">
+    </div>
     <p><span class="chip">{{ profile.pack }}</span>{% if profile.pricing.kind == "paid" %}<span class="chip">paid</span>{% else %}<span class="chip">free</span>{% endif %}</p>
     <h3><a href="/profiles/{{ profile.id }}">{{ profile.name }}</a></h3>
     <p class="muted">{{ profile.species }}{% if profile.strain %} · {{ profile.strain }}{% endif %}</p>

@@ -11,7 +11,7 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 - Dark soil, spore-green glow, mycelium gold, terracotta cap.
 - Distinctive display face (**Fraunces**, self-hosted) + accessible sans (**Atkinson Hyperlegible**, self-hosted).
 - Glassy cards, grain, restrained motion. Respect `prefers-reduced-motion`.
-- Species cards use deterministic SVG illustrations (no stock photos, no CDN).
+- Species cards use original generated harvest photographs (self-hosted JPEGs, no CDN, not scraped from shrooly.com). On-device stays illustration-free to protect flash.
 - Grow stages are timelines, not walls of text.
 
 ## Accessibility (WCAG AA)

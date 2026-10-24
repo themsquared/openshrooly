@@ -100,6 +100,28 @@ a { color: var(--sl-spore); }
   background: linear-gradient(90deg, var(--sl-spore), var(--sl-mycelium), var(--sl-cap));
   opacity: 0.55;
 }
+.card.has-art { padding-top: 0; }
+.card.has-art::before { display: none; }
+.profile-art {
+  margin: 0 -1.15rem 0.85rem;
+  height: 168px;
+  background: #0c1410;
+}
+.profile-art img,
+.profile-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.profile-hero {
+  margin: 0 0 1.2rem;
+  border-radius: var(--sl-radius);
+  overflow: hidden;
+  height: min(42vw, 280px);
+  background: #0c1410;
+  border: 1px solid var(--sl-line);
+}
 .card h2, .card h3 { margin: 0.2rem 0 0.4rem; letter-spacing: -0.03em; }
 .muted { color: var(--sl-muted); }
 .ok { color: var(--sl-ok); font-weight: 700; }
