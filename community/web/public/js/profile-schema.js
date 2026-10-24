@@ -3,10 +3,11 @@
 export const PROFILE_SCHEMA_VERSION = 1;
 
 export class ValidationError extends Error {
-  constructor(message, status = 400) {
+  constructor(message, status = 400, code) {
     super(message);
     this.name = "ValidationError";
     this.status = status;
+    if (code) this.code = code;
   }
 }
 
