@@ -251,25 +251,25 @@ Paid culinary AI after device mTLS. $3.99/month, entitlement-gated.
 
 Devices configurable from Shroom Labs, with mTLS, without opening a port on the chamber.
 
-**Pick (verified):** Cloudflare-**managed** client certs on the **free** plan. The create API accepts a **CSR**, so the P-256 key is born on the ESP32-S3 and never uploaded. API Shield (Enterprise add-on) is **not** required for mTLS. A Worker CA is used for tests and local Node; it cannot do edge mTLS unless we pay for BYOCA.
+**Pick (verified):** Worker CA + app-layer proof over TLS for a community that will outgrow Cloudflare’s **100 active client certs / zone**. The P-256 key is still born on the ESP32-S3 (CSR only). Cloudflare-managed edge mTLS remains optional under a 90-slot soft cap; rotation is zero-overlap. See `docs/DEVICES.md`.
 
-| | Free CF managed CA | Worker CA + BYOCA | Worker CA only |
+| | Worker CA + proof over TLS | Free CF managed CA | Worker CA + BYOCA |
 | --- | --- | --- | --- |
-| Edge mTLS | Yes | Yes | No |
-| Key stays on device | Yes (CSR) | Yes | Yes |
-| Active cert quota | **100 / zone** (revoke frees a slot) | Unlimited (CF stores the CA only) | n/a |
-| Monthly cost | $0 | Enterprise | $0 |
-| When to use | First ~50 chambers, 7-day certs, rotate+revoke | High churn / thousands of devices | Tests |
+| Edge mTLS | No — Worker verifies | Yes | Yes |
+| Key stays on device | Yes (CSR) | Yes (CSR) | Yes |
+| Active cert quota | Unlimited | **100 / zone** | Unlimited |
+| Monthly cost | $0 | $0 | Enterprise |
+| When to use | Growing community (default) | First ~90 chambers, optional | Only if we later need edge mTLS at thousands |
 
 Threat model, ESP32-S3 heap/flash (~22–42 KB heap TLS, ~155 KB flash if mbedTLS is newly linked), and Mike’s `CF_API_TOKEN` / `link.shroomlabs.io` checklist: [`docs/DEVICES.md`](DEVICES.md).
 
 - [x] Enroll + 6-char / QR claim, verified email
-- [x] CSR issuance (Worker CA locally; Cloudflare-managed when secrets exist)
-- [x] Silent rotation, revoke, re-claim
+- [x] CSR issuance (Worker CA by default; Cloudflare-managed only under the 90-slot soft cap)
+- [x] Zero-overlap rotation, revoke, re-claim, app-layer proof of possession
 - [x] Command queue + telemetry; **local settings win** if cloud is off, overridden, or older
 - [x] Tests for issue / rotate / revoke / reclaim / local-wins
 - [x] Opt-in ESPHome component (`esphome/external_components/shroom_labs_cloud`) — **not** in default YAML
-- [ ] Production: enable mTLS on `link.shroomlabs.io`, put `CF_API_TOKEN` + `CF_ZONE_ID` in Wrangler
+- [ ] Production: set `DEVICE_ISSUER=worker` + `DEVICE_REQUIRE_PROOF=1` + pin `DEVICE_CA_*`; optional first-90 CF mTLS
 
 ### Phase 0b — UI system + passwordless auth (this follow-up)
 

@@ -4,12 +4,14 @@ import { laterIso, nowIso, randomToken, sha256Hex, timingSafeEqual } from "./cry
 import { clientIp, rateLimit } from "./security.js";
 import { ValidationError } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
-import { buildCsr, createWorkerCa, generateP256, importCaKey, issueDeviceCertificate, jwkOf } from "./pki.js";
+import { buildCsr, createWorkerCa, ECDSA_SHA256, generateP256, importCaKey, issueDeviceCertificate, jwkOf, keyFromJwk } from "./pki.js";
 
 export const CERT_DAYS = 7;
 export const ROTATE_AFTER_MS = 3.5 * 24 * 3600 * 1000;
 export const CLAIM_MS = 15 * 60 * 1000;
 export const CLAIM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const CF_CERT_SOFT_CAP = 90;
+export const PROOF_MS = 5 * 60 * 1000;
 
 function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -102,10 +104,52 @@ export function useCloudflareIssuer(env) {
   return Boolean(env.CF_API_TOKEN && env.CF_ZONE_ID && String(env.DEVICE_ISSUER || "auto") !== "worker");
 }
 
+export async function countActiveCfCerts(db) {
+  const rows = await db.all("SELECT * FROM device_certs WHERE issuer=? AND status=?", ["cloudflare-managed", "active"]);
+  return rows.length;
+}
+
+export async function shouldUseCloudflareIssuer(env) {
+  if (!useCloudflareIssuer(env)) return false;
+  if (String(env.DEVICE_ISSUER || "") === "cloudflare") return true;
+  const used = await countActiveCfCerts(env.db);
+  const cap = Number(env.CF_CERT_SOFT_CAP) || CF_CERT_SOFT_CAP;
+  return used < cap;
+}
+
+export function deviceProofPayload(method, path, ts) {
+  return `${ts}\n${String(method || "").toUpperCase()}\n${path}`;
+}
+
+export async function signDeviceProof(privateKey, method, path, ts) {
+  const raw = new Uint8Array(
+    await crypto.subtle.sign(ECDSA_SHA256, privateKey, new TextEncoder().encode(deviceProofPayload(method, path, ts)))
+  );
+  return btoa(String.fromCharCode(...raw));
+}
+
+export async function verifyDeviceProof(jwk, method, path, ts, sigB64) {
+  if (!jwk || !sigB64 || !ts) return false;
+  const age = Math.abs(Date.now() - Date.parse(ts));
+  if (!Number.isFinite(age) || age > PROOF_MS) return false;
+  try {
+    const parsed = typeof jwk === "string" ? JSON.parse(jwk) : jwk;
+    const key = await keyFromJwk(parsed, ["verify"]);
+    const sig = Uint8Array.from(atob(sigB64), (c) => c.charCodeAt(0));
+    return crypto.subtle.verify(ECDSA_SHA256, key, sig, new TextEncoder().encode(deviceProofPayload(method, path, ts)));
+  } catch {
+    return false;
+  }
+}
+
 async function issueCert(env, csrPem, cn) {
   try {
-    if (useCloudflareIssuer(env)) {
-      return await issueViaCloudflare(env, csrPem, CERT_DAYS);
+    if (await shouldUseCloudflareIssuer(env)) {
+      try {
+        return await issueViaCloudflare(env, csrPem, CERT_DAYS);
+      } catch (err) {
+        if (String(env.DEVICE_ISSUER || "") === "cloudflare") throw err;
+      }
     }
     const ca = await getWorkerCa(env);
     const issued = await issueDeviceCertificate(ca, csrPem, { cn, days: CERT_DAYS });
@@ -123,10 +167,9 @@ async function enrollProofOk(body, device) {
   return false;
 }
 
-export async function requireDeviceCert(request, db) {
-  const serial = (request.headers.get("cf-cert-serial") || request.headers.get("x-device-cert-serial") || "")
-    .toLowerCase()
-    .replace(/:/g, "");
+export async function requireDeviceCert(request, db, env = {}) {
+  const edgeSerial = (request.headers.get("cf-cert-serial") || "").toLowerCase().replace(/:/g, "");
+  const serial = (edgeSerial || request.headers.get("x-device-cert-serial") || "").toLowerCase().replace(/:/g, "");
   const fingerprint = (request.headers.get("cf-cert-fingerprint-sha256") || request.headers.get("x-device-cert-fingerprint") || "")
     .toLowerCase()
     .replace(/:/g, "");
@@ -139,6 +182,14 @@ export async function requireDeviceCert(request, db) {
   if (fingerprint && cert.fingerprint && !timingSafeEqual(fingerprint, cert.fingerprint)) return null;
   const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [cert.device_id]);
   if (!device || device.status === "revoked") return null;
+  const proof = request.headers.get("x-device-proof") || "";
+  const proofTs = request.headers.get("x-device-proof-ts") || "";
+  const url = new URL(request.url);
+  if (proof || proofTs) {
+    if (!(await verifyDeviceProof(device.public_jwk, request.method, url.pathname, proofTs, proof))) return null;
+  } else if (!edgeSerial && (env.DEVICE_REQUIRE_PROOF === "1" || env.DEVICE_REQUIRE_PROOF === 1)) {
+    return null;
+  }
   return { device, cert };
 }
 
@@ -173,6 +224,18 @@ async function revokeDeviceCerts(env, db, deviceId, status = "revoked") {
 export async function handleDevices(method, path, url, request, env) {
   const { db } = env;
   const site = String(env.SITE_ORIGIN || "https://shroomlabs.io").replace(/\/$/, "");
+
+  if (method === "GET" && path === "/api/devices/ca") {
+    const ca = await getWorkerCa(env);
+    const cfActive = await countActiveCfCerts(db);
+    return json({
+      issuer: "worker-ca",
+      certificate: ca.certPem || null,
+      auth: "app-layer",
+      proof: "x-device-proof over timestamp, method, and path",
+      cloudflare_slots: { active: cfActive, soft_cap: Number(env.CF_CERT_SOFT_CAP) || CF_CERT_SOFT_CAP },
+    });
+  }
 
   if (method === "POST" && path === "/api/devices/enroll") {
     const limited = await rateLimit(db, `enroll:${clientIp(request)}`, 20, 3600);
@@ -263,15 +326,15 @@ export async function handleDevices(method, path, url, request, env) {
 
   const rotateMatch = path.match(/^\/api\/devices\/([^/]+)\/rotate$/);
   if (rotateMatch && method === "POST") {
-    const bound = await requireDeviceCert(request, db);
+    const bound = await requireDeviceCert(request, db, env);
     if (!bound || bound.device.id !== decodeURIComponent(rotateMatch[1])) {
       throw new ValidationError("current device certificate required", 401);
     }
     const body = await request.json().catch(() => ({}));
-    const issued = await issueCert(env, body.csr, bound.device.id);
-    await saveCert(db, bound.device.id, issued);
     await db.run("UPDATE device_certs SET status=? WHERE id=?", ["superseded", bound.cert.id]);
     if (bound.cert.cf_id) await revokeViaCloudflare(env, bound.cert.cf_id);
+    const issued = await issueCert(env, body.csr, bound.device.id);
+    await saveCert(db, bound.device.id, issued);
     await audit(db, bound.device.owner_id, "device_cert_rotate", `${bound.device.id}:${issued.serial}`, request);
     return json({
       certificate: issued.pem,
@@ -368,7 +431,7 @@ export async function handleDevices(method, path, url, request, env) {
 
   const inboxMatch = path.match(/^\/api\/devices\/([^/]+)\/inbox$/);
   if (inboxMatch && method === "GET") {
-    const bound = await requireDeviceCert(request, db);
+    const bound = await requireDeviceCert(request, db, env);
     if (!bound || bound.device.id !== decodeURIComponent(inboxMatch[1])) {
       throw new ValidationError("device certificate required", 401);
     }
@@ -393,7 +456,7 @@ export async function handleDevices(method, path, url, request, env) {
 
   const telMatch = path.match(/^\/api\/devices\/([^/]+)\/telemetry$/);
   if (telMatch && method === "POST") {
-    const bound = await requireDeviceCert(request, db);
+    const bound = await requireDeviceCert(request, db, env);
     if (!bound || bound.device.id !== decodeURIComponent(telMatch[1])) {
       throw new ValidationError("device certificate required", 401);
     }

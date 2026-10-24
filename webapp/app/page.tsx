@@ -5,6 +5,7 @@ import { api } from '../lib/esphome-api'
 import LiveGauge from './components/LiveGauge'
 import LightTimeline from './components/LightTimeline'
 import ProfileStrip from './components/ProfileStrip'
+import Icon, { ModalTitle } from './components/Icon'
 import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
 import type { EntityState } from './entity-types'
 
@@ -671,7 +672,8 @@ export default function Dashboard() {
         <div className="alerts-banner">
           {alerts.map((alert) => (
             <div key={alert.id} className="alert-item">
-              ⚠️ {alert.msg}
+              <Icon name="alert" size={16} />
+              <span>{alert.msg}</span>
             </div>
           ))}
         </div>
@@ -741,77 +743,88 @@ export default function Dashboard() {
       />
 
       <div className="main-grid">
-        {/* Row 1 */}
-        <div className="card card-temp" onClick={() => setModal({ type: 'temperature' })}>
-          {heatRequested && <div className="status-rectangle heating-badge">HEATING</div>}
-          <div className="card-icon">🌡️</div>
-          <div className="card-label">Temperature</div>
+        <button type="button" className="card card-temp" onClick={() => setModal({ type: 'temperature' })}>
+          {heatRequested && <div className="status-rectangle heating-badge">Heating</div>}
+          <div className="card-top">
+            <span className="card-icon-wrap tone-heat"><Icon name="temp" /></span>
+            <span className="card-label">Temperature</span>
+          </div>
           <div className="card-value">
             {temp.toFixed(1)}
             <span className="card-unit">°C</span>
           </div>
           {tempControlEnabled && (
-            <div className="card-range">
-              {tempMin.toFixed(1)}° - {tempMax.toFixed(1)}°
+            <div className="card-meta">
+              Band {tempMin.toFixed(1)}–{tempMax.toFixed(1)}°
             </div>
           )}
-        </div>
+        </button>
 
-        <div className="card card-humidity" onClick={() => setModal({ type: 'humidity' })}>
-          {humidifierOn && <div className="status-rectangle humidifying-badge">HUMIDIFYING</div>}
-          <div className="card-icon">💧</div>
-          <div className="card-label">Humidity</div>
+        <button type="button" className="card card-humidity" onClick={() => setModal({ type: 'humidity' })}>
+          {humidifierOn && <div className="status-rectangle humidifying-badge">Humidifying</div>}
+          <div className="card-top">
+            <span className="card-icon-wrap tone-humid"><Icon name="humidity" /></span>
+            <span className="card-label">Humidity</span>
+          </div>
           <div className="card-value">
             {humidity.toFixed(1)}
             <span className="card-unit">%</span>
           </div>
-          <div className="card-target">
-            Target: {targetHumidity}%
-          </div>
-        </div>
+          <div className="card-meta">Target {targetHumidity}%</div>
+        </button>
 
-        <div className="card card-air" onClick={() => setModal({ type: 'air' })}>
-          {airExchangeOn && <div className="status-rectangle running-badge">RUNNING</div>}
-          <div className="card-icon">🌀</div>
-          <div className="card-label">Air Exchange</div>
+        <button type="button" className="card card-air" onClick={() => setModal({ type: 'air' })}>
+          {airExchangeOn && <div className="status-rectangle running-badge">Running</div>}
+          <div className="card-top">
+            <span className="card-icon-wrap tone-spore"><Icon name="air" /></span>
+            <span className="card-label">Air exchange</span>
+          </div>
           <div className="card-value">
             {getNumber('air_exchange__period__min_')}
             <span className="card-unit">min</span>
           </div>
-          <div className="card-detail">
-            {getNumber('air_exchange__run_duration__s_')}s @ {getNumber('air_exchange__speed')}%
+          <div className="card-meta">
+            {getNumber('air_exchange__run_duration__s_')}s · {getNumber('air_exchange__speed')}%
           </div>
-        </div>
+        </button>
 
-        {/* Row 2 */}
-        <div className="card card-light" onClick={() => setModal({ type: 'light' })}>
-          <div className="card-icon">{lightsOn ? '💡' : '🌙'}</div>
-          <div className="card-label">Lighting</div>
+        <button type="button" className="card card-light" onClick={() => setModal({ type: 'light' })}>
+          <div className="card-top">
+            <span className={`card-icon-wrap ${lightsOn ? 'tone-gold' : 'tone-muted'}`}>
+              <Icon name={lightsOn ? 'light' : 'moon'} />
+            </span>
+            <span className="card-label">Lighting</span>
+          </div>
           <div className="card-value">
-            {lightsOn ? getNumber('white_led_intensity') : 'OFF'}
+            {lightsOn ? getNumber('white_led_intensity') : 'Off'}
             {lightsOn && <span className="card-unit">lux</span>}
           </div>
-          <div className="card-schedule">
-            {formatTime(lightSunrise)} - {formatTime(lightSunset)}
+          <div className="card-meta">
+            {formatTime(lightSunrise)}–{formatTime(lightSunset)}
           </div>
-        </div>
+        </button>
 
-        <div className="card card-water" onClick={() => setModal({ type: 'water' })}>
-          {!isWaterCalibrated && <div className="status-rectangle humidifying-badge">NOT CALIBRATED</div>}
-          <div className="card-icon">🚰</div>
-          <div className="card-label">Water Level</div>
+        <button type="button" className="card card-water" onClick={() => setModal({ type: 'water' })}>
+          {!isWaterCalibrated && <div className="status-rectangle humidifying-badge">Calibrate</div>}
+          <div className="card-top">
+            <span className="card-icon-wrap tone-spore"><Icon name="water" /></span>
+            <span className="card-label">Water level</span>
+          </div>
           <div className="card-value">
             {waterLevel.toFixed(0)}
             <span className="card-unit">%</span>
           </div>
-        </div>
+          <div className="card-meta">{isWaterCalibrated ? 'Sensor ready' : 'Dry-tank baseline needed'}</div>
+        </button>
 
-        <div className="card card-settings" onClick={() => setModal({ type: 'settings' })}>
-          <div className="card-icon">⚙️</div>
-          <div className="card-label">Settings</div>
-          <div className="card-value">v1.0.0</div>
-          <div className="card-detail">System & Network</div>
-        </div>
+        <button type="button" className="card card-settings" onClick={() => setModal({ type: 'settings' })}>
+          <div className="card-top">
+            <span className="card-icon-wrap tone-muted"><Icon name="settings" /></span>
+            <span className="card-label">Settings</span>
+          </div>
+          <div className="card-value card-value-sm">v1.0.0</div>
+          <div className="card-meta">System and network</div>
+        </button>
       </div>
 
       {/* Footer */}
@@ -840,18 +853,18 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🚰 Water Level</h2>
+            <ModalTitle name="water">Water level</ModalTitle>
             <div className="modal-content">
               <div className="water-level-display">
                 <div className="water-level-value">{waterLevel.toFixed(0)}%</div>
                 {waterLevel < 20 && (
-                  <div className="water-warning">⚠️ Water level low - please refill soon</div>
+                  <div className="water-warning"><Icon name="alert" size={16} /> Water level low — refill soon</div>
                 )}
               </div>
 
               {calibrationSuccess && (
                 <div className="calibration-success">
-                  ✅ Water level calibration complete! The sensor has been calibrated to measure from an empty tank.
+                  <Icon name="check" size={16} /> Water level calibration complete. The sensor now measures from an empty tank.
                 </div>
               )}
 
@@ -873,7 +886,7 @@ export default function Dashboard() {
 
               <div className="calibrate-info" style={isCalibrated ? { color: '#4ade80' } : undefined}>
                 {isCalibrated
-                  ? '✓ Sensor is calibrated'
+                  ? 'Sensor is calibrated'
                   : 'Calibration sets the dry-tank baseline for accurate water-level measurement.'}
               </div>
 
@@ -892,10 +905,10 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal calibrate-modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🚰 Water Calibration</h2>
+            <ModalTitle name="water">Water calibration</ModalTitle>
             <div className="modal-content">
               <p className="calibrate-warning">
-                ⚠️ Please completely empty and dry the water reservoir before calibrating.
+                Please completely empty and dry the water reservoir before calibrating.
               </p>
               <p className="calibrate-instruction">
                 This will set the current sensor readings as the "dry" baseline for accurate water level measurement.
@@ -950,7 +963,7 @@ export default function Dashboard() {
           <div className="modal-overlay" onClick={() => setModal({ type: null })}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
               <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-              <h2>💧 Humidity Control</h2>
+              <ModalTitle name="humidity">Humidity control</ModalTitle>
               <div className="modal-content">
                 <div className="control-group">
                   <label>Target: {target.toFixed(1)}% ± {hysteresis.toFixed(2)}% • Turns ON below {lowerBound.toFixed(1)}%, OFF {upperBound >= 100 ? 'at' : 'above'} {upperBound.toFixed(1)}%</label>
@@ -1033,7 +1046,7 @@ export default function Dashboard() {
                         setDraggingHumidityHandle('lower')
                       }}
                     >
-                      <div className="humidity-tick">◀</div>
+                      <div className="humidity-tick"><Icon name="chevronLeft" size={14} /></div>
                     </div>
 
                     {/* Upper bound handle - on bottom, slightly right */}
@@ -1056,7 +1069,7 @@ export default function Dashboard() {
                         setDraggingHumidityHandle('upper')
                       }}
                     >
-                      <div className="humidity-tick">▶</div>
+                      <div className="humidity-tick"><Icon name="chevronRight" size={14} /></div>
                     </div>
 
                     {/* Humidity scale below track */}
@@ -1119,7 +1132,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🌡️ Temperature Control</h2>
+            <ModalTitle name="temp">Temperature control</ModalTitle>
             <div className="modal-content">
               <div className="control-group" style={{ marginBottom: '20px' }}>
                 <label className="checkbox-label">
@@ -1137,7 +1150,7 @@ export default function Dashboard() {
               {(entities['switch-temperature_control_enabled']?.state === 'ON' || entities['switch-temperature_control_enabled']?.value === true) && (
                 <>
                   <div className="temp-disclaimer" style={{ marginBottom: '20px' }}>
-                    ⚠️ <strong>Important:</strong> OpenShrooly can request heating, but external heating equipment must be controlled via Home Assistant. The "Heat Requested" binary sensor signals when heating is needed.
+                    <Icon name="alert" size={16} /> <strong>Important:</strong> OpenShrooly can request heating, but external heating equipment must be controlled via Home Assistant. The "Heat Requested" binary sensor signals when heating is needed.
                   </div>
 
                   <div className="control-group">
@@ -1223,7 +1236,7 @@ export default function Dashboard() {
                           setDraggingTempHandle('lower')
                         }}
                       >
-                        <div className="temperature-tick">◀</div>
+                        <div className="temperature-tick"><Icon name="chevronLeft" size={14} /></div>
                       </div>
 
                       {/* Upper bound handle - on bottom, right */}
@@ -1246,7 +1259,7 @@ export default function Dashboard() {
                           setDraggingTempHandle('upper')
                         }}
                       >
-                        <div className="temperature-tick">▶</div>
+                        <div className="temperature-tick"><Icon name="chevronRight" size={14} /></div>
                       </div>
 
                       {/* Temperature scale below track */}
@@ -1273,7 +1286,7 @@ export default function Dashboard() {
                   Temperature Warnings
                 </h3>
                 <div className="temp-disclaimer" style={{ marginBottom: '15px' }}>
-                  ℹ️ <strong>Note:</strong> These thresholds only trigger warnings. Home Assistant integration is required to receive and act on temperature warning alerts.
+                  <Icon name="info" size={16} /> <strong>Note:</strong> These thresholds only trigger warnings. Home Assistant integration is required to receive and act on temperature warning alerts.
                 </div>
                 <div className="control-group">
                   <label>Warning Minimum: {getNumber('temperature__warning_minimum')}°C</label>
@@ -1312,7 +1325,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🌀 Air Exchange</h2>
+            <ModalTitle name="air">Air exchange</ModalTitle>
             <div className="modal-content">
               <div className="control-group">
                 <label>Period: {getNumber('air_exchange__period__min_')} minutes</label>
@@ -1369,7 +1382,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>💡 Lighting Schedule</h2>
+            <ModalTitle name="light">Lighting schedule</ModalTitle>
             <div className="modal-content">
               <div className="control-group">
                 <label>Light Schedule: {formatTime(lightSunrise)} - {formatTime(lightSunset)} ({lightDuration.toFixed(1)}h)</label>
@@ -1387,7 +1400,7 @@ export default function Dashboard() {
                       setDraggingHandle('sunrise')
                     }}
                   >
-                    <div className="slider-icon">☀️</div>
+                    <div className="slider-icon"><Icon name="sun" size={18} /></div>
                   </div>
 
                   {/* Sunset handle with moon icon - above track */}
@@ -1403,7 +1416,7 @@ export default function Dashboard() {
                       setDraggingHandle('sunset')
                     }}
                   >
-                    <div className="slider-icon">🌙</div>
+                    <div className="slider-icon"><Icon name="moon" size={18} /></div>
                   </div>
 
                   <div className="dual-slider-track">
@@ -1465,7 +1478,7 @@ export default function Dashboard() {
                 />
                 {luxValue > 1000 && (
                   <div className="warning-message" style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', color: '#856404' }}>
-                    ⚠️ Very few mushroom species like this light level. High light can cause bleached or discolored caps.
+                    Very few mushroom species like this light level. High light can cause bleached or discolored caps.
                   </div>
                 )}
                 <div className="lux-guide">
@@ -1497,7 +1510,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>⚙️ Settings</h2>
+            <ModalTitle name="settings">Settings</ModalTitle>
             <div className="modal-content">
               <div className="settings-section">
                 <h3>System Information</h3>

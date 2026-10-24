@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createMemoryDb } from "../src/db.js";
 import { handleRequest } from "../src/handlers.js";
 import { createMemoryStorage } from "../src/storage.js";
-import { buildCsr, generateP256, jwkOf, localWins } from "../src/devices.js";
+import { buildCsr, generateP256, jwkOf, localWins, signDeviceProof, CF_CERT_SOFT_CAP } from "../src/devices.js";
 
 function env() {
   return {
@@ -26,6 +26,8 @@ async function call(ctx, method, path, { token, body, device } = {}) {
   if (device) {
     headers["x-device-cert-serial"] = device.serial;
     headers["x-device-cert-fingerprint"] = device.fingerprint;
+    if (device.proof) headers["x-device-proof"] = device.proof;
+    if (device.proofTs) headers["x-device-proof-ts"] = device.proofTs;
   }
   const request = new Request(`http://test${path}`, {
     method,
@@ -174,6 +176,128 @@ test("Cloudflare-managed issuer is used when zone token is set", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("auto issuer falls back to Worker CA at the Cloudflare soft cap", async () => {
+  const ctx = env();
+  ctx.CF_API_TOKEN = "test-token";
+  ctx.CF_ZONE_ID = "zone1";
+  ctx.DEVICE_ISSUER = "auto";
+  for (let i = 0; i < CF_CERT_SOFT_CAP; i += 1) {
+    await ctx.db.run(
+      "INSERT INTO device_certs (device_id, serial, fingerprint, pem, issuer, status, cf_id, not_before, not_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [`cap-${i}`, `s${i}`, `f${i}`, "pem", "cloudflare-managed", "active", `cf-${i}`, "2026-01-01T00:00:00Z", "2026-12-01T00:00:00Z", "2026-01-01T00:00:00Z"]
+    );
+  }
+  let posted = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    posted = true;
+    throw new Error("Cloudflare should not be called at the soft cap");
+  };
+  try {
+    const { token } = await register(ctx, "cap@example.com");
+    const pair = await devicePair();
+    const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+      body: { hardware_id: "cafecafecafecafe", public_jwk: pair.public_jwk },
+    });
+    await call(ctx, "POST", "/api/devices/claim", { token, body: { code: enrolled.data.claim_code } });
+    const csr = await buildCsr(pair.keys.privateKey, pair.keys.publicKey, enrolled.data.device_id);
+    const issued = await call(ctx, "POST", `/api/devices/${enrolled.data.device_id}/csr`, {
+      body: { csr, enroll_token: enrolled.data.enroll_token },
+    });
+    assert.equal(issued.status, 200, JSON.stringify(issued.data));
+    assert.equal(issued.data.issuer, "worker-ca");
+    assert.equal(posted, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Cloudflare rotate revokes the old slot before requesting a replacement", async () => {
+  const ctx = env();
+  ctx.CF_API_TOKEN = "test-token";
+  ctx.CF_ZONE_ID = "zone1";
+  ctx.DEVICE_ISSUER = "cloudflare";
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  let n = 0;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ method: init?.method || "GET", url: String(url) });
+    n += 1;
+    return new Response(
+      JSON.stringify({
+        success: true,
+        result: {
+          id: `cf-cert-${n}`,
+          certificate: "-----BEGIN CERTIFICATE-----\nCF\n-----END CERTIFICATE-----\n",
+          serial_number: `aa${String(n).padStart(6, "0")}`,
+          fingerprint_sha256: `${String(n).padStart(2, "0")}`.repeat(32),
+          issued_on: "2026-10-23T00:00:00Z",
+          expires_on: "2026-10-30T00:00:00Z",
+        },
+      }),
+      { status: 200 }
+    );
+  };
+  try {
+    const { token } = await register(ctx, "rotate-cf@example.com");
+    const pair = await devicePair();
+    const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+      body: { hardware_id: "aabbccddeeff9900", public_jwk: pair.public_jwk },
+    });
+    await call(ctx, "POST", "/api/devices/claim", { token, body: { code: enrolled.data.claim_code } });
+    const csr = await buildCsr(pair.keys.privateKey, pair.keys.publicKey, enrolled.data.device_id);
+    const issued = await call(ctx, "POST", `/api/devices/${enrolled.data.device_id}/csr`, {
+      body: { csr, enroll_token: enrolled.data.enroll_token },
+    });
+    assert.equal(issued.status, 200, JSON.stringify(issued.data));
+    const csr2 = await buildCsr(pair.keys.privateKey, pair.keys.publicKey, enrolled.data.device_id);
+    const rotated = await call(ctx, "POST", `/api/devices/${enrolled.data.device_id}/rotate`, {
+      device: issued.data,
+      body: { csr: csr2 },
+    });
+    assert.equal(rotated.status, 200, JSON.stringify(rotated.data));
+    const rotateCalls = calls.slice(1);
+    assert.equal(rotateCalls[0].method, "DELETE");
+    assert.match(rotateCalls[0].url, /client_certificates\/cf-cert-1/);
+    assert.equal(rotateCalls[1].method, "POST");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Worker CA pin endpoint is public", async () => {
+  const ctx = env();
+  const res = await call(ctx, "GET", "/api/devices/ca");
+  assert.equal(res.status, 200);
+  assert.equal(res.data.issuer, "worker-ca");
+  assert.equal(res.data.auth, "app-layer");
+  assert.match(res.data.certificate || "", /BEGIN CERTIFICATE|/);
+});
+
+test("device proof of possession is accepted and required when DEVICE_REQUIRE_PROOF=1", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "proof@example.com");
+  const { pair, issued, deviceId } = await enrollClaimIssue(ctx, token, "1122334455667799");
+  const ts = new Date().toISOString();
+  const proof = await signDeviceProof(pair.keys.privateKey, "GET", `/api/devices/${deviceId}/inbox`, ts);
+  const withProof = await call(ctx, "GET", `/api/devices/${deviceId}/inbox`, {
+    device: { ...issued.data, proof, proofTs: ts },
+  });
+  assert.equal(withProof.status, 200, JSON.stringify(withProof.data));
+
+  ctx.DEVICE_REQUIRE_PROOF = "1";
+  const missing = await call(ctx, "GET", `/api/devices/${deviceId}/inbox`, { device: issued.data });
+  assert.equal(missing.status, 401);
+  const ok = await call(ctx, "GET", `/api/devices/${deviceId}/inbox`, {
+    device: { ...issued.data, proof, proofTs: ts },
+  });
+  assert.equal(ok.status, 200);
+  const stale = await call(ctx, "GET", `/api/devices/${deviceId}/inbox`, {
+    device: { ...issued.data, proof, proofTs: "2020-01-01T00:00:00Z" },
+  });
+  assert.equal(stale.status, 401);
 });
 
 test("CSR is required after claim; random PEM is rejected", async () => {

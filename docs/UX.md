@@ -9,7 +9,7 @@ Shroom Labs should read as a **2026 product**: Linear / Vercel / Arc polish with
 Owners already know the original Shrooly company site (shrooly.com): warm studio photography, a glass-front chamber, calm “grow at home” tone, function-first hardware. **Take inspiration only.** Do not copy their logo, Poppins wordmark, slogans (“grow mushrooms you can’t find anywhere”, Growing Pod, “7 days”), product shots, or trade dress. Familiar cues we *do* use: harvest language, species as beautiful objects, a window-into-the-chamber card, generous hero, no clutter.
 
 - Dark soil, spore-green glow, mycelium gold, terracotta cap.
-- Distinctive display face (**Fraunces**, self-hosted) + accessible sans (**Atkinson Hyperlegible**, self-hosted).
+- Distinctive display face (**Fraunces**, self-hosted) + accessible sans (**Atkinson Hyperlegible**, self-hosted). Hero type is large; the mycelium canvas is the light, not a wallpaper.
 - Glassy cards, grain, restrained motion. Respect `prefers-reduced-motion`.
 - Species cards use original generated harvest photographs (self-hosted JPEGs, no CDN, not scraped from shrooly.com). On-device stays illustration-free to protect flash.
 - Grow stages are timelines, not walls of text.
@@ -54,4 +54,4 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 
 ## Copy
 
-Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Restricted-pack legality notice is always visible on that pack.
+Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Restricted-pack legality notice is always visible on that pack. The pack is not in the main header; owners open it with the library filter.
