@@ -1,95 +1,100 @@
-# USB installer and signed OTA
+# USB installer and signed updates
 
-Shroom Labs flashes the same ESP32-S3 artifacts as [openshrooly.com](https://openshrooly.com): `factory.bin`, `ota.bin`, and an ESP Web Tools `manifest.json` from `grahamsz/openshrooly` releases. Signing is artifact-level (checksums + Ed25519). It is not a new on-device OTA protocol.
+OpenShrooly releases from Shroom Labs are signed with one Ed25519 key. The device and the
+USB installer both refuse anything that does not carry a valid signature from that key.
 
-The installer lives at [`/install.html`](https://shroomlabs.io/install.html). Chrome or Edge on a computer. Hold BOOT if the serial port does not appear.
-
-## What this ship adds
-
-| Piece | Role |
+| Where | URL |
 | --- | --- |
-| `community/web/public/install.html` | ESP Web Tools button. Default manifest is grahamsz `latest`. `?manifest=` overrides. |
-| `GET /api/firmware/latest` | Manifest, checksum, and signature URLs. `signature_required` is true only when `FIRMWARE_SIGNING_PUB` is set. |
-| `POST /api/firmware/verify` | Fail-closed without a public key. With a key, requires `SHA256SUMS` + `SHA256SUMS.sig` and the named `.ota.bin`. |
-| `.github/workflows/dev-release.yml` | Writes `SHA256SUMS`. Signs with `FIRMWARE_SIGNING_KEY` when that repo secret exists. |
-| `safe_mode` + `improv_serial` | Listed firmware deviations. Recovery after a bad OTA, and USB serial Wi-Fi provisioning. |
+| USB installer page | https://shroomlabs.io/install.html |
+| Release info (signed) | https://shroomlabs.io/firmware/stable/manifest.json |
+| Release images | https://shroomlabs.io/firmware/stable/openshrooly-<version>.ota.bin and `.factory.bin` |
 
-The local hub still does not flash firmware. If it ever proxies an `.ota.bin`, it must call `/api/firmware/verify` first.
+Releases are static files on the Netlify site, not in this repo and not in R2.
 
-## Deviations from grahamsz/openshrooly
+## Trust path
 
-| Change | Why |
-| --- | --- |
-| `safe_mode:` in `esphome/openshrooly.yaml` | Recover after a bad OTA without a cable |
-| `improv_serial:` | Browser installer can hand the chamber a Wi-Fi network over USB |
+1. `scripts/sign_release.mjs` signs a text block that names the product, channel, version,
+   size, SHA-256 and exact download URL:
 
-Climate, pins, sensors, humidifier, fan, lights, partitions, and the existing `ota: platform: esphome` path stay upstream. Signed checksums do not change how the device applies OTA.
+   ```
+   openshrooly-release-v1
+   product=openshrooly        (openshrooly-usb for the factory image)
+   channel=stable
+   version=1.0.3-sl.1
+   size=<bytes>
+   sha256=<hex>
+   url=https://shroomlabs.io/firmware/stable/openshrooly-1.0.3-sl.1.ota.bin
+   ```
 
-## Secrets and migrations
+   The Wi-Fi and USB images use different product names, so one signature can never be
+   replayed for the other image.
+2. The private key lives only on the release machine (`/workspace/secrets/` on the build box).
+   The signer refuses a key that sits inside the repo, and refuses a key whose public half
+   does not match the one compiled into the device.
+3. The public key is compiled into the firmware (`esphome/components/updates.yaml`) and into
+   `community/web/public/js/install.js`. A test checks they match.
 
-Optional. USB factory flash works without them (physical possession). OTA verify stays fail-closed until the public key is set.
+### On the device (`esphome/external_components/signed_update`)
 
-```
-# GitHub Actions (PKCS8 PEM, or base64 of that PEM). Newlines as \n are fine.
-# Repo secret: FIRMWARE_SIGNING_KEY
+- Nothing is checked or downloaded until someone presses **Check for updates** in the
+  device's Settings. There is no timer and no check at boot.
+- The release info is fetched over HTTPS from `https://shroomlabs.io/firmware/stable/` only,
+  with the certificate checked against the built-in CA bundle. Redirects are not followed.
+- The signature is checked (Monocypher Ed25519, strict: non-canonical `S` is refused) before
+  the version is offered, and again when **Install** is pressed.
+- Older versions are refused unless **Allow older versions** is on. That switch turns itself
+  off at every restart.
+- The image is streamed into the spare app slot while SHA-256 is computed. The boot slot is
+  switched only if the size and hash match the signed values. Any failure aborts the write and
+  the device stays on its current version.
+- If a new image fails to boot, the bootloader returns to the previous one (app rollback plus
+  `safe_mode`, which marks a new image good after it has run for a minute).
 
-# Worker (matching SPKI public key)
-npx wrangler secret put FIRMWARE_SIGNING_PUB
-```
+Plain messages the device shows include "You have the latest version (1.0.3-sl.1).",
+"Could not reach shroomlabs.io. Check the Wi-Fi connection and try again.", and "This update
+failed the safety check and was not installed. Your Shrooly is still on version X."
 
-Optional Worker vars (defaults point at grahamsz latest):
+### USB installer (`community/web/public/install.html`, `js/install.js`)
 
-- `FIRMWARE_MANIFEST_URL`
-- `FIRMWARE_CHECKSUMS_URL`
-- `FIRMWARE_SIGNATURE_URL`
+- ESP Web Tools 10.4.0 is served from this site (`public/vendor/esp-web-tools-10.4.0/`,
+  Apache-2.0, unchanged). The page CSP allows scripts from this site only.
+- The page reads `/firmware/stable/manifest.json`, checks the `usb` entry's Ed25519 signature
+  with WebCrypto, downloads the factory image, checks size and SHA-256, and gives ESP Web Tools
+  those checked bytes. If any step fails the Install button never appears.
+- Browsers without WebCrypto Ed25519 are told to update; the page does not fall back to
+  installing without a check.
 
-No D1 SQL. No wrangler route or D1 id changes. Netlify needs no new secret; `/install.html` has a looser CSP for `unpkg.com` and GitHub release downloads.
+### Local recovery paths (unsigned, on purpose)
 
-## How to validate in prod
+The device's own **Install from a file on this computer** upload and ESPHome's native OTA still
+accept unsigned images from the home network. They are recovery tools for someone who already
+has the device on their LAN and are labelled as such in the UI.
 
-After a Netlify rebuild of the site (Worker deploy only if you added `FIRMWARE_SIGNING_PUB`):
+## Publishing a release
 
 ```bash
-# Installer page and CSP for ESP Web Tools
-curl -sI https://shroomlabs.io/install.html | grep -i -e HTTP -e content-security
-# expect 200 and unpkg.com in script-src / connect-src
+# 1. Build (bump device_version in esphome/openshrooly.yaml first)
+cd webapp && NEXT_BUILD_ID=openshrooly npm run build && cd ../esphome
+esphome compile openshrooly.yaml
+B=.esphome/build/openshrooly/build
 
-curl -s https://shroomlabs.io/install.html | grep -e esp-web-tools -e 192.168.4.1
-# expect the unpkg script and the AP URL
+# 2. Sign into the site's firmware folder (never commit these files)
+node ../scripts/sign_release.mjs --key /workspace/secrets/firmware-signing.key.pem \
+  --version 1.0.3-sl.1 --ota $B/firmware.ota.bin --factory $B/firmware.factory.bin \
+  --out ../community/web/public/firmware/stable
 
-# Catalog still links to the installer
-curl -s https://shroomlabs.io/ | grep -c install.html
-# expect 2 or more
-
-# Latest firmware pointer (grahamsz until we publish our own manifest)
-curl -s https://api.shroomlabs.io/api/firmware/latest
-# expect manifest_url containing grahamsz/openshrooly and signature_required false
-# (true only after FIRMWARE_SIGNING_PUB is set)
-
-# Unsigned OTA is refused when no public key is configured
-curl -s -o /tmp/fw.json -w "%{http_code}" -X POST https://api.shroomlabs.io/api/firmware/verify \
-  -H "content-type: application/json" \
-  -d '{"checksums":"deadbeef  openshrooly.ota.bin","signature":"QQ==","filename":"openshrooly.ota.bin"}'
-# expect 400 and {"ok":false,"error":"unsigned firmware rejected"}
+# 3. Check and deploy the site
+cd ../community/web && npm test && npm run deploy
 ```
 
-`curl -sI https://api.shroomlabs.io/health` should still be 200 from earlier ships.
-
-## Hardware checklist
-
-1. Chrome or Edge on a computer. Open `https://shroomlabs.io/install.html`. The Install button appears after the grahamsz (or override) manifest loads.
-2. USB-C to the chamber. Hold BOOT if no port is listed. Flash the factory image.
-3. After reboot, join `OpenShrooly` and open `http://192.168.4.1/app/`. First-run banner from Ship 5b.
-4. Use `/` or the phone captive portal (or Improv over the same USB serial) to join home Wi-Fi.
-5. Settings → OTA file upload still accepts a local `.ota.bin` on the LAN. That path is unchanged.
-6. If `FIRMWARE_SIGNING_PUB` is set: `POST /api/firmware/verify` with the release `SHA256SUMS` + `.sig` returns `{ ok: true }` for the named OTA file, and 400 without the signature.
-7. Safe mode: interrupt power during an OTA once. The chamber should come back on a recovery AP so you can USB-flash again.
-8. `?manifest=` still installs from a custom ESP Web Tools manifest (dev builds).
+`community/web/scripts/install-verify.test.js` re-verifies a published manifest and both
+images with the device key whenever `public/firmware/stable/manifest.json` is present.
 
 ## Tests
 
 ```bash
-cd community/api && npm test
+python3 scripts/test_signed_update.py          # device verifier, host build + signer end to end
+cd webapp && npm test                          # update UI wiring, no automatic checks
+cd community/web && npm test                   # installer: signed only, same site only
+cd community/api && npm test                   # site chrome and SEO
 ```
-
-Firmware cases: signed checksums verify, unsigned OTA is refused, ESP32-S3 manifest shape, `/api/firmware/verify` fail-closed without `FIRMWARE_SIGNING_PUB`.

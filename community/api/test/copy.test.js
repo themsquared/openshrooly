@@ -35,9 +35,15 @@ function visitorFacing(html) {
 }
 
 function pages() {
-  return readdirSync(PUBLIC)
-    .filter((name) => name.endsWith(".html"))
-    .map((name) => ({ name, html: readFileSync(join(PUBLIC, name), "utf8") }));
+  const names = [
+    ...readdirSync(PUBLIC).filter((name) => name.endsWith(".html")),
+    ...["profiles", "auth"].flatMap((dir) =>
+      readdirSync(join(PUBLIC, dir))
+        .filter((name) => name.endsWith(".html"))
+        .map((name) => `${dir}/${name}`)
+    ),
+  ];
+  return names.map((name) => ({ name, html: readFileSync(join(PUBLIC, name), "utf8") }));
 }
 
 test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or Mike", () => {

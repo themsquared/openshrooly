@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /profile.html
+Disallow: /account.html
+Disallow: /publish.html
+Disallow: /auth/
+Sitemap: https://shroomlabs.io/sitemap.xml

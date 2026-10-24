@@ -1,7 +1,8 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
-import { bindMobileNav } from "./shell.js";
+import { bindMobileNav } from "./chrome.js";
+import { INDEXED_PROFILES } from "./indexed-profiles.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -65,6 +66,11 @@ function selectPack(pack) {
   return renderHome();
 }
 
+/** Seeded profiles have an indexed static page. Community published ones use the live page. */
+function profileHref(id) {
+  return INDEXED_PROFILES.has(id) ? `/profiles/${encodeURIComponent(id)}.html` : `/profile.html?id=${encodeURIComponent(id)}`;
+}
+
 async function renderHome() {
   const canvas = $("#mycelium");
   if (canvas && !canvas.dataset.hero) {
@@ -73,27 +79,28 @@ async function renderHome() {
   }
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
-  $("#pack-label").textContent = pack === "psilocybin" ? "Off-menu" : "Culinary library";
-  $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
+  const off = pack === "psilocybin";
+  $("#pack-label").textContent = off ? "Off-menu" : "Culinary Profiles";
+  $("#legal")?.classList.toggle("hidden", !off);
   $("#q").value = q;
   $("#pack").value = pack;
-  $("#pack-culinary")?.classList.toggle("is-on", pack !== "psilocybin");
-  $("#pack-restricted")?.classList.toggle("is-on", pack === "psilocybin");
-  $("#pack-culinary")?.setAttribute("aria-pressed", pack !== "psilocybin" ? "true" : "false");
-  $("#pack-restricted")?.setAttribute("aria-pressed", pack === "psilocybin" ? "true" : "false");
+  $("#pack-culinary")?.classList.toggle("is-on", !off);
+  $("#pack-offmenu")?.classList.toggle("is-on", off);
+  $("#pack-culinary")?.setAttribute("aria-pressed", !off ? "true" : "false");
+  $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
   const supplies = $("#supplies");
-  if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
-  $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
-  $("#nav-coach")?.classList.toggle("hidden", pack === "psilocybin");
+  if (supplies) supplies.classList.toggle("hidden", off);
+  $("#coach-promo")?.classList.toggle("hidden", off);
+  for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", off);
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML = profiles.length
     ? profiles
         .map(
           (p, index) => `
-    <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
+    <a class="profile-card" href="${profileHref(p.id)}">
       <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack, { priority: index === 0 })}</div>
       <div class="profile-body">
-        <p><span class="chip">${escapeHtml(p.pack)}</span>${
+        <p><span class="chip">${escapeHtml(off ? "Off-menu" : "Culinary")}</span>${
           p.pricing?.kind === "paid"
             ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
             : `<span class="chip">free</span>`
@@ -128,7 +135,7 @@ async function renderProfile() {
     $("#legal").textContent = p.legal_notice;
     $("#legal").classList.remove("hidden");
   }
-  $("#nav-coach")?.classList.toggle("hidden", p.pack === "psilocybin");
+  for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", p.pack === "psilocybin");
   const caps = await capabilities();
   if (!caps.photos) {
     document.querySelector('input[name="photo"]')?.closest("label")?.classList.add("hidden");
@@ -297,7 +304,7 @@ async function renderCallback() {
       return;
     }
     if (code) {
-      $("#status").textContent = "OIDC finished on the API host. You can close this if you were redirected.";
+      $("#status").textContent = "You are signed in. You can close this tab if it did not move on by itself.";
       return;
     }
     $("#error").textContent = "This sign-in link is missing or expired.";
@@ -398,8 +405,8 @@ function fileToBase64(file) {
   });
 }
 
-renderNav();
 bindMobileNav();
+renderNav();
 const page = document.body.dataset.page;
 if (page === "home") {
   renderHome().catch(() => {
@@ -412,6 +419,7 @@ if (page === "home") {
   });
   $("#pack-culinary")?.addEventListener("click", () => selectPack("culinary"));
   $("#pack-restricted")?.addEventListener("click", () => selectPack("psilocybin"));
+  $("#pack-offmenu")?.addEventListener("click", () => selectPack("psilocybin"));
   window.addEventListener("popstate", () => renderHome().catch(() => {}));
 }
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));
@@ -519,7 +527,7 @@ async function renderCoach() {
       ? `<p>Suggested <strong>${s.humidity_percent}% RH</strong> · <strong>${s.temperature_c} °C</strong> · fan ${s.fan_speed_percent}%. ${
           (s.reasons || []).join(" ") || "No change needed yet."
         }</p>`
-      : "<p class='muted'>Need a few telemetry samples before I can tune this chamber.</p>";
+      : "<p class='muted'>Need a few more readings from this chamber before I can tune it.</p>";
     $("#suggestion").dataset.ready = s.within_bounds ? "1" : "0";
   }
 

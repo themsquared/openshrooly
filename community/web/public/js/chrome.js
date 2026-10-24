@@ -1,6 +1,12 @@
-export function brandSvg() {
-  return `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
-}
+/** Shared Community chrome. One header, one nav, one footer. */
+
+export const SITE = "https://shroomlabs.io";
+export const TAGLINE = "Chamber profiles for OpenShrooly.";
+export const PRODUCT =
+  "Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.";
+export const POSITIONING = "Works with Shrooly devices running OpenShrooly.";
+export const DISCLOSURE =
+  "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
 
 export const NAV_ITEMS = [
   { id: "profiles", href: "/", label: "Profiles" },
@@ -10,24 +16,36 @@ export const NAV_ITEMS = [
   { id: "docs", href: "/docs.html", label: "Docs" },
 ];
 
-export function navHtml(activeId = "") {
+export function brandSvg() {
+  return `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
+}
+
+function navLinks(activeId = "", { idPrefix = "", hideCoach = false } = {}) {
   return NAV_ITEMS.map((item) => {
     const current = item.id === activeId ? ' aria-current="page"' : "";
-    return `<a href="${item.href}"${current}>${item.label}</a>`;
+    const id = idPrefix && item.id === "coach" ? ` id="${idPrefix}coach"` : "";
+    const hidden = hideCoach && item.id === "coach" ? ' class="hidden"' : "";
+    return `<a${id} href="${item.href}"${hidden}${current}>${item.label}</a>`;
   }).join("");
 }
 
-export function headerHtml(navInner) {
-  return `<a class="skip" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="/">${brandSvg()}<span>Shroom Labs<small>works with OpenShrooly</small></span></a>
+/** hideCoach: Off-menu pages never promote Grow Coach. The link stays in the DOM so the chrome is identical. */
+export function renderHeader(activeId = "", { hideCoach = false } = {}) {
+  return `<div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/">${brandSvg()}<span>Shroom Labs<small>${POSITIONING}</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site">${navInner || navHtml()}<span id="session-nav"></span></nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site">${navLinks(activeId, { idPrefix: "nav-", hideCoach })}<span id="session-nav"></span></nav>
   </header>`;
 }
 
-export function footerHtml(extra = "") {
-  return `<footer class="site-footer">Shroom Labs. shroomlabs.io. Works with Shrooly devices running OpenShrooly. ${extra}</footer>`;
+export function renderFooter({ hideCoach = false } = {}) {
+  return `<footer class="site-footer" data-chrome="footer">
+    <p>${POSITIONING}</p>
+    <nav class="footer-nav" aria-label="Footer">${navLinks("", { idPrefix: "footer-nav-", hideCoach })}</nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+  </footer>`;
 }
 
 function mobileNav() {
@@ -43,7 +61,7 @@ function focusableIn(root) {
 export function bindMobileNav() {
   const header = document.querySelector(".site-header");
   const toggle = header?.querySelector(".nav-toggle");
-  const nav = header?.querySelector("#site-nav");
+  const nav = header?.querySelector("#site-nav") || document.querySelector("#site-nav");
   if (!header || !toggle || !nav || toggle.dataset.bound === "1") return;
   toggle.dataset.bound = "1";
 
