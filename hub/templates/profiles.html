@@ -8,11 +8,12 @@
 <h1>Mushroom profiles</h1>
 {% if error %}<p class="notice">{{ error }}</p>{% endif %}
 <div class="row">
-  <form method="post" action="/sync/pull"><button class="secondary" type="submit">Pull from community</button></form>
-  <form method="post" action="/sync/push"><button type="submit">Push library + grow reports</button></form>
+  <form method="post" action="/sync/pull"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary" type="submit">Pull from community</button></form>
+  <form method="post" action="/sync/push"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Push library + grow reports</button></form>
 </div>
 <p class="muted">Shroom Labs sync needs <code>COMMUNITY_URL</code> (default local API, or <code>https://api.shroomlabs.io</code>) and <code>COMMUNITY_TOKEN</code>.</p>
 <form class="card" id="builder-form" method="post" action="/profiles/import">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>Build a profile</h2>
   <p class="muted">Private to this hub until you push to Shroom Labs. Sharing there needs review.</p>
   <p id="builder-error" class="notice" hidden></p>

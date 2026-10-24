@@ -17,8 +17,17 @@
     <nav>
       <a href="/">Fleet</a>
       <a href="/devices">Devices</a>
+      <a href="/smart-home">Smart Home</a>
       <a href="/profiles">Profiles</a>
       <a href="/history">History</a>
+      {% if admin_signed_in %}
+      <form class="nav-auth" method="post" action="/logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="link">Sign out</button>
+      </form>
+      {% else %}
+      <a href="/login">Sign in</a>
+      {% endif %}
     </nav>
   </header>
   <main>
