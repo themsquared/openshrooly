@@ -84,7 +84,7 @@ Built-in profiles live in `data/profiles/`. The API bundles them into `src/seeds
 - Passwordless: magic link, Google/Apple OIDC (PKCE), passkeys. See [`docs/AUTH.md`](../docs/AUTH.md) and [`SECURITY.md`](../SECURITY.md).
 - `Access-Control-Allow-Origin` reflects an origin from `CORS_ORIGIN` (never `*` in production).
 - `Access-Control-Allow-Headers` includes `authorization, content-type`.
-- Grow photos are stored in R2 and served from `https://cdn.shroomlabs.io/<key>`. `/api/media/...` remains a local fallback.
+- Grow-report and coach photos are served only through `/api/media` on the API origin. Pending objects live under `pending/` and are never mapped on `cdn.shroomlabs.io`.
 
 ## Alerts
 

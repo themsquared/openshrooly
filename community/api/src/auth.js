@@ -19,7 +19,7 @@ import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } fr
 import { renderSignInEmail } from "./email-layout.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, rateLimitClient, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
-import { safeEqual, safeNextPath, sha256B64url, verifyIdToken } from "./oidc.js";
+import { appleClientSecret, safeEqual, safeNextPath, sha256B64url, verifyIdToken } from "./oidc.js";
 import {
   allowedOrigins,
   clientDataOk,
@@ -60,9 +60,17 @@ function cookie(value, maxAge) {
   return parts.join("; ");
 }
 
-/** Browser-binding cookie for an OIDC round trip. Lax so it rides the top-level redirect back from the provider. */
-function oidcCookie(value, maxAgeMs) {
-  return `${OIDC_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`;
+/**
+ * Browser-binding cookie for an OIDC round trip (__Host-, Path=/, Secure, HttpOnly, 10 min).
+ * Google uses Lax (top-level GET redirect). Apple form_post is a cross-site POST, so only the
+ * Apple start path sets SameSite=None. The session cookie stays Lax. Cleared on callback.
+ */
+function oidcCookie(value, maxAgeMs, sameSite = "Lax") {
+  return `${OIDC_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=${sameSite}; Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`;
+}
+
+function oidcSameSite(provider) {
+  return provider === "apple" ? "None" : "Lax";
 }
 
 export function readCookie(request, name = COOKIE) {
@@ -288,6 +296,9 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/oidc/complete") {
     return completeOidcHandoff(env, request);
   }
+  if (method === "POST" && path === "/api/auth/oidc/apple/callback") {
+    return finishOidc(env, request, url, "apple");
+  }
   if (method === "GET" && path === "/api/auth/oidc/apple/callback") {
     return finishOidc(env, request, url, "apple");
   }
@@ -498,7 +509,7 @@ function redirect(location, setCookie) {
 async function startOidc(env, request, url, provider) {
   const limited = await rateLimit(env.db, `oidc-${provider}:${rateLimitClient(request)}`, 10, 900);
   if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
-  const cfg = providerConfig(env, provider);
+  const cfg = await providerConfig(env, provider);
   const ready = provider === "google" ? googleConfigured(env) : appleConfigured(env);
   const stubs = devStubsEnabled(env, request);
   if (!ready && !stubs) {
@@ -531,16 +542,31 @@ async function startOidc(env, request, url, provider) {
   auth.searchParams.set("code_challenge", challenge);
   auth.searchParams.set("code_challenge_method", "S256");
   if (provider === "google") auth.searchParams.set("prompt", "select_account");
-  const setCookie = oidcCookie(binding, OIDC_STATE_MS);
+  if (cfg.responseMode) auth.searchParams.set("response_mode", cfg.responseMode);
+  const setCookie = oidcCookie(binding, OIDC_STATE_MS, oidcSameSite(provider));
   if (stubs) {
     return json({ authorize_url: auth.toString(), state, debug_code: `stub-${state}` }, 200, { "set-cookie": setCookie });
   }
   return redirect(auth.toString(), setCookie);
 }
 
+async function callbackParams(request, url) {
+  const params = new URLSearchParams(url.search);
+  if (request.method.toUpperCase() !== "POST") return params;
+  const type = request.headers.get("content-type") || "";
+  if (!type.includes("application/x-www-form-urlencoded")) return params;
+  try {
+    const form = new URLSearchParams(await request.text());
+    for (const [key, value] of form) params.set(key, value);
+  } catch {
+    /* ignore a malformed body; missing fields fail below */
+  }
+  return params;
+}
+
 async function finishOidc(env, request, url, provider) {
   const stubs = devStubsEnabled(env, request);
-  const clear = oidcCookie("", 0);
+  const clear = oidcCookie("", 0, oidcSameSite(provider));
   const fail = async (reason, userId) => {
     // Specific reasons go to the audit log only; the browser always gets the same generic outcome.
     await audit(env.db, userId || null, `oidc_${provider}_fail`, reason, request);
@@ -548,7 +574,8 @@ async function finishOidc(env, request, url, provider) {
   };
   const limited = await rateLimit(env.db, `oidc-cb-${provider}:${rateLimitClient(request)}`, 20, 900);
   if (!limited.ok) return fail("rate limited");
-  const state = url.searchParams.get("state") || "";
+  const params = await callbackParams(request, url);
+  const state = params.get("state") || "";
   const binding = readCookie(request, OIDC_COOKIE);
   if (!state) return fail("missing state");
   if (!binding) return fail("missing browser binding");
@@ -559,8 +586,8 @@ async function finishOidc(env, request, url, provider) {
   const consumed = await env.db.run("DELETE FROM oauth_states WHERE state=?", [state]);
   if (Number(consumed?.meta?.changes ?? consumed?.changes ?? 0) !== 1) return fail("state replay");
   if (row.expires_at < nowIso() || row.provider !== provider) return fail("expired or wrong provider");
-  if (url.searchParams.get("error")) return fail(`provider error ${String(url.searchParams.get("error")).slice(0, 40)}`);
-  const code = url.searchParams.get("code") || "";
+  if (params.get("error")) return fail(`provider error ${String(params.get("error")).slice(0, 40)}`);
+  const code = params.get("code") || "";
   if (!code) return fail("missing code");
 
   let email = "";
@@ -569,7 +596,7 @@ async function finishOidc(env, request, url, provider) {
     email = `${provider}.user@example.com`;
     subject = `stub-${provider}`;
   } else {
-    const cfg = providerConfig(env, provider);
+    const cfg = await providerConfig(env, provider);
     if (!cfg.clientId || !cfg.secret) return fail("not configured");
     let tokens = {};
     try {
@@ -646,7 +673,9 @@ async function resolveOidcUser(db, provider, subject, email, request) {
     await audit(db, existing.id, `oidc_${provider}_link`, "linked to existing verified account", request);
     return { user: existing };
   }
-  const created = await findOrCreateByEmail(db, email);
+  // Apple: never store the real name or use the email local part. Hide My Email users get a
+  // random handle; display_name stays that same handle so it cannot leak on a later public surface.
+  const created = await findOrCreateByEmail(db, email, provider === "apple" ? randomHandle() : "");
   await db.run("INSERT INTO auth_identities (user_id, provider, subject, created_at) VALUES (?, ?, ?, ?)", [
     created.id,
     provider,
@@ -675,7 +704,7 @@ async function completeOidcHandoff(env, request) {
   return completeSignIn(env.db, user, request, env, body);
 }
 
-function providerConfig(env, provider) {
+async function providerConfig(env, provider) {
   const api = "https://api.shroomlabs.io";
   if (provider === "google") {
     return {
@@ -688,12 +717,13 @@ function providerConfig(env, provider) {
     };
   }
   return {
-    clientId: env.APPLE_CLIENT_ID,
-    secret: env.APPLE_CLIENT_SECRET,
+    clientId: env.APPLE_SERVICES_ID,
+    secret: await appleClientSecret(env),
     authorize: "https://appleid.apple.com/auth/authorize",
     token: "https://appleid.apple.com/auth/token",
-    scope: "name email",
+    scope: "email",
     redirectUri: env.APPLE_REDIRECT_URI || `${api}/api/auth/oidc/apple/callback`,
+    responseMode: "form_post",
   };
 }
 

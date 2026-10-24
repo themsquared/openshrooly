@@ -2,7 +2,7 @@ name: Hub and community tests
 
 on:
   pull_request:
-    branches: [main, cursor/community-platform-fa9c]
+    branches: [main, cursor/community-platform-fa9c, cursor/google-oidc-fa9c]
   push:
     branches: [main]
   workflow_dispatch:
@@ -38,6 +38,23 @@ jobs:
         run: npm ci
       - name: Test
         working-directory: community/api
+        run: npm test
+
+  matter-bridge:
+    name: Matter bridge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: bridge/package-lock.json
+      - name: Install
+        working-directory: bridge
+        run: npm ci
+      - name: Test
+        working-directory: bridge
         run: npm test
 
   community-web:

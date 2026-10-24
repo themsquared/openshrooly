@@ -4,17 +4,16 @@ import { renderProfileCards } from "./profile-cards.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
+import { encodePhotoForUpload, resolveMediaUrl } from "./photo-upload.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
 }
 
 function mediaUrl(key, fallback) {
-  if (fallback) return fallback;
+  if (fallback) return resolveMediaUrl(fallback, apiBase());
   if (!key) return "";
-  const base = String(cfg().mediaBase || "").replace(/\/$/, "");
-  if (base) return `${base}/${key}`;
-  return `${apiBase()}/api/media/${encodeURIComponent(key)}`;
+  return resolveMediaUrl(`/api/media/${encodeURIComponent(key)}`, apiBase());
 }
 
 function $(sel) {
@@ -185,6 +184,39 @@ async function renderProfile() {
       </li>`
     )
     .join("");
+  const recipeBox = $("#light-recipe");
+  if (recipeBox && p.light_recipe) {
+    const recipe = p.light_recipe;
+    const rows = Object.entries(recipe.phases || {})
+      .map(
+        ([id, phase]) =>
+          `<tr><th scope="row">${escapeHtml(id)}</th><td>${phase.photoperiod_hours} h on</td><td>white ${phase.white_brightness_percent}%</td><td>RGB ${phase.red_percent} / ${phase.green_percent} / ${phase.blue_percent}</td></tr>`
+      )
+      .join("");
+    const sources = (recipe.sources || [])
+      .map((note) => {
+        const title = escapeHtml(note.title);
+        const detail = escapeHtml(note.detail);
+        const href = httpsSourceHref(note.url);
+        if (href) {
+          const rel = off ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
+          return `<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`;
+        }
+        return `<li><strong>${title}.</strong> ${detail}</li>`;
+      })
+      .join("");
+    recipeBox.classList.remove("hidden");
+    recipeBox.innerHTML = `<h2 id="light-recipe-heading">Light recipe</h2>
+      <p>${escapeHtml(recipe.why)}</p>
+      <p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p>
+      <table class="light-recipe-table">
+        <caption>Photoperiod and mix for this chamber</caption>
+        <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <h3>Recipe sources</h3>
+      <ul>${sources}</ul>`;
+  }
   $("#sources").innerHTML = (p.source_notes || [])
     .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
     .join("");
@@ -204,7 +236,8 @@ async function renderProfile() {
       .map((r) => {
         const href = mediaUrl(r.photo_key, r.photo_url);
         const photo = href ? ` <a href="${href}">photo</a>` : "";
-        return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}</li>`;
+        const review = r.photo_status === "pending" && href ? " <span class='muted'>Awaiting review</span>" : "";
+        return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}${review}</li>`;
       })
       .join("") || "<li class='muted'>No community reports yet.</li>";
 
@@ -227,11 +260,7 @@ async function renderProfile() {
       flushes: fd.get("flushes"),
     };
     const file = fd.get("photo");
-    if (file && file.size) {
-      payload.photo_base64 = await fileToBase64(file);
-      payload.photo_type = file.type;
-      payload.photo_ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    }
+    if (file && file.size) Object.assign(payload, await encodePhotoForUpload(file));
     await api(`/api/profiles/${id}/reports`, { method: "POST", jsonBody: payload });
     location.reload();
   });
@@ -266,7 +295,7 @@ async function renderAuth(mode) {
     $("#oidc-soon")?.classList.remove("hidden");
   }
   if (params().get("error") === "oidc") {
-    $("#error").textContent = "Google sign-in didn't finish. Try again, or use an email link.";
+    $("#error").textContent = "Sign-in didn't finish. Try again, or use an email link.";
     $("#error").classList.remove("hidden");
   }
   const oidcNext = params().get("next") ? safeNext(params().get("next"), "") : "";
@@ -309,7 +338,7 @@ async function renderCallback() {
   const handoff = hash.get("oidc");
   try {
     if (handoff) {
-      // One-time handoff from the Google callback. Drop it from the address bar and history first.
+      // One-time handoff from the OIDC callback. Drop it from the address bar and history first.
       history.replaceState(null, "", location.pathname);
       const data = await api("/api/auth/oidc/complete", { method: "POST", jsonBody: { token: handoff } });
       if (data.access_token) setToken(data.access_token);
@@ -414,16 +443,14 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      resolve(result.split(",")[1] || "");
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+function httpsSourceHref(url) {
+  if (url == null || String(url).trim() === "") return "";
+  try {
+    const parsed = new URL(String(url).trim());
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
 }
 
 bindMobileNav();
@@ -612,9 +639,7 @@ async function renderCoach() {
       const data = await api("/api/coach/photo", {
         method: "POST",
         jsonBody: {
-          photo_base64: await fileToBase64(file),
-          photo_type: file.type,
-          photo_ext: (file.name.split(".").pop() || "jpg").toLowerCase(),
+          ...(await encodePhotoForUpload(file)),
           hint: $("#photo-hint").value,
         },
       });

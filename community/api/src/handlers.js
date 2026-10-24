@@ -20,6 +20,9 @@ import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RE
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 import { handleAlerts } from "./alerts/http.js";
+import { decodePhotoBase64, IMAGE_TYPES, mediaFilename, sanitizeGrowPhoto, sniffImage } from "./image.js";
+import { readJsonLimited } from "./http-body.js";
+import { canSeeMedia, getMedia, insertMedia, mediaApiUrl, mediaApproved, pendingPhotoKey } from "./media-acl.js";
 
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
@@ -59,10 +62,21 @@ export function withCors(response, env, request) {
 }
 
 export function mediaUrl(env, key) {
-  if (!key) return null;
-  const cdn = String(env.CDN_BASE_URL || "").replace(/\/$/, "");
-  if (cdn) return `${cdn}/${key}`;
-  return `/api/media/${encodeURIComponent(key)}`;
+  return mediaApiUrl(env, key);
+}
+
+function reportPhotoPayload(env, report, viewer) {
+  if (!report.photo_key) return { photo_key: null, photo_url: null, photo_status: null };
+  const status = report.photo_status || "approved";
+  const acl = { owner_id: report.author_id, status };
+  if (!canSeeMedia(viewer, acl)) {
+    return { photo_key: null, photo_url: null, photo_status: null };
+  }
+  return {
+    photo_key: report.photo_key,
+    photo_url: mediaApiUrl(env, report.photo_key),
+    photo_status: status,
+  };
 }
 
 function json(body, status = 200, headers = {}) {
@@ -77,17 +91,7 @@ function redirect(location, status = 302) {
 }
 
 async function readJson(request) {
-  const type = request.headers.get("content-type") || "";
-  if (type.includes("application/json")) return request.json();
-  if (type.includes("application/x-www-form-urlencoded")) {
-    const text = await request.text();
-    return Object.fromEntries(new URLSearchParams(text).entries());
-  }
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
+  return readJsonLimited(request);
 }
 
 async function userFromAuth(request, db) {
@@ -198,9 +202,23 @@ export function internalError(err, method, path) {
   return json({ error: INTERNAL_ERROR_MESSAGE, request_id: requestId }, 500, { "x-request-id": requestId });
 }
 
+function allowAppleFormPost(path, request) {
+  return (
+    path === "/api/auth/oidc/apple/callback" &&
+    request.method.toUpperCase() === "POST" &&
+    request.headers.get("origin") === "https://appleid.apple.com"
+  );
+}
+
 async function route(method, path, url, request, env) {
   const { db, storage } = env;
-  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && !originAllowed(env, request)) {
+  if (
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS" &&
+    !originAllowed(env, request) &&
+    !allowAppleFormPost(path, request)
+  ) {
     if (request.headers.get("origin")) return json({ error: "origin not allowed" }, 403);
   }
   const authResponse = await handleAuth(method, path, url, request, env);
@@ -364,18 +382,19 @@ async function route(method, path, url, request, env) {
     const body = await readJson(request);
     if (!["success", "partial", "fail"].includes(body.outcome)) throw new ValidationError("bad outcome");
     let photoKey = null;
+    let photoStatus = "approved";
     if (body.photo_base64) {
-      const raw = Uint8Array.from(atob(body.photo_base64), (c) => c.charCodeAt(0));
       const caps = capabilities(env, request);
-      if (!caps.photos) {
-        photoKey = null;
-      } else {
-        photoKey = `reports/${profileId}/${randomToken()}.${body.photo_ext || "jpg"}`;
-        await storage.put(photoKey, raw, body.photo_type || "image/jpeg");
+      if (caps.photos) {
+        const photo = sanitizeGrowPhoto(decodePhotoBase64(body.photo_base64));
+        photoKey = pendingPhotoKey("reports", profileId, photo.ext);
+        await storage.put(photoKey, photo.bytes, photo.contentType);
+        photoStatus = "pending";
+        await insertMedia(db, { photo_key: photoKey, owner_id: user.id, status: "pending", kind: "report" });
       }
     }
     await db.run(
-      "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, photo_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         profileId,
         user.id,
@@ -385,10 +404,11 @@ async function route(method, path, url, request, env) {
         body.flushes ? Number(body.flushes) : null,
         body.device_name || null,
         photoKey,
+        photoStatus,
         nowIso(),
       ]
     );
-    return json({ ok: true, photo_key: photoKey }, 201);
+    return json({ ok: true, photo_key: photoKey, photo_status: photoKey ? photoStatus : null }, 201);
   }
 
   const checkoutMatch = path.match(/^\/api\/profiles\/([^/]+)\/checkout$/);
@@ -457,9 +477,27 @@ async function route(method, path, url, request, env) {
 
   const mediaMatch = path.match(/^\/api\/media\/(.+)$/);
   if (mediaMatch && method === "GET") {
-    const file = await storage.get(decodeURIComponent(mediaMatch[1]));
+    const key = decodeURIComponent(mediaMatch[1]);
+    if (!key || key.includes("..") || key.includes("\\") || key.includes("\0")) {
+      return json({ error: "not found" }, 404);
+    }
+    const row = await getMedia(db, key);
+    const viewer = await userFromAuth(request, db);
+    if (!canSeeMedia(viewer, row)) return json({ error: "not found" }, 404);
+    const file = await storage.get(key);
     if (!file) return json({ error: "not found" }, 404);
-    return new Response(file.bytes, { headers: { "content-type": file.contentType } });
+    const bytes = file.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file.bytes);
+    const kind = sniffImage(bytes);
+    if (!kind) return json({ error: "not found" }, 404);
+    const type = IMAGE_TYPES[kind];
+    const headers = {
+      "content-type": type.mime,
+      "x-content-type-options": "nosniff",
+      "content-disposition": `inline; filename="${mediaFilename(kind)}"`,
+      "content-security-policy": "default-src 'none'",
+    };
+    if (!mediaApproved(row)) headers["cache-control"] = "private, no-store";
+    return new Response(bytes, { headers });
   }
 
   if (method === "GET" && path === "/api/hub/pull") {
@@ -494,7 +532,7 @@ async function route(method, path, url, request, env) {
       const exists = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
       if (!exists) continue;
       await db.run(
-        "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, photo_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           report.profile_id,
           user.id,
@@ -504,6 +542,7 @@ async function route(method, path, url, request, env) {
           report.flushes ?? null,
           report.device_name || null,
           null,
+          "approved",
           nowIso(),
         ]
       );
@@ -568,7 +607,7 @@ async function showProfile(request, db, env, profileId) {
   );
   const avgRow = await db.one("SELECT AVG(stars) AS a FROM ratings WHERE profile_id=?", [profileId]);
   const reports = (await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId])).map(
-    (report) => ({ ...report, photo_url: mediaUrl(env, report.photo_key) })
+    (report) => ({ ...report, ...reportPhotoPayload(env, report, user) })
   );
   const publicDoc = unlocked
     ? profile

@@ -565,3 +565,11 @@ test("Google 503 does not list callback URIs", async () => {
   assert.equal(res.data.redirect_uris, undefined);
   assert.doesNotMatch(JSON.stringify(res.data), /callback/);
 });
+
+test("Apple 503 does not list callback URIs", async () => {
+  const ctx = testEnv({ DEV_STUBS: "", OIDC_STUB: "", APPLE_TEAM_ID: "", APPLE_SERVICES_ID: "" });
+  const res = await call(ctx, "GET", "/api/auth/oidc/apple/start");
+  assert.equal(res.status, 503);
+  assert.equal(res.data.redirect_uris, undefined);
+  assert.doesNotMatch(JSON.stringify(res.data), /callback/);
+});

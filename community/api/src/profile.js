@@ -54,7 +54,13 @@ export function validateProfile(profile) {
     require(period >= 1 && period <= 240, `stage ${stage.id} fan period invalid`);
     require(run >= 5 && run <= 900, `stage ${stage.id} fan run duration invalid`);
     require(period * 60 - run >= 60, `stage ${stage.id} fan cycle needs >= 60s downtime`);
+    const light = stage.light || {};
+    if (light.red_percent != null) require(light.red_percent >= 0 && light.red_percent <= 100, `stage ${stage.id} red percent invalid`);
+    if (light.green_percent != null) require(light.green_percent >= 0 && light.green_percent <= 100, `stage ${stage.id} green percent invalid`);
+    if (light.blue_percent != null) require(light.blue_percent >= 0 && light.blue_percent <= 100, `stage ${stage.id} blue percent invalid`);
   }
+
+  if (profile.light_recipe) validateLightRecipe(profile.light_recipe);
 
   const pricing = profile.pricing || { kind: "free", amount_cents: 0 };
   if (pricing.kind === "paid") {
@@ -77,6 +83,46 @@ export function validateProfile(profile) {
     require(!(profile.affiliate_links || []).length, "affiliates_allowed=false cannot include links");
   }
   return profile;
+}
+
+export function isHttpsSourceUrl(url) {
+  if (url == null || String(url).trim() === "") return true;
+  try {
+    return new URL(String(url).trim()).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function httpsSourceHref(url) {
+  if (url == null || String(url).trim() === "") return "";
+  if (!isHttpsSourceUrl(url)) return "";
+  return new URL(String(url).trim()).href;
+}
+
+export function validateLightRecipe(recipe) {
+  require(Boolean(String(recipe.why || "").trim()), "light_recipe.why is required");
+  require(Boolean(String(recipe.wavelength_note || "").trim()), "light_recipe.wavelength_note is required");
+  require(Array.isArray(recipe.sources) && recipe.sources.length >= 1, "light_recipe needs at least one source");
+  for (const note of recipe.sources) {
+    require(Boolean(String(note.title || "").trim()), "light_recipe source title is required");
+    require(Boolean(String(note.detail || "").trim()), "light_recipe source detail is required");
+    require(isHttpsSourceUrl(note.url), "light_recipe source url must be https");
+  }
+  const phases = recipe.phases || {};
+  require(Boolean(phases.colonization), "light_recipe needs a colonization phase");
+  require(Boolean(phases.fruiting), "light_recipe needs a fruiting phase");
+  for (const [name, phase] of Object.entries(phases)) {
+    require(phase.photoperiod_hours >= 0 && phase.photoperiod_hours <= 24, `light_recipe ${name} photoperiod invalid`);
+    require(
+      phase.white_brightness_percent >= 0 && phase.white_brightness_percent <= 100,
+      `light_recipe ${name} white brightness invalid`
+    );
+    for (const channel of ["red_percent", "green_percent", "blue_percent"]) {
+      require(phase[channel] >= 0 && phase[channel] <= 100, `light_recipe ${name} ${channel} invalid`);
+    }
+  }
+  return recipe;
 }
 
 export function affiliateLinksFor(profile) {

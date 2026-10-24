@@ -22,6 +22,8 @@ from openshrooly_lib.models import (  # noqa: E402
     ProfileStage,
     SourceNote,
 )
+from openshrooly_lib.light_recipes import recipe_for  # noqa: E402
+from openshrooly_lib.mapping import apply_recipe_to_profile  # noqa: E402
 from openshrooly_lib.schema import PSILOCYBIN_LEGAL_NOTICE, validate_profile  # noqa: E402
 
 EXAMPLE_SPAWN = AffiliateLink(
@@ -1249,6 +1251,9 @@ def build_profiles() -> list[MushroomProfile]:
             ],
         ),
     ]
+    for profile in profiles:
+        profile.light_recipe = recipe_for(profile.id)
+        apply_recipe_to_profile(profile)
     return profiles
 
 

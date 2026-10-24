@@ -30,15 +30,15 @@
     {
       "id": "colonization",
       "name": "Colonization",
-      "duration_days": 28,
-      "humidity_percent": 90,
+      "duration_days": 28.0,
+      "humidity_percent": 90.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 22,
+      "temperature_c": 22.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 17,
-      "temperature_warning_max_c": 27,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -57,19 +57,19 @@
     {
       "id": "pinning",
       "name": "Primordia",
-      "duration_days": 10,
-      "humidity_percent": 93,
+      "duration_days": 10.0,
+      "humidity_percent": 93.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 17,
+      "temperature_c": 17.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 12,
-      "temperature_warning_max_c": 22,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 22.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 10,
-        "white_led_lux": 180,
+        "duration_hours": 12,
+        "white_led_lux": 506,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
@@ -84,19 +84,19 @@
     {
       "id": "fruiting",
       "name": "Fruiting",
-      "duration_days": 16,
-      "humidity_percent": 88,
+      "duration_days": 16.0,
+      "humidity_percent": 88.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 16,
+      "temperature_c": 16.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 12,
-      "temperature_warning_max_c": 21,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 10,
-        "white_led_lux": 200,
+        "duration_hours": 12,
+        "white_led_lux": 506,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
@@ -138,5 +138,42 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization is dark. Fruiting uses 12 h (Kurahashi 2015) and 37% white, mapped from the 500 lux yield optimum in Chi 2008. That trial found white outyielded blue and green, so RGB stays off and the white channel carries the light. Blue is not used because it conflicted with that yield result.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Chi et al. 2008 maitake",
+        "detail": "Jeong-Hyun Chi et al., Studies on Favorable Light Condition for Artificial Cultivation of Grifola frondosa, Korean J. Mycology 36 (2008). White light outyielded blue and green. Primordia formed best at 200 lux. Yield was best at 500 lux. 500 lux maps to 37% white.",
+        "url": "https://doi.org/10.4489/kjm.2008.36.1.031"
+      },
+      {
+        "title": "Kurahashi et al. 2015",
+        "detail": "Atsushi Kurahashi et al., A putative transcription factor Gf.BMR1 in Grifola frondosa, the homolog of BMR1 in Bipolaris oryzae, was strongly induced by near-ultraviolet light and blue light, Mycoscience 56 (2015). Fruiting used a 12 h light / 12 h dark cycle under a white fluorescent lamp, then compared 463 nm blue LED and near-UV. Dark-grown caps stayed pale and antler-like.",
+        "url": "https://doi.org/10.1016/j.myc.2014.05.005"
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 37,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      }
+    }
   }
 }

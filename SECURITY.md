@@ -10,7 +10,7 @@ Shroom Labs and OpenShrooly treat **security and UX as non-negotiable**. If a ch
 | Local hub | LAN attacker applying a profile | Hub binds to the home network; no cloud required; optional community token is a hashed Bearer secret |
 | Shroom Labs accounts | Credential stuffing, phishing, session theft | Passwordless default (magic link, OIDC, passkeys); httpOnly `Secure; SameSite=None` host cookies; refresh rotation; verified email before publish/buy/claim |
 | Paid culinary items | Charge without entitlement | Checkout stub + entitlement row; psilocybin pack cannot take payments |
-| Grow photos | Public object leak | R2 keys, no secrets in git, least-privilege Worker bindings |
+| Grow photos | Public object leak, XSS via SVG/HTML, EXIF/GPS, decompress bombs | Magic-byte sniff (JPEG/PNG/WebP only). JPEG keep-only: SOI, SOF0–15 (not DHT/JPG/DAC), DHT, DQT, DRI, SOS, RST0–7, EOI, and APP14 Adobe only when SOF is 4-component; unknown markers (COM, other APPn, JPGn/FFF0) are dropped including between progressive scans. PNG/WebP metadata strip, size/dimension caps, base64/body caps before decode, `/api/media` deny-by-default (`uploaded_media` row). Served only through `/api/media` (never `CDN_BASE_URL`). Pending objects live under `pending/` and are owner/staff only. Missing: moderator queue, approve/reject API, and staff UI — approval must copy off `pending/` and set status `approved`; reject/takedown deletes the object. R2 is unbound in production, so there are no stored grow-report objects to reprocess. Image CPU (~430 ms for 4.6 MB) needs Workers Paid before R2 is enabled. |
 | Psilocybin pack | Commerce / affiliate ToS | Validators hard-block paid + affiliates |
 | Device identity | Stolen chamber / cloned cert / malicious cloud apply | On-device P-256 key; short-lived client certs; revoke + re-claim; local setpoints win |
 | Grow Coach | Unpaid inference, prompt leak of another chamber, restricted-pack coaching | Entitlement + daily caps; device ownership check; culinary-only refusal; slim grounding (no raw telemetry dump); approve or opt-in auto-tune inside hard bounds |
@@ -26,7 +26,7 @@ Out of scope this pass: on-device signed recipe objects, live Stripe keys, compi
 
 ## Auth summary
 
-- Sign-in: email magic link (primary), Google OIDC + PKCE, Sign in with Apple, WebAuthn passkeys.
+- Sign-in: email magic link (primary), Google OIDC + PKCE, Sign in with Apple (form_post; state cookie is SameSite=None so it survives the cross-site POST; session cookie stays Lax), WebAuthn passkeys.
 - Passwords are optional and discouraged. If set: PBKDF2-SHA-256 **600,000** iterations (Workers have no native argon2id/scrypt) + HIBP k-anonymity range API. **Tradeoff flagged:** WASM argon2id would blow Worker CPU/size; we do not cut passwordless.
 - Sessions: 30-minute `__Host-sl_session` cookie, rotation via `/api/auth/refresh`, server-side revoke, sign-out-everywhere.
 - Verified email required for publish, checkout, fork, rate, report.

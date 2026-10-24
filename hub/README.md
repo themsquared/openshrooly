@@ -15,6 +15,8 @@ Works with Shrooly devices running OpenShrooly. The firmware stays offline-first
 
 It does **not** flash firmware or replace the on-device dashboard.
 
+The optional Matter sidecar (`bridge/`) makes chambers show up in Apple Home and Google Home. Pairing lives on **Smart Home** and needs the hub admin login. On a Mac, run the bridge with Node on the host. The compose `bridge` service is Linux-only. See [`docs/SMART_HOME.md`](../docs/SMART_HOME.md) and `scripts/macos/`.
+
 ## Requirements
 
 - Python 3.11+
@@ -27,7 +29,7 @@ cd /path/to/openshrooly
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r hub/requirements.txt
-PYTHONPATH=shared python -m uvicorn hub.app:app --host 127.0.0.1 --port 8090
+PYTHONPATH=shared python -m uvicorn hub.app:app --host 127.0.0.1 --port 8090 --no-proxy-headers
 ```
 
 Open http://127.0.0.1:8090
@@ -42,7 +44,9 @@ docker run --rm -p 8090:8090 \
   openshrooly-hub
 ```
 
-On a Pi, `--network host` makes mDNS discovery more reliable.
+On a Linux box or Pi, `--network host` makes mDNS discovery more reliable. `docker compose --profile linux up` uses host networking for both the hub and the Matter bridge so the pairing status server can stay on `127.0.0.1`.
+
+On a Mac mini, do not run the compose `bridge` service. Docker Desktop host networking needs 4.34 or newer, must be enabled while signed in, does not work with Enhanced Container Isolation, and only carries TCP/UDP. Matter mDNS from a container will not work. Run `scripts/macos/run-matter-bridge.sh` (or the launchd plist next to it). Run the hub with `scripts/macos/run-hub.sh`, or `docker compose -f docker-compose.yml -f docker-compose.macos.yml up hub`.
 
 ## Configuration
 
@@ -54,6 +58,13 @@ On a Pi, `--network host` makes mDNS discovery more reliable.
 | `COMMUNITY_URL` | `http://127.0.0.1:8787` | Shroom Labs API (`https://api.shroomlabs.io` in production) |
 | `COMMUNITY_TOKEN` | empty | Hub API token from a Shroom Labs account |
 | `HUB_POLL_SECONDS` | `60` | Sensor history interval |
+| `BRIDGE_STATUS_URL` | `http://127.0.0.1:8091` | Matter sidecar status HTTP (loopback only) |
+| `BRIDGE_STATUS_FILE` | empty | Optional shared file the sidecar writes (`/shared/status.json` in compose) |
+| `HUB_NEEDS_WATER_PCT` | `15` | Water percent that maps to the Home "needs water" contact |
+| `HUB_ADMIN_PASSWORD` | empty | Hub admin password. If empty, the hub writes one to `admin.json` |
+| `HUB_SECRET` | generated | Signs the hub session cookie. If unset, the hub writes a random value to `hub.secret` (mode 0600). The old published default is refused. |
+| `HUB_ALLOWED_HOSTS` | empty | Extra Host names the hub accepts, comma-separated. `localhost`, loopback, `.local`, and LAN IPs are already allowed. |
+| `HUB_TRUST_FORWARDED` | `0` | Set to `1` only behind a trusted reverse proxy. Uvicorn forwarded headers stay off otherwise. |
 
 The psilocybin pack is **off** unless you opt in. Even then, those profiles stay free and never carry affiliate links.
 

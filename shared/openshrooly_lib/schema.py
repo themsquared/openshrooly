@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 from .models import MushroomProfile
 
@@ -29,6 +30,17 @@ PSILOCYBIN_BLOCKED_PROVIDERS = {"stripe", "paypal", "square"}
 
 class ValidationError(ValueError):
     """Raised when a profile document is not usable."""
+
+
+def is_https_source_url(url: str | None) -> bool:
+    """True when a source link is absent or is an https URL with a host."""
+    if url is None:
+        return True
+    text = str(url).strip()
+    if not text:
+        return True
+    parsed = urlparse(text)
+    return parsed.scheme == "https" and bool(parsed.netloc)
 
 
 def _require(condition: bool, message: str) -> None:
@@ -64,6 +76,15 @@ def validate_profile(data: dict[str, Any] | MushroomProfile) -> MushroomProfile:
         _require(5 <= stage.fan.run_duration_s <= 900, f"stage {stage.id} fan run duration invalid")
         downtime = stage.fan.period_min * 60 - stage.fan.run_duration_s
         _require(downtime >= 60, f"stage {stage.id} fan cycle needs >= 60s downtime")
+        for channel, value in (
+            ("red", stage.light.red_percent),
+            ("green", stage.light.green_percent),
+            ("blue", stage.light.blue_percent),
+        ):
+            _require(0 <= value <= 100, f"stage {stage.id} {channel} percent invalid")
+
+    if profile.light_recipe:
+        _validate_light_recipe(profile)
 
     if profile.pricing.kind == "paid":
         _require(1_00 <= profile.pricing.amount_cents <= 20_00, "paid profiles must be $1-$20")
@@ -86,6 +107,32 @@ def validate_profile(data: dict[str, Any] | MushroomProfile) -> MushroomProfile:
         _require(not profile.affiliate_links, "affiliates_allowed=false cannot include links")
 
     return profile
+
+
+def _validate_light_recipe(profile: MushroomProfile) -> None:
+    recipe = profile.light_recipe
+    assert recipe is not None
+    _require(bool(recipe.why.strip()), "light_recipe.why is required")
+    _require(bool(recipe.wavelength_note.strip()), "light_recipe.wavelength_note is required")
+    _require(len(recipe.sources) >= 1, "light_recipe needs at least one source")
+    for note in recipe.sources:
+        _require(bool(note.title.strip()), "light_recipe source title is required")
+        _require(bool(note.detail.strip()), "light_recipe source detail is required")
+        _require(is_https_source_url(note.url), "light_recipe source url must be https")
+    _require("colonization" in recipe.phases, "light_recipe needs a colonization phase")
+    _require("fruiting" in recipe.phases, "light_recipe needs a fruiting phase")
+    for name, phase in recipe.phases.items():
+        _require(0 <= phase.photoperiod_hours <= 24, f"light_recipe {name} photoperiod invalid")
+        _require(
+            0 <= phase.white_brightness_percent <= 100,
+            f"light_recipe {name} white brightness invalid",
+        )
+        for channel, value in (
+            ("red", phase.red_percent),
+            ("green", phase.green_percent),
+            ("blue", phase.blue_percent),
+        ):
+            _require(0 <= value <= 100, f"light_recipe {name} {channel} percent invalid")
 
 
 def export_json_dict(profile: MushroomProfile) -> dict[str, Any]:

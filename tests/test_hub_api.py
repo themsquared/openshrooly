@@ -6,22 +6,40 @@ import pytest
 os.environ.setdefault("HUB_DATA_DIR", str(Path("/tmp/openshrooly-hub-test")))
 os.environ.setdefault("OPENSHROOLY_DATA_DIR", str(Path(__file__).resolve().parents[1] / "data"))
 os.environ.setdefault("HUB_ENABLE_PSILOCYBIN", "0")
+os.environ.setdefault("HUB_ADMIN_PASSWORD", "test-admin-9x")
 
 from fastapi.testclient import TestClient
 
 from hub.app import app
+from hub import auth
+from hub import config
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("HUB_DATA_DIR", str(tmp_path))
-    from hub import config
-    from hub import db as hubdb
-
+    monkeypatch.setenv("HUB_ADMIN_PASSWORD", "test-admin-9x")
     config.DB_PATH = tmp_path / "hub.sqlite"
+    config.DATA_DIR = tmp_path
     config.ENABLE_PSILOCYBIN = False
+    config.ADMIN_PASSWORD = "test-admin-9x"
+    auth.reset_login_guard()
+    auth.reset_sessions()
     with TestClient(app) as test_client:
         yield test_client
+    auth.reset_login_guard()
+    auth.reset_sessions()
+
+
+def _login(client):
+    client.get("/login")
+    token = client.cookies.get("hub_csrf")
+    return client.post(
+        "/login",
+        data={"username": "admin", "password": "test-admin-9x", "csrf": token, "next": "/smart-home"},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
 
 
 def test_health_and_seeded_profiles(client):
@@ -33,18 +51,31 @@ def test_health_and_seeded_profiles(client):
 
 
 def test_import_and_export_json(client):
+    assert _login(client).status_code == 303
     pearl = client.get("/api/profiles/pearl-oyster").json()
     pearl["id"] = "pearl-oyster-copy"
     pearl["name"] = "Pearl copy"
-    res = client.post("/profiles/import", data={"document": __import__("json").dumps(pearl)}, follow_redirects=False)
+    token = client.cookies.get("hub_csrf")
+    res = client.post(
+        "/profiles/import",
+        data={"document": __import__("json").dumps(pearl), "csrf": token},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
     assert res.status_code == 303
     exported = client.get("/api/profiles/pearl-oyster-copy").json()
     assert exported["id"] == "pearl-oyster-copy"
 
 
 def test_rejects_psilocybin_when_disabled(client):
+    assert _login(client).status_code == 303
     raw = Path(__file__).resolve().parents[1].joinpath("data/profiles/psilocybin/golden-teacher.json").read_text()
-    page = client.post("/profiles/import", data={"document": raw})
+    token = client.cookies.get("hub_csrf")
+    page = client.post(
+        "/profiles/import",
+        data={"document": raw, "csrf": token},
+        headers={"Origin": "http://testserver"},
+    )
     assert page.status_code == 200
     assert b"disabled" in page.content
 

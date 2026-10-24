@@ -21,6 +21,16 @@ export function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+export function httpsSourceHref(url) {
+  if (url == null || String(url).trim() === "") return "";
+  try {
+    const parsed = new URL(String(url).trim());
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
 export function isPsi(profile) {
   return isOffMenu(profile);
 }
@@ -39,6 +49,58 @@ export function loadProfiles() {
 function fruiting(profile) {
   const stages = profile.stages || [];
   return stages.find((s) => s.id === "fruiting") || stages[stages.length - 1] || {};
+}
+
+const FRUITING_LIKE = new Set(["pinning", "fruiting", "flush"]);
+
+export function recipePhase(profile, stageId) {
+  const phases = profile.light_recipe?.phases || {};
+  if (phases[stageId]) return phases[stageId];
+  if (FRUITING_LIKE.has(stageId)) return phases.fruiting || {};
+  return phases.colonization || {};
+}
+
+export function lightMixLine(phase) {
+  return `${phase.photoperiod_hours ?? 0} h, white ${phase.white_brightness_percent ?? 0}%, RGB ${phase.red_percent ?? 0}/${phase.green_percent ?? 0}/${phase.blue_percent ?? 0}`;
+}
+
+export function renderLightRecipe(profile) {
+  const recipe = profile.light_recipe;
+  if (!recipe) return "";
+  if (isPaid(profile)) {
+    return `<section class="light-recipe" aria-labelledby="light-recipe-heading"><h2 id="light-recipe-heading">Light recipe</h2><p class="muted">Hours, brightness, and the RGB mix unlock after purchase.</p><p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p></section>`;
+  }
+  const rows = Object.entries(recipe.phases || {})
+    .map(
+      ([id, phase]) =>
+        `<tr><th scope="row">${escapeHtml(id)}</th><td>${phase.photoperiod_hours} h on</td><td>white ${phase.white_brightness_percent}%</td><td>RGB ${phase.red_percent} / ${phase.green_percent} / ${phase.blue_percent}</td></tr>`
+    )
+    .join("");
+  const psi = isPsi(profile);
+    const sources = (recipe.sources || [])
+    .map((note) => {
+      const title = escapeHtml(note.title);
+      const detail = escapeHtml(note.detail);
+      const href = httpsSourceHref(note.url);
+      if (href) {
+        const rel = psi ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
+        return `<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`;
+      }
+      return `<li><strong>${title}.</strong> ${detail}</li>`;
+    })
+    .join("");
+  return `<section class="light-recipe" aria-labelledby="light-recipe-heading">
+      <h2 id="light-recipe-heading">Light recipe</h2>
+      <p>${escapeHtml(recipe.why)}</p>
+      <p class="muted">${escapeHtml(recipe.wavelength_note)}</p>
+      <table class="light-recipe-table">
+        <caption>Photoperiod and mix for this chamber</caption>
+        <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <h3>Recipe sources</h3>
+      <ul>${sources}</ul>
+    </section>`;
 }
 
 function daysToFruit(profile) {
@@ -144,7 +206,7 @@ export function profileJsonLd(profile) {
         "@type": "HowToStep",
         position: i + 1,
         name: s.name,
-        text: `${s.duration_days} days at ${s.temperature_c} °C and ${s.humidity_percent}% humidity.${s.notes ? " " + s.notes : ""}`,
+        text: `${s.duration_days} days at ${s.temperature_c} °C and ${s.humidity_percent}% humidity. Light ${lightMixLine(recipePhase(profile, s.id))}.${s.notes ? " " + s.notes : ""}`,
       })),
     };
     if (photo) howto.image = image;
@@ -324,6 +386,7 @@ export function renderProfilePage(profile) {
       <h2>${paid ? "Stages" : "Grow parameters"}</h2>
       <ol class="grow-timeline">${stages}</ol>
       ${paid ? `<p class="muted">Temperatures, humidity, and notes unlock after purchase.</p>` : ""}
+      ${renderLightRecipe(profile)}
       ${cta}
       ${psi ? microscopySection() : ""}
     </article>`;

@@ -91,9 +91,91 @@ async function keyFor(uri, kid, now) {
   return key || null;
 }
 
+const APPLE_AUD = "https://appleid.apple.com";
+const APPLE_SECRET_TTL_S = 15 * 60;
+const APPLE_SECRET_CACHE_MS = 5 * 60 * 1000;
+
+let appleSecretCache = { jwt: "", stamp: "", expiresAt: 0 };
+
+export function resetAppleSecretCache() {
+  appleSecretCache = { jwt: "", stamp: "", expiresAt: 0 };
+}
+
+function pemToPkcs8(pem) {
+  const cleaned = String(pem || "")
+    .replaceAll("\\n", "\n")
+    .replace(/-----BEGIN [A-Z ]+-----/g, "")
+    .replace(/-----END [A-Z ]+-----/g, "")
+    .replace(/\s+/g, "");
+  if (!cleaned) throw new Error("empty key");
+  const bin = atob(cleaned);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function signEs256Jwt(key, header, claims) {
+  const h = bytesToB64url(new TextEncoder().encode(JSON.stringify(header)));
+  const c = bytesToB64url(new TextEncoder().encode(JSON.stringify(claims)));
+  const sig = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    new TextEncoder().encode(`${h}.${c}`)
+  );
+  return `${h}.${c}.${bytesToB64url(sig)}`;
+}
+
+/** Apple Hide My Email addresses. Treated as verified even when email_verified is missing. */
+export function appleRelayEmail(email) {
+  return /@privaterelay\.appleid\.com$/i.test(String(email || "").trim());
+}
+
+function emailIsVerified(provider, claims) {
+  if (claims.email_verified === true || claims.email_verified === "true") return true;
+  return provider === "apple" && appleRelayEmail(claims.email);
+}
+
+/**
+ * ES256 client secret for Apple's token endpoint. Cached for a few minutes. Never log the result.
+ * Returns "" if any credential is missing or the key cannot be imported.
+ */
+export async function appleClientSecret(env = {}, nowMs = Date.now()) {
+  const team = String(env.APPLE_TEAM_ID || "").trim();
+  const kid = String(env.APPLE_KEY_ID || "").trim();
+  const sub = String(env.APPLE_SERVICES_ID || "").trim();
+  const pem = String(env.APPLE_PRIVATE_KEY || "").trim();
+  if (!team || !kid || !sub || !pem) return "";
+  const stamp = `${team}:${kid}:${sub}`;
+  if (appleSecretCache.jwt && appleSecretCache.stamp === stamp && appleSecretCache.expiresAt - 60 * 1000 > nowMs) {
+    return appleSecretCache.jwt;
+  }
+  try {
+    const key = await crypto.subtle.importKey(
+      "pkcs8",
+      pemToPkcs8(pem),
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"]
+    );
+    const now = Math.floor(nowMs / 1000);
+    const jwt = await signEs256Jwt(key, { alg: "ES256", kid }, {
+      iss: team,
+      iat: now,
+      exp: now + APPLE_SECRET_TTL_S,
+      aud: APPLE_AUD,
+      sub,
+    });
+    appleSecretCache = { jwt, stamp, expiresAt: nowMs + APPLE_SECRET_CACHE_MS };
+    return jwt;
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Verify an ID token. Returns { ok: true, claims } or { ok: false, reason } (reason is for audit logs only).
  * Checks: RS256 signature against the provider JWKS, iss, aud (and azp), exp, iat, nonce, email_verified.
+ * Apple Hide My Email (@privaterelay.appleid.com) counts as verified.
  */
 export async function verifyIdToken(idToken, { provider, clientId, nonce, nowMs = Date.now() }) {
   const spec = PROVIDERS[provider];
@@ -135,8 +217,7 @@ export async function verifyIdToken(idToken, { provider, clientId, nonce, nowMs 
   }
   if (!nonce || !safeEqual(claims.nonce || "", nonce)) return { ok: false, reason: "nonce mismatch" };
   if (!claims.sub) return { ok: false, reason: "no sub" };
-  const verified = claims.email_verified === true || claims.email_verified === "true";
-  if (!claims.email || !verified) return { ok: false, reason: "email not verified" };
+  if (!claims.email || !emailIsVerified(provider, claims)) return { ok: false, reason: "email not verified" };
   return { ok: true, claims };
 }
 

@@ -11,9 +11,11 @@ import {
 } from "../src/pack.js";
 import {
   FAQ,
+  httpsSourceHref,
   loadProfiles,
   seoDescription,
   renderFaqPage,
+  renderLightRecipe,
   renderLlms,
   renderProfilePage,
   renderSitemap,
@@ -147,6 +149,37 @@ test("built-in profiles are served from the bundled seeds, not stale D1 text", a
   assert.doesNotMatch(detail.data.profile.summary, /\bFAE\b|\bRH\b/);
   const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
   assert.doesNotMatch(list.data.find((p) => p.id === "lions-mane").summary, /\bFAE\b|\bRH\b/);
+});
+
+test("profile pages show the light recipe, wavelength note, and at least one source", () => {
+  const profiles = loadProfiles();
+  for (const profile of profiles) {
+    const html = renderProfilePage(profile);
+    assert.match(html, /Light recipe/);
+    assert.match(html, /465 to 475 nm/);
+    assert.match(html, /RGB mix is an approximation/);
+    if (profile.pricing?.kind === "paid") {
+      assert.match(html, /unlock after purchase/);
+      assert.doesNotMatch(html, /white 20%/);
+      continue;
+    }
+    assert.match(html, /Recipe sources/);
+    const fruit = profile.light_recipe.phases.fruiting;
+    assert.match(html, new RegExp(`${fruit.photoperiod_hours} h on`));
+    assert.ok(profile.light_recipe.sources.some((note) => html.includes(note.title)));
+  }
+});
+
+test("light recipe source links drop javascript, data, and http hrefs", () => {
+  const pearl = structuredClone(loadProfiles().find((p) => p.id === "pearl-oyster"));
+  assert.equal(httpsSourceHref("https://doi.org/10.1111/j.1751-1097.1987.tb07888.x"), "https://doi.org/10.1111/j.1751-1097.1987.tb07888.x");
+  for (const badUrl of ["javascript:alert(1)", "data:text/html,hi", "http://example.com/paper"]) {
+    assert.equal(httpsSourceHref(badUrl), "");
+    pearl.light_recipe.sources = [{ title: "Bad link", detail: "Must not be clickable.", url: badUrl }];
+    const html = renderLightRecipe(pearl);
+    assert.doesNotMatch(html, /href="/);
+    assert.match(html, /Bad link/);
+  }
 });
 
 test("FAQ answers read plainly", () => {
