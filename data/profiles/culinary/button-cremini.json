@@ -144,9 +144,9 @@
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
-        "title": "Kertesz and Thai 2020",
-        "detail": "M. A. Kertesz and M. Thai, Critical Factors Involved in Primordia Building in Agaricus bisporus, Molecules 25 (2020). A. bisporus does not require light to fruit. Triggers are temperature, carbon dioxide, casing, and volatiles.",
-        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7411738/"
+        "title": "Baars et al. 2020",
+        "detail": "Johan J. P. Baars et al., Critical Factors Involved in Primordia Building in Agaricus bisporus: A Review, Molecules 25 (2020). A. bisporus does not require light to fruit. Triggers are temperature, carbon dioxide, casing, and volatiles.",
+        "url": "https://doi.org/10.3390/molecules25132984"
       },
       {
         "title": "Penn State Agaricus",

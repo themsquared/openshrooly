@@ -144,7 +144,7 @@
     "sources": [
       {
         "title": "General default",
-        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h (Stamets) and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
       },
       {
         "title": "Sakamoto 2018",
@@ -153,11 +153,11 @@
       },
       {
         "title": "Stamets",
-        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
       },
       {
         "title": "Penn State oyster production",
-        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h for fruiting (Stamets) and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
+        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
         "url": "https://mushroomcompany.com/resources/oyster/paoyster.pdf"
       }
     ],

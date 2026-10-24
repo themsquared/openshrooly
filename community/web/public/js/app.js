@@ -217,9 +217,10 @@ async function renderProfile() {
       .map((note) => {
         const title = escapeHtml(note.title);
         const detail = escapeHtml(note.detail);
-        if (note.url) {
+        const href = httpsSourceHref(note.url);
+        if (href) {
           const rel = off ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
-          return `<li><a href="${escapeHtml(note.url)}"${rel}>${title}</a>. ${detail}</li>`;
+          return `<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`;
         }
         return `<li><strong>${title}.</strong> ${detail}</li>`;
       })
@@ -460,6 +461,16 @@ async function renderAccount() {
   });
 }
 
+function httpsSourceHref(url) {
+  if (url == null || String(url).trim() === "") return "";
+  try {
+    const parsed = new URL(String(url).trim());
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -623,6 +634,7 @@ async function renderModerate() {
                 <button type="button" data-mod="approve" data-id="${escapeHtml(p.id)}">Approve</button>
                 <button type="button" class="secondary" data-mod="request-changes" data-id="${escapeHtml(p.id)}">Ask for changes</button>
                 <button type="button" class="secondary" data-mod="reject" data-id="${escapeHtml(p.id)}">Reject</button>
+                <button type="button" class="secondary" data-mod="takedown" data-id="${escapeHtml(p.id)}">Take down</button>
               </p>
             </article>`);
     }

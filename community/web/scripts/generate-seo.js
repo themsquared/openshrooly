@@ -20,6 +20,16 @@ export function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+export function httpsSourceHref(url) {
+  if (url == null || String(url).trim() === "") return "";
+  try {
+    const parsed = new URL(String(url).trim());
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
 export function isPsi(profile) {
   return isOffMenu(profile);
 }
@@ -74,13 +84,14 @@ export function renderLightRecipe(profile) {
     )
     .join("");
   const psi = isPsi(profile);
-  const sources = (recipe.sources || [])
+    const sources = (recipe.sources || [])
     .map((note) => {
       const title = escapeHtml(note.title);
       const detail = escapeHtml(note.detail);
-      if (note.url) {
+      const href = httpsSourceHref(note.url);
+      if (href) {
         const rel = psi ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
-        return `<li><a href="${escapeHtml(note.url)}"${rel}>${title}</a>. ${detail}</li>`;
+        return `<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`;
       }
       return `<li><strong>${title}.</strong> ${detail}</li>`;
     })

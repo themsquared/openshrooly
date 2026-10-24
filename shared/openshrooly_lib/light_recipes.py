@@ -16,6 +16,8 @@ DARK = LightPhase(0, 0, 0, 0, 0)
 OYSTER_FRUITING = LightPhase(12, 20, 0, 0, 80)
 # 500 lux cited for lion's mane and maitake yield maps to 37% white.
 LUX_500 = LightPhase(12, 37, 0, 0, 80)
+# Chi 2008: white outyielded blue, so maitake uses white only at that 500 lux.
+MAITAKE_FRUITING = LightPhase(12, 37, 0, 0, 0)
 # 200 lux (inside 50 to 300 and maitake primordia papers) maps to 26% white.
 LUX_200 = LightPhase(12, 26, 0, 0, 80)
 # Cordyceps 1250 lux (cordycepin optimum in Wu 2016) maps to 51% white.
@@ -37,10 +39,11 @@ def _recipe(why: str, sources: list[SourceNote], fruiting: LightPhase, **extra: 
     return LightRecipe(why=why, sources=sources, phases=phases, wavelength_note=WAVELENGTH_NOTE)
 
 
-STAMETS_12H = _src(
+STAMETS_BOOK = _src(
     "Stamets",
     "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. "
-    "Spawn run is described as dark. Fruiting is commonly cited as about 12 h light.",
+    "Used here as a general cultivation reference. This recipe does not take a "
+    "photoperiod or lux number from a cited page in that book.",
 )
 SAKAMOTO_2018 = _src(
     "Sakamoto 2018",
@@ -56,15 +59,16 @@ PENN_STATE_OYSTER = _src(
     "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural "
     "Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. "
     "After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. "
-    "This recipe uses 12 h for fruiting (Stamets) and maps 20% white to 92 lux, inside that "
-    "50 to 300 lux band.",
+    "This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, "
+    "and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
     "https://mushroomcompany.com/resources/oyster/paoyster.pdf",
 )
-DURAND_1987 = _src(
-    "Durand 1987 action spectrum",
-    "R. Durand and R. Jacques, Action spectra for hyphal aggregation, the first stage of "
-    "fruiting, in Pleurotus ostreatus, Photochemistry and Photobiology 45 (1987). Peaks at "
-    "370 nm and 440 to 450 nm. Wavelengths longer than 530 nm gave no response.",
+RICHARTZ_1987 = _src(
+    "Richartz and MacLellan 1987 action spectrum",
+    "Gisela Richartz and Andrew J. MacLellan, Action spectra for hyphal aggregation, the "
+    "first stage of fruiting, in Pleurotus ostreatus, Photochemistry and Photobiology 45 "
+    "(1987). Peaks at 370 nm and 440 to 450 nm. Wavelengths longer than 530 nm gave no "
+    "response.",
     "https://doi.org/10.1111/j.1751-1097.1987.tb07888.x",
 )
 WANG_2020 = _src(
@@ -84,37 +88,42 @@ DE_BONIS_2024 = _src(
 XIE_2018 = _src(
     "Xie 2018 king oyster",
     "Chunliang Xie et al., Comparative transcriptomics of Pleurotus eryngii reveals "
-    "blue-light regulation of CAZymes at primordium differentiated into fruiting body "
-    "stage, Gene 646 (2018). Blue light induced primordium differentiation.",
-    "https://www.sciencedirect.com/science/article/pii/S0888754317300927",
+    "blue-light regulation of carbohydrate-active enzymes (CAZymes) at primordium "
+    "differentiated into fruiting body stage, Genomics 110 (2018). Blue light induced "
+    "primordium differentiation.",
+    "https://doi.org/10.1016/j.ygeno.2017.09.012",
 )
 LEATHAM_1987 = _src(
     "Leatham and Stahmann 1987",
     "Gary F. Leatham and Mark A. Stahmann, Effect of light and aeration on fruiting of "
     "Lentinula edodes, Trans. Br. Mycol. Soc. 88 (1987). Light is required for normal "
-    "fruiting. Blue 400 to 500 nm stimulated fruiting on high-calcium media. Only "
-    "pigmented primordia expanded.",
-    "https://www.fpl.fs.usda.gov/documnts/pdf1987/leath87a.pdf",
+    "fruiting. Blue 400 to 500 nm stimulated fruiting on high-calcium media and "
+    "suppressed fruiting on low-calcium media. Only pigmented primordia expanded.",
+    "https://doi.org/10.1016/s0007-1536(87)80180-8",
 )
 KIM_2024_SHIITAKE = _src(
     "Kim 2024 shiitake blue light",
     "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and "
     "Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). "
-    "Blue light raised yield versus white in two cultivars.",
+    "Blue light was applied during incubation, not during fruiting. Yield and "
+    "ergothioneine rose versus white in two cultivars. This recipe does not treat that "
+    "as a fruiting-stage blue mix.",
     "https://doi.org/10.1080/12298093.2024.2430052",
 )
-HERICIUM_2025 = _src(
-    "Czech University of Life Sciences 2025",
-    "Jan Kazda et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 "
-    "(2025). Fruiting at 17 to 18 C, 90 to 95% humidity, 500 lux (one strain also at 35 lux). "
-    "500 lux maps to 37% white on this chamber.",
+JOZIFEK_2025 = _src(
+    "Jozifek et al. 2025",
+    "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, "
+    "Agriculture 15 (2025). The 500 lux treatment was 24 h continuous light and caused "
+    "pink stress coloring. It does not support 12 h at 500 lux, so this recipe does not "
+    "copy that schedule.",
     "https://doi.org/10.3390/agriculture15050460",
 )
 HERICIUM_12H = _src(
-    "Lion's mane 12 h photoperiod",
-    "A controlled-room Hericium erinaceus study used a 12 h photoperiod with 6500 K "
-    "fluorescent light at 500 lux (Pharmacognosy Journal cultivation methods). Hours and "
-    "lux match the Czech University room.",
+    "Firth and Blackwood 2025 lion's mane room",
+    "Gavin Firth and Megan Blackwood, International Journal of Pharmacognosy and Life "
+    "Science 6 (2025). A controlled-room Hericium erinaceus study used a 12 h photoperiod "
+    "with 6500 K fluorescent light at 500 lux. That is the hours and lux used here. "
+    "500 lux maps to 37% white.",
     "https://www.pharmacognosyjournal.com/article/230/7-3-72-360.pdf",
 )
 SAKAMOTO_ENOKI = _src(
@@ -134,19 +143,21 @@ WU_2016_CORDYCEPS = _src(
     "cordycepin at 1250 plus or minus 250 lux. This recipe maps 51% white to about 1250 lux.",
     "https://doi.org/10.1615/intjmedmushrooms.v18.i7.40",
 )
-CORDYCEPS_BLUE = _src(
-    "Chang 2024 Cordyceps LED",
-    "Single-wavelength LED work on Cordyceps militaris found glare-blue wavelengths raised "
-    "fruiting-body weight and cordycepin versus other colors (Journal of Food Biochemistry "
-    "style LED trial, 2024). Used here only for the blue bias, not for a lux number.",
+LIN_2024 = _src(
+    "Lin et al. 2024 Cordyceps LED",
+    "Yu-Wen Lin et al., Growth of Cordyceps militaris cultivation and its bioactive "
+    "component accumulation as affected by various single-wavelength LED light sources, "
+    "International Journal of Food Properties 27 (2024). Single-wavelength LEDs changed "
+    "bioactive compound levels. This paper is used only for a blue bias, not for a yield "
+    "or lux number.",
     "https://doi.org/10.1080/10942912.2024.2373781",
 )
-KERTESZ_2020 = _src(
-    "Kertesz and Thai 2020",
-    "M. A. Kertesz and M. Thai, Critical Factors Involved in Primordia Building in "
-    "Agaricus bisporus, Molecules 25 (2020). A. bisporus does not require light to fruit. "
-    "Triggers are temperature, carbon dioxide, casing, and volatiles.",
-    "https://pmc.ncbi.nlm.nih.gov/articles/PMC7411738/",
+BAARS_2020 = _src(
+    "Baars et al. 2020",
+    "Johan J. P. Baars et al., Critical Factors Involved in Primordia Building in "
+    "Agaricus bisporus: A Review, Molecules 25 (2020). A. bisporus does not require "
+    "light to fruit. Triggers are temperature, carbon dioxide, casing, and volatiles.",
+    "https://doi.org/10.3390/molecules25132984",
 )
 PENN_STATE_AGARICUS = _src(
     "Penn State Agaricus",
@@ -155,18 +166,21 @@ PENN_STATE_AGARICUS = _src(
     "as a fruiting control.",
     "https://extension.psu.edu/basic-procedures-for-agaricus-mushroom-growing/",
 )
-MAITAKE_2008 = _src(
-    "Oh et al. 2008 maitake",
-    "Studies on Favorable Light Condition for Artificial Cultivation of Grifola frondosa, "
-    "Korean J. Mycology 36 (2008). White light outyielded blue and green. Primordia formed "
-    "best at 200 lux. Yield was best at 500 lux. 500 lux maps to 37% white.",
+CHI_2008 = _src(
+    "Chi et al. 2008 maitake",
+    "Jeong-Hyun Chi et al., Studies on Favorable Light Condition for Artificial "
+    "Cultivation of Grifola frondosa, Korean J. Mycology 36 (2008). White light "
+    "outyielded blue and green. Primordia formed best at 200 lux. Yield was best at "
+    "500 lux. 500 lux maps to 37% white.",
     "https://doi.org/10.4489/kjm.2008.36.1.031",
 )
-MAITAKE_2014 = _src(
-    "Kurahashi et al. 2014",
-    "A Grifola frondosa fruiting trial used a 12 h light / 12 h dark cycle under white "
-    "fluorescent light, then compared 463 nm blue LED and near-UV. Dark-grown caps stayed "
-    "pale and antler-like.",
+KURAHASHI_2015 = _src(
+    "Kurahashi et al. 2015",
+    "Atsushi Kurahashi et al., A putative transcription factor Gf.BMR1 in Grifola "
+    "frondosa, the homolog of BMR1 in Bipolaris oryzae, was strongly induced by "
+    "near-ultraviolet light and blue light, Mycoscience 56 (2015). Fruiting used a "
+    "12 h light / 12 h dark cycle under a white fluorescent lamp, then compared 463 nm "
+    "blue LED and near-UV. Dark-grown caps stayed pale and antler-like.",
     "https://doi.org/10.1016/j.myc.2014.05.005",
 )
 REISHI_PHD = _src(
@@ -198,19 +212,21 @@ BADHAM_1980 = _src(
     "flash energy, not a room lux, so intensity here is the general default.",
     "https://doi.org/10.1080/00275514.1980.12021162",
 )
-MCKERNAN_2023 = _src(
-    "McKernan et al. 2023 fruiting protocol",
-    "Kevin McKernan et al., Exploring Psilocybe spp. mycelium and fruiting body chemistry, "
-    "PLOS ONE (2023). Fruiting used a 12 h photoperiod at about 6400 K. No lux number.",
-    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10716206/",
+WALDBILLIG_2023 = _src(
+    "Waldbillig et al. 2023 fruiting protocol",
+    "Adam Waldbillig et al., Exploring Psilocybe spp. mycelium and fruiting body chemistry "
+    "for potential therapeutic compounds, Frontiers in Fungal Biology 4 (2023). Fruiting "
+    "used a 12 h photoperiod at about 6400 K. No lux number.",
+    "https://doi.org/10.3389/ffunb.2023.1295223",
 )
 GENERAL_DEFAULT = _src(
     "General default",
     "No variety-specific photoperiod or lux was found for this species. Colonization is "
-    "dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h (Stamets) and "
-    "20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux "
-    "band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not "
-    "a measured value for this variety.",
+    "dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled "
+    "default, not a page-cited Stamets value, and 20% white, which is 92 lux on this "
+    "chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the "
+    "440 to 470 nm finding. This is a labeled default, not a measured value for this "
+    "variety.",
 )
 
 OYSTER_WHY = (
@@ -228,7 +244,7 @@ GENERAL_WHY = (
 def _oyster() -> LightRecipe:
     return _recipe(
         OYSTER_WHY,
-        [PENN_STATE_OYSTER, DURAND_1987, WANG_2020, DE_BONIS_2024, STAMETS_12H],
+        [PENN_STATE_OYSTER, RICHARTZ_1987, WANG_2020, DE_BONIS_2024, STAMETS_BOOK],
         OYSTER_FRUITING,
     )
 
@@ -238,7 +254,7 @@ def _king() -> LightRecipe:
         "Same dark spawn run as other oysters. Fruiting is blue-heavy because P. eryngii "
         "primordia respond to blue light. Hours and white percent are the oyster default "
         "(12 h, 20% / 92 lux). No king-oyster-specific lux was found.",
-        [XIE_2018, PENN_STATE_OYSTER, STAMETS_12H, SAKAMOTO_2018],
+        [XIE_2018, PENN_STATE_OYSTER, STAMETS_BOOK, SAKAMOTO_2018],
         OYSTER_FRUITING,
     )
 
@@ -250,30 +266,33 @@ RECIPES: dict[str, LightRecipe] = {
         "P. djamor has no variety-specific lux in the sources below. The recipe is the "
         "P. ostreatus oyster default (dark colonize, 12 h, 20% white, blue-heavy RGB) "
         "and is labeled as such.",
-        [PENN_STATE_OYSTER, DURAND_1987, WANG_2020, STAMETS_12H, GENERAL_DEFAULT],
+        [PENN_STATE_OYSTER, RICHARTZ_1987, WANG_2020, STAMETS_BOOK, GENERAL_DEFAULT],
         OYSTER_FRUITING,
     ),
     "golden-oyster": _recipe(
         "P. citrinopileatus has no variety-specific lux in the sources below. The recipe "
         "is the P. ostreatus oyster default and is labeled as such.",
-        [PENN_STATE_OYSTER, DURAND_1987, DE_BONIS_2024, STAMETS_12H, GENERAL_DEFAULT],
+        [PENN_STATE_OYSTER, RICHARTZ_1987, DE_BONIS_2024, STAMETS_BOOK, GENERAL_DEFAULT],
         OYSTER_FRUITING,
     ),
     "king-oyster": _king(),
     "king-oyster-thick-stem": _king(),
     "lions-mane": _recipe(
-        "Colonization is dark to limit early pins. Fruiting uses 12 h and 37% white, "
-        "mapped from the 500 lux rooms in the Hericium papers. RGB is the general "
-        "blue mix; those papers used white fluorescent, not a measured blue ratio.",
-        [HERICIUM_2025, HERICIUM_12H, SAKAMOTO_2018, STAMETS_12H],
+        "Colonization is dark to limit early pins. Fruiting uses 12 h and 37% white from "
+        "the Firth and Blackwood 500 lux, 12 h room. Jozifek 2025 also used 500 lux, but "
+        "as 24 h continuous light that caused pink stress coloring, so that schedule is "
+        "not used. RGB is the general blue mix; those papers used white fluorescent, not "
+        "a measured blue ratio.",
+        [JOZIFEK_2025, HERICIUM_12H, SAKAMOTO_2018, STAMETS_BOOK],
         LUX_500,
     ),
     "shiitake": _recipe(
         "Colonization and the browning rest stay dark (mycelium grows faster without "
         "strong light). Fruiting uses 12 h and the general 20% white / blue mix. Leatham "
-        "and Kim show light, especially blue, is needed for normal caps. No shiitake-specific "
-        "lux for this chamber was found.",
-        [LEATHAM_1987, KIM_2024_SHIITAKE, STAMETS_12H, SAKAMOTO_2018, GENERAL_DEFAULT],
+        "found blue helped only on high-calcium media and suppressed fruiting on "
+        "low-calcium media. Kim 2024 applied blue during incubation, not fruiting. No "
+        "shiitake-specific fruiting lux for this chamber was found.",
+        [LEATHAM_1987, KIM_2024_SHIITAKE, STAMETS_BOOK, SAKAMOTO_2018, GENERAL_DEFAULT],
         GENERAL_FRUITING,
     ),
     "reishi": _recipe(
@@ -281,17 +300,17 @@ RECIPES: dict[str, LightRecipe] = {
         "the Corvinus literature table (200 to 500 lux early, 500 to 1000 lux later). "
         "Blue is the general photomorphogenesis mix. A 2024 paper found green raised "
         "weight and red delayed caps; we do not invent a green-heavy mix from that.",
-        [REISHI_PHD, REISHI_2024, OSU_REISHI, STAMETS_12H],
+        [REISHI_PHD, REISHI_2024, OSU_REISHI, STAMETS_BOOK],
         LUX_500,
     ),
     "chestnut": _recipe(
         GENERAL_WHY,
-        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_12H, PENN_STATE_OYSTER],
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK, PENN_STATE_OYSTER],
         GENERAL_FRUITING,
     ),
     "pioppino": _recipe(
         GENERAL_WHY,
-        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_12H, PENN_STATE_OYSTER],
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK, PENN_STATE_OYSTER],
         GENERAL_FRUITING,
     ),
     "enoki": _recipe(
@@ -299,93 +318,95 @@ RECIPES: dict[str, LightRecipe] = {
         "cold dark room makes long pale pinhead fruits; light then forms a cap. This "
         "recipe keeps both phases at 0 h so stems stay long. That is a morphology choice "
         "from the paper, not a lux number.",
-        [SAKAMOTO_ENOKI, SAKAMOTO_2018, STAMETS_12H],
+        [SAKAMOTO_ENOKI, SAKAMOTO_2018, STAMETS_BOOK],
         ENOKI_FRUITING,
     ),
     "maitake": _recipe(
-        "Colonization is dark. Fruiting uses 12 h (Kurahashi) and 37% white, mapped from "
-        "the 500 lux yield optimum. White fluorescent outyielded blue in that trial, so "
-        "the white channel carries the intensity and blue stays as a modest WS2812 bias.",
-        [MAITAKE_2008, MAITAKE_2014, SAKAMOTO_2018],
-        LUX_500,
+        "Colonization is dark. Fruiting uses 12 h (Kurahashi 2015) and 37% white, mapped "
+        "from the 500 lux yield optimum in Chi 2008. That trial found white outyielded "
+        "blue and green, so RGB stays off and the white channel carries the light. Blue "
+        "is not used because it conflicted with that yield result.",
+        [CHI_2008, KURAHASHI_2015, SAKAMOTO_2018],
+        MAITAKE_FRUITING,
     ),
     "cordyceps-militaris": _recipe(
         "Colonization stays dark. Fruiting uses 12 h and 51% white, mapped from 1250 lux "
         "(cordycepin optimum in Wu 2016; 1750 lux gave more dry weight). RGB is blue-heavy "
-        "from later LED trials, not from a measured spectrum on this strip.",
-        [WU_2016_CORDYCEPS, CORDYCEPS_BLUE],
+        "from later LED work on compound levels, not from a yield result or a measured "
+        "spectrum on this strip.",
+        [WU_2016_CORDYCEPS, LIN_2024],
         CORDYCEPS_FRUITING,
     ),
     "wine-cap": _recipe(
         "Wine cap is usually an outdoor bed crop. No indoor lux or photoperiod paper was "
         "found, so this is the labeled general default.",
-        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_12H],
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK],
         GENERAL_FRUITING,
     ),
     "button-cremini": _recipe(
         "A. bisporus does not need light to fruit. Penn State rooms usually run without "
         "it. Both phases stay at 0 h and 0% on this strip.",
-        [KERTESZ_2020, PENN_STATE_AGARICUS, SAKAMOTO_2018],
+        [BAARS_2020, PENN_STATE_AGARICUS, SAKAMOTO_2018],
         AGARICUS_FRUITING,
     ),
     "nameko": _recipe(
         GENERAL_WHY,
-        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_12H, PENN_STATE_OYSTER],
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK, PENN_STATE_OYSTER],
         GENERAL_FRUITING,
     ),
     "turkey-tail": _recipe(
-        "No Trametes-specific lux was found. Stamets notes light helps zone the brackets. "
-        "Hours and intensity are the labeled general default.",
-        [STAMETS_12H, SAKAMOTO_2018, GENERAL_DEFAULT],
+        "No Trametes-specific lux was found. Hours and intensity are the labeled general "
+        "default.",
+        [STAMETS_BOOK, SAKAMOTO_2018, GENERAL_DEFAULT],
         GENERAL_FRUITING,
     ),
     "beech-shimeji": _recipe(
         GENERAL_WHY,
-        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_12H, PENN_STATE_OYSTER],
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK, PENN_STATE_OYSTER],
         GENERAL_FRUITING,
     ),
     "elm-oyster": _recipe(
         "Hypsizygus ulmarius is not a Pleurotus. No variety-specific lux was found, so "
         "this is the labeled general default, not the oyster production numbers.",
-        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_12H],
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK],
         GENERAL_FRUITING,
     ),
     "wood-ear": _recipe(
         GENERAL_WHY,
-        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_12H],
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK],
         GENERAL_FRUITING,
     ),
     "golden-teacher": _recipe(
         "Badham 1980 showed P. cubensis initials need light, with peaks at 370, 440, and "
-        "460 nm. McKernan 2023 fruited at 12 h. Intensity is the labeled general default "
+        "460 nm. Waldbillig 2023 fruited at 12 h. Intensity is the labeled general default "
         "(20% white / 92 lux) because those papers do not give a room lux.",
-        [BADHAM_1980, MCKERNAN_2023, SAKAMOTO_2018, GENERAL_DEFAULT],
+        [BADHAM_1980, WALDBILLIG_2023, SAKAMOTO_2018, GENERAL_DEFAULT],
         GENERAL_FRUITING,
     ),
     "b-plus": _recipe(
         "Same species as Golden Teacher. No B+-specific light paper was found. Hours and "
-        "mix follow Badham 1980 and the 12 h McKernan protocol. Intensity is the labeled "
+        "mix follow Badham 1980 and the 12 h Waldbillig protocol. Intensity is the labeled "
         "general default.",
-        [BADHAM_1980, MCKERNAN_2023, GENERAL_DEFAULT],
+        [BADHAM_1980, WALDBILLIG_2023, GENERAL_DEFAULT],
         GENERAL_FRUITING,
     ),
     "penis-envy": _recipe(
         "Same species as Golden Teacher. No strain-specific light paper was found. Hours "
-        "and mix follow Badham 1980 and the 12 h McKernan protocol. Intensity is the "
+        "and mix follow Badham 1980 and the 12 h Waldbillig protocol. Intensity is the "
         "labeled general default.",
-        [BADHAM_1980, MCKERNAN_2023, GENERAL_DEFAULT],
+        [BADHAM_1980, WALDBILLIG_2023, GENERAL_DEFAULT],
         GENERAL_FRUITING,
     ),
     "p-cyanescens": _recipe(
         "No P. cyanescens photoperiod or lux paper was found. This is the labeled general "
         "default plus the P. cubensis blue-light finding, which is not a cyanescens measurement.",
-        [GENERAL_DEFAULT, BADHAM_1980, SAKAMOTO_2018, STAMETS_12H],
+        [GENERAL_DEFAULT, BADHAM_1980, SAKAMOTO_2018, STAMETS_BOOK],
         GENERAL_FRUITING,
     ),
     "p-natalensis": _recipe(
         "No P. natalensis photoperiod or lux paper was found. This is the labeled general "
         "default plus the P. cubensis blue-light finding, which is not a natalensis measurement.",
-        [GENERAL_DEFAULT, BADHAM_1980, MCKERNAN_2023],
+        [GENERAL_DEFAULT, BADHAM_1980, WALDBILLIG_2023],
         GENERAL_FRUITING,
     ),
 }

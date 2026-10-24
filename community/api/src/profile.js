@@ -6,6 +6,8 @@ export {
   isPsilocybin,
   isFree,
   isPaid,
+  isHttpsSourceUrl,
+  httpsSourceHref,
   validateProfile,
   validateLightRecipe,
   collectProfileIssues,

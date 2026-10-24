@@ -46,6 +46,11 @@ def test_light_recipe_ranges_and_sources():
     del raw["light_recipe"]["phases"]["colonization"]
     with pytest.raises(ValidationError, match="colonization"):
         validate_profile(raw)
+    for bad_url in ("javascript:alert(1)", "data:text/html,hi", "http://example.com/paper"):
+        raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+        raw["light_recipe"]["sources"][0]["url"] = bad_url
+        with pytest.raises(ValidationError, match="https"):
+            validate_profile(raw)
 
 
 def test_psilocybin_cannot_be_paid_or_affiliated():

@@ -149,12 +149,12 @@
     "sources": [
       {
         "title": "Penn State oyster production",
-        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h for fruiting (Stamets) and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
+        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
         "url": "https://mushroomcompany.com/resources/oyster/paoyster.pdf"
       },
       {
-        "title": "Durand 1987 action spectrum",
-        "detail": "R. Durand and R. Jacques, Action spectra for hyphal aggregation, the first stage of fruiting, in Pleurotus ostreatus, Photochemistry and Photobiology 45 (1987). Peaks at 370 nm and 440 to 450 nm. Wavelengths longer than 530 nm gave no response.",
+        "title": "Richartz and MacLellan 1987 action spectrum",
+        "detail": "Gisela Richartz and Andrew J. MacLellan, Action spectra for hyphal aggregation, the first stage of fruiting, in Pleurotus ostreatus, Photochemistry and Photobiology 45 (1987). Peaks at 370 nm and 440 to 450 nm. Wavelengths longer than 530 nm gave no response.",
         "url": "https://doi.org/10.1111/j.1751-1097.1987.tb07888.x"
       },
       {
@@ -169,7 +169,7 @@
       },
       {
         "title": "Stamets",
-        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
       }
     ],
     "phases": {

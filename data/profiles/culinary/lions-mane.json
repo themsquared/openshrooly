@@ -144,17 +144,17 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 37% white, mapped from the 500 lux rooms in the Hericium papers. RGB is the general blue mix; those papers used white fluorescent, not a measured blue ratio.",
+    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 37% white from the Firth and Blackwood 500 lux, 12 h room. Jozifek 2025 also used 500 lux, but as 24 h continuous light that caused pink stress coloring, so that schedule is not used. RGB is the general blue mix; those papers used white fluorescent, not a measured blue ratio.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
-        "title": "Czech University of Life Sciences 2025",
-        "detail": "Jan Kazda et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). Fruiting at 17 to 18 C, 90 to 95% humidity, 500 lux (one strain also at 35 lux). 500 lux maps to 37% white on this chamber.",
+        "title": "Jozifek et al. 2025",
+        "detail": "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). The 500 lux treatment was 24 h continuous light and caused pink stress coloring. It does not support 12 h at 500 lux, so this recipe does not copy that schedule.",
         "url": "https://doi.org/10.3390/agriculture15050460"
       },
       {
-        "title": "Lion's mane 12 h photoperiod",
-        "detail": "A controlled-room Hericium erinaceus study used a 12 h photoperiod with 6500 K fluorescent light at 500 lux (Pharmacognosy Journal cultivation methods). Hours and lux match the Czech University room.",
+        "title": "Firth and Blackwood 2025 lion's mane room",
+        "detail": "Gavin Firth and Megan Blackwood, International Journal of Pharmacognosy and Life Science 6 (2025). A controlled-room Hericium erinaceus study used a 12 h photoperiod with 6500 K fluorescent light at 500 lux. That is the hours and lux used here. 500 lux maps to 37% white.",
         "url": "https://www.pharmacognosyjournal.com/article/230/7-3-72-360.pdf"
       },
       {
@@ -164,7 +164,7 @@
       },
       {
         "title": "Stamets",
-        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
       }
     ],
     "phases": {
