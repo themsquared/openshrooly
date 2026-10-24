@@ -1,4 +1,4 @@
-/** Deterministic per-device learning. No model call — cheap and testable. */
+/** Deterministic per-device learning. No model call, so it is cheap and testable. */
 
 export const COACH_ITEM = "grow-coach";
 export const COACH_PRICE_CENTS = 399;
