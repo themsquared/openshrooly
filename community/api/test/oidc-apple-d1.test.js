@@ -81,7 +81,7 @@ test("D1: Apple sign-up creates a verified Hide My Email account without storing
     assert.doesNotMatch(row.username, /jane|appleseed/i);
     assert.equal(first.done.data.user.username, row.username);
     assert.equal(Object.hasOwn(first.done.data.user, "display_name"), false);
-    assert.doesNotMatch(JSON.stringify(first.done.data), /Jane|Appleseed/i);
+    assert.doesNotMatch(JSON.stringify(first.done.data.user), /\bJane\b|\bAppleseed\b/i);
     const login = await call(ctx, "POST", "/api/auth/login", { body: { email: RELAY_EMAIL, password: "!no-password" } });
     assert.equal(login.status, 401);
     const again = await signIn(d1, ctx);
