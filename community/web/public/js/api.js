@@ -46,8 +46,9 @@ export function isSignedIn() {
   return Boolean(getToken());
 }
 
-export function oidcStart(provider) {
-  return `${apiBase()}/api/auth/oidc/${provider}/start`;
+export function oidcStart(provider, next = "") {
+  const qs = next ? `?next=${encodeURIComponent(next)}` : "";
+  return `${apiBase()}/api/auth/oidc/${provider}/start${qs}`;
 }
 
 let capsCache = null;

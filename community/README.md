@@ -12,7 +12,7 @@ The data layer is portable: standard SQL (`api/schema.sql`) and plain `fetch` ha
 
 USB installer: [`/install.html`](https://shroomlabs.io/install.html) offers only Shroom Labs signed releases from `/firmware/stable/`. Devices check the same signature before installing an update. See [`docs/INSTALL.md`](../docs/INSTALL.md).
 
-Opt-in device cloud: claim at `/claim.html`, mTLS on `link.shroomlabs.io`. See [`docs/DEVICES.md`](../docs/DEVICES.md). Default firmware does not open a cloud socket.
+Opt-in device cloud: `/claim.html` explains pairing. The code form stays hidden until `?code=` or `deviceClaiming` is on. Firmware that shows a code is not shipped yet. See [`docs/DEVICES.md`](../docs/DEVICES.md). Default firmware does not open a cloud socket.
 
 **Grow Coach** (`/coach.html`) is a culinary subscription, coming soon at $3.99/month. It uses a device's readings and past grows to tailor humidity and temperature advice. Photo checks come later. Not marketed with off-menu varieties. See [`docs/COACH.md`](../docs/COACH.md).
 
@@ -84,7 +84,7 @@ Built-in profiles live in `data/profiles/`. The API bundles them into `src/seeds
 - Passwordless: magic link, Google/Apple OIDC (PKCE), passkeys. See [`docs/AUTH.md`](../docs/AUTH.md) and [`SECURITY.md`](../SECURITY.md).
 - `Access-Control-Allow-Origin` reflects an origin from `CORS_ORIGIN` (never `*` in production).
 - `Access-Control-Allow-Headers` includes `authorization, content-type`.
-- Grow photos are stored in R2 and served from `https://cdn.shroomlabs.io/<key>`. `/api/media/...` remains a local fallback.
+- Grow-report and coach photos are served only through `/api/media` on the API origin. Pending objects live under `pending/` and are never mapped on `cdn.shroomlabs.io`.
 
 ## Alerts
 

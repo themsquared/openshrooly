@@ -24,6 +24,8 @@ import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 import { handleAlerts } from "./alerts/http.js";
 import { handleReview } from "./review-http.js";
+import { readJsonLimited } from "./http-body.js";
+import { canSeeMedia, getMedia, mediaApiUrl, mediaApproved } from "./media-acl.js";
 import {
   canSeeProfile,
   getReview,
@@ -37,7 +39,6 @@ import {
   requireVisibleRow,
   reviewView,
   saveDraftReview,
-  backfillLegacyReviews,
   storeReportPhoto,
 } from "./review.js";
 
@@ -79,10 +80,21 @@ export function withCors(response, env, request) {
 }
 
 export function mediaUrl(env, key) {
-  if (!key) return null;
-  const cdn = String(env.CDN_BASE_URL || "").replace(/\/$/, "");
-  if (cdn) return `${cdn}/${key}`;
-  return `/api/media/${encodeURIComponent(key)}`;
+  return mediaApiUrl(env, key);
+}
+
+function reportPhotoPayload(env, report, viewer) {
+  if (!report.photo_key) return { photo_key: null, photo_url: null, photo_status: null };
+  const status = report.photo_status || "approved";
+  const acl = { owner_id: report.author_id, status };
+  if (!canSeeMedia(viewer, acl)) {
+    return { photo_key: null, photo_url: null, photo_status: null };
+  }
+  return {
+    photo_key: report.photo_key,
+    photo_url: mediaApiUrl(env, report.photo_key),
+    photo_status: status,
+  };
 }
 
 function json(body, status = 200, headers = {}) {
@@ -97,17 +109,7 @@ function redirect(location, status = 302) {
 }
 
 async function readJson(request) {
-  const type = request.headers.get("content-type") || "";
-  if (type.includes("application/json")) return request.json();
-  if (type.includes("application/x-www-form-urlencoded")) {
-    const text = await request.text();
-    return Object.fromEntries(new URLSearchParams(text).entries());
-  }
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
+  return readJsonLimited(request);
 }
 
 async function userFromAuth(request, db) {
@@ -169,7 +171,6 @@ export async function handleRequest(request, env) {
       // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
       // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
       await seedMissing(env.db, seeds);
-      await backfillLegacyReviews(env.db);
       env._seeded = true;
     }
     return await route(method, path, url, request, env);
@@ -510,6 +511,9 @@ async function route(method, path, url, request, env) {
     if (!key || key.includes("..") || key.includes("\\") || key.includes("\0")) {
       return json({ error: "not found" }, 404);
     }
+    const row = await getMedia(db, key);
+    const viewer = await userFromAuth(request, db);
+    if (!canSeeMedia(viewer, row)) return json({ error: "not found" }, 404);
     const file = await storage.get(key);
     if (!file) return json({ error: "not found" }, 404);
     const bytes = file.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file.bytes);
@@ -517,22 +521,18 @@ async function route(method, path, url, request, env) {
     if (!kind) return json({ error: "not found" }, 404);
     const gallery = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [key]);
     if (gallery && !photoIsPublic(gallery)) {
-      const viewer = await userFromAuth(request, db);
       const ownerRow = await db.one("SELECT * FROM profiles WHERE id=?", [gallery.profile_id]);
       if (!canSeePhoto(gallery, viewer, ownerRow?.author_id)) return json({ error: "not found" }, 404);
     }
     const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
-    if (report) {
-      const viewer = await userFromAuth(request, db);
-      if (!(await canServeReportPhoto(db, viewer, report))) return json({ error: "not found" }, 404);
-    }
+    if (report && !(await canServeReportPhoto(db, viewer, report))) return json({ error: "not found" }, 404);
     const headers = {
       "content-type": PHOTO_TYPES[kind],
       "x-content-type-options": "nosniff",
       "content-disposition": `inline; filename="${mediaFilename(kind)}"`,
       "content-security-policy": "default-src 'none'",
     };
-    if ((report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery))) {
+    if (!mediaApproved(row) || (report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery))) {
       headers["cache-control"] = "private, no-store";
     }
     return new Response(bytes, { headers });

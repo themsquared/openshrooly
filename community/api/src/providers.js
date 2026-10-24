@@ -28,7 +28,7 @@ export function emailConfigured(env = {}) {
 }
 
 export function googleConfigured(env = {}) {
-  return Boolean(String(env.GOOGLE_CLIENT_ID || "").trim());
+  return Boolean(String(env.GOOGLE_CLIENT_ID || "").trim() && String(env.GOOGLE_CLIENT_SECRET || "").trim());
 }
 
 export function appleConfigured(env = {}) {

@@ -265,14 +265,24 @@ h1, .display {
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45), 0 0 36px rgba(125, 255, 179, 0.14);
 }
 .profile-card:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 3px; }
-.profile-art { height: 176px; background: #0c1410; overflow: hidden; }
+.profile-art { background: #0c1410; overflow: hidden; }
 .profile-art img, .profile-art svg {
   width: 100%;
-  height: 100%;
+  height: 176px;
   object-fit: cover;
   display: block;
   transition: transform 0.55s ease;
 }
+.species-photo { margin: 0; }
+.photo-credit {
+  margin: 0;
+  padding: 0.4rem 0.75rem 0.55rem;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sl-ink-dim);
+}
+.photo-credit a { color: inherit; }
+.photo-caption { display: block; margin-top: 0.25rem; }
 .profile-card:hover .profile-art img,
 .profile-card:hover .profile-art svg,
 .profile-card:focus-visible .profile-art img,
@@ -285,6 +295,7 @@ h1, .display {
   object-fit: cover;
   display: block;
 }
+#art .species-photo img { height: auto; max-height: min(42vw, 340px); }
 .how { margin: 2.4rem 0; }
 .how h3 { font-family: var(--display); font-size: 1.35rem; margin: 0.2rem 0 0.35rem; }
 .profile-art svg { width: 100%; height: 100%; display: block; }
@@ -506,6 +517,21 @@ button.nav-toggle {
   font-weight: 700;
 }
 .auth-actions { display: grid; gap: 10px; margin: 1rem 0; }
+/* Google brand button, dark theme (Google Identity branding: #131314 fill, #8E918F stroke, #E3E3E3 label). */
+.button.google {
+  background: #131314;
+  border: 1px solid #8e918f;
+  color: #e3e3e3;
+  border-radius: 12px;
+  box-shadow: none;
+  gap: 12px;
+  min-height: 44px;
+  font-family: var(--sans);
+  font-weight: 700;
+}
+.button.google:hover { background: #1f1f20; border-color: #c4c7c5; }
+.button.google:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
+.button.google .g-logo { flex: none; }
 .site-footer {
   padding: 1.4rem;
   color: var(--sl-muted);
@@ -699,6 +725,7 @@ button.nav-toggle {
 .profile-page .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 2rem; }
 .profile-page-art { padding: 0; margin-bottom: 1.4rem; }
 .profile-page-art img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.profile-page-art .species-photo img { aspect-ratio: auto; object-fit: contain; background: #0c1410; }
 .profile-page .grow-timeline p { margin: 0.35rem 0 0; color: var(--sl-ink-dim); }
 .light-recipe { margin: 1.6rem 0 0; }
 .light-recipe h3 { font-family: var(--display); font-size: 1.2rem; margin: 1.1rem 0 0.45rem; }
@@ -710,6 +737,79 @@ button.nav-toggle {
 .light-recipe a { color: var(--sl-mycelium); }
 .faq-links { padding-left: 1.2rem; }
 .faq-links li { margin: 0 0 0.6rem; }
+
+.claim-page .lede { font-size: clamp(1.12rem, 2vw, 1.32rem); max-width: 36rem; }
+.claim-need { padding-left: 1.2rem; margin: 0.4rem 0 0; }
+.claim-need li { margin: 0 0 0.45rem; }
+.claim-flow {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  padding: 0;
+  margin: 1rem 0 1.4rem;
+}
+.claim-flow li {
+  position: relative;
+  flex: 1 1 6.4rem;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--sl-line);
+  border-radius: 14px;
+  background: rgba(7, 17, 14, 0.55);
+  color: var(--sl-ink);
+  font-weight: 700;
+  font-size: 13px;
+}
+.claim-flow li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -14px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--sl-spore);
+  border-top: 2px solid var(--sl-spore);
+  transform: translateY(-50%) rotate(45deg);
+}
+.claim-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.1rem;
+  padding: 0;
+  margin: 0.6rem 0 1.2rem;
+}
+@media (min-width: 720px) {
+  .claim-steps { grid-template-columns: 1fr 1fr; }
+}
+.claim-steps li {
+  margin: 0;
+  padding: 1.15rem 1.2rem 1.25rem;
+  background: var(--sl-bg-glass);
+  border: 1px solid var(--sl-line);
+  border-radius: 22px;
+}
+.claim-steps h3 {
+  font-family: var(--display);
+  font-size: 1.35rem;
+  margin: 0.2rem 0 0.35rem;
+}
+.claim-steps p { margin: 0; color: var(--sl-ink-dim); }
+.claim-code-card {
+  padding: 1.3rem 1.35rem 1.45rem;
+  margin: 2rem 0 0;
+  overflow: visible;
+}
+.claim-code-card h2 { margin-top: 0; }
+@media (max-width: 640px) {
+  .claim-flow li:not(:last-child)::after { display: none; }
+}
 
 /* Alerts: account settings, chamber rules, unsubscribe. */
 .alert-form { padding: 1.1rem 1.2rem 1.2rem; margin: 0.6rem 0 1.2rem; overflow: visible; }

@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { createMemoryDb } from "../src/db.js";
 import { handleRequest } from "../src/handlers.js";
 import { createMemoryStorage } from "../src/storage.js";
@@ -17,6 +18,7 @@ export function testEnv(extra = {}) {
     DEV_STUBS: "1",
     HIBP_DISABLED: "1",
     SITE_ORIGIN: "http://127.0.0.1:8888",
+    API_ORIGIN: "https://api.shroomlabs.io",
     OIDC_STUB: "1",
     TURNSTILE_STUB: "1",
     GROW_COACH_STUB: "1",
@@ -48,6 +50,53 @@ export async function callRaw(ctx, method, path, { token, headers: extra = {}, h
   const res = await handleRequest(request, ctx);
   return { status: res.status, bytes: new Uint8Array(await res.arrayBuffer()), headers: res.headers };
 }
+
+export const RANDOM_HANDLE = /^grower_[0-9a-f]{10}$/;
+
+export function assertPublicHandle(row, responseUser) {
+  assert.match(row.username, RANDOM_HANDLE);
+  assert.equal(row.display_name, row.username);
+  assert.notEqual(row.username, "grower");
+  if (responseUser) {
+    assert.equal(responseUser.username, row.username);
+    assert.equal(Object.hasOwn(responseUser, "display_name"), false);
+  }
+}
+
+/** True when `text` contains the email local part as its own token, not inside grower_<hex>. */
+export function hasEmailLocalPart(text, email) {
+  const body = typeof text === "string" ? text : JSON.stringify(text);
+  const local = String(email).split("@")[0];
+  const escaped = local.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9_])${escaped}([^a-z0-9_]|$)`, "i").test(body);
+}
+
+export function assertNoPublicPii(value, email, extra = [], label = "public output") {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  assert.equal(hasEmailLocalPart(text, email), false, `${label} leaked the email local part`);
+  assert.doesNotMatch(text, new RegExp(String(email).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), `${label} leaked the email`);
+  for (const bit of extra) {
+    assert.doesNotMatch(text, new RegExp(bit, "i"), `${label} leaked ${bit}`);
+  }
+}
+
+export const SAMPLE_CULINARY_PROFILE = {
+  id: "privacy-oyster",
+  name: "Privacy Oyster",
+  species: "Pleurotus ostreatus",
+  pack: "culinary",
+  schema_version: 1,
+  stages: [
+    {
+      id: "fruiting",
+      name: "Fruiting",
+      duration_days: 7,
+      humidity_percent: 90,
+      temperature_c: 18,
+      fan: { speed_percent: 30, period_min: 15, run_duration_s: 30 },
+    },
+  ],
+};
 
 export async function register(ctx, email = "grower@example.com") {
   const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email, turnstile: "ok" } });

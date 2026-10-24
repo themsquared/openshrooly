@@ -24,6 +24,17 @@ test("write-config emits apiBase and turnstileSiteKey from env", () => {
     assert.match(written, /apiBase: "https:\/\/api.shroomlabs.io"/);
     assert.match(written, /turnstileSiteKey: "0x4AAAAAAFjd0Rzec6mAd5y6"/);
     assert.match(written, /showPsilocybin: true/);
+    assert.match(written, /deviceClaiming: false/);
+    const live = spawnSync(process.execPath, [script], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        API_BASE_URL: "https://api.shroomlabs.io",
+        DEVICE_CLAIMING: "1",
+      },
+    });
+    assert.equal(live.status, 0, live.stderr);
+    assert.match(readFileSync(configPath, "utf8"), /deviceClaiming: true/);
   } finally {
     writeFileSync(configPath, before);
   }

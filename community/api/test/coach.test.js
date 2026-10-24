@@ -9,7 +9,8 @@ import {
   refuseRestrictedPack,
   suggestSetpoints,
 } from "../src/coach-learn.js";
-import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
+import { call, callRaw, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
+import { buildJpeg, toBase64 } from "./image-fixtures.js";
 
 function env() {
   return testEnv({ GROW_COACH_STUB: "1" });
@@ -179,12 +180,16 @@ test("photo check returns stage flags and next steps", async () => {
   await subscribe(ctx, token);
   const photo = await call(ctx, "POST", "/api/coach/photo", {
     token,
-    body: { photo_base64: btoa("fake-jpeg"), hint: "green mold on the block" },
+    body: { photo_base64: toBase64(buildJpeg()), hint: "green mold on the block" },
   });
   assert.equal(photo.status, 200, JSON.stringify(photo.data));
   assert.ok(photo.data.flags.some((f) => f.kind === "contamination"));
   assert.match(photo.data.next_steps, /Isolate/i);
-  assert.ok(photo.data.photo_key.startsWith("coach/"));
+  assert.match(photo.data.photo_key, /^pending\/coach\/\d+\//);
+  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`);
+  assert.equal(anon.status, 404);
+  const owner = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`, { token });
+  assert.equal(owner.status, 200);
 
   const first = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
   assert.equal(first.status, 200);

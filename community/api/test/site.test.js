@@ -50,6 +50,25 @@ test("generated pages, sitemap, robots, and llms.txt are up to date", () => {
   }
 });
 
+test("claim page explains pairing and hides the code form until a code or flag", () => {
+  const html = read("claim.html");
+  const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
+  assert.match(main, /Link your chamber to your account/);
+  assert.match(main, /How pairing works/);
+  assert.match(main, /firmware update that is not out yet/);
+  assert.match(main, /Connect to Shroom Labs/);
+  assert.match(html, /id="claim-code-panel"[^>]*class="[^"]*\bhidden\b/);
+  assert.match(html, /id="claim-form"[^>]*class="[^"]*\bhidden\b/);
+  assert.doesNotMatch(main, /Cloud is opt-in/);
+  assert.doesNotMatch(html, />Claim device</);
+  const home = read("index.html");
+  assert.match(home, /href="\/claim.html">How linking works</);
+  assert.doesNotMatch(home, /Claim a chamber|Claim device/);
+  const app = readFileSync(join(PUBLIC, "js/app.js"), "utf8");
+  assert.match(app, /Email verified\. You can publish and buy\./);
+  assert.doesNotMatch(app, /claim devices/);
+});
+
 test("every page has the same header, nav, and footer", () => {
   const reference = chrome(read("index.html"));
   assert.match(reference, /data-chrome="header"/);
@@ -171,7 +190,7 @@ test("paid profile pages keep setpoints locked, like the API", () => {
 test("home links seeded profiles to their indexed page", () => {
   const indexed = read("js/indexed-profiles.js");
   for (const profile of profiles) assert.ok(indexed.includes(`"${profile.id}"`));
-  assert.match(read("js/app.js"), /INDEXED_PROFILES\.has\(id\)/);
+  assert.match(read("js/profile-cards.js"), /INDEXED_PROFILES\.has\(id\)/);
 });
 
 test("every page loads the stylesheet, icons, and the script that runs the mobile menu", () => {
