@@ -50,6 +50,23 @@ test("research links are plain third-party links without tracking", () => {
   }
 });
 
+test("Off-menu photos use licensed files, alt text, and ImageObject credits", async () => {
+  const { LICENSED_PHOTOS, photoRecordFor, creditText } = await import("../../web/public/js/species-photos.js");
+  const gt = loadProfiles().find((p) => p.id === "golden-teacher");
+  const html = renderProfilePage(gt);
+  const photo = photoRecordFor(gt);
+  assert.ok(photo);
+  assert.match(html, new RegExp(`src="${photo.src}"`));
+  assert.match(html, /alt="Cluster of Golden Teacher Psilocybe cubensis/);
+  assert.match(html, /photo-credit/);
+  const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  const article = ld["@graph"].find((n) => n["@type"] === "Article");
+  assert.equal(article.image["@type"], "ImageObject");
+  assert.equal(article.image.creditText, creditText(photo));
+  assert.equal(article.image.license, photo.licenseUrl);
+  assert.ok(LICENSED_PHOTOS.every((row) => row.alt && /CC BY-SA|CC BY|CC0|Public domain/.test(row.license)));
+});
+
 test("generated Off-menu HTML carries legal notice, microscopy, and no commerce", () => {
   const profiles = loadProfiles();
   const gt = profiles.find((p) => p.id === "golden-teacher");

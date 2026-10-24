@@ -190,7 +190,7 @@ test("paid profile pages keep setpoints locked, like the API", () => {
 test("home links seeded profiles to their indexed page", () => {
   const indexed = read("js/indexed-profiles.js");
   for (const profile of profiles) assert.ok(indexed.includes(`"${profile.id}"`));
-  assert.match(read("js/app.js"), /INDEXED_PROFILES\.has\(id\)/);
+  assert.match(read("js/profile-cards.js"), /INDEXED_PROFILES\.has\(id\)/);
 });
 
 test("every page loads the stylesheet, icons, and the script that runs the mobile menu", () => {

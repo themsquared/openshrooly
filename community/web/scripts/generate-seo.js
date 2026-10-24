@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NAV_ITEMS, POSITIONING, PRODUCT, SITE, TAGLINE, renderFooter, renderHeader } from "../public/js/chrome.js";
 import { speciesArt } from "../public/js/species-art.js";
+import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.js";
 import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -116,6 +117,8 @@ function breadcrumbs(rows) {
 
 export function profileJsonLd(profile) {
   const url = profileUrl(profile);
+  const photo = photoRecordFor(profile);
+  const image = photo ? speciesImageObject(photo, SITE) : ogImage(profile);
   const article = {
     "@type": "Article",
     "@id": `${url}#article`,
@@ -123,7 +126,7 @@ export function profileJsonLd(profile) {
     description: answerFirst(profile),
     url,
     mainEntityOfPage: url,
-    image: ogImage(profile),
+    image,
     inLanguage: "en",
     isAccessibleForFree: !isPaid(profile),
     author: ORG_REF,
@@ -131,7 +134,7 @@ export function profileJsonLd(profile) {
   };
   const graph = [article];
   if (!isPaid(profile)) {
-    graph.push({
+    const howto = {
       "@type": "HowTo",
       "@id": `${url}#howto`,
       name: `Grow ${profile.name} in a chamber running OpenShrooly`,
@@ -143,7 +146,9 @@ export function profileJsonLd(profile) {
         name: s.name,
         text: `${s.duration_days} days at ${s.temperature_c} °C and ${s.humidity_percent}% humidity.${s.notes ? " " + s.notes : ""}`,
       })),
-    });
+    };
+    if (photo) howto.image = image;
+    graph.push(howto);
   }
   graph.push(breadcrumbs([["Profiles", `${SITE}/`], [profile.name, url]]));
   return { "@context": "https://schema.org", "@graph": graph };
@@ -306,9 +311,10 @@ export function renderProfilePage(profile) {
   const cta = paid
     ? `<p class="actions"><a class="button" href="${tools}">Unlock for ${price(profile)}</a></p>`
     : `<p class="actions"><a class="button" href="${tools}">Download, rate, or report a grow</a></p>`;
+  const art = speciesArt(profile.species, profile.strain, profile.name, profile.pack, { priority: true, id: profile.id });
   const body = `
     <article class="profile-page">
-      <div class="card profile-page-art">${speciesArt(profile.species, profile.strain, profile.name, profile.pack, { priority: true })}</div>
+      ${art ? `<div class="card profile-page-art">${art}</div>` : ""}
       <p class="eyebrow">${psi ? "Off-menu Profile" : paid ? "Paid culinary Profile" : "Culinary Profile"}</p>
       <h1>${escapeHtml(profile.name)}</h1>
       <p class="muted">${escapeHtml(profile.species || "")}${profile.strain ? `, ${escapeHtml(profile.strain)}` : ""}</p>

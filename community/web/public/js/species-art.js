@@ -1,4 +1,8 @@
-/** Original harvest photos generated for Shroom Labs. Not taken from shrooly.com. */
+/** Original harvest photos generated for Shroom Labs. Not taken from shrooly.com.
+ *  Licensed Off-menu photos live in species-photos.js.
+ */
+
+import { photoRecordFor, renderLicensedPhoto } from "./species-photos.js";
 
 const PHOTOS = [
   { keys: ["pink", "oyster"], src: "/img/species/species-pink-oyster.jpg" },
@@ -41,7 +45,6 @@ const PHOTOS = [
 ];
 
 const FALLBACK = "/img/species/species-generic.jpg";
-const OFF_MENU = "/img/species/off-menu.svg";
 
 export function isOffMenuArt(species, strain = "", name = "", pack = "") {
   if (String(pack).toLowerCase() === "psilocybin") return true;
@@ -49,8 +52,7 @@ export function isOffMenuArt(species, strain = "", name = "", pack = "") {
   return /\bpsilocybe\b|\bpsilocybin\b/.test(blob);
 }
 
-export function speciesPhoto(species, strain = "", name = "", pack = "") {
-  if (isOffMenuArt(species, strain, name, pack)) return OFF_MENU;
+function culinaryPhoto(species, strain = "", name = "") {
   const blob = `${species} ${strain} ${name}`.toLowerCase();
   for (const row of PHOTOS) {
     if (row.keys.every((key) => blob.includes(key))) return row.src;
@@ -58,12 +60,22 @@ export function speciesPhoto(species, strain = "", name = "", pack = "") {
   return FALLBACK;
 }
 
-/** Pass { priority: true } only for the largest above-the-fold image (the LCP candidate). */
-export function speciesArt(species, strain = "", name = "", pack = "", { priority = false } = {}) {
-  const src = speciesPhoto(species, strain, name, pack);
-  const label = isOffMenuArt(species, strain, name, pack)
-    ? [name, species].filter(Boolean).join(" · ") || "Off-menu variety"
-    : [name, species].filter(Boolean).join(" · ") || "mushroom";
+export function speciesPhoto(species, strain = "", name = "", pack = "", id = "") {
+  const licensed = photoRecordFor({ id, species, strain, name, pack });
+  if (licensed) return licensed.src;
+  if (isOffMenuArt(species, strain, name, pack)) return "";
+  return culinaryPhoto(species, strain, name);
+}
+
+/** Pass { priority: true } only for the largest above-the-fold image (the LCP candidate).
+ *  Cards that wrap the art in an <a> must pass { linked: false } so credits stay plain text.
+ */
+export function speciesArt(species, strain = "", name = "", pack = "", { priority = false, id = "", linked = true } = {}) {
+  const licensed = photoRecordFor({ id, species, strain, name, pack });
+  if (licensed) return renderLicensedPhoto(licensed, { priority, linked });
+  if (isOffMenuArt(species, strain, name, pack)) return "";
+  const src = culinaryPhoto(species, strain, name);
+  const label = [name, species].filter(Boolean).join(" · ") || "mushroom";
   const loading = priority ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
   return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" ${loading} decoding="async">`;
 }
