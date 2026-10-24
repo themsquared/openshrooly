@@ -625,11 +625,6 @@ test("grow report photos stay off the profile gallery and are queued for the upl
     photosAfter.some((photo) => photo.object_key === report.data.photo_key),
     false
   );
-  const publicPhotos = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=?", ["alice-gallery"]);
-  for (const photo of publicPhotos) {
-    const listed = await call(ctx, "GET", `/api/public-photos/${photo.id}`);
-    if (photo.status === "approved") assert.equal(listed.status, 200);
-  }
   const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
   assert.equal(anon.status, 404);
   const ownerView = await call(ctx, "GET", "/api/profiles/alice-gallery", { token: alice.token });

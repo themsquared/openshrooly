@@ -622,7 +622,7 @@ async function pushOneProfile(db, item, user) {
       profile.allowed_payment_providers = [];
     }
     const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
-    if (existing?.author_id == null) {
+    if (existing && existing.author_id == null) {
       return { id: profile.id, status: "skipped", reason: "official" };
     }
     if (existing && Number(existing.author_id) !== Number(user.id)) {
