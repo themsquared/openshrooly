@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Shroom Labs — mushroom profiles for OpenShrooly</title>
   <meta name="description" content="Browse, fork, and apply researched mushroom grow profiles. Local-first. Works with Shrooly devices running OpenShrooly.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/config.js"></script>
 </head>
@@ -18,6 +20,7 @@
     </a>
     <nav>
       <a href="/">Catalog</a>
+      <a href="/faq.html">FAQ</a>
       <a href="/claim.html">Claim device</a>
       <a id="nav-coach" href="/coach.html">Grow Coach</a>
       <span id="session-nav"></span>
@@ -45,13 +48,12 @@
     </section>
     <section id="library" class="library" aria-label="Profile library">
       <div class="library-toolbar">
-        <div class="pack-toggle" role="group" aria-label="Library pack filter">
-          <a id="pack-culinary" href="/?pack=culinary#library">Culinary</a>
-          <a id="pack-restricted" href="/?pack=psilocybin#library">Restricted</a>
+        <div class="browse-filters" role="group" aria-label="Browse filter">
+          <a id="pack-culinary" class="filter-chip is-on" href="/#library" aria-pressed="true">Culinary</a>
+          <a id="pack-offmenu" class="filter-chip off-menu" href="/?pack=psilocybin#library" aria-pressed="false">Off-menu</a>
         </div>
-        <p class="pack-hint">Restricted species stay off the main nav. Open them here only if your jurisdiction allows cultivation.</p>
       </div>
-      <p id="legal" class="legal hidden">Legality of cultivating Psilocybe species varies by jurisdiction. These cards are free environmental setpoints only. They are never sold and never carry affiliate links.</p>
+      <p id="legal" class="legal legal-prominent hidden">Psilocybin mushrooms are illegal to grow, possess or sell in most countries and in most US states under federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.</p>
       <div id="cards" class="cards"></div>
     </section>
     <section class="how" aria-label="How it works">
@@ -64,7 +66,7 @@
     </section>
     <section id="coach-promo" class="how" aria-label="Grow Coach">
       <h2 class="display" style="font-size:1.8rem">Grow Coach</h2>
-      <p class="muted">A $3.99/month culinary subscription that learns each chamber from telemetry and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included. Not sold with the restricted pack.</p>
+      <p class="muted">A $3.99/month culinary subscription that learns each chamber from telemetry and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included.</p>
       <p><a class="button" href="/coach.html">Open Grow Coach</a></p>
     </section>
     <section id="supplies" class="supplies">
@@ -76,7 +78,10 @@
       </ul>
     </section>
   </main>
-  <footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</footer>
+  <footer class="site-footer">
+    <p>Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</p>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

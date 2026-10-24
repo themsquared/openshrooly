@@ -62,7 +62,7 @@ function workersAiProvider(env) {
     name: "workers-ai",
     async chat({ message, grounding }) {
       const system =
-        "You are Grow Coach for Shroom Labs. Culinary home cultivation only. Never market, price, or coach the restricted/psilocybin pack. Use only the grounding JSON. Suggest setpoints only inside the provided safe bounds. Be concise.";
+        "You are Grow Coach for Shroom Labs. Culinary home cultivation only. Never market, price, or coach the off-menu/psilocybin pack. Use only the grounding JSON. Suggest setpoints only inside the provided safe bounds. Be concise.";
       const result = await env.AI.run(textModel, {
         messages: [
           { role: "system", content: system },

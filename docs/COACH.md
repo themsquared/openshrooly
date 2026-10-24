@@ -1,6 +1,6 @@
 # Grow Coach
 
-Paid culinary coaching on Shroom Labs. **$3.99 / month.** Not sold or marketed with the restricted / psilocybin pack.
+Paid culinary coaching on Shroom Labs. **$3.99 / month.** Not sold or marketed with off-menu / psilocybin varieties.
 
 Cloud control is still opt-in. Coach can only *queue* setpoints; the chamber applies them if cloud is enabled and local settings do not win. See [`DEVICES.md`](DEVICES.md).
 
@@ -8,7 +8,7 @@ Cloud control is still opt-in. Coach can only *queue* setpoints; the chamber app
 
 1. **Per-device model** (`community/api/src/coach-learn.js`) — deterministic. Humidity error / droop, temperature offset, rise rate, water use, fan average, culinary outcome rate. No LLM.
 2. **Suggest / auto-tune** — clips to safe bounds (RH 70–96%, 16–28 °C, Δ 6% / 2 °C). Apply requires **approve**, or an opt-in `auto_tune` flag on the subscription. `auto: true` in the request body is ignored.
-3. **Chat** — grounded in that model, the user’s culinary journal, and published culinary profiles. Restricted pack is refused.
+3. **Chat** — grounded in that model, the user’s culinary journal, and published culinary profiles. Off-menu varieties are refused.
 4. **Photo check** — JPEG/PNG to R2 at `coach/{userId}/…`. Stage + flags (contamination, too_dry, pinning) + confidence + next steps.
 5. **Alerts** — humidity trouble, stalled colonization, time to harvest.
 

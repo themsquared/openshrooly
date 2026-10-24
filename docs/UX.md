@@ -39,7 +39,7 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 
 ## Grow Coach
 
-- Culinary copy only. Price is $3.99/month, said in plain language. Never pair the page with the restricted pack.
+- Culinary copy only. Price is $3.99/month, said in plain language. Never pair the page with off-menu varieties.
 - Subscribe is one button (stub checkout). Gated tools stay hidden until paid.
 - Chamber picker, learned stats, alerts, then **Approve & queue setpoints**. Auto-tune is an explicit checkbox with “inside safe bounds” in the label.
 - Chat and photo check show remaining daily caps. Photo result always includes confidence and a next step, not color alone.
@@ -54,4 +54,4 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 
 ## Copy
 
-Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Restricted-pack legality notice is always visible on that pack. The pack is not in the main header; owners open it with the library filter.
+Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Off-menu pages show the legal notice above grow parameters. The pack is not in the main header; owners open it with the library filter. See [`BRAND.md`](BRAND.md).

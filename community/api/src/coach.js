@@ -37,7 +37,7 @@ export function coachCatalog() {
     period: "month",
     pack: "culinary",
     summary:
-      "Per-chamber coaching for culinary grows: learned setpoints, photo checks, and alerts. Not sold or marketed with the restricted pack.",
+      "Per-chamber coaching for culinary grows: learned setpoints, photo checks, and alerts. Not sold or marketed with off-menu varieties.",
   };
 }
 
@@ -176,7 +176,7 @@ export async function handleCoach(method, path, url, request, env) {
       auto_tune: Boolean(Number(sub?.auto_tune)),
       period_end: sub?.period_end || null,
       marketing:
-        "Grow Coach learns each culinary chamber and suggests safer humidity and temperature. It is not sold with the restricted pack.",
+        "Grow Coach learns each culinary chamber and suggests safer humidity and temperature. It is not sold with off-menu varieties.",
     });
   }
 
@@ -185,7 +185,7 @@ export async function handleCoach(method, path, url, request, env) {
     requireVerified(user);
     const body = await request.json().catch(() => ({}));
     if (body.pack === "psilocybin") {
-      throw new ValidationError("Grow Coach is not sold or marketed with the restricted pack.", 400);
+      throw new ValidationError("Grow Coach is not sold or marketed with off-menu varieties.", 400);
     }
     const sessionId = `cs_test_${randomToken().slice(0, 16)}`;
     await db.run(
@@ -229,7 +229,7 @@ export async function handleCoach(method, path, url, request, env) {
     const user = await requireCoach(request, db);
     const body = await request.json().catch(() => ({}));
     if (refuseRestrictedPack(body.profile)) {
-      throw new ValidationError("Grow Coach will not auto-tune the restricted pack.", 400);
+      throw new ValidationError("Grow Coach will not auto-tune off-menu varieties.", 400);
     }
     const grounding = await loadGrounding(db, user, body.device_id);
     const stage = body.stage || grounding.stage;
@@ -266,7 +266,7 @@ export async function handleCoach(method, path, url, request, env) {
     const user = await requireCoach(request, db);
     const body = await request.json().catch(() => ({}));
     if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
-      throw new ValidationError("Grow Coach does not discuss the restricted pack.", 400);
+      throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
     }
     await assertCap(db, user.id, "chats");
     const grounding = await loadGrounding(db, user, body.device_id);
@@ -304,7 +304,7 @@ export async function handleCoach(method, path, url, request, env) {
     const user = await requireCoach(request, db);
     const body = await request.json().catch(() => ({}));
     if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
-      throw new ValidationError("Grow Coach does not discuss the restricted pack.", 400);
+      throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
     }
     await assertCap(db, user.id, "photos");
     if (!body.photo_base64) throw new ValidationError("photo_base64 required");

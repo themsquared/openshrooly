@@ -1,0 +1,51 @@
+# Shroom Labs
+
+> Chamber profiles for OpenShrooly. Culinary first. Offline-first.
+
+Site: https://shroomlabs.io
+
+## Culinary
+
+- [Beech / Buna Shimeji](https://shroomlabs.io/profiles/beech-shimeji.html): Clustered beech mushroom. Cool, humid, and a little less FAE than oysters.
+- [Blue Oyster](https://shroomlabs.io/profiles/blue-oyster.html): Cool-preferring oyster. Deep color holds better below 18 °C.
+- [Button / Cremini](https://shroomlabs.io/profiles/button-cremini.html): Compost + casing species. Low light, cool fruiting, casing required.
+- [Chestnut Mushroom](https://shroomlabs.io/profiles/chestnut.html): Clustered woodlover. Cool fruiting and high RH keep caps glossy.
+- [Cordyceps militaris](https://shroomlabs.io/profiles/cordyceps-militaris.html): Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.
+- [Elm Oyster](https://shroomlabs.io/profiles/elm-oyster.html): Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.
+- [Enoki](https://shroomlabs.io/profiles/enoki.html): Needs cold fruiting and low FAE for supermarket-long stems.
+- [Golden Oyster](https://shroomlabs.io/profiles/golden-oyster.html): Warm oyster with dense golden clusters. Needs strong FAE to keep stems short.
+- [King Oyster](https://shroomlabs.io/profiles/king-oyster.html): Thick-stem oyster. Cooler, slightly drier, and less FAE than cluster oysters.
+- [King Oyster — thick-stem method](https://shroomlabs.io/profiles/king-oyster-thick-stem.html): Paid example recipe: cooler, drier fruiting to favor thick stems.
+- [Lion's Mane](https://shroomlabs.io/profiles/lions-mane.html): Tooth fungus. Moderate FAE — too much air yellows spines.
+- [Maitake](https://shroomlabs.io/profiles/maitake.html): Slow woodlover. Primordia look like brains; do not dry them out.
+- [Nameko](https://shroomlabs.io/profiles/nameko.html): Cool, very wet fruiting. The slime coat is normal.
+- [Pearl Oyster](https://shroomlabs.io/profiles/pearl-oyster.html): Forgiving beginner oyster. Fast, high FAE, cool-to-room fruiting.
+- [Pink Oyster](https://shroomlabs.io/profiles/pink-oyster.html): Tropical oyster. Wants warmth; stalls and fades in a cold room.
+- [Pioppino](https://shroomlabs.io/profiles/pioppino.html): Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.
+- [Reishi](https://shroomlabs.io/profiles/reishi.html): Antlers under high CO2, then consoles when FAE increases.
+- [Shiitake](https://shroomlabs.io/profiles/shiitake.html): Needs a full colonize + browning rest, then a cold shock before fruiting.
+- [Turkey Tail](https://shroomlabs.io/profiles/turkey-tail.html): Thin polypore. Long fruiting, lots of FAE, not a thick-fleshed edible.
+- [Wine Cap](https://shroomlabs.io/profiles/wine-cap.html): Best as an outdoor bed mushroom. Indoor profile is a climate approximation only.
+- [Wood Ear](https://shroomlabs.io/profiles/wood-ear.html): Warm, wet jelly fungus. High RH matters more than light intensity.
+
+## Off-menu
+
+Internal pack id: psilocybin. Visitor-facing name: Off-menu.
+
+Psilocybin mushrooms are illegal to grow, possess or sell in most countries and in most US states under federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.
+
+Spore purchase and possession laws vary by state and country. Some US states ban spores outright. Where they are sold, spores are offered for microscopy only.
+
+- [B+](https://shroomlabs.io/profiles/b-plus.html): Forgiving cubensis strain with a slightly wider temperature window.
+- [Golden Teacher](https://shroomlabs.io/profiles/golden-teacher.html): Common cubensis strain. Standard monotub-style climate mapped onto Shrooly setpoints.
+- [Penis Envy](https://shroomlabs.io/profiles/penis-envy.html): Slower cubensis. Same climate band as Golden Teacher with longer stage timers.
+- [Psilocybe cyanescens](https://shroomlabs.io/profiles/p-cyanescens.html): Cool-weather woodlover. Indoor chambers are a poor substitute for outdoor beds.
+- [Psilocybe natalensis](https://shroomlabs.io/profiles/p-natalensis.html): Cubensis-adjacent climate; often described as a bit more vigorous.
+
+## Microscopy and research (third-party, nofollow, no affiliate)
+
+These are plain third-party outbound links. We do not endorse the vendors or publishers, we do not profit from them, and there are no affiliate codes or tracking parameters.
+
+- [PNW Spore](https://pnwspore.com/) — Pacific Northwest Spore Co. (Spokane). Cubensis spore syringes and prints labeled for microscopy.
+- [Sporeworks](https://sporeworks.com/) — Long-running US microscopy catalog (The Spore Works). Notes CA, ID, FL, and GA spore restrictions.
+- [Johns Hopkins Center for Psychedelic and Consciousness Research](https://www.hopkinspsychedelic.org/publications) — Peer-reviewed psilocybin publications from Johns Hopkins Medicine.

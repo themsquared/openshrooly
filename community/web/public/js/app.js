@@ -1,6 +1,7 @@
 import { api, apiBase, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
+import { isOffMenu, packLabel, profilePath, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -48,32 +49,77 @@ function stageDots(stages = []) {
     .join("")}</ol>`;
 }
 
+function upsertMeta(attr, key, value) {
+  let el = document.querySelector(`meta[${attr}="${key}"]`);
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, key);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", value);
+}
+
+function applySeo({ title, description, canonical, robots = "index,follow" }) {
+  document.title = title;
+  upsertMeta("name", "description", description);
+  upsertMeta("name", "robots", robots);
+  upsertMeta("property", "og:title", title);
+  upsertMeta("property", "og:description", description);
+  upsertMeta("property", "og:url", canonical);
+  upsertMeta("property", "og:type", "article");
+  let link = document.querySelector('link[rel="canonical"]');
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "canonical";
+    document.head.appendChild(link);
+  }
+  link.href = canonical;
+}
+
+function renderResources(el, resources) {
+  if (!el || !resources) return;
+  const links = resources.links || PSI_RESOURCES;
+  el.hidden = false;
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <h2 id="microscopy-heading">Microscopy and research resources</h2>
+    <p class="muted">${escapeHtml(resources.disclaimer || PSI_RESOURCE_DISCLAIMER)}</p>
+    <p>${escapeHtml(resources.spore_law || PSI_SPORE_LAW)}</p>
+    <ul>${links
+      .map(
+        (r) =>
+          `<li><a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${escapeHtml(r.name)}</a> — ${escapeHtml(r.note)}</li>`
+      )
+      .join("")}</ul>`;
+}
+
 async function renderHome() {
   const canvas = $("#mycelium");
   if (canvas) startHero(canvas);
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
-  $("#pack-label").textContent = pack === "psilocybin" ? "Restricted pack" : "Culinary library";
-  $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
+  const off = pack === "psilocybin";
+  $("#pack-label").textContent = off ? "Off-menu" : "Culinary library";
+  $("#legal")?.classList.toggle("hidden", !off);
   $("#q").value = q;
   $("#pack").value = pack;
-  $("#pack-culinary")?.classList.toggle("is-on", pack !== "psilocybin");
-  $("#pack-restricted")?.classList.toggle("is-on", pack === "psilocybin");
-  $("#pack-culinary")?.setAttribute("aria-pressed", pack !== "psilocybin" ? "true" : "false");
-  $("#pack-restricted")?.setAttribute("aria-pressed", pack === "psilocybin" ? "true" : "false");
+  $("#pack-culinary")?.classList.toggle("is-on", !off);
+  $("#pack-offmenu")?.classList.toggle("is-on", off);
+  $("#pack-culinary")?.setAttribute("aria-pressed", !off ? "true" : "false");
+  $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
   const supplies = $("#supplies");
-  if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
-  $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
-  $("#nav-coach")?.classList.toggle("hidden", pack === "psilocybin");
+  if (supplies) supplies.classList.toggle("hidden", off);
+  $("#coach-promo")?.classList.toggle("hidden", off);
+  $("#nav-coach")?.classList.toggle("hidden", off);
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML = profiles.length
     ? profiles
         .map(
           (p) => `
-    <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
+    <a class="profile-card" href="${profilePath(p.id)}">
       <div class="profile-art">${speciesArt(p.species, p.strain, p.name)}</div>
       <div class="profile-body">
-        <p><span class="chip">${escapeHtml(p.pack)}</span>${
+        <p><span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>${
           p.pricing?.kind === "paid"
             ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
             : `<span class="chip">free</span>`
@@ -94,21 +140,41 @@ async function renderHome() {
       </div>`;
 }
 
+function profileIdFromLocation() {
+  const q = params().get("id");
+  if (q) return q;
+  const match = location.pathname.match(/^\/profiles\/([^/]+)\.html$/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
 async function renderProfile() {
-  const id = params().get("id");
+  const id = profileIdFromLocation();
   if (!id) return;
   const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
   const p = data.profile;
+  const off = isOffMenu(p);
+  const label = p.pack_label || packLabel(p.pack);
+  applySeo({
+    title: `${p.name}${p.species ? ` (${p.species})` : ""} — ${label} · Shroom Labs`,
+    description: off ? `${p.summary || ""} ${PSI_LEGAL_NOTICE}` : p.summary || "",
+    canonical: `${location.origin}${profilePath(id)}`,
+  });
   $("#title").textContent = p.name;
-  $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${p.pack}`;
+  $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
-  $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack || "")}</span>`;
+  $("#chips").innerHTML = `<span class="chip">${escapeHtml(label)}</span>`;
   $("#art").innerHTML = speciesArt(p.species, p.strain, p.name);
-  if (p.legal_notice) {
-    $("#legal").textContent = p.legal_notice;
-    $("#legal").classList.remove("hidden");
+  const legal = $("#legal");
+  if (legal && (off || p.legal_notice)) {
+    legal.textContent = off ? PSI_LEGAL_NOTICE : p.legal_notice;
+    legal.classList.remove("hidden");
+    legal.classList.add("legal-prominent");
   }
-  $("#nav-coach")?.classList.toggle("hidden", p.pack === "psilocybin");
+  $("#nav-coach")?.classList.toggle("hidden", off);
+  if (off) {
+    $("#affiliates")?.replaceChildren();
+    renderResources($("#resources"), data.resources || { links: PSI_RESOURCES });
+  }
   if (!data.unlocked) {
     $("#locked").classList.remove("hidden");
     $("#price").textContent = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
@@ -138,7 +204,7 @@ async function renderProfile() {
   $("#sources").innerHTML = (p.source_notes || [])
     .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
     .join("");
-  if (data.links?.length) {
+  if (!off && data.links?.length) {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
       data.links
