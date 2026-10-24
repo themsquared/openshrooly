@@ -1,5 +1,28 @@
 @import './tokens.css';
 
+/* Shroom Labs type, served from the chamber itself so it works without internet. */
+@font-face {
+  font-family: "Fraunces";
+  src: url("/fonts/fraunces-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson";
+  src: url("/fonts/atkinson-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson";
+  src: url("/fonts/atkinson-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -228,32 +251,83 @@ input[type="number"]:focus,
   margin-top: 16px;
 }
 
+.preset-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .preset-card {
-  text-align: left;
   background: var(--sl-bg-2);
   border: 1px solid var(--sl-line);
   border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.preset-card.is-picked {
+  border-color: var(--sl-line-strong);
+  box-shadow: 0 0 0 1px var(--sl-spore-deep);
+}
+
+.preset-pick {
+  text-align: left;
+  background: none;
+  border: none;
   padding: 14px;
   color: inherit;
   font: inherit;
   cursor: pointer;
+  flex: 1;
 }
 
-.preset-card strong {
+.preset-pick strong {
   display: block;
   margin-bottom: 6px;
 }
 
-.preset-card span {
+.preset-pick span {
   display: block;
   color: var(--sl-muted);
   font-size: 13px;
 }
 
-.preset-card:disabled {
+.preset-confirm {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 14px 14px;
+}
+
+.preset-cancel {
+  background: none;
+  border: none;
+  color: var(--sl-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.preset-card button:disabled {
   opacity: 0.6;
   cursor: wait;
 }
+
+.ota-file {
+  padding: 8px;
+  border: 1px solid var(--sl-line);
+  border-radius: 8px;
+  margin-top: 8px;
+  color: var(--sl-ink-dim);
+  background: var(--sl-bg-2);
+}
+
+.ota-meta { margin-top: 10px; font-size: 14px; color: var(--sl-muted); }
+.ota-button { margin-top: 12px; }
+.ota-button:disabled { opacity: 0.6; cursor: not-allowed; }
+.ota-track { width: 100%; background: var(--sl-bg-2); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 12px; }
+.ota-fill { background: var(--sl-spore); height: 100%; transition: width 0.3s ease; }
+.ota-message { margin-top: 8px; font-size: 14px; color: var(--sl-muted); }
+.ota-message.is-success { color: var(--sl-ok); }
+.ota-message.is-error { color: var(--sl-bad); }
 
 @media (max-width: 600px) {
   .connection-banner { flex-direction: column; align-items: stretch; }
@@ -1007,3 +1081,24 @@ input[type="range"]::-moz-range-thumb {
   .modal { padding: 22px; }
   .card-value { font-size: 30px; }
 }
+
+/* Shroom Labs type: Atkinson for reading, Fraunces for headings. */
+body,
+button,
+input,
+select {
+  font-family: "Atkinson", var(--sl-font);
+}
+
+.header-bar h1,
+.first-run h2,
+.modal h2,
+.profile-name {
+  font-family: "Fraunces", "Iowan Old Style", Palatino, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-name { font-weight: 600; }
+
+.first-run p.first-run-error { color: var(--sl-bad); }

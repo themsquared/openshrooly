@@ -18,7 +18,7 @@ export default function ConnectionBanner({ state, ssid, onRetry }: Props) {
       <div>
         <strong>{steps.title}</strong>
         <p>{steps.body}</p>
-        {ssid ? <p className="connection-meta">SSID {ssid}</p> : null}
+        {ssid && state !== 'first-run-wifi' ? <p className="connection-meta">Wi-Fi network: {ssid}</p> : null}
       </div>
       {state === 'unreachable' && onRetry ? (
         <button type="button" className="charts-button" onClick={onRetry}>
@@ -27,7 +27,7 @@ export default function ConnectionBanner({ state, ssid, onRetry }: Props) {
       ) : null}
       {state === 'first-run-wifi' ? (
         <a className="charts-button" href="/">
-          Open Wi-Fi form
+          Set up Wi-Fi
         </a>
       ) : null}
     </aside>

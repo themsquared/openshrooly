@@ -2,18 +2,8 @@
 
 const GROW_PRESETS = [
   {
-    id: "idle",
-    label: "No grow",
-    detail: "Climate keeps running. The screen says Idle.",
-    phase: "Idle",
-    day: 0,
-    total: 0,
-    setpoints: null,
-  },
-  {
     id: "colonizing",
     label: "Colonizing, 14 days",
-    detail: "Caption only plus typical colonization setpoints you can still edit.",
     phase: "Colonizing",
     day: 1,
     total: 14,
@@ -22,7 +12,6 @@ const GROW_PRESETS = [
   {
     id: "oyster-fruit",
     label: "Oyster fruiting, 10 days",
-    detail: "Culinary oyster-style fruiting caption and setpoints.",
     phase: "Fruiting",
     day: 1,
     total: 10,
@@ -31,7 +20,6 @@ const GROW_PRESETS = [
   {
     id: "lions-mane-fruit",
     label: "Lion's mane fruiting, 14 days",
-    detail: "Cooler fruiting caption and setpoints.",
     phase: "Fruiting",
     day: 1,
     total: 14,
@@ -39,10 +27,37 @@ const GROW_PRESETS = [
   },
 ];
 
+function formatHour(hour) {
+  const h = Number(hour) % 24;
+  const suffix = h < 12 ? "AM" : "PM";
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  return `${twelve} ${suffix}`;
+}
+
+/** Plain summary of exactly what a preset will change, shown before it is applied. */
+function presetSummary(preset) {
+  const sp = preset.setpoints;
+  if (!sp) return "Only the grow name and day count change.";
+  const lights =
+    sp.lightHours > 0 ? `lights on ${sp.lightHours} hours from ${formatHour(sp.sunrise)}` : "lights off";
+  return `Humidity ${sp.humidity}%, temperature ${sp.temperature}°C, ${lights}.`;
+}
+
+/** Must match device_version in esphome/openshrooly.yaml (a test checks this). */
+const DEVICE_VERSION = "1.0.2";
+
+function connectionLabel(wifiMode) {
+  const mode = String(wifiMode || "");
+  if (mode === "Station") return "Home Wi-Fi";
+  if (mode === "Access Point") return "Setup network";
+  return "Unknown";
+}
+
 function isApMode(wifiMode, ssid) {
   const mode = String(wifiMode || "");
-  const name = String(ssid || "");
-  return mode === "Access Point" || name === "OpenShrooly" || name.startsWith("OpenShrooly");
+  if (mode) return mode === "Access Point";
+  // Mode not known yet: the device reports this exact name only for its own setup network.
+  return String(ssid || "") === "OpenShrooly";
 }
 
 function hasActiveGrow(phase, totalDays) {
@@ -63,21 +78,21 @@ function firstRunSteps(state) {
   if (state === "unreachable") {
     return {
       title: "Cannot reach the chamber",
-      body: "Open this page on the same Wi-Fi, or join the OpenShrooly access point at 192.168.4.1.",
+      body: "Make sure you are on the same Wi-Fi as the chamber. If the chamber is in setup mode, join the OpenShrooly Wi-Fi network and open 192.168.4.1.",
       action: "retry",
     };
   }
   if (state === "first-run-wifi") {
     return {
       title: "This chamber is in setup mode",
-      body: "You are on the device access point. Name the chamber, then join your home Wi-Fi from the phone captive portal or the ESPHome Wi-Fi form at /.",
+      body: "The chamber is not on your home Wi-Fi yet. Connect it to your home network to finish setup.",
       action: "wifi",
     };
   }
   if (state === "empty-grow") {
     return {
       title: "No grow is running",
-      body: "Pick a culinary stage for the e-paper caption. Setpoints use the same humidity, temperature, and light numbers as the sliders.",
+      body: "Pick a starting point. It names the grow on the chamber screen and sets humidity, temperature, and lights. You can still change any of them later.",
       action: "profile",
     };
   }
@@ -113,6 +128,9 @@ function entityPatchFromWrites(writes) {
 
 module.exports = {
   GROW_PRESETS,
+  DEVICE_VERSION,
+  connectionLabel,
+  presetSummary,
   isApMode,
   hasActiveGrow,
   deviceSurfaceState,

@@ -15,7 +15,7 @@ export default function ProfileStrip({ profile, stage, day, stageDays, stages = 
         <div>
           <div className="card-label">Current grow</div>
           <div className="profile-name">Idle</div>
-          <p className="profile-empty">No grow is running. Pick a culinary stage above. Climate numbers stay on the sliders.</p>
+          <p className="profile-empty">No grow is running. Pick a starting point above, or set humidity, temperature, and lights yourself.</p>
         </div>
       </section>
     )
@@ -33,7 +33,7 @@ export default function ProfileStrip({ profile, stage, day, stageDays, stages = 
         <div className="card-label">Current grow</div>
         <div className="profile-name">{profile || stage || 'Untitled'}</div>
         <div className="profile-stage">
-          {stage || '—'}
+          {stage || 'Not set'}
           {day != null && stageDays ? ` · day ${day} of ${stageDays}` : ''}
         </div>
       </div>

@@ -6,6 +6,9 @@ const {
   deviceSurfaceState,
   firstRunSteps,
   applyPresetWrites,
+  presetSummary,
+  connectionLabel,
+  DEVICE_VERSION,
   GROW_PRESETS,
 } = require("./setup-state.js");
 
@@ -46,11 +49,46 @@ test("fruiting preset writes grow caption and existing setpoint numbers", () => 
   assert.equal(writes.find((w) => w.id === "target_humidity").value, 90);
 });
 
-test("idle preset does not touch climate numbers", () => {
-  const idle = GROW_PRESETS.find((p) => p.id === "idle");
-  const writes = applyPresetWrites(idle);
-  assert.equal(writes.some((w) => w.id === "target_humidity"), false);
+test("every preset says exactly what it will change", () => {
+  for (const preset of GROW_PRESETS) {
+    const summary = presetSummary(preset);
+    assert.match(summary, new RegExp(`Humidity ${preset.setpoints.humidity}%`));
+    assert.match(summary, new RegExp(`temperature ${preset.setpoints.temperature}°C`));
+  }
+  assert.equal(presetSummary(GROW_PRESETS.find((p) => p.id === "colonizing")), "Humidity 90%, temperature 24°C, lights off.");
+  assert.equal(
+    presetSummary(GROW_PRESETS.find((p) => p.id === "oyster-fruit")),
+    "Humidity 90%, temperature 22°C, lights on 12 hours from 8 AM."
+  );
   assert.equal(firstRunSteps("empty-grow").action, "profile");
+});
+
+test("presets stay inside the chamber's allowed ranges", () => {
+  for (const preset of GROW_PRESETS) {
+    const sp = preset.setpoints;
+    assert.ok(sp.humidity >= 30 && sp.humidity <= 100);
+    assert.ok(sp.temperature >= 15 && sp.temperature <= 35);
+    assert.ok(sp.sunrise >= 0 && sp.sunrise <= 23);
+    assert.ok(sp.lightHours >= 0 && sp.lightHours <= 24);
+    assert.ok(preset.total >= 0 && preset.total <= 90);
+  }
+});
+
+test("a home network whose name starts with OpenShrooly is not setup mode", () => {
+  assert.equal(isApMode("Station", "OpenShrooly-guest"), false);
+  assert.equal(isApMode("Station", "OpenShrooly"), false);
+  assert.equal(isApMode("", "OpenShrooly"), true);
+  assert.equal(connectionLabel("Station"), "Home Wi-Fi");
+  assert.equal(connectionLabel("Access Point"), "Setup network");
+});
+
+test("shown version matches the firmware version", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const yaml = fs.readFileSync(path.join(__dirname, "..", "..", "esphome", "openshrooly.yaml"), "utf8");
+  const match = yaml.match(/device_version:\s*"([^"]+)"/);
+  assert.ok(match, "device_version not found in openshrooly.yaml");
+  assert.equal(DEVICE_VERSION, match[1]);
 });
 
 test("writes become the same entity ids the dashboard already listens to", () => {

@@ -1,7 +1,6 @@
 export type GrowPreset = {
   id: string
   label: string
-  detail: string
   phase: string
   day: number
   total: number
@@ -14,6 +13,9 @@ export type PresetWrite = { kind: 'select' | 'number'; id: string; value: string
 
 export const GROW_PRESETS: GrowPreset[]
 
+export const DEVICE_VERSION: string
+export function connectionLabel(wifiMode?: string): string
+export function presetSummary(preset: GrowPreset): string
 export function isApMode(wifiMode?: string, ssid?: string): boolean
 export function hasActiveGrow(phase?: string, totalDays?: number | string): boolean
 export function deviceSurfaceState(input: {

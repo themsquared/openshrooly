@@ -7,6 +7,7 @@ import {
   deviceSurfaceState,
   entityPatchFromWrites,
 } from '../lib/setup-state'
+import { DEVICE_VERSION, connectionLabel } from '../lib/setup-state'
 import type { GrowPreset } from '../lib/setup-state'
 import LiveGauge from './components/LiveGauge'
 import LightTimeline from './components/LightTimeline'
@@ -77,7 +78,7 @@ export default function Dashboard() {
           ok = true
         }
       } catch (e) {
-        setLastError('Could not read setpoints')
+        setLastError('Could not read the chamber settings')
       }
 
       try {
@@ -215,7 +216,7 @@ export default function Dashboard() {
       setLastError('')
       setReachable(true)
     } else {
-      setLastError('The chamber did not accept the grow caption')
+      setLastError('The chamber did not accept the new grow. Try again.')
     }
     setApplyingPreset(false)
   }
@@ -325,14 +326,14 @@ export default function Dashboard() {
 
   const handleOtaUpload = async () => {
     if (!otaFile) {
-      setOtaMessage('Please select a firmware file')
+      setOtaMessage('Choose an update file first')
       setOtaStatus('error')
       return
     }
 
     setOtaStatus('uploading')
     setOtaProgress(0)
-    setOtaMessage('Uploading firmware...')
+    setOtaMessage('Sending the update. Keep this page open.')
 
     try {
       const formData = new FormData()
@@ -350,7 +351,7 @@ export default function Dashboard() {
       xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
           setOtaStatus('success')
-          setOtaMessage('Firmware uploaded successfully! Device will restart...')
+          setOtaMessage('Update installed. The chamber is restarting.')
           setOtaProgress(100)
           setTimeout(() => {
             setOtaStatus('idle')
@@ -360,20 +361,20 @@ export default function Dashboard() {
           }, 5000)
         } else {
           setOtaStatus('error')
-          setOtaMessage(`Upload failed: ${xhr.statusText}`)
+          setOtaMessage('The chamber did not accept this file. Check that it is an OpenShrooly update and try again.')
         }
       })
 
       xhr.addEventListener('error', () => {
         setOtaStatus('error')
-        setOtaMessage('Upload failed: Network error')
+        setOtaMessage('Lost the connection to the chamber. Try again.')
       })
 
       xhr.open('POST', '/update')
       xhr.send(formData)
     } catch (error) {
       setOtaStatus('error')
-      setOtaMessage(`Upload failed: ${error}`)
+      setOtaMessage('Something went wrong sending the update. Try again.')
     }
   }
 
@@ -744,32 +745,19 @@ export default function Dashboard() {
       <div className="header-bar">
         <h1>
           <svg
+            className="brand-mark"
             width="28"
             height="28"
-            viewBox="0 0 27.753101 27.941927"
-            style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}
+            viewBox="0 0 28 28"
+            aria-hidden="true"
+            style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '10px', color: 'var(--sl-spore)' }}
           >
-            <g transform="translate(-34.692395,-50.295771)">
-              <g transform="matrix(0.27075242,0,0,0.27075242,20.785884,18.671899)">
-                <path
-                  style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '5.84717', strokeLinecap: 'round' }}
-                  d="m 62.774608,173.92618 h 78.560862 l 8.90336,-8.72004 -14.27203,-26.09984 -33.49774,-18.94359 -32.774503,18.71907 -14.741382,26.7906 z"
-                />
-                <path
-                  style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '5.84719', strokeLinecap: 'round' }}
-                  d="m 89.451285,173.99131 -7.470248,31.26293 11.879354,11.82315 h 17.766519 l 11.28636,-12.42725 -7.37135,-30.71071 z"
-                />
-                <path
-                  style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '5.84719', strokeLinecap: 'butt' }}
-                  d="m 109.6765,124.069 -10.553806,27.49 m -40.080662,18.96541 40.085576,-18.98387 29.393522,22.89182 v 0"
-                />
-              </g>
-            </g>
+            <path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" strokeWidth="1.6" />
           </svg>
           <span>
-            <span style={{ fontWeight: 'bold' }}>Open</span>
-            <span style={{ fontWeight: '300' }}>Shrooly</span>
-            <span className="brand-sub">Shroom Labs chamber</span>
+            <span className="brand-name">Shroom Labs</span>
+            <span className="brand-sub">Works with Shrooly devices running OpenShrooly</span>
           </span>
         </h1>
         <div className="header-right">
@@ -786,7 +774,7 @@ export default function Dashboard() {
         onRetry={() => window.location.reload()}
       />
 
-      <FirstRun state={surface} applying={applyingPreset} onApply={applyPreset} />
+      <FirstRun state={surface} applying={applyingPreset} onApply={applyPreset} error={lastError} />
 
       {alerts.length > 0 && (
         <div className="alerts-banner">
@@ -930,8 +918,8 @@ export default function Dashboard() {
         <div className="card card-settings" onClick={() => setModal({ type: 'settings' })}>
           <div className="card-icon">⚙️</div>
           <div className="card-label">Settings</div>
-          <div className="card-value">v1.0.0</div>
-          <div className="card-detail">System & Network</div>
+          <div className="card-value">v{DEVICE_VERSION}</div>
+          <div className="card-detail">Chamber and Wi-Fi</div>
         </div>
       </div>
 
@@ -949,7 +937,7 @@ export default function Dashboard() {
           Powered by ESPHome
         </a>
         <span className="footer-separator">•</span>
-        <span className="footer-text">Works with Shroom Labs · No Warranty</span>
+        <span className="footer-text">Shroom Labs. Works with Shrooly devices running OpenShrooly. No warranty.</span>
       </div>
 
       {/* Modals */}
@@ -966,7 +954,7 @@ export default function Dashboard() {
               <div className="water-level-display">
                 <div className="water-level-value">{waterLevel.toFixed(0)}%</div>
                 {waterLevel < 20 && (
-                  <div className="water-warning">⚠️ Water level low - please refill soon</div>
+                  <div className="water-warning">⚠️ Water is low. Please refill soon.</div>
                 )}
               </div>
 
@@ -1625,7 +1613,7 @@ export default function Dashboard() {
                 <div className="settings-info">
                   <div className="info-row">
                     <span className="info-label">Version:</span>
-                    <span className="info-value">1.0.0</span>
+                    <span className="info-value">{DEVICE_VERSION}</span>
                   </div>
                   <div className="info-row">
                     <span className="info-label">Voltage:</span>
@@ -1638,15 +1626,15 @@ export default function Dashboard() {
                 <h3>Network</h3>
                 <div className="settings-info">
                   <div className="info-row">
-                    <span className="info-label">Mode:</span>
-                    <span className="info-value">{entities['text_sensor-wifi_mode']?.state || 'Unknown'}</span>
+                    <span className="info-label">Connection:</span>
+                    <span className="info-value">{connectionLabel(entities['text_sensor-wifi_mode']?.state)}</span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">SSID:</span>
+                    <span className="info-label">Wi-Fi network:</span>
                     <span className="info-value">{entities['text_sensor-wifi_ssid']?.state || 'Unknown'}</span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">IP Address:</span>
+                    <span className="info-label">Chamber address:</span>
                     <span className="info-value">{entities['text_sensor-ip_address']?.state || 'Unknown'}</span>
                   </div>
                 </div>
@@ -1690,9 +1678,9 @@ export default function Dashboard() {
               </div>
 
               <div className="settings-section">
-                <h3>Firmware Update (OTA)</h3>
+                <h3>Software update</h3>
                 <div className="control-group">
-                  <label>Upload Firmware (.bin file)</label>
+                  <label>Choose the OpenShrooly update file (ends in .bin)</label>
                   <input
                     type="file"
                     accept=".bin"
@@ -1705,56 +1693,28 @@ export default function Dashboard() {
                       }
                     }}
                     disabled={otaStatus === 'uploading'}
-                    style={{
-                      padding: '8px',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      marginTop: '8px'
-                    }}
+                    className="ota-file"
                   />
                   {otaFile && (
-                    <div style={{ marginTop: '10px', fontSize: '14px', color: '#64748b' }}>
+                    <div className="ota-meta">
                       Selected: {otaFile.name} ({(otaFile.size / 1024 / 1024).toFixed(2)} MB)
                     </div>
                   )}
                   <button
                     onClick={handleOtaUpload}
                     disabled={!otaFile || otaStatus === 'uploading'}
-                    style={{
-                      marginTop: '12px',
-                      padding: '10px 20px',
-                      backgroundColor: otaStatus === 'uploading' ? '#94a3b8' : '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: otaStatus === 'uploading' ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
+                    className="charts-button ota-button"
                   >
-                    {otaStatus === 'uploading' ? 'Uploading...' : 'Upload Firmware'}
+                    {otaStatus === 'uploading' ? 'Sending…' : 'Install update'}
                   </button>
                   {otaStatus !== 'idle' && (
-                    <div style={{ marginTop: '12px' }}>
+                    <div>
                       {otaStatus === 'uploading' && (
-                        <div style={{ width: '100%', backgroundColor: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
-                          <div
-                            style={{
-                              width: `${otaProgress}%`,
-                              backgroundColor: '#3b82f6',
-                              height: '100%',
-                              transition: 'width 0.3s ease'
-                            }}
-                          />
+                        <div className="ota-track">
+                          <div className="ota-fill" style={{ width: `${otaProgress}%` }} />
                         </div>
                       )}
-                      <div
-                        style={{
-                          marginTop: '8px',
-                          fontSize: '14px',
-                          color: otaStatus === 'success' ? '#22c55e' : otaStatus === 'error' ? '#ef4444' : '#64748b'
-                        }}
-                      >
+                      <div className={`ota-message${otaStatus === 'success' ? ' is-success' : otaStatus === 'error' ? ' is-error' : ''}`}>
                         {otaMessage}
                       </div>
                     </div>
