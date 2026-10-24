@@ -21,10 +21,88 @@ export function headerHtml(navInner) {
   return `<a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
     <a class="brand" href="/">${brandSvg()}<span>Shroom Labs<small>works with OpenShrooly</small></span></a>
-    <nav aria-label="Site">${navInner || navHtml()}<span id="session-nav"></span></nav>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site">${navInner || navHtml()}<span id="session-nav"></span></nav>
   </header>`;
 }
 
 export function footerHtml(extra = "") {
-  return `<footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly. ${extra}</footer>`;
+  return `<footer class="site-footer">Shroom Labs. shroomlabs.io. Works with Shrooly devices running OpenShrooly. ${extra}</footer>`;
+}
+
+function mobileNav() {
+  return window.matchMedia("(max-width: 767px)").matches;
+}
+
+function focusableIn(root) {
+  return [...root.querySelectorAll('a[href], button:not([disabled]), summary, input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(
+    (el) => !el.hasAttribute("hidden") && el.getAttribute("aria-hidden") !== "true"
+  );
+}
+
+export function bindMobileNav() {
+  const header = document.querySelector(".site-header");
+  const toggle = header?.querySelector(".nav-toggle");
+  const nav = header?.querySelector("#site-nav");
+  if (!header || !toggle || !nav || toggle.dataset.bound === "1") return;
+  toggle.dataset.bound = "1";
+
+  let backdrop = document.querySelector(".nav-backdrop");
+  if (!backdrop) {
+    backdrop = document.createElement("button");
+    backdrop.type = "button";
+    backdrop.className = "nav-backdrop";
+    backdrop.setAttribute("aria-label", "Close menu");
+    backdrop.hidden = true;
+    document.body.appendChild(backdrop);
+  }
+
+  function setOpen(open) {
+    header.classList.toggle("is-open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    toggle.textContent = open ? "Close" : "Menu";
+    backdrop.hidden = !open;
+    document.body.classList.toggle("nav-lock", open);
+    if (open) {
+      const items = focusableIn(nav);
+      (items[0] || toggle).focus();
+    } else {
+      toggle.focus();
+    }
+  }
+
+  toggle.addEventListener("click", () => {
+    if (!mobileNav()) return;
+    setOpen(!header.classList.contains("is-open"));
+  });
+  backdrop.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (event) => {
+    if (!header.classList.contains("is-open")) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const items = [toggle, ...focusableIn(nav)];
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+  window.addEventListener("resize", () => {
+    if (!mobileNav() && header.classList.contains("is-open")) {
+      header.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.textContent = "Menu";
+      backdrop.hidden = true;
+      document.body.classList.remove("nav-lock");
+    }
+  });
 }

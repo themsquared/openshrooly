@@ -65,3 +65,24 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
   }
   assert.deepEqual(hits, []);
 });
+
+test("visitor-facing pages never use en or em dashes", () => {
+  const publicDir = join(dirname(fileURLToPath(import.meta.url)), "../public");
+  const dash = /[\u2013\u2014]/;
+  const hits = [];
+  for (const name of readdirSync(publicDir).filter((file) => file.endsWith(".html"))) {
+    const html = readFileSync(join(publicDir, name), "utf8")
+      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[\s\S]*?<\/style>/gi, " ");
+    const extras = [];
+    for (const match of html.matchAll(
+      /\b(?:content|placeholder|title|alt|aria-label|aria-description)\s*=\s*("([^"]*)"|'([^']*)')/gi
+    )) {
+      extras.push(match[2] ?? match[3] ?? "");
+    }
+    const text = `${html.replace(/<[^>]+>/g, " ")} ${extras.join(" ")}`;
+    const found = text.match(dash);
+    if (found) hits.push(`${name}: ${found[0]}`);
+  }
+  assert.deepEqual(hits, []);
+});

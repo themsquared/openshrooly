@@ -1,4 +1,4 @@
-/** Original harvest photos generated for Shroom Labs — not taken from shrooly.com. */
+/** Original harvest photos generated for Shroom Labs. Not taken from shrooly.com. */
 
 const PHOTOS = [
   { keys: ["pink", "oyster"], src: "/img/species/species-pink-oyster.jpg" },
@@ -52,7 +52,7 @@ export function speciesPhoto(species, strain = "", name = "") {
 
 export function speciesArt(species, strain = "", name = "") {
   const src = speciesPhoto(species, strain, name);
-  const label = [name, species].filter(Boolean).join(" — ") || "mushroom";
+  const label = [name, species].filter(Boolean).join(" · ") || "mushroom";
   return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" loading="lazy" decoding="async">`;
 }
 

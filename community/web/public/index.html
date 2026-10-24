@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shroom Labs — mushroom profiles for OpenShrooly</title>
+  <title>Shroom Labs. Mushroom profiles for OpenShrooly</title>
   <meta name="description" content="Browse, fork, and apply researched mushroom grow profiles. Local-first. Works with Shrooly devices running OpenShrooly.">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -19,7 +19,8 @@
       <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       <span>Shroom Labs<small>works with OpenShrooly</small></span>
     </a>
-    <nav aria-label="Site">
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site">
       <a href="/" aria-current="page">Profiles</a>
       <a href="/faq.html">FAQ</a>
       <a id="nav-coach" href="/coach.html">Grow Coach</a>
@@ -34,7 +35,7 @@
       <div class="hero-copy">
         <p class="eyebrow" id="pack-label">Culinary library</p>
         <h1>Grow the flush you planned.</h1>
-        <p class="lede">Stage-perfect humidity, light, and air — written as living setpoints you watch through the glass. Offline-first. The chamber stays yours.</p>
+        <p class="lede">Humidity, light, and air as living setpoints you watch through the glass. Offline first. The chamber stays yours.</p>
         <div class="hero-actions">
           <a class="button hero-cta" href="#library">Open the library</a>
           <a class="button ghost" href="/claim.html">Claim a chamber</a>
@@ -52,9 +53,9 @@
       <div class="library-toolbar">
         <div class="pack-toggle" role="group" aria-label="Library pack filter">
           <button type="button" id="pack-culinary" aria-pressed="true">Culinary</button>
-          <button type="button" id="pack-restricted" aria-pressed="false">Restricted</button>
+          <button type="button" id="pack-restricted" aria-pressed="false">Off-menu</button>
         </div>
-        <p class="pack-hint">Restricted species stay off the main nav. Open them here only if your jurisdiction allows cultivation.</p>
+        <p class="pack-hint">A few varieties stay off the printed menu. Open them only if growing them is legal where you live.</p>
       </div>
       <p id="legal" class="legal hidden">Legality of cultivating Psilocybe species varies by jurisdiction. These cards are free environmental setpoints only. They are never sold and never carry affiliate links.</p>
       <div id="cards" class="cards"></div>
@@ -69,19 +70,19 @@
     </section>
     <section id="coach-promo" class="how" aria-label="Grow Coach">
       <h2 class="display" style="font-size:1.8rem">Grow Coach</h2>
-      <p class="muted">A $3.99/month culinary subscription that learns each chamber from telemetry and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included. Not sold with the restricted pack.</p>
+      <p class="muted">A $3.99/month culinary subscription that learns each chamber from telemetry and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included. Not sold with Off-menu profiles.</p>
       <p><a class="button" href="/coach.html">Open Grow Coach</a></p>
     </section>
     <section id="supplies" class="supplies">
       <h2 class="display" style="font-size:1.8rem">Supplies</h2>
       <p class="muted">Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.</p>
       <ul>
-        <li>Hardwood pellets — example affiliate on culinary profile pages</li>
-        <li>Filter-patch grow bags — example affiliate on culinary profile pages</li>
+        <li>Hardwood pellets. Example affiliate on culinary profile pages</li>
+        <li>Filter-patch grow bags. Example affiliate on culinary profile pages</li>
       </ul>
     </section>
   </main>
-  <footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</footer>
+  <footer class="site-footer">Shroom Labs. shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</footer>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

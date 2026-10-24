@@ -63,3 +63,42 @@ test("public pages share one nav label set", () => {
   }
   assert.deepEqual(missing, []);
 });
+
+const DASH = /[\u2013\u2014]/;
+
+test("visitor-facing pages and chrome never use en or em dashes", () => {
+  const hits = [];
+  for (const page of pages()) {
+    const found = visitorFacing(page.html).match(DASH);
+    if (found) hits.push(`${page.name}: ${found[0]}`);
+  }
+  const jsDir = join(PUBLIC, "js");
+  for (const name of readdirSync(jsDir).filter((file) => file.endsWith(".js"))) {
+    const found = readFileSync(join(jsDir, name), "utf8").match(DASH);
+    if (found) hits.push(`js/${name}: ${found[0]}`);
+  }
+  assert.deepEqual(hits, []);
+});
+
+test("home pack toggle is Off-menu, not Restricted", () => {
+  const home = pages().find((page) => page.name === "index.html");
+  const text = visitorFacing(home.html);
+  assert.match(text, /Off-menu/);
+  const hits = [];
+  for (const page of pages()) {
+    if (/Restricted/i.test(visitorFacing(page.html))) hits.push(page.name);
+  }
+  assert.deepEqual(hits, []);
+});
+
+test("shared chrome uses an accessible mobile menu button", () => {
+  const missing = [];
+  for (const page of pages()) {
+    if (page.name === "legacy-preview.html") continue;
+    if (!page.html.includes('class="nav-toggle"')) missing.push(`${page.name}: nav-toggle`);
+    if (!page.html.includes('aria-expanded="false"')) missing.push(`${page.name}: aria-expanded`);
+    if (!page.html.includes('aria-controls="site-nav"')) missing.push(`${page.name}: aria-controls`);
+    if (!page.html.includes('id="site-nav"')) missing.push(`${page.name}: site-nav`);
+  }
+  assert.deepEqual(missing, []);
+});

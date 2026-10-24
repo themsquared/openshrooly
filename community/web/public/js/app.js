@@ -1,6 +1,7 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
+import { bindMobileNav } from "./shell.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -44,7 +45,7 @@ function renderNav() {
       location.href = "/";
     });
   } else {
-    nav.innerHTML = `<a href="/login.html">Sign in</a>`;
+    nav.innerHTML = `<a class="nav-signin button" href="/login.html">Sign in</a>`;
   }
 }
 
@@ -71,7 +72,7 @@ async function renderHome() {
   }
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
-  $("#pack-label").textContent = pack === "psilocybin" ? "Restricted pack" : "Culinary library";
+  $("#pack-label").textContent = pack === "psilocybin" ? "Off-menu" : "Culinary library";
   $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
   $("#q").value = q;
   $("#pack").value = pack;
@@ -176,7 +177,7 @@ async function renderProfile() {
       "</ul>";
   }
   $("#ratings").innerHTML =
-    data.ratings.map((r) => `<li>${escapeHtml(r.username)} — ${r.stars}/5 — ${escapeHtml(r.comment || "")}</li>`).join("") ||
+    data.ratings.map((r) => `<li>${escapeHtml(r.username)}, ${r.stars}/5. ${escapeHtml(r.comment || "")}</li>`).join("") ||
     "<li class='muted'>No ratings yet.</li>";
   $("#reports").innerHTML =
     data.reports
@@ -314,7 +315,7 @@ async function renderAccount() {
   const me = await api("/api/me");
   $("#who").textContent = me.user.email || me.user.username;
   $("#verified").textContent = me.user.email_verified
-    ? "Email verified — you can publish, buy, and claim devices."
+    ? "Email verified. You can publish, buy, and claim devices."
     : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
   $("#ents").innerHTML =
@@ -397,6 +398,7 @@ function fileToBase64(file) {
 }
 
 renderNav();
+bindMobileNav();
 const page = document.body.dataset.page;
 if (page === "home") {
   renderHome().catch((err) => ($("#cards").textContent = err.message));
@@ -426,7 +428,7 @@ function showCoachError(err) {
 }
 
 function fmtNum(value, digits = 1) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
+  if (value == null || Number.isNaN(Number(value))) return "n/a";
   return Number(value).toFixed(digits);
 }
 
@@ -502,7 +504,7 @@ async function renderCoach() {
       .join("");
     $("#alerts").innerHTML =
       (data.alerts || [])
-        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong> — ${escapeHtml(a.message)}</li>`)
+        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong>. ${escapeHtml(a.message)}</li>`)
         .join("") || `<li class="info">No alerts right now.</li>`;
     const s = data.suggestion || {};
     $("#suggestion").innerHTML = s.humidity_percent
