@@ -17,6 +17,7 @@ const env = {
   SHOW_PSILOCYBIN: process.env.COMMUNITY_SHOW_PSILOCYBIN || "1",
   SITE_NAME: process.env.COMMUNITY_SITE_NAME || "Shroom Labs",
   AUTH_DEBUG: process.env.AUTH_DEBUG || "1",
+  DEV_STUBS: process.env.DEV_STUBS || "1",
   HIBP_DISABLED: process.env.HIBP_DISABLED || "1",
   SITE_ORIGIN: process.env.SITE_ORIGIN || "http://127.0.0.1:8888",
   OIDC_STUB: process.env.OIDC_STUB || "1",

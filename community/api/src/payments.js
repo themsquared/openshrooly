@@ -1,9 +1,30 @@
 /** Stripe webhook adapter. Fail-closed when the secret is unset. */
 
-import { nowIso } from "./crypto.js";
+import { nowIso, randomToken } from "./crypto.js";
 import { COACH_ITEM } from "./coach-learn.js";
 import { activateCoachSub } from "./coach.js";
+import { comingSoonBody, devStubsEnabled, paymentsConfigured } from "./providers.js";
 import { ValidationError } from "./profile.js";
+
+export async function startCheckout(db, env, request, { userId, itemId, amountCents, details }) {
+  if (!paymentsConfigured(env) && !devStubsEnabled(env, request)) {
+    return { ok: false, status: 503, ...comingSoonBody("Payments") };
+  }
+  const sessionId = `cs_test_${randomToken().slice(0, 16)}`;
+  await db.run(
+    "INSERT INTO checkouts (id, user_id, item_id, provider, status, amount_cents, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [sessionId, userId, itemId, "stripe", "requires_payment", amountCents, JSON.stringify(details || {}), nowIso()]
+  );
+  return {
+    ok: true,
+    id: sessionId,
+    provider: "stripe",
+    status: "requires_payment",
+    checkout_url: devStubsEnabled(env, request) ? `/pay/stub/${sessionId}` : null,
+    amount_cents: amountCents,
+    item_id: itemId,
+  };
+}
 
 export function parseStripeEvent(body) {
   if (!body || typeof body !== "object") return null;

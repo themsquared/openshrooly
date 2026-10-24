@@ -14,6 +14,7 @@ import {
   verifyTotp,
 } from "./crypto.js";
 import { sendEmail } from "./email.js";
+import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } from "./providers.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
 import {
@@ -166,7 +167,7 @@ export async function handleAuth(method, path, url, request, env) {
     const ip = clientIp(request);
     const limited = await rateLimit(db, `magic:${ip}:${email}`, 5, 900);
     if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
-    const turnstile = await verifyTurnstile(env, body.turnstile, ip);
+    const turnstile = await verifyTurnstile(env, body.turnstile, ip, request);
     if (!turnstile.ok) return json({ error: "Turnstile check failed." }, 400);
     const token = randomToken() + randomToken();
     await db.run(
@@ -174,11 +175,16 @@ export async function handleAuth(method, path, url, request, env) {
       [email, await sha256Hex(token), "login", laterIso(MAGIC_MS), nowIso()]
     );
     const link = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/auth/callback.html?token=${token}`;
-    const sent = await sendEmail(env, {
-      to: email,
-      subject: "Your Shroom Labs sign-in link",
-      text: `Sign in (expires in 15 minutes):\n${link}\nIf you did not request this, ignore the email.`,
-    });
+    const sent = await sendEmail(
+      env,
+      {
+        to: email,
+        subject: "Your Shroom Labs sign-in link",
+        text: `Sign in (expires in 15 minutes):\n${link}\nIf you did not request this, ignore the email.`,
+      },
+      request
+    );
+    if (!sent.ok) return json({ error: sent.error || "Email sign-in is not configured yet.", coming_soon: true }, 503);
     await audit(db, null, "magic_start", email, request);
     const payload = { ok: true, message: "Check your email for a sign-in link." };
     if (sent.debug) payload.debug_token = token;
@@ -437,8 +443,9 @@ async function startOidc(env, request, provider) {
   const limited = await rateLimit(env.db, `oidc-${provider}:${clientIp(request)}`, 10, 900);
   if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
   const cfg = providerConfig(env, provider);
-  if (!cfg.clientId && String(env.OIDC_STUB || "") !== "1") {
-    return json({ error: `${provider} OAuth is not configured.` }, 503);
+  const ready = provider === "google" ? googleConfigured(env) : appleConfigured(env);
+  if (!ready && !devStubsEnabled(env, request)) {
+    return json(comingSoonBody(`${provider} sign-in`), 503);
   }
   if (!originAllowed(env, request) && request.headers.get("origin")) {
     return json({ error: "origin not allowed" }, 403);
@@ -460,7 +467,7 @@ async function startOidc(env, request, provider) {
   auth.searchParams.set("nonce", nonce);
   auth.searchParams.set("code_challenge", challenge);
   auth.searchParams.set("code_challenge_method", "S256");
-  if (String(env.OIDC_STUB || "") === "1") {
+  if (devStubsEnabled(env, request)) {
     return json({ authorize_url: auth.toString(), state, debug_code: `stub-${state}` });
   }
   return new Response(null, { status: 302, headers: { location: auth.toString() } });
@@ -474,7 +481,7 @@ async function finishOidc(env, request, url, provider) {
   if (!row || row.expires_at < nowIso() || row.provider !== provider) return json({ error: "invalid OIDC state" }, 401);
   let email = "";
   let subject = "";
-  if (String(env.OIDC_STUB || "") === "1") {
+  if (devStubsEnabled(env, request)) {
     email = `${provider}.user@example.com`;
     subject = `stub-${provider}`;
   } else {
@@ -506,7 +513,7 @@ async function finishOidc(env, request, url, provider) {
   );
   await audit(env.db, user.id, `oidc_${provider}`, email, request);
   const completed = await completeSignIn(env.db, user, request, env, {});
-  if (String(env.OIDC_STUB || "") === "1") return completed;
+  if (devStubsEnabled(env, request)) return completed;
   if (completed.status !== 200) return completed;
   const dest = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/account.html`;
   return new Response(null, { status: 302, headers: { location: dest, "set-cookie": completed.headers.get("set-cookie") } });

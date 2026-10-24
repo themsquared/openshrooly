@@ -71,8 +71,14 @@ test("first request still exposes the full culinary catalog from memory", async 
 
 test("optional storage survives a missing or throwing R2 binding", async () => {
   const none = createOptionalStorage(null);
-  await none.put("x", new Uint8Array([1]), "image/jpeg");
-  assert.ok(await none.get("x"));
+  assert.equal(none.driver, "disabled");
+  assert.equal(await none.put("x", new Uint8Array([1]), "image/jpeg"), null);
+  assert.equal(await none.get("x"), null);
+
+  const memory = createOptionalStorage(null, { allowMemory: true });
+  assert.equal(memory.driver, "memory");
+  await memory.put("x", new Uint8Array([1]), "image/jpeg");
+  assert.ok(await memory.get("x"));
 
   const broken = createOptionalStorage({
     async put() {
@@ -82,6 +88,6 @@ test("optional storage survives a missing or throwing R2 binding", async () => {
       throw new Error("R2 not enabled");
     },
   });
-  assert.equal(await broken.put("y", new Uint8Array([2]), "image/jpeg"), "y");
+  assert.equal(await broken.put("y", new Uint8Array([2]), "image/jpeg"), null);
   assert.equal(await broken.get("y"), null);
 });

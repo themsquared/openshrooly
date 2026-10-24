@@ -13,7 +13,8 @@ import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
 import { handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
-import { applyStripeEvent, parseStripeEvent } from "./payments.js";
+import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
+import { capabilities } from "./providers.js";
 import { originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
@@ -159,7 +160,11 @@ async function route(method, path, url, request, env) {
   if (coachResponse) return coachResponse;
 
   if (method === "GET" && path === "/health") {
-    return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver });
+    return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver, capabilities: capabilities(env, request) });
+  }
+
+  if (method === "GET" && path === "/api/capabilities") {
+    return json(capabilities(env, request));
   }
 
   if (method === "GET" && path === "/api/me") {
@@ -307,8 +312,13 @@ async function route(method, path, url, request, env) {
     let photoKey = null;
     if (body.photo_base64) {
       const raw = Uint8Array.from(atob(body.photo_base64), (c) => c.charCodeAt(0));
-      photoKey = `reports/${profileId}/${randomToken()}.${body.photo_ext || "jpg"}`;
-      await storage.put(photoKey, raw, body.photo_type || "image/jpeg");
+      const caps = capabilities(env, request);
+      if (!caps.photos) {
+        photoKey = null;
+      } else {
+        photoKey = `reports/${profileId}/${randomToken()}.${body.photo_ext || "jpg"}`;
+        await storage.put(photoKey, raw, body.photo_type || "image/jpeg");
+      }
     }
     await db.run(
       "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -339,26 +349,14 @@ async function route(method, path, url, request, env) {
     if (isFree(profile)) throw new ValidationError("free items do not go through checkout");
     const allowed = profile.allowed_payment_providers || [];
     if (!allowed.includes("stripe")) throw new ValidationError("no configured payment provider in " + allowed);
-    const sessionId = `cs_test_${randomToken().slice(0, 16)}`;
-    await db.run(
-      "INSERT INTO checkouts (id, user_id, item_id, provider, status, amount_cents, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        sessionId,
-        user.id,
-        profile.id,
-        "stripe",
-        "requires_payment",
-        profile.pricing.amount_cents,
-        JSON.stringify({ note: "Payment stub session." }),
-        nowIso(),
-      ]
-    );
-    return json({
-      id: sessionId,
-      provider: "stripe",
-      status: "requires_payment",
-      checkout_url: `/pay/stub/${sessionId}`,
+    const session = await startCheckout(db, env, request, {
+      userId: user.id,
+      itemId: profile.id,
+      amountCents: profile.pricing.amount_cents,
+      details: { note: "Culinary checkout." },
     });
+    if (!session.ok) return json({ error: session.error, coming_soon: true }, session.status || 503);
+    return json(session);
   }
 
   if (method === "POST" && path === "/api/payments/webhook") {

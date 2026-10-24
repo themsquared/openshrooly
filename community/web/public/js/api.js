@@ -49,3 +49,24 @@ export function isSignedIn() {
 export function oidcStart(provider) {
   return `${apiBase()}/api/auth/oidc/${provider}/start`;
 }
+
+let capsCache = null;
+
+export async function capabilities() {
+  if (capsCache) return capsCache;
+  try {
+    capsCache = await api("/api/capabilities");
+  } catch {
+    capsCache = {
+      email: false,
+      google: false,
+      apple: false,
+      payments: false,
+      photos: false,
+      coach: false,
+      push: false,
+      stubs: false,
+    };
+  }
+  return capsCache;
+}

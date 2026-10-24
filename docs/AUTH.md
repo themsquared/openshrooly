@@ -62,7 +62,7 @@ npx wrangler secret put RESEND_API_KEY
 
 Optional var: `EMAIL_FROM=Shroom Labs <noreply@shroomlabs.io>`
 
-Until the key exists, the API stubs send and (when `AUTH_DEBUG=1`) returns `debug_token` for local complete.
+Until the key exists, email sign-in is hidden as Coming soon and the endpoint fails closed. Local completing stubs (fake outbox + `debug_token`) need `DEV_STUBS=1` and refuse `shroomlabs.io` / `api.shroomlabs.io`.
 
 ### Cloudflare Turnstile
 
@@ -80,7 +80,7 @@ Also enable **Cloudflare Rate Limiting** on `api.shroomlabs.io/api/auth/*` (e.g.
 
 Worker var: `SITE_ORIGIN=https://shroomlabs.io` (magic-link landing: `/auth/callback.html?token=`).
 
-Production: `AUTH_DEBUG` unset, `OIDC_STUB` unset, `HIBP_DISABLED` unset.
+Production: `AUTH_DEBUG` unset, `DEV_STUBS` unset, `OIDC_STUB` unset, `HIBP_DISABLED` unset. Completing stubs never run on the production hosts.
 
 ## Apply on D1
 

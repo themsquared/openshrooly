@@ -20,13 +20,14 @@
   <main id="main">
     <section class="card auth-panel">
       <h1>Create account</h1>
-      <p class="muted">No password. Enter your email and we’ll send a magic link. Publishing, buying, and claiming devices require a verified address.</p>
+      <p class="muted">No password. Enter your email and we send a magic link. Publishing, buying, and claiming devices require a verified address.</p>
       <p id="error" class="notice hidden"></p>
       <form id="form">
         <label>Email <input name="email" type="email" required autocomplete="email"></label>
         <div id="turnstile" class="cf-turnstile"></div>
         <button type="submit">Send magic link</button>
       </form>
+      <p id="email-soon" class="muted hidden">Email sign-in is coming soon.</p>
     </section>
   </main>
   <footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly.</footer>

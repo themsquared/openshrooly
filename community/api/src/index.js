@@ -13,13 +13,14 @@ async function envContext(env) {
     }
     env._ctx = {
       db,
-      storage: createOptionalStorage(env.PHOTOS),
+      storage: createOptionalStorage(env.PHOTOS, { allowMemory: String(env.DEV_STUBS || "") === "1" }),
       CORS_ORIGIN: env.CORS_ORIGIN,
       CDN_BASE_URL: env.CDN_BASE_URL,
       SHOW_PSILOCYBIN: env.SHOW_PSILOCYBIN,
       SITE_NAME: env.SITE_NAME,
       COMMUNITY_SECRET: env.COMMUNITY_SECRET,
       AUTH_DEBUG: env.AUTH_DEBUG,
+      DEV_STUBS: env.DEV_STUBS,
       HIBP_DISABLED: env.HIBP_DISABLED,
       SITE_ORIGIN: env.SITE_ORIGIN || "https://shroomlabs.io",
       OIDC_STUB: env.OIDC_STUB,

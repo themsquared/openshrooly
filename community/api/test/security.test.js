@@ -203,7 +203,7 @@ test("TOTP confirm requires a real code and stores an encrypted secret", async (
 });
 
 test("Turnstile fails closed without a secret or with a bad stub token", async () => {
-  const closed = testEnv({ TURNSTILE_STUB: "", TURNSTILE_SECRET_KEY: "" });
+  const closed = testEnv({ DEV_STUBS: "", TURNSTILE_STUB: "", TURNSTILE_SECRET_KEY: "" });
   const missing = await call(closed, "POST", "/api/auth/magic/start", {
     body: { email: "closed@example.com", turnstile: "ok" },
   });
@@ -438,7 +438,7 @@ print("ok")
 });
 
 test("Google 503 does not list callback URIs", async () => {
-  const ctx = testEnv({ OIDC_STUB: "", GOOGLE_CLIENT_ID: "" });
+  const ctx = testEnv({ DEV_STUBS: "", OIDC_STUB: "", GOOGLE_CLIENT_ID: "" });
   const res = await call(ctx, "GET", "/api/auth/oidc/google/start");
   assert.equal(res.status, 503);
   assert.equal(res.data.redirect_uris, undefined);
