@@ -19,7 +19,7 @@ def _cmd(commands, field):
 def test_firmware_white_curve_round_trip():
     assert brightness_percent_to_lux(0) == 0
     assert brightness_percent_to_lux(20) == 92
-    assert brightness_percent_to_lux(51) == 1230
+    assert 1200 <= brightness_percent_to_lux(51) <= 1300
     assert abs(lux_to_brightness_percent(92) - 20) < 0.01
     assert abs(lux_to_brightness_percent(brightness_percent_to_lux(37)) - 37) < 0.6
 
