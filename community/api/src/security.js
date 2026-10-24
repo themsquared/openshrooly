@@ -173,7 +173,7 @@ export async function rateLimit(db, key, limit, windowSec) {
 }
 
 export function clientIp(request) {
-  return request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "";
+  return request.headers.get("cf-connecting-ip") || "";
 }
 
 export function originAllowed(env, request) {
