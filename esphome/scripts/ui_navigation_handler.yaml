@@ -19,6 +19,7 @@
           PAGE_AIR = 5,
           PAGE_WATER = 6,
           PAGE_SYSTEM = 7,
+          PAGE_CLOUD = 8,
         };
 
         int page = PAGE_MAIN;
@@ -36,6 +37,8 @@
           page = PAGE_WATER;
         } else if (id(hsystemsettings).is_showing()) {
           page = PAGE_SYSTEM;
+        } else if (id(icloudclaim).is_showing()) {
+          page = PAGE_CLOUD;
         }
 
         id(current_ui_page) = page;
@@ -63,17 +66,18 @@
             id(current_ui_page) = PAGE_MAIN;
             id(page_just_changed) = true;
           } else if (button == 2) {
-            id(menu_selection) = (id(menu_selection) + 5) % 6;
+            id(menu_selection) = (id(menu_selection) + 6) % 7;
           } else if (button == 3) {
-            id(menu_selection) = (id(menu_selection) + 1) % 6;
+            id(menu_selection) = (id(menu_selection) + 1) % 7;
           } else if (button == 4) {
-            static const int menu_pages[6] = {
+            static const int menu_pages[7] = {
               PAGE_TEMPERATURE,
               PAGE_HUMIDITY,
               PAGE_LIGHT,
               PAGE_AIR,
               PAGE_WATER,
               PAGE_SYSTEM,
+              PAGE_CLOUD,
             };
             id(settings_selection) = 0;
             id(current_ui_page) = menu_pages[id(menu_selection)];
@@ -191,6 +195,13 @@
               id(shrooly_touch_controller).request_recalibration();
             }
           }
+        } else if (page == PAGE_CLOUD) {
+          if (button == 1) {
+            id(current_ui_page) = PAGE_MENU;
+            id(page_just_changed) = true;
+          } else if (button == 4) {
+            id(shl_cloud)->refresh();
+          }
         } else if (page == PAGE_SYSTEM) {
           if (button == 1) {
             id(current_ui_page) = PAGE_MENU;
@@ -277,6 +288,12 @@
           lambda: 'return id(page_just_changed) && id(current_ui_page) == 7;'
         then:
           - lvgl.page.show: hsystemsettings
+    - if:
+        condition:
+          lambda: 'return id(page_just_changed) && id(current_ui_page) == 8;'
+        then:
+          - lvgl.page.show: icloudclaim
+          - script.execute: update_cloud_screen
 
     # Settings menu.
     - if:
@@ -315,6 +332,11 @@
               text: !lambda |-
                 return std::string(
                     id(menu_selection) == 5 ? "> System" : "  System");
+          - lvgl.label.update:
+              id: menu_cloud_item
+              text: !lambda |-
+                return std::string(
+                    id(menu_selection) == 6 ? "> Cloud" : "  Cloud");
 
     # Temperature settings.
     - if:

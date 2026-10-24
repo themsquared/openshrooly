@@ -17,6 +17,7 @@ import LightTimeline from './components/LightTimeline'
 import ProfileStrip from './components/ProfileStrip'
 import ConnectionBanner from './components/ConnectionBanner'
 import FirstRun from './components/FirstRun'
+import CloudSettings from './components/CloudSettings'
 import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
 import type { EntityState } from './entity-types'
 
@@ -1669,6 +1670,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+
+              <CloudSettings demo={demoMode} open={modal.type === 'settings'} />
 
               <div className="settings-section">
                 <h3>Display & Time</h3>

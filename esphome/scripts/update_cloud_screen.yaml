@@ -1,0 +1,49 @@
+# Paint the claim page: large code, QR, expiry. Display only.
+- id: update_cloud_screen
+  mode: restart
+  then:
+    - lvgl.label.update:
+        id: claim_title
+        text: !lambda 'return id(shl_cloud)->display_title();'
+    - lvgl.label.update:
+        id: claim_code_label
+        text: !lambda 'return id(shl_cloud)->display_code();'
+    - lvgl.label.update:
+        id: claim_hint
+        text: !lambda 'return id(shl_cloud)->display_hint();'
+    - lvgl.label.update:
+        id: claim_expiry
+        text: !lambda 'return id(shl_cloud)->display_expiry();'
+    - lambda: |-
+        if (!id(display_ready)) {
+          return;
+        }
+        shroom_labs::QrCode qr{};
+        const bool have = id(shl_cloud)->fill_qr(&qr);
+        lv_obj_t *canvas = id(claim_qr).obj;
+        if (canvas == nullptr) {
+          return;
+        }
+        const lv_color_t paper = lv_color_hex(0x000000);
+        const lv_color_t ink = lv_color_hex(0xFFFFFF);
+        lv_canvas_fill_bg(canvas, paper, LV_OPA_COVER);
+        if (have && qr.size > 0) {
+          const int box = 105;
+          const int quiet = 2;
+          const int inner = box - quiet * 2;
+          const int scale = inner / qr.size;
+          const int origin = quiet + (inner - scale * qr.size) / 2;
+          for (int y = 0; y < qr.size; y++) {
+            for (int x = 0; x < qr.size; x++) {
+              if (!shroom_labs::qr_module(qr, x, y))
+                continue;
+              for (int dy = 0; dy < scale; dy++) {
+                for (int dx = 0; dx < scale; dx++) {
+                  lv_canvas_set_px(canvas, origin + x * scale + dx, origin + y * scale + dy, ink,
+                                   LV_OPA_COVER);
+                }
+              }
+            }
+          }
+        }
+        lv_obj_invalidate(canvas);

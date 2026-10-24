@@ -1,0 +1,112 @@
+# ========================================================================
+# CLOUD CLAIM - Large 6-character code + QR, glanceable like the grow screen
+# Canvas is 296x128. Hero type for the code. QR on the right.
+# ========================================================================
+
+- id: icloudclaim
+  bg_color: paper_white
+  widgets:
+    - image:
+        id: claim_header_mark
+        src: mark_16
+        align: TOP_LEFT
+        x: 5
+        y: 3
+
+    - label:
+        id: claim_title
+        text: "Claim"
+        align: TOP_LEFT
+        x: 25
+        y: 0
+        text_font: font_ui
+
+    - label:
+        id: claim_code_label
+        text: ""
+        align: TOP_LEFT
+        x: 6
+        y: 28
+        text_font: font_hero
+
+    - canvas:
+        id: claim_qr
+        width: 105
+        height: 105
+        align: TOP_RIGHT
+        x: -4
+        y: 2
+
+    - label:
+        id: claim_hint
+        text: "Turn on from the web page"
+        align: TOP_LEFT
+        x: 6
+        y: 80
+        text_font: font1
+
+    - label:
+        id: claim_expiry
+        text: ""
+        align: TOP_LEFT
+        x: 6
+        y: 94
+        text_font: font1
+
+    - obj:
+        x: 0
+        y: 107
+        width: 73
+        height: 20
+        radius: 0
+        border_width: 0
+        bg_color: paper_black
+        widgets:
+          - label:
+              text: "Back"
+              align: CENTER
+              text_color: paper_white
+              text_font: font1
+    - obj:
+        x: 75
+        y: 107
+        width: 73
+        height: 20
+        radius: 0
+        border_width: 0
+        bg_color: paper_black
+        widgets:
+          - label:
+              text: "-"
+              align: CENTER
+              text_color: paper_white
+              text_font: font1
+    - obj:
+        x: 150
+        y: 107
+        width: 73
+        height: 20
+        radius: 0
+        border_width: 0
+        bg_color: paper_black
+        widgets:
+          - label:
+              text: "+"
+              align: CENTER
+              text_color: paper_white
+              text_font: font1
+    - obj:
+        x: 225
+        y: 107
+        width: 71
+        height: 20
+        radius: 0
+        border_width: 0
+        bg_color: paper_black
+        widgets:
+          - label:
+              id: claim_next_label
+              text: "Refresh"
+              align: CENTER
+              text_color: paper_white
+              text_font: font1

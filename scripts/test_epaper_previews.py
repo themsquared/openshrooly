@@ -51,8 +51,14 @@ def main() -> None:
     assert "id: mark_16" in display, "mark_16 must live in display.yaml so << merge keeps it"
     splash_yaml = (ROOT / "esphome" / "lvgl_screens" / "00_splash.yaml").read_text(encoding="utf-8")
     assert "by Shroom Labs" in splash_yaml
+    claim_yaml = (ROOT / "esphome" / "lvgl_screens" / "07_cloud_claim.yaml").read_text(encoding="utf-8")
+    assert "id: icloudclaim" in claim_yaml
+    assert "id: claim_code_label" in claim_yaml
+    assert "text_font: font_hero" in claim_yaml
+    assert "id: claim_qr" in claim_yaml
     script = (ROOT / "esphome" / "scripts" / "update_growing_screen.yaml").read_text(encoding="utf-8")
-    for path_text in (main_yaml, splash_yaml, script):
+    cloud_script = (ROOT / "esphome" / "scripts" / "update_cloud_screen.yaml").read_text(encoding="utf-8")
+    for path_text in (main_yaml, splash_yaml, claim_yaml, script, cloud_script):
         assert "\u2014" not in path_text and "\u2013" not in path_text, "no em or en dashes in screen text"
     assert "grow_started_ts" in script, "grow day must auto-advance from grow_started_ts"
     logo = Image.open(ROOT / "esphome" / "images" / "splash_logo.png")

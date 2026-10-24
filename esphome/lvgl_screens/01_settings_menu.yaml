@@ -53,6 +53,13 @@
         x: 10
         y: 78
         text_font: font1
+    - label:
+        id: menu_cloud_item
+        text: "  Cloud"
+        align: TOP_LEFT
+        x: 10
+        y: 90
+        text_font: font1
 
     - obj:
         x: 0

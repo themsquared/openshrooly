@@ -42,10 +42,10 @@ shroomlabs-device-pop-v1
 <nonce>
 <METHOD>
 <path>
-<base64url SHA-256 of the exact request body>
+<lowercase hex SHA-256 of the exact request body>
 ```
 
-3. It sends `x-device-nonce: <nonce>` and `x-device-proof: <base64url signature>` (raw 64-byte r||s or DER).
+3. It sends `x-device-nonce: <nonce>` and `x-device-proof: <base64 signature>` (raw 64-byte r||s or DER). The Worker also accepts URL-safe base64.
 4. The Worker verifies the signature with the device key on file, then consumes the nonce with one atomic `DELETE ... WHERE nonce_hash = ? AND device_id = ? AND expires_at > ?`. Replays, expired nonces, another device's nonce, and edits to the path or body are all refused.
 
 ### CSR rules

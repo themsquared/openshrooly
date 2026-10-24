@@ -95,6 +95,7 @@ jobs:
         run: |
           (cd webapp && npm test)
           python3 scripts/test_signed_update.py
+          python3 scripts/test_shroom_labs_cloud.py
 
       - name: Verify embedded assets are current
         run: |

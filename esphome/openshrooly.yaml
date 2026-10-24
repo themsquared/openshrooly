@@ -260,3 +260,4 @@ packages:
   updates: !include components/updates.yaml
   security: !include components/security.yaml
   daily_range: !include components/daily_range.yaml
+  cloud: !include components/cloud.yaml
