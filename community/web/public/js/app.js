@@ -117,10 +117,11 @@ async function renderHome() {
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML = profiles.length
     ? profiles
-        .map(
-          (p, index) => `
+        .map((p, index) => {
+          const art = speciesArt(p.species, p.strain, p.name, p.pack, { priority: index === 0, id: p.id });
+          return `
     <a class="profile-card" href="${profileHref(p.id)}">
-      <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack, { priority: index === 0 })}</div>
+      ${art ? `<div class="profile-art">${art}</div>` : ""}
       <div class="profile-body">
         <p><span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>${
           p.pricing?.kind === "paid"
@@ -132,8 +133,8 @@ async function renderHome() {
         <p>${escapeHtml(p.summary || "")}</p>
         ${stageDots(p.stage_list || [])}
       </div>
-    </a>`
-        )
+    </a>`;
+        })
         .join("")
     : `<div class="empty-library">
         <svg class="empty-mark" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg>
@@ -154,7 +155,12 @@ async function renderProfile() {
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
   $("#chips").innerHTML = `<span class="chip">${escapeHtml(label)}</span>`;
-  $("#art").innerHTML = speciesArt(p.species, p.strain, p.name, p.pack);
+  const art = speciesArt(p.species, p.strain, p.name, p.pack, { id: p.id });
+  const artEl = $("#art");
+  if (artEl) {
+    artEl.innerHTML = art;
+    artEl.hidden = !art;
+  }
   const legal = $("#legal");
   if (legal && (off || p.legal_notice)) {
     legal.textContent = off ? PSI_LEGAL_NOTICE : p.legal_notice;

@@ -265,14 +265,23 @@ h1, .display {
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45), 0 0 36px rgba(125, 255, 179, 0.14);
 }
 .profile-card:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 3px; }
-.profile-art { height: 176px; background: #0c1410; overflow: hidden; }
+.profile-art { background: #0c1410; overflow: hidden; }
 .profile-art img, .profile-art svg {
   width: 100%;
-  height: 100%;
+  height: 176px;
   object-fit: cover;
   display: block;
   transition: transform 0.55s ease;
 }
+.species-photo { margin: 0; }
+.photo-credit {
+  margin: 0;
+  padding: 0.4rem 0.75rem 0.55rem;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sl-ink-dim);
+}
+.photo-credit a { color: inherit; }
 .profile-card:hover .profile-art img,
 .profile-card:hover .profile-art svg,
 .profile-card:focus-visible .profile-art img,
@@ -285,6 +294,7 @@ h1, .display {
   object-fit: cover;
   display: block;
 }
+#art .species-photo img { height: auto; max-height: min(42vw, 340px); }
 .how { margin: 2.4rem 0; }
 .how h3 { font-family: var(--display); font-size: 1.35rem; margin: 0.2rem 0 0.35rem; }
 .profile-art svg { width: 100%; height: 100%; display: block; }
@@ -699,6 +709,7 @@ button.nav-toggle {
 .profile-page .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 2rem; }
 .profile-page-art { padding: 0; margin-bottom: 1.4rem; }
 .profile-page-art img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.profile-page-art .species-photo img { aspect-ratio: auto; object-fit: contain; background: #0c1410; }
 .profile-page .grow-timeline p { margin: 0.35rem 0 0; color: var(--sl-ink-dim); }
 .faq-links { padding-left: 1.2rem; }
 .faq-links li { margin: 0 0 0.6rem; }
