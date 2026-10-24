@@ -106,6 +106,8 @@ Trust boundaries:
 
 Commands the SaaS may queue: `apply_profile`, `setpoints`, `schedule`, `firmware_notice`. The device decides whether to apply.
 
+Telemetry and `last_seen_at` are the data source for a later **email alerts** ship (plan: [`docs/ALERTS.md`](ALERTS.md)). Do not implement that ship until the device web UI and signed OTA have landed. Push is a later channel, not a second pipeline.
+
 ## ESP32-S3 footprint
 
 | Piece | Flash | Heap (idle / handshake) | Notes |

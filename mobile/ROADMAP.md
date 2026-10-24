@@ -7,5 +7,5 @@ Scaffold only. No App Store binary.
 3. **Apply profiles** — list entitled/free profiles from `api.shroomlabs.io`, apply via the hub.
 4. **Browse / purchase** — culinary catalog; Stripe stub until live keys.
 5. **Grow journal** — camera photos, later upload to `cdn.shroomlabs.io`.
-6. **Push** — Expo notifications for stage auto-advance (hub-originated). Not implemented.
+6. **Push** — Expo is a **channel** on the email-first alerts pipeline (`docs/ALERTS.md`, Ship 8). Do not invent a second event engine. Not implemented until email lands.
 7. **Review** — privacy nutrition labels, Sign in with Apple (mandatory if Google is present), no tracking SDK.
