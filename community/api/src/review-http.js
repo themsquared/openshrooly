@@ -268,11 +268,12 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const profile = validateProfile(stripCommunityAffiliates(await readJson(request)));
     if (profile.id !== id) throw new ValidationError("profile id cannot change");
     profile.author = user.username;
+    const priorRow = { ...existing, document: existing.document };
     await upsertProfile(db, profile, user, { published: Number(existing.published) });
     const bodyTitle = profile.name;
     const bodyDesc = profile.summary;
     await maybeResetOnPublicEdit(db, profile, { title: bodyTitle, description: bodyDesc });
-    await saveDraftReview(db, profile, { priorRow: existing });
+    await saveDraftReview(db, profile, { priorRow });
     const review = await getReview(db, id);
     const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [id]);
     return json({ profile, review: reviewView(review, photos) });

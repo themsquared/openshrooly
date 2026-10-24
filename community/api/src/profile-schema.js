@@ -295,7 +295,7 @@ export function classifyTaxon(profile, extra = {}) {
     isLatinLetterSafe(profile?.name) && isLatinLetterSafe(profile?.species) && isLatinLetterSafe(profile?.strain);
   const realEpithet = Boolean(parsed.epithet) && !PLACEHOLDER_EPITHETS.has(parsed.epithet);
   const culinary = !force && CULINARY_GENERA.has(parsed.genus) && realEpithet && latinOk;
-  const hasSpecies = Boolean(normalizeTaxonText(profile?.species));
+  const hasSpecies = Boolean(String(profile?.species || "").trim());
   const hold = !force && !culinary && hasSpecies;
   const identityStrainFlag = looksLikeCubeStrain(profile?.strain) || looksLikeCubeStrain(profile?.name);
   const proseFlag = hasProseFlag(proseFields(profile, extra)) || (culinary && identityStrainFlag);

@@ -786,7 +786,7 @@ test("fork and official seed ids cannot be squatted", async () => {
   assert.equal(seedSquat.status, 409);
   const forked = await call(ctx, "POST", "/api/profiles/blue-oyster/fork", { token: alice.token, body: {} });
   assert.equal(forked.status, 201, JSON.stringify(forked.data));
-  assert.equal(forked.data.id, "blue-oyster-fork-alice");
+  assert.equal(forked.data.id, `blue-oyster-fork-${alice.user.username}`);
 });
 
 test("an approved report photo on an unpublished draft stays private", async () => {

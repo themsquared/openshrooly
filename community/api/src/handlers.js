@@ -651,8 +651,9 @@ async function pushOneProfile(db, item, user) {
     if (existing && Number(existing.author_id) !== Number(user.id)) {
       return { id: profile.id, status: "skipped", reason: "owned_by_other" };
     }
+    const priorRow = existing ? { ...existing, document: existing.document } : null;
     await upsertProfile(db, profile, user, { published: 0 });
-    await saveDraftReview(db, profile, { priorRow: existing });
+    await saveDraftReview(db, profile, { priorRow });
     return { id: profile.id, status: existing ? "updated" : "created" };
   } catch (err) {
     return { id, status: "skipped", reason: err?.message || "invalid" };
