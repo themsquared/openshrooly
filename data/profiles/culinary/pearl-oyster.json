@@ -34,15 +34,15 @@
     {
       "id": "colonization",
       "name": "Colonization",
-      "duration_days": 14,
-      "humidity_percent": 90,
+      "duration_days": 14.0,
+      "humidity_percent": 90.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 24,
+      "temperature_c": 24.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 19,
-      "temperature_warning_max_c": 29,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -61,22 +61,22 @@
     {
       "id": "pinning",
       "name": "Pinning",
-      "duration_days": 5,
-      "humidity_percent": 93,
+      "duration_days": 5.0,
+      "humidity_percent": 93.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 18,
+      "temperature_c": 18.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 13,
-      "temperature_warning_max_c": 23,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 23.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 200,
+        "white_led_lux": 92,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 15,
@@ -88,22 +88,22 @@
     {
       "id": "fruiting",
       "name": "Fruiting",
-      "duration_days": 10,
-      "humidity_percent": 88,
+      "duration_days": 10.0,
+      "humidity_percent": 88.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 16,
+      "temperature_c": 16.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 11,
-      "temperature_warning_max_c": 21,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 11.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 250,
+        "white_led_lux": 92,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 10,
@@ -142,5 +142,51 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization stays dark, as in Penn State spawn-run rooms. Fruiting uses 12 h and a blue-heavy mix because P. ostreatus aggregates and forms caps under 440 to 470 nm light. White 20% is 92 lux on this strip, inside the Penn State 50 to 300 lux band.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Penn State oyster production",
+        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h for fruiting (Stamets) and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
+        "url": "https://mushroomcompany.com/resources/oyster/paoyster.pdf"
+      },
+      {
+        "title": "Durand 1987 action spectrum",
+        "detail": "R. Durand and R. Jacques, Action spectra for hyphal aggregation, the first stage of fruiting, in Pleurotus ostreatus, Photochemistry and Photobiology 45 (1987). Peaks at 370 nm and 440 to 450 nm. Wavelengths longer than 530 nm gave no response.",
+        "url": "https://doi.org/10.1111/j.1751-1097.1987.tb07888.x"
+      },
+      {
+        "title": "Wang 2020 blue versus red",
+        "detail": "Hao Wang et al., Transcriptomic profiling sheds light on the blue-light and red-light response of oyster mushroom (Pleurotus ostreatus), AMB Express 10 (2020). Blue LED 430 to 470 nm at about 50 umol/m2/s improved cap growth. Red 610 to 640 nm did not.",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6969877/"
+      },
+      {
+        "title": "De Bonis 2024 LED wavelengths",
+        "detail": "Marina De Bonis et al., Effect of Different LED Light Wavelengths on Production and Quality of Pleurotus ostreatus, Horticulturae 10 (2024), with Penn State co-authors. 450 nm blue increased cap diameter versus red 610 nm.",
+        "url": "https://www.mdpi.com/2311-7524/10/4/349"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
   }
 }

@@ -30,15 +30,15 @@
     {
       "id": "colonization",
       "name": "Colonization",
-      "duration_days": 21,
-      "humidity_percent": 88,
+      "duration_days": 21.0,
+      "humidity_percent": 88.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 27,
+      "temperature_c": 27.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 20,
-      "temperature_warning_max_c": 33,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 20.0,
+      "temperature_warning_max_c": 33.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -57,22 +57,22 @@
     {
       "id": "pinning",
       "name": "Antler / primordia",
-      "duration_days": 21,
-      "humidity_percent": 90,
+      "duration_days": 21.0,
+      "humidity_percent": 90.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 24,
+      "temperature_c": 24.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 19,
-      "temperature_warning_max_c": 29,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 10,
-        "white_led_lux": 150,
+        "duration_hours": 12,
+        "white_led_lux": 506,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 90,
@@ -84,22 +84,22 @@
     {
       "id": "fruiting",
       "name": "Console formation",
-      "duration_days": 35,
-      "humidity_percent": 85,
+      "duration_days": 35.0,
+      "humidity_percent": 85.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 23,
+      "temperature_c": 23.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 18,
-      "temperature_warning_max_c": 28,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 18.0,
+      "temperature_warning_max_c": 28.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 280,
+        "white_led_lux": 506,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 20,
@@ -138,5 +138,46 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization is dark. Fruiting uses 12 h and 37% white, mapped from 500 lux in the Corvinus literature table (200 to 500 lux early, 500 to 1000 lux later). Blue is the general photomorphogenesis mix. A 2024 paper found green raised weight and red delayed caps; we do not invent a green-heavy mix from that.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Corvinus University reishi thesis",
+        "detail": "Petra Maszlaver, Cultivation possibilities for production of reishi mushroom Ganoderma lucidum, Corvinus University of Budapest PhD (2011). Literature table: 200 to 500 lux in early fruiting, 500 to 1000 lux later. 500 lux maps to 37% white.",
+        "url": "https://phd.lib.uni-corvinus.hu/319/3/maszlaver_petra_ten.pdf"
+      },
+      {
+        "title": "Agriculture 2024 Ganoderma light",
+        "detail": "Study on the Effects of Different Light Supply Modes on Ganoderma lucidum, Agriculture 14 (2024). 12 h / 12 h at 15 umol/m2/s. Red delayed or blocked differentiation. Green raised fruit weight. Blue is still used here as the general photomorphogenesis mix; this paper did not give a lux number for our white channel.",
+        "url": "https://doi.org/10.3390/agriculture14060835"
+      },
+      {
+        "title": "Oregon State Extension reishi",
+        "detail": "OSU Extension EM 9364, Reishi Mushroom Growing Guide. Antler versus shelf form is tied to oxygen, not a lux number. Colonize blocks before opening them to fruiting.",
+        "url": "https://extension.oregonstate.edu/catalog/pub/em-9364-nontimber-forest-products-small-woodland-owners-reishi-mushroom-growing-guide"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 37,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
   }
 }

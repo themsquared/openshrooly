@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readdirSync } from "node:fs";
 import { affiliateLinksFor, isPsilocybin, validateProfile, ValidationError } from "../src/profile.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -23,6 +24,43 @@ test("paid culinary profile is allowed", () => {
   validateProfile(premium);
   assert.equal(premium.pricing.kind, "paid");
   assert.deepEqual(premium.allowed_payment_providers, ["stripe"]);
+});
+
+test("every seed profile has a sourced light recipe inside the ranges", () => {
+  const files = ["culinary", "psilocybin"].flatMap((pack) =>
+    readdirSync(join(root, "data/profiles", pack))
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => `data/profiles/${pack}/${name}`)
+  );
+  assert.ok(files.length >= 26);
+  for (const file of files) {
+    const profile = load(file);
+    validateProfile(profile);
+    const recipe = profile.light_recipe;
+    assert.ok(recipe, file);
+    assert.ok(recipe.why);
+    assert.match(recipe.wavelength_note, /465 to 475 nm/);
+    assert.ok(recipe.sources.length >= 1, file);
+    assert.ok(recipe.phases.colonization);
+    assert.ok(recipe.phases.fruiting);
+    for (const [name, phase] of Object.entries(recipe.phases)) {
+      assert.ok(phase.photoperiod_hours >= 0 && phase.photoperiod_hours <= 24, `${file} ${name}`);
+      assert.ok(phase.white_brightness_percent >= 0 && phase.white_brightness_percent <= 100, `${file} ${name}`);
+    }
+  }
+});
+
+test("light recipe validation rejects bad ranges and missing sources", () => {
+  const pearl = load("data/profiles/culinary/pearl-oyster.json");
+  const badHours = structuredClone(pearl);
+  badHours.light_recipe.phases.fruiting.photoperiod_hours = 25;
+  assert.throws(() => validateProfile(badHours), ValidationError);
+  const badWhite = structuredClone(pearl);
+  badWhite.light_recipe.phases.fruiting.white_brightness_percent = -1;
+  assert.throws(() => validateProfile(badWhite), ValidationError);
+  const noSources = structuredClone(pearl);
+  noSources.light_recipe.sources = [];
+  assert.throws(() => validateProfile(noSources), ValidationError);
 });
 
 test("psilocybin pack rejects payments and affiliates", () => {

@@ -134,7 +134,7 @@ def maybe_advance_grow(conn, device_id: int) -> None:
     stage = profile.stage_at_day(elapsed)
     if stage.id != grow["current_stage_id"]:
         device = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
-        result = device_client(device).apply_stage(stage)
+        result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
         conn.execute("UPDATE grows SET current_stage_id=? WHERE id=?", (stage.id, grow["id"]))
         conn.execute(
             "UPDATE devices SET current_profile_id=?, current_stage_id=? WHERE id=?",
@@ -314,7 +314,7 @@ def apply_profile(
         raise HTTPException(404, "device not found")
     profile = get_profile(conn, profile_id)
     stage = profile.stage_by_id(stage_id) if stage_id else profile.stages[0]
-    result = device_client(device).apply_stage(stage)
+    result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
     if start_grow == "1":
         conn.execute("UPDATE grows SET ended_at=? WHERE device_id=? AND ended_at IS NULL", (db.now(), device_id))
         conn.execute(
@@ -349,7 +349,7 @@ def profile_detail(request: Request, profile_id: str):
         request,
         "profile.html",
         profile=profile,
-        preview={stage.id: commands_as_preview(stage) for stage in profile.stages},
+        preview={stage.id: commands_as_preview(stage, profile.light_recipe) for stage in profile.stages},
     )
 
 

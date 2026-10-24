@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from .models import ProfileStage
+from .models import LightPhase, LightRecipe, LightSchedule, MushroomProfile, ProfileStage
 
 # Firmware 1.0.x exposes one live setpoint set. The hub applies the active
 # stage; automatic multi-day stage changes stay on the hub (see ROADMAP).
@@ -57,8 +57,63 @@ ENTITY_CANDIDATES: dict[str, tuple[str, ...]] = {
 }
 
 
-def stage_to_commands(stage: ProfileStage) -> list[DeviceCommand]:
+def brightness_percent_to_lux(percent: float) -> int:
+    """Inverse of lighting_control_manager.yaml lux_to_brightness.
+
+    At or below 20% the firmware uses a linear fit: 20% is 92 lux.
+    Above 20% it uses lux = 0.02307 * brightness^2.768.
+    """
+    pct = float(percent)
+    if pct <= 0:
+        return 0
+    if pct <= 20:
+        return int(round((pct / 20.0) * 92.0))
+    return int(round(0.02307 * (pct**2.768)))
+
+
+def lux_to_brightness_percent(lux: float) -> float:
+    """Same curve the firmware applies to the white channel."""
+    value = float(lux)
+    if value <= 0:
+        return 0.0
+    if value <= 92:
+        return (value / 92.0) * 20.0
+    return (value / 0.02307) ** (1.0 / 2.768)
+
+
+def phase_to_schedule(phase: LightPhase, sunrise_hour: int = 8) -> LightSchedule:
+    return LightSchedule(
+        sunrise_hour=sunrise_hour,
+        duration_hours=phase.photoperiod_hours,
+        white_led_lux=brightness_percent_to_lux(phase.white_brightness_percent),
+        red_percent=phase.red_percent,
+        green_percent=phase.green_percent,
+        blue_percent=phase.blue_percent,
+    )
+
+
+def schedule_for_stage(
+    stage: ProfileStage, recipe: LightRecipe | None = None
+) -> LightSchedule:
+    if recipe is not None:
+        return phase_to_schedule(recipe.phase_for(stage.id), stage.light.sunrise_hour)
+    return stage.light
+
+
+def apply_recipe_to_profile(profile: MushroomProfile) -> MushroomProfile:
+    """Copy the light recipe onto each stage so hub writes match the cited mix."""
+    if profile.light_recipe is None:
+        return profile
+    for stage in profile.stages:
+        stage.light = phase_to_schedule(profile.light_recipe.phase_for(stage.id), stage.light.sunrise_hour)
+    return profile
+
+
+def stage_to_commands(
+    stage: ProfileStage, recipe: LightRecipe | None = None
+) -> list[DeviceCommand]:
     """Translate one grow stage into REST writes the 1.0.x firmware already accepts."""
+    light = schedule_for_stage(stage, recipe)
     return [
         DeviceCommand("number", ENTITY_CANDIDATES["target_humidity"], stage.humidity_percent, "humidity"),
         DeviceCommand(
@@ -124,28 +179,30 @@ def stage_to_commands(stage: ProfileStage) -> list[DeviceCommand]:
         DeviceCommand(
             "number",
             ENTITY_CANDIDATES["sunrise_hour"],
-            stage.light.sunrise_hour,
+            light.sunrise_hour,
             "sunrise_hour",
         ),
         DeviceCommand(
             "number",
             ENTITY_CANDIDATES["light_hours"],
-            stage.light.duration_hours,
+            light.duration_hours,
             "light_hours",
         ),
         DeviceCommand(
             "number",
             ENTITY_CANDIDATES["white_intensity"],
-            stage.light.white_led_lux,
+            light.white_led_lux,
             "white_led_lux",
         ),
-        DeviceCommand("number", ENTITY_CANDIDATES["color_r"], stage.light.red_percent, "red"),
-        DeviceCommand("number", ENTITY_CANDIDATES["color_g"], stage.light.green_percent, "green"),
-        DeviceCommand("number", ENTITY_CANDIDATES["color_b"], stage.light.blue_percent, "blue"),
+        DeviceCommand("number", ENTITY_CANDIDATES["color_r"], light.red_percent, "red"),
+        DeviceCommand("number", ENTITY_CANDIDATES["color_g"], light.green_percent, "green"),
+        DeviceCommand("number", ENTITY_CANDIDATES["color_b"], light.blue_percent, "blue"),
     ]
 
 
-def commands_as_preview(stage: ProfileStage) -> list[dict[str, Any]]:
+def commands_as_preview(
+    stage: ProfileStage, recipe: LightRecipe | None = None
+) -> list[dict[str, Any]]:
     return [
         {
             "field": cmd.field,
@@ -153,5 +210,5 @@ def commands_as_preview(stage: ProfileStage) -> list[dict[str, Any]]:
             "entity_ids": list(cmd.entity_ids),
             "value": cmd.value,
         }
-        for cmd in stage_to_commands(stage)
+        for cmd in stage_to_commands(stage, recipe)
     ]

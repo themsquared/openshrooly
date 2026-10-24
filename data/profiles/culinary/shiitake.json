@@ -30,15 +30,15 @@
     {
       "id": "colonization",
       "name": "Colonization",
-      "duration_days": 42,
-      "humidity_percent": 88,
+      "duration_days": 42.0,
+      "humidity_percent": 88.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 24,
+      "temperature_c": 24.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 19,
-      "temperature_warning_max_c": 29,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -57,15 +57,15 @@
     {
       "id": "browning",
       "name": "Browning / skin",
-      "duration_days": 21,
-      "humidity_percent": 80,
+      "duration_days": 21.0,
+      "humidity_percent": 80.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 21,
+      "temperature_c": 21.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 16,
-      "temperature_warning_max_c": 26,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 16.0,
+      "temperature_warning_max_c": 26.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -84,15 +84,15 @@
     {
       "id": "cold_shock",
       "name": "Cold shock (off-device)",
-      "duration_days": 1,
-      "humidity_percent": 90,
+      "duration_days": 1.0,
+      "humidity_percent": 90.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 16,
+      "temperature_c": 16.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 13,
-      "temperature_warning_max_c": 20,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 20.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -111,22 +111,22 @@
     {
       "id": "fruiting",
       "name": "Fruiting",
-      "duration_days": 10,
-      "humidity_percent": 85,
+      "duration_days": 10.0,
+      "humidity_percent": 85.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 16,
+      "temperature_c": 16.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 12,
-      "temperature_warning_max_c": 21,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 250,
+        "white_led_lux": 92,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 12,
@@ -165,5 +165,50 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization and the browning rest stay dark (mycelium grows faster without strong light). Fruiting uses 12 h and the general 20% white / blue mix. Leatham and Kim show light, especially blue, is needed for normal caps. No shiitake-specific lux for this chamber was found.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Leatham and Stahmann 1987",
+        "detail": "Gary F. Leatham and Mark A. Stahmann, Effect of light and aeration on fruiting of Lentinula edodes, Trans. Br. Mycol. Soc. 88 (1987). Light is required for normal fruiting. Blue 400 to 500 nm stimulated fruiting on high-calcium media. Only pigmented primordia expanded.",
+        "url": "https://www.fpl.fs.usda.gov/documnts/pdf1987/leath87a.pdf"
+      },
+      {
+        "title": "Kim 2024 shiitake blue light",
+        "detail": "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). Blue light raised yield versus white in two cultivars.",
+        "url": "https://doi.org/10.1080/12298093.2024.2430052"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      },
+      {
+        "title": "General default",
+        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h (Stamets) and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
   }
 }

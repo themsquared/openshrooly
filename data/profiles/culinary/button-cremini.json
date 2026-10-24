@@ -30,15 +30,15 @@
     {
       "id": "colonization",
       "name": "Spawn run",
-      "duration_days": 16,
-      "humidity_percent": 88,
+      "duration_days": 16.0,
+      "humidity_percent": 88.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 24,
+      "temperature_c": 24.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 19,
-      "temperature_warning_max_c": 29,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -57,19 +57,19 @@
     {
       "id": "pinning",
       "name": "Casing / pinning",
-      "duration_days": 8,
-      "humidity_percent": 92,
+      "duration_days": 8.0,
+      "humidity_percent": 92.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 17,
+      "temperature_c": 17.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 12,
-      "temperature_warning_max_c": 22,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 22.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 2,
-        "white_led_lux": 40,
+        "duration_hours": 0,
+        "white_led_lux": 0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
@@ -84,19 +84,19 @@
     {
       "id": "fruiting",
       "name": "Fruiting",
-      "duration_days": 12,
-      "humidity_percent": 88,
+      "duration_days": 12.0,
+      "humidity_percent": 88.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 16,
+      "temperature_c": 16.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 12,
-      "temperature_warning_max_c": 21,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 2,
-        "white_led_lux": 40,
+        "duration_hours": 0,
+        "white_led_lux": 0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
@@ -138,5 +138,42 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "A. bisporus does not need light to fruit. Penn State rooms usually run without it. Both phases stay at 0 h and 0% on this strip.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Kertesz and Thai 2020",
+        "detail": "M. A. Kertesz and M. Thai, Critical Factors Involved in Primordia Building in Agaricus bisporus, Molecules 25 (2020). A. bisporus does not require light to fruit. Triggers are temperature, carbon dioxide, casing, and volatiles.",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7411738/"
+      },
+      {
+        "title": "Penn State Agaricus",
+        "detail": "Penn State Extension, Basic Procedures for Agaricus Mushroom Growing. Mushrooms are usually grown without light. Darkness is not a requirement, and light is not listed as a fruiting control.",
+        "url": "https://extension.psu.edu/basic-procedures-for-agaricus-mushroom-growing/"
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      }
+    }
   }
 }

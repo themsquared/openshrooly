@@ -30,15 +30,15 @@
     {
       "id": "colonization",
       "name": "Colonization",
-      "duration_days": 18,
-      "humidity_percent": 88,
+      "duration_days": 18.0,
+      "humidity_percent": 88.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 22,
+      "temperature_c": 22.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 17,
-      "temperature_warning_max_c": 27,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -57,22 +57,22 @@
     {
       "id": "pinning",
       "name": "Pinning",
-      "duration_days": 6,
-      "humidity_percent": 90,
+      "duration_days": 6.0,
+      "humidity_percent": 90.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 16,
+      "temperature_c": 16.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 11,
-      "temperature_warning_max_c": 21,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 11.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 10,
-        "white_led_lux": 180,
+        "duration_hours": 12,
+        "white_led_lux": 92,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 25,
@@ -84,22 +84,22 @@
     {
       "id": "fruiting",
       "name": "Fruiting",
-      "duration_days": 14,
-      "humidity_percent": 82,
+      "duration_days": 14.0,
+      "humidity_percent": 82.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 15,
+      "temperature_c": 15.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 11,
-      "temperature_warning_max_c": 21,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 11.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 10,
-        "white_led_lux": 200,
+        "duration_hours": 12,
+        "white_led_lux": 92,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 25,
@@ -138,5 +138,46 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Same dark spawn run as other oysters. Fruiting is blue-heavy because P. eryngii primordia respond to blue light. Hours and white percent are the oyster default (12 h, 20% / 92 lux). No king-oyster-specific lux was found.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Xie 2018 king oyster",
+        "detail": "Chunliang Xie et al., Comparative transcriptomics of Pleurotus eryngii reveals blue-light regulation of CAZymes at primordium differentiated into fruiting body stage, Gene 646 (2018). Blue light induced primordium differentiation.",
+        "url": "https://www.sciencedirect.com/science/article/pii/S0888754317300927"
+      },
+      {
+        "title": "Penn State oyster production",
+        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h for fruiting (Stamets) and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
+        "url": "https://mushroomcompany.com/resources/oyster/paoyster.pdf"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Spawn run is described as dark. Fruiting is commonly cited as about 12 h light."
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
   }
 }

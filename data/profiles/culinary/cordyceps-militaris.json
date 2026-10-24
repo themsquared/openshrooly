@@ -30,15 +30,15 @@
     {
       "id": "colonization",
       "name": "Colonization",
-      "duration_days": 12,
-      "humidity_percent": 82,
+      "duration_days": 12.0,
+      "humidity_percent": 82.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 20,
+      "temperature_c": 20.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 15,
-      "temperature_warning_max_c": 25,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 15.0,
+      "temperature_warning_max_c": 25.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -57,22 +57,22 @@
     {
       "id": "pinning",
       "name": "Orange initials",
-      "duration_days": 10,
-      "humidity_percent": 86,
+      "duration_days": 10.0,
+      "humidity_percent": 86.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 18,
+      "temperature_c": 18.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 13,
-      "temperature_warning_max_c": 23,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 23.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 400,
+        "white_led_lux": 1229,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 20
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 30,
@@ -84,22 +84,22 @@
     {
       "id": "fruiting",
       "name": "Stroma",
-      "duration_days": 35,
-      "humidity_percent": 84,
+      "duration_days": 35.0,
+      "humidity_percent": 84.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 18,
+      "temperature_c": 18.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 13,
-      "temperature_warning_max_c": 23,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 23.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 450,
+        "white_led_lux": 1229,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 25
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 25,
@@ -138,5 +138,37 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization stays dark. Fruiting uses 12 h and 51% white, mapped from 1250 lux (cordycepin optimum in Wu 2016; 1750 lux gave more dry weight). RGB is blue-heavy from later LED trials, not from a measured spectrum on this strip.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Wu 2016 Cordyceps militaris",
+        "detail": "Chiu-Yeh Wu et al., Effects of Illumination Pattern during Cultivation of Fruiting Body and Bioactive Compound Production by Cordyceps militaris, Int. J. Med. Mushrooms 18 (2016). Colonization in a spawn room without a stated photoperiod. Primordia and fruiting at 12 h per day. Highest dry yield at 1750 plus or minus 250 lux. Highest cordycepin at 1250 plus or minus 250 lux. This recipe maps 51% white to about 1250 lux.",
+        "url": "https://doi.org/10.1615/intjmedmushrooms.v18.i7.40"
+      },
+      {
+        "title": "Chang 2024 Cordyceps LED",
+        "detail": "Single-wavelength LED work on Cordyceps militaris found glare-blue wavelengths raised fruiting-body weight and cordycepin versus other colors (Journal of Food Biochemistry style LED trial, 2024). Used here only for the blue bias, not for a lux number.",
+        "url": "https://doi.org/10.1080/10942912.2024.2373781"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 51,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
   }
 }
