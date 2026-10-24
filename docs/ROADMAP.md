@@ -325,6 +325,21 @@ Threat model, ESP32-S3 heap/flash (~22–42 KB heap TLS, ~155 KB flash if mbedTL
 
 See `mobile/ROADMAP.md`. Talks to `api.shroomlabs.io` and the local hub. Same tokens. Push notifications planned. No App Store submission in this pass.
 
+### Phase 6 — alerts, email first (after device mTLS + 5b/5c)
+
+**Plan only. Do not implement until Ships 5b (device web UI) and 5c (USB / signed OTA) have landed.** Full spec: [`docs/ALERTS.md`](ALERTS.md).
+
+Depends on opted-in `POST /api/devices/:id/telemetry` and `last_seen_at` from Phase 0c / PR `#9`. Push is a later **channel** on the same pipeline, shipped with the Expo app, not a rewrite.
+
+- [ ] Channel interface (`email` now; `expo` and `web_push` stubs)
+- [ ] Events from upstream OpenShrooly fields: temp / humidity out of band (hold + hysteresis), water low, device offline, phase change, harvest window, firmware available
+- [ ] Per-user and per-device prefs, quiet hours in the account timezone, instant vs daily digest, minimal defaults
+- [ ] Dedupe, backoff, per-device rate limit, one resolved follow-up
+- [ ] Resend via existing `RESEND_API_KEY`, List-Unsubscribe, verified email only
+- [ ] Hub SMTP path so local alerts work with no cloud
+- [ ] Cron every 5 min + D1 (Queues are free as of 2026-02-04 but not required; free cron is 10 ms CPU)
+- [ ] Tests for dedupe, quiet hours, resolved; prod curl checklist in `docs/ALERTS.md`
+
 ## What works / what's stubbed (this PR)
 
 See the pull request body for a checklist. Short version:
