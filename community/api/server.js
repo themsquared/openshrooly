@@ -2,6 +2,7 @@
 /** Local/VPS adapter: same fetch handlers, memory DB + memory R2. */
 import { createServer } from "node:http";
 import { createMemoryDb } from "./src/db.js";
+import { runAlerts } from "./src/alerts/cron.js";
 import { handleRequest, withCors } from "./src/handlers.js";
 import { createMemoryStorage } from "./src/storage.js";
 
@@ -20,6 +21,7 @@ const env = {
   DEV_STUBS: process.env.DEV_STUBS || "1",
   HIBP_DISABLED: process.env.HIBP_DISABLED || "1",
   SITE_ORIGIN: process.env.SITE_ORIGIN || "http://127.0.0.1:8888",
+  API_ORIGIN: process.env.API_ORIGIN || `http://${host}:${port}`,
   OIDC_STUB: process.env.OIDC_STUB || "1",
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
@@ -55,6 +57,14 @@ const server = createServer(async (req, res) => {
   const buf = Buffer.from(await response.arrayBuffer());
   res.end(buf);
 });
+
+// Local stand in for the Worker Cron Trigger. ALERTS_CRON_MS=0 turns it off.
+const alertsEvery = Number(process.env.ALERTS_CRON_MS ?? 60000);
+if (alertsEvery > 0) {
+  setInterval(() => {
+    runAlerts(env).catch((err) => console.error("alerts cron", err?.message || err));
+  }, alertsEvery).unref();
+}
 
 server.listen(port, host, () => {
   console.log(`Shroom Labs API (local) http://${host}:${port}`);

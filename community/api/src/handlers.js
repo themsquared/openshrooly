@@ -19,6 +19,7 @@ import { corsAllowlist, originAllowed, securityHeaders, verifyPaymentWebhook } f
 import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
+import { handleAlerts } from "./alerts/http.js";
 
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
@@ -201,6 +202,8 @@ async function route(method, path, url, request, env) {
   if (deviceResponse) return deviceResponse;
   const coachResponse = await handleCoach(method, path, url, request, env);
   if (coachResponse) return coachResponse;
+  const alertsResponse = await handleAlerts(method, path, url, request, env);
+  if (alertsResponse) return alertsResponse;
 
   if (method === "GET" && path === "/health") {
     return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver, capabilities: capabilities(env, request) });

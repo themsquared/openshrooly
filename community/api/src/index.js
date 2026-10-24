@@ -2,6 +2,7 @@ import { createD1Db } from "./db.js";
 import { handleRequest, withCors } from "./handlers.js";
 import { SCHEMA_SQL } from "./schema.js";
 import { createOptionalStorage } from "./storage.js";
+import { runAlerts } from "./alerts/cron.js";
 
 async function envContext(env) {
   if (!env._ctx) {
@@ -23,6 +24,8 @@ async function envContext(env) {
       DEV_STUBS: env.DEV_STUBS,
       HIBP_DISABLED: env.HIBP_DISABLED,
       SITE_ORIGIN: env.SITE_ORIGIN || "https://shroomlabs.io",
+      API_ORIGIN: env.API_ORIGIN || "https://api.shroomlabs.io",
+      ALERTS_BATCH: env.ALERTS_BATCH,
       OIDC_STUB: env.OIDC_STUB,
       GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
@@ -59,5 +62,15 @@ export default {
     const ctx = await envContext(env);
     const response = await handleRequest(request, ctx);
     return withCors(response, ctx, request);
+  },
+
+  /** Cron Trigger: evaluate grow alerts. Overlapping or repeated runs are safe (see alerts/cron.js). */
+  async scheduled(event, env, executionCtx) {
+    const ctx = await envContext(env);
+    const work = runAlerts(ctx, { now: Number(event?.scheduledTime) || Date.now() })
+      .then((summary) => console.log(JSON.stringify({ level: "info", event: "alerts_cron", ...summary })))
+      .catch((err) => console.log(JSON.stringify({ level: "error", event: "alerts_cron_failed", message: String(err?.message || err).slice(0, 200) })));
+    executionCtx.waitUntil(work);
+    await work;
   },
 };

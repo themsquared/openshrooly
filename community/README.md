@@ -86,6 +86,10 @@ Built-in profiles live in `data/profiles/`. The API bundles them into `src/seeds
 - `Access-Control-Allow-Headers` includes `authorization, content-type`.
 - Grow photos are stored in R2 and served from `https://cdn.shroomlabs.io/<key>`. `/api/media/...` remains a local fallback.
 
+## Alerts
+
+Grow alerts (temperature, humidity, water, offline, fruiting day) are evaluated by a Cron Trigger every 5 minutes and shown on `account.html#alerts` and `device.html?id=`. Email is a stub until `RESEND_API_KEY` is set; see [`docs/ALERTS.md`](../docs/ALERTS.md). Locally, `server.js` runs the same evaluation every minute (`ALERTS_CRON_MS=0` turns it off).
+
 ## Environment
 
 See [`.env.example`](.env.example). Production secrets go in Wrangler / Netlify, never in git.
