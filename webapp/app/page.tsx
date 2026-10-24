@@ -817,7 +817,7 @@ export default function Dashboard() {
             min={400}
             max={2000}
             color="var(--sl-co2)"
-            detail="if sensor present"
+            detail="air freshness"
           />
         ) : (
           <LiveGauge
@@ -983,7 +983,7 @@ export default function Dashboard() {
               <div className="calibrate-info" style={isCalibrated ? { color: '#4ade80' } : undefined}>
                 {isCalibrated
                   ? '✓ Sensor is calibrated'
-                  : 'Calibration sets the dry-tank baseline for accurate water-level measurement.'}
+                  : 'Calibrating tells the chamber what an empty tank looks like, so the water level reads correctly.'}
               </div>
 
               {calibrationError && (
@@ -1007,7 +1007,7 @@ export default function Dashboard() {
                 ⚠️ Please completely empty and dry the water reservoir before calibrating.
               </p>
               <p className="calibrate-instruction">
-                This will set the current sensor readings as the "dry" baseline for accurate water level measurement.
+                This saves the current reading as an empty tank, so the water level reads correctly.
               </p>
               <p className="calibrate-instruction">
                 The reading will update immediately after calibration.
@@ -1246,7 +1246,7 @@ export default function Dashboard() {
               {(entities['switch-temperature_control_enabled']?.state === 'ON' || entities['switch-temperature_control_enabled']?.value === true) && (
                 <>
                   <div className="temp-disclaimer" style={{ marginBottom: '20px' }}>
-                    ⚠️ <strong>Important:</strong> OpenShrooly can request heating, but external heating equipment must be controlled via Home Assistant. The "Heat Requested" binary sensor signals when heating is needed.
+                    ⚠️ <strong>Important:</strong> The chamber can ask for heat, but it cannot run a heater by itself. Pair a heater with your smart home system, such as Home Assistant, so it turns on when the chamber asks for heat.
                   </div>
 
                   <div className="control-group">
@@ -1382,7 +1382,7 @@ export default function Dashboard() {
                   Temperature Warnings
                 </h3>
                 <div className="temp-disclaimer" style={{ marginBottom: '15px' }}>
-                  ℹ️ <strong>Note:</strong> These thresholds only trigger warnings. Home Assistant integration is required to receive and act on temperature warning alerts.
+                  ℹ️ <strong>Note:</strong> These limits only show a warning here. To get alerts on your phone or act on them, connect the chamber to a smart home system such as Home Assistant.
                 </div>
                 <div className="control-group">
                   <label>Warning Minimum: {getNumber('temperature__warning_minimum')}°C</label>

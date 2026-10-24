@@ -46,7 +46,7 @@ test("no em or en dashes anywhere in the UI source", () => {
 });
 
 test("visible copy avoids developer words", () => {
-  const banned = [/\bSSID\b/, /captive portal/i, /setpoint/i, /\bcaption\b/i, /e-paper/i, /\bOTA\b/, /firmware/i, /ESPHome form/i, /\bJSON\b/, /\bAPI\b/];
+  const banned = [/\bSSID\b/, /captive portal/i, /setpoint/i, /\bcaption\b/i, /e-paper/i, /\bOTA\b/, /firmware/i, /ESPHome form/i, /\bJSON\b/, /\bAPI\b/, /binary sensor/i, /\bintegration\b/i, /\bbaseline\b/i, /if sensor present/i];
   for (const file of sources.filter((f) => f.endsWith(".tsx") || f.endsWith(".js"))) {
     const text = visibleText(stripComments(fs.readFileSync(file, "utf8")));
     for (const word of banned) {
