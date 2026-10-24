@@ -149,6 +149,10 @@ function publicUser(user) {
   };
 }
 
+// Production users.password_hash is NOT NULL. Accounts without a password store this marker;
+// verifyPassword only accepts "pbkdf2$..." values, so it can never match a password.
+export const NO_PASSWORD = "!no-password";
+
 async function findOrCreateByEmail(db, email, usernameHint) {
   const normalized = email.trim().toLowerCase();
   let user = await db.one("SELECT * FROM users WHERE email=?", [normalized]);
@@ -162,7 +166,7 @@ async function findOrCreateByEmail(db, email, usernameHint) {
   }
   await db.run(
     "INSERT INTO users (username, password_hash, email, email_verified, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [candidate, null, normalized, 1, candidate, "user", nowIso()]
+    [candidate, NO_PASSWORD, normalized, 1, candidate, "user", nowIso()]
   );
   return db.one("SELECT * FROM users WHERE email=?", [normalized]);
 }
@@ -204,11 +208,16 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/magic/complete") {
     const body = await request.json().catch(() => ({}));
     const token = String(body.token || url.searchParams.get("token") || "");
-    const row = await db.one("SELECT * FROM magic_links WHERE token_hash=?", [await sha256Hex(token)]);
-    if (!row || row.purpose !== "login" || row.used_at || row.expires_at < nowIso()) {
-      return json({ error: "Link expired or already used." }, 401);
-    }
-    await db.run("UPDATE magic_links SET used_at=? WHERE token_hash=?", [nowIso(), await sha256Hex(token)]);
+    const tokenHash = await sha256Hex(token);
+    const now = nowIso();
+    // Consume in one statement so two concurrent requests cannot both use the link. Only login links count;
+    // an OIDC handoff token is not a magic link.
+    const consumed = await db.run(
+      "UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at > ? AND purpose=?",
+      [now, tokenHash, now, "login"]
+    );
+    if (Number(consumed?.meta?.changes) !== 1) return json({ error: "Link expired or already used." }, 401);
+    const row = await db.one("SELECT * FROM magic_links WHERE token_hash=?", [tokenHash]);
     const user = await findOrCreateByEmail(db, row.email);
     await db.run("UPDATE users SET email_verified=1 WHERE id=?", [user.id]);
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
@@ -632,14 +641,15 @@ async function completeOidcHandoff(env, request) {
   if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
   const body = await request.json().catch(() => ({}));
   const hash = await sha256Hex(String(body.token || ""));
-  const row = await env.db.one("SELECT * FROM magic_links WHERE token_hash=?", [hash]);
   const expired = { error: "This sign-in expired. Start again." };
-  if (!row || row.purpose !== "oidc_handoff" || row.used_at || row.expires_at < nowIso()) return json(expired, 401);
+  const now = nowIso();
   const used = await env.db.run(
-    "UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL AND purpose=?",
-    [nowIso(), hash, "oidc_handoff"]
+    "UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at > ? AND purpose=?",
+    [now, hash, now, "oidc_handoff"]
   );
-  if (Number(used?.meta?.changes ?? used?.changes ?? 0) !== 1) return json(expired, 401);
+  if (Number(used?.meta?.changes ?? 0) !== 1) return json(expired, 401);
+  const row = await env.db.one("SELECT * FROM magic_links WHERE token_hash=?", [hash]);
+  if (!row) return json(expired, 401);
   const user = await env.db.one("SELECT * FROM users WHERE email=?", [row.email]);
   if (!user) return json(expired, 401);
   return completeSignIn(env.db, user, request, env, body);

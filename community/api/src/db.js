@@ -268,16 +268,13 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM magic_links WHERE token_hash=")) {
     return tables.magic_links.filter((s) => s.token_hash === params[0]);
   }
-  if (q.startsWith("UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL AND purpose=?")) {
-    const row = tables.magic_links.find((s) => s.token_hash === params[1] && !s.used_at && s.purpose === params[2]);
-    if (row) row.used_at = params[0];
-    const changes = row ? 1 : 0;
-    return { changes, meta: { changes } };
-  }
   if (q.startsWith("UPDATE magic_links SET used_at=")) {
-    const row = tables.magic_links.find((s) => s.token_hash === params[1]);
+    // used_at=?, token_hash=?, expires_at > ?, purpose=? (purpose optional)
+    const row = tables.magic_links.find(
+      (s) => s.token_hash === params[1] && !s.used_at && s.expires_at > params[2] && (params[3] === undefined || s.purpose === params[3])
+    );
     if (row) row.used_at = params[0];
-    return {};
+    return { meta: { changes: row ? 1 : 0 } };
   }
   if (q.startsWith("INSERT INTO webauthn_challenges")) {
     tables.webauthn_challenges.push({
