@@ -9,7 +9,7 @@ export async function sendEmail(env, { to, subject, text, html, headers }, reque
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-      body: JSON.stringify({ from, to: [to], subject, text, html: html || text, ...(headers ? { headers } : {}) }),
+      body: JSON.stringify({ from, to: [to], subject, text, ...(html ? { html } : {}), ...(headers ? { headers } : {}) }),
     });
     if (!res.ok) throw new Error("email provider rejected the message");
     return { ok: true, provider: "resend" };

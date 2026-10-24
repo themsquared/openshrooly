@@ -2,7 +2,7 @@ export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
-    password_hash TEXT,
+    password_hash TEXT NOT NULL,
     email TEXT UNIQUE,
     email_verified INTEGER NOT NULL DEFAULT 0,
     display_name TEXT,

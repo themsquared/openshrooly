@@ -239,8 +239,8 @@ test("email copy has no dashes, carries the footer, and the one click headers", 
     assert.doesNotMatch(`${r.title} ${r.detail}`, DASHES, r.title);
     assert.match(r.title, /^(Kitchen: |Test alert)/);
   }
-  assert.match(rows[0].detail, /27\.5 °C \(82 °F\) for 45 minutes/);
-  assert.match(rows[2].detail, /2 hours 5 minutes/);
+  assert.match(rows[0].detail, /27\.5\u00a0°C \(82\u00a0°F\) for 45\u00a0minutes/, "numbers and units are held together with a non-breaking space");
+  assert.match(rows[2].detail, /2\u00a0hours 5\u00a0minutes/);
   const links = {
     settings: "https://shroomlabs.io/account.html#alerts",
     unsubscribePage: "https://shroomlabs.io/alerts-unsub.html?token=abc",

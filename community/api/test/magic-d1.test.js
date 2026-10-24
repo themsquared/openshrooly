@@ -6,12 +6,11 @@ import { createD1Db } from "../src/db.js";
 import { call, testEnv } from "./helpers.js";
 import { sha256Hex } from "../src/crypto.js";
 
-// Production D1 declares users.password_hash NOT NULL (schema.sql does not), so mirror production here.
+// schema.sql must match production, where users.password_hash is NOT NULL.
 function prodSchema() {
   const sql = readFileSync(new URL("../schema.sql", import.meta.url), "utf8");
-  const out = sql.replace(/password_hash TEXT,/, "password_hash TEXT NOT NULL,");
-  assert.notEqual(out, sql, "schema.sql users.password_hash line changed; update this test");
-  return out.replace(/--.*$/gm, "").split(";").map((s) => s.trim()).filter(Boolean);
+  assert.match(sql, /password_hash TEXT NOT NULL/, "schema.sql drifted from production users.password_hash");
+  return sql.replace(/--.*$/gm, "").split(";").map((s) => s.trim()).filter(Boolean);
 }
 
 async function withProdD1(fn) {

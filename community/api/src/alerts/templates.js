@@ -4,39 +4,31 @@
  * in the body and in the List-Unsubscribe headers.
  */
 
-const BRAND = "#1f3b2d";
-const INK = "#1d2a22";
-const MUTED = "#5b6b61";
-const PAPER = "#f6f3ec";
-export const FOOTER_LINE = "Works with Shrooly devices running OpenShrooly.";
+import { BRAND, button, escapeHtml, FOOTER_LINE, INK, layout, MUTED } from "../email-layout.js";
 
-export function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+export { escapeHtml, FOOTER_LINE };
+
+// Non-breaking space between a number and its unit, so "27 °C" never wraps apart.
+const NB = "\u00a0";
 
 const f = (c) => Math.round((c * 9) / 5 + 32);
 const one = (n) => (Math.round(n * 10) / 10).toString();
 
 function tempText(c) {
-  return `${one(c)} °C (${f(c)} °F)`;
+  return `${one(c)}${NB}°C (${f(c)}${NB}°F)`;
 }
 
 function tempRange(range) {
-  return `${one(range.min)} to ${one(range.max)} °C (${f(range.min)} to ${f(range.max)} °F)`;
+  return `${one(range.min)} to ${one(range.max)}${NB}°C (${f(range.min)} to ${f(range.max)}${NB}°F)`;
 }
 
 export function duration(minutes) {
   const m = Math.max(0, Math.round(minutes));
-  if (m < 60) return `${m} minute${m === 1 ? "" : "s"}`;
+  if (m < 60) return `${m}${NB}minute${m === 1 ? "" : "s"}`;
   const h = Math.floor(m / 60);
   const rest = m % 60;
-  const hours = `${h} hour${h === 1 ? "" : "s"}`;
-  return rest ? `${hours} ${rest} minute${rest === 1 ? "" : "s"}` : hours;
+  const hours = `${h}${NB}hour${h === 1 ? "" : "s"}`;
+  return rest ? `${hours} ${rest}${NB}minute${rest === 1 ? "" : "s"}` : hours;
 }
 
 function chamber(name) {
@@ -122,28 +114,13 @@ export function renderEmail(alerts, links) {
 </td></tr>`
     )
     .join("\n");
-  const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:0;background:${PAPER};">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${PAPER};">
-<tr><td align="center" style="padding:16px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<tr><td style="background:${BRAND};padding:18px 24px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.2px;">Shroom Labs</td></tr>
-<tr><td style="padding:24px 24px 6px 24px;">
-${intro ? `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:${MUTED};">${escapeHtml(intro)}</p>` : ""}
+  const bodyHtml = `${intro ? `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:${MUTED};">${escapeHtml(intro)}</p>` : ""}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 ${itemsHtml}
 </table>
-<p style="margin:4px 0 22px 0;"><a href="${escapeHtml(links.settings)}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:12px 18px;border-radius:8px;">Open alert settings</a></p>
-</td></tr>
-<tr><td style="padding:16px 24px 22px 24px;border-top:1px solid #e6e1d6;font-size:14px;line-height:1.5;color:${MUTED};">
-<p style="margin:0 0 8px 0;">${escapeHtml(FOOTER_LINE)}</p>
-<p style="margin:0;">You get these because alert emails are on for your account. <a href="${escapeHtml(links.settings)}" style="color:${BRAND};">Change alert settings</a> or <a href="${escapeHtml(links.unsubscribePage)}" style="color:${BRAND};">unsubscribe from alert emails</a>.</p>
-</td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>`;
+${button(links.settings, "Open alert settings")}`;
+  const footerHtml = `<p style="margin:0;">You get these because alert emails are on for your account. <a href="${escapeHtml(links.settings)}" style="color:${BRAND};">Change alert settings</a> or <a href="${escapeHtml(links.unsubscribePage)}" style="color:${BRAND};">unsubscribe from alert emails</a>.</p>`;
+  const html = layout({ title: subject, bodyHtml, footerHtml });
   const text = [
     "Shroom Labs",
     "",
