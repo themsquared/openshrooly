@@ -73,7 +73,7 @@
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 506,
+        "white_led_lux": 190,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
@@ -100,7 +100,7 @@
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 12,
-        "white_led_lux": 506,
+        "white_led_lux": 190,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
@@ -144,18 +144,13 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 37% white from the Firth and Blackwood 500 lux, 12 h room. Jozifek 2025 also used 500 lux, but as 24 h continuous light that caused pink stress coloring, so that schedule is not used. RGB is the general blue mix; those papers used white fluorescent, not a measured blue ratio.",
+    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 26% white, mapped from Jozifek et al. 2025 additional tests at 200 lux on a 12 h cycle, which produced white basidiocarps. Their main 500 lux treatment was 24 h continuous light and caused pink stress coloring, so that schedule is not used. RGB is the general blue mix; that paper used white fluorescent, not a measured blue ratio.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
         "title": "Jozifek et al. 2025",
-        "detail": "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). The 500 lux treatment was 24 h continuous light and caused pink stress coloring. It does not support 12 h at 500 lux, so this recipe does not copy that schedule.",
+        "detail": "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). The main cultivation used 500 lux for 24 h continuous light and caused pink stress coloring. Additional tests at 200 lux or lower on a 12 h cycle produced white basidiocarps. This recipe uses that 200 lux, 12 h schedule. 200 lux maps to 26% white.",
         "url": "https://doi.org/10.3390/agriculture15050460"
-      },
-      {
-        "title": "Firth and Blackwood 2025 lion's mane room",
-        "detail": "Gavin Firth and Megan Blackwood, International Journal of Pharmacognosy and Life Science 6 (2025). A controlled-room Hericium erinaceus study used a 12 h photoperiod with 6500 K fluorescent light at 500 lux. That is the hours and lux used here. 500 lux maps to 37% white.",
-        "url": "https://www.pharmacognosyjournal.com/article/230/7-3-72-360.pdf"
       },
       {
         "title": "Sakamoto 2018",
@@ -177,7 +172,7 @@
       },
       "fruiting": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 37,
+        "white_brightness_percent": 26,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

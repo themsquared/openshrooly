@@ -112,6 +112,8 @@ def test_corrected_citations_match_the_papers():
     assert "Jozifek" in JOZIFEK_2025.detail
     assert "24 h continuous" in JOZIFEK_2025.detail
     assert "pink stress" in JOZIFEK_2025.detail
+    assert "200 lux" in JOZIFEK_2025.detail
+    assert "12 h" in JOZIFEK_2025.detail
     assert "Lin et al" in LIN_2024.detail
     assert "compound" in LIN_2024.detail
     assert "yield" in LIN_2024.detail and "not for a yield" in LIN_2024.detail
@@ -147,4 +149,6 @@ def test_corrected_citations_match_the_papers():
     assert "PLOS ONE" not in catalog
     lions = recipe_for("lions-mane")
     assert lions.phases["fruiting"].photoperiod_hours == 12
-    assert lions.phases["fruiting"].white_brightness_percent == 37
+    assert lions.phases["fruiting"].white_brightness_percent == 26
+    assert "Firth" not in lions.why
+    assert all("Firth" not in note.title and "Firth" not in note.detail for note in lions.sources)
