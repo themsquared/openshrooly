@@ -52,7 +52,7 @@ the reset never reached the chip and the problem is the USB link, not the firmwa
 
 1. **Replug the USB cable** at the Shrooly end, wait 5 seconds, and run step 2 again. This
    fixes a USB link the Mac has stopped talking to. The chamber keeps running on its own
-   power. This is what was needed on 2026-10-24: the port still enumerated on the Mac, but
+   power. This is the expected fix for what we saw on 2026-10-24: the port still enumerated on the Mac, but
    no bytes came through, even the ROM boot banner during an OTA restart. The firmware was
    ruled out because its only change from the last good build was the embedded dashboard
    files.
