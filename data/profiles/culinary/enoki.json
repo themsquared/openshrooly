@@ -14,16 +14,16 @@
   "restricted": false,
   "summary": "Needs cold fruiting and low FAE for supermarket-long stems.",
   "notes": "",
-  "chamber_notes": "A Shrooly cannot reach true 4\u201310 \u00b0C enoki rooms. This profile uses the coolest firmware target (15 \u00b0C) and very low FAE as a chamber approximation.",
+  "chamber_notes": "A Shrooly cannot reach true 4 to 10 \u00b0C enoki rooms. This profile uses the coolest firmware target (15 \u00b0C) and very low FAE as a chamber approximation.",
   "legal_notice": null,
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Commercial enoki: ~10\u201316 \u00b0C, high CO2, low light, 90\u201395% RH."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Commercial enoki: ~10 to 16 \u00b0C, high CO2, low light, 90 to 95% RH."
     },
     {
       "title": "Vendor cards",
-      "detail": "Home growers who lack a cold room get shorter, darker, more petaled fruits \u2014 still edible."
+      "detail": "Home growers who lack a cold room get shorter, darker, more petaled fruits: still edible."
     }
   ],
   "stages": [

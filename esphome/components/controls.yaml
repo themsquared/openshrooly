@@ -449,6 +449,45 @@ number:
     set_action:
       - script.execute: lighting_control_manager
 
+  # Display-only grow caption. Does not change climate, lights, fan, or humidifier.
+  - platform: template
+    id: grow_day
+    name: "Grow Day"
+    icon: mdi:calendar-today
+    min_value: 0
+    max_value: 90
+    step: 1
+    mode: box
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: grp_hidden
+    # Setting the day by hand back-dates the grow start so the auto-advance
+    # in update_growing_screen keeps counting from here. Display-only.
+    set_action:
+      - lambda: |-
+          auto now = id(sntp_time).now();
+          if (now.is_valid() && x >= 1) {
+            id(grow_started_ts) = now.timestamp - ((int) x - 1) * 86400;
+          }
+
+  - platform: template
+    id: grow_days_total
+    name: "Grow Days Total"
+    icon: mdi:calendar-range
+    min_value: 0
+    max_value: 90
+    step: 1
+    mode: box
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: grp_hidden
+
 
 # Human readable text sensors
 
