@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { Miniflare } from "miniflare";
 import { createD1Db } from "../src/db.js";
 import { resetJwksCache } from "../src/oidc.js";
-import { call, testEnv } from "./helpers.js";
+import { assertPublicHandle, call, testEnv } from "./helpers.js";
 import { CLIENT_ID, SITE, fakeGoogle, realFetch } from "./fake-google.js";
 
 let google;
@@ -68,8 +68,9 @@ test("D1: Google sign-up creates a verified account, repeat login reuses it", as
     assert.equal(first.done.status, 200, JSON.stringify(first.done.data));
     assert.equal(first.done.data.user.email, "grower@gmail.com");
     assert.equal(first.done.data.user.email_verified, true);
-    const row = await d1.prepare("SELECT password_hash FROM users WHERE email=?").bind("grower@gmail.com").first();
+    const row = await d1.prepare("SELECT password_hash, username, display_name FROM users WHERE email=?").bind("grower@gmail.com").first();
     assert.equal(row.password_hash, "!no-password");
+    assertPublicHandle(row, first.done.data.user);
     const login = await call(ctx, "POST", "/api/auth/login", { body: { email: "grower@gmail.com", password: "!no-password" } });
     assert.equal(login.status, 401);
     const again = await signIn(d1, ctx);
@@ -102,6 +103,18 @@ test("D1: concurrent handoff use signs in exactly once", async () => {
     const handoff = new URLSearchParams(cb.headers.get("location").split("#")[1]).get("oidc");
     const results = await Promise.all([1, 2, 3].map(() => call(ctx, "POST", "/api/auth/oidc/complete", { body: { token: handoff } })));
     assert.deepEqual(results.map((x) => x.status).sort(), [200, 401, 401]);
+  });
+});
+
+test("D1: Google sign-up with grower@gmail.com and a name hint gets grower_<hex>", async () => {
+  await withD1(async (d1, ctx) => {
+    google.claims = { name: "Ada Lovelace", given_name: "Ada", family_name: "Lovelace" };
+    const first = await signIn(d1, ctx);
+    assert.equal(first.done.status, 200, JSON.stringify(first.done.data));
+    const row = await d1.prepare("SELECT username, display_name FROM users WHERE email=?").bind("grower@gmail.com").first();
+    assertPublicHandle(row, first.done.data.user);
+    assert.doesNotMatch(row.username, /ada|lovelace/i);
+    assert.doesNotMatch(JSON.stringify(first.done.data), /Ada|Lovelace/i);
   });
 });
 

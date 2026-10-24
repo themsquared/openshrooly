@@ -166,23 +166,41 @@ function randomHandle() {
   return `grower_${randomToken().slice(0, 10)}`;
 }
 
+function isRandomHandle(value) {
+  return typeof value === "string" && /^grower_[0-9a-f]{10}$/.test(value);
+}
+
+function isUniqueConflict(err) {
+  const msg = String(err?.message || err || "");
+  return msg === "UNIQUE" || /UNIQUE constraint failed/i.test(msg);
+}
+
 async function findOrCreateByEmail(db, email, usernameHint) {
   const normalized = email.trim().toLowerCase();
   let user = await db.one("SELECT * FROM users WHERE email=?", [normalized]);
   if (user) return user;
-  const username = (usernameHint || normalized.split("@")[0] || "grower").replace(/[^a-z0-9._-]/gi, "").slice(0, 24) || "grower";
-  let candidate = username;
-  let n = 1;
-  while (await db.one("SELECT * FROM users WHERE username=?", [candidate])) {
-    candidate = `${username}${n}`;
-    n += 1;
+  // New accounts never take a public handle from the email or a provider name.
+  // usernameHint is kept so Apple's shared OIDC path can pass a pre-made grower_<hex>.
+  let candidate = isRandomHandle(usernameHint) ? usernameHint : randomHandle();
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (await db.one("SELECT * FROM users WHERE username=?", [candidate])) {
+      candidate = randomHandle();
+      continue;
+    }
+    try {
+      await db.run(
+        "INSERT INTO users (username, password_hash, email, email_verified, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [candidate, NO_PASSWORD, normalized, 1, candidate, "user", nowIso()]
+      );
+      return db.one("SELECT * FROM users WHERE email=?", [normalized]);
+    } catch (err) {
+      user = await db.one("SELECT * FROM users WHERE email=?", [normalized]);
+      if (user) return user;
+      if (!isUniqueConflict(err)) throw err;
+      candidate = randomHandle();
+    }
   }
-  const display = String(usernameHint || candidate).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 80) || candidate;
-  await db.run(
-    "INSERT INTO users (username, password_hash, email, email_verified, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [candidate, NO_PASSWORD, normalized, 1, display, "user", nowIso()]
-  );
-  return db.one("SELECT * FROM users WHERE email=?", [normalized]);
+  throw new Error("could not allocate username");
 }
 
 export async function handleAuth(method, path, url, request, env) {

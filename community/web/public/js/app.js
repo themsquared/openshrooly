@@ -1,20 +1,19 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
+import { renderProfileCards } from "./profile-cards.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
-import { INDEXED_PROFILES } from "./indexed-profiles.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
+import { encodePhotoForUpload, resolveMediaUrl } from "./photo-upload.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
 }
 
 function mediaUrl(key, fallback) {
-  if (fallback) return fallback;
+  if (fallback) return resolveMediaUrl(fallback, apiBase());
   if (!key) return "";
-  const base = String(cfg().mediaBase || "").replace(/\/$/, "");
-  if (base) return `${base}/${key}`;
-  return `${apiBase()}/api/media/${encodeURIComponent(key)}`;
+  return resolveMediaUrl(`/api/media/${encodeURIComponent(key)}`, apiBase());
 }
 
 function $(sel) {
@@ -58,13 +57,6 @@ function renderNav() {
   }
 }
 
-function stageDots(stages = []) {
-  if (!stages.length) return "";
-  return `<ol class="mini-timeline" aria-label="Stage timeline">${stages
-    .map((s, i) => `<li class="${i === 0 ? "is-on" : ""}" title="${escapeHtml(s.name || s.id)} · ${s.duration_days || 0}d"></li>`)
-    .join("")}</ol>`;
-}
-
 function selectPack(pack) {
   const url = new URL(location.href);
   url.searchParams.set("pack", pack);
@@ -72,11 +64,6 @@ function selectPack(pack) {
   history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
   document.getElementById("library")?.scrollIntoView();
   return renderHome();
-}
-
-/** Seeded profiles have an indexed static page. Community published ones use the live page. */
-function profileHref(id) {
-  return INDEXED_PROFILES.has(id) ? `/profiles/${encodeURIComponent(id)}.html` : `/profile.html?id=${encodeURIComponent(id)}`;
 }
 
 function renderResources(el, resources) {
@@ -123,25 +110,7 @@ async function renderHome() {
   for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", off);
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML = profiles.length
-    ? profiles
-        .map(
-          (p, index) => `
-    <a class="profile-card" href="${profileHref(p.id)}">
-      <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack, { priority: index === 0 })}</div>
-      <div class="profile-body">
-        <p><span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>${
-          p.pricing?.kind === "paid"
-            ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
-            : `<span class="chip">free</span>`
-        }</p>
-        <h2>${escapeHtml(p.name)}</h2>
-        <p class="muted">${escapeHtml(p.species)}${p.strain ? " · " + escapeHtml(p.strain) : ""}</p>
-        <p>${escapeHtml(p.summary || "")}</p>
-        ${stageDots(p.stage_list || [])}
-      </div>
-    </a>`
-        )
-        .join("")
+    ? renderProfileCards(profiles)
     : `<div class="empty-library">
         <svg class="empty-mark" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg>
         <h2>Nothing in this flush</h2>
@@ -161,7 +130,12 @@ async function renderProfile() {
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
   $("#chips").innerHTML = `<span class="chip">${escapeHtml(label)}</span>`;
-  $("#art").innerHTML = speciesArt(p.species, p.strain, p.name, p.pack);
+  const art = speciesArt(p.species, p.strain, p.name, p.pack, { id: p.id });
+  const artEl = $("#art");
+  if (artEl) {
+    artEl.innerHTML = art;
+    artEl.hidden = !art;
+  }
   const legal = $("#legal");
   if (legal && (off || p.legal_notice)) {
     legal.textContent = off ? PSI_LEGAL_NOTICE : p.legal_notice;
@@ -229,7 +203,8 @@ async function renderProfile() {
       .map((r) => {
         const href = mediaUrl(r.photo_key, r.photo_url);
         const photo = href ? ` <a href="${href}">photo</a>` : "";
-        return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}</li>`;
+        const review = r.photo_status === "pending" && href ? " <span class='muted'>Awaiting review</span>" : "";
+        return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}${review}</li>`;
       })
       .join("") || "<li class='muted'>No community reports yet.</li>";
 
@@ -252,11 +227,7 @@ async function renderProfile() {
       flushes: fd.get("flushes"),
     };
     const file = fd.get("photo");
-    if (file && file.size) {
-      payload.photo_base64 = await fileToBase64(file);
-      payload.photo_type = file.type;
-      payload.photo_ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    }
+    if (file && file.size) Object.assign(payload, await encodePhotoForUpload(file));
     await api(`/api/profiles/${id}/reports`, { method: "POST", jsonBody: payload });
     location.reload();
   });
@@ -363,7 +334,7 @@ async function renderAccount() {
   const me = await api("/api/me");
   $("#who").textContent = me.user.email || me.user.username;
   $("#verified").textContent = me.user.email_verified
-    ? "Email verified. You can publish, buy, and claim devices."
+    ? "Email verified. You can publish and buy."
     : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
   $("#ents").innerHTML =
@@ -437,18 +408,6 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      resolve(result.split(",")[1] || "");
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 bindMobileNav();
@@ -637,9 +596,7 @@ async function renderCoach() {
       const data = await api("/api/coach/photo", {
         method: "POST",
         jsonBody: {
-          photo_base64: await fileToBase64(file),
-          photo_type: file.type,
-          photo_ext: (file.name.split(".").pop() || "jpg").toLowerCase(),
+          ...(await encodePhotoForUpload(file)),
           hint: $("#photo-hint").value,
         },
       });
@@ -659,26 +616,45 @@ async function renderCoach() {
   await refreshUsage();
 }
 
+function deviceClaimingLive() {
+  return Boolean(cfg().deviceClaiming) || params().has("code");
+}
+
 async function renderClaim() {
+  const primary = $("#claim-now-primary");
+  if (getToken() && primary) {
+    primary.textContent = "Open your account";
+    primary.setAttribute("href", "/account.html");
+  }
+
+  const live = deviceClaimingLive();
+  const panel = $("#claim-code-panel");
+  const form = $("#claim-form");
+  const signin = $("#claim-signin");
+  if (!live) {
+    panel?.classList.add("hidden");
+    form?.classList.add("hidden");
+    signin?.classList.add("hidden");
+    return;
+  }
+
+  panel?.classList.remove("hidden");
+  const preset = params().get("code") || "";
+  if (preset && $("#code")) $("#code").value = preset;
+
   if (!getToken()) {
-    const title = $("#claim-title");
-    if (title) title.textContent = "Sign in to claim your device";
-    $("#claim-form")?.classList.add("hidden");
-    const signin = $("#claim-signin");
+    form?.classList.add("hidden");
     if (signin) {
       const next = encodeURIComponent(location.pathname + location.search);
-      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in</a>`;
+      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in to enter a code</a>`;
       signin.classList.remove("hidden");
     }
     return;
   }
-  const title = $("#claim-title");
-  if (title) title.textContent = "Claim a chamber";
-  $("#claim-signin")?.classList.add("hidden");
-  $("#claim-form")?.classList.remove("hidden");
-  const preset = params().get("code") || "";
-  if (preset) $("#code").value = preset;
-  $("#claim-form").addEventListener("submit", async (ev) => {
+
+  signin?.classList.add("hidden");
+  form?.classList.remove("hidden");
+  form?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     try {
       const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code: $("#code").value } });

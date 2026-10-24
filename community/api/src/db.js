@@ -10,6 +10,7 @@ export function createMemoryDb() {
     profiles: [],
     ratings: [],
     grow_reports: [],
+    uploaded_media: [],
     entitlements: [],
     checkouts: [],
     affiliate_clicks: [],
@@ -562,6 +563,7 @@ function dispatch(mode, tables, ids, sql, params) {
     return [{ a: rows.reduce((s, r) => s + r.stars, 0) / rows.length }];
   }
   if (q.startsWith("INSERT INTO grow_reports")) {
+    const hasStatus = q.includes("photo_status");
     const row = {
       id: ids.grow_reports++,
       profile_id: params[0],
@@ -572,13 +574,30 @@ function dispatch(mode, tables, ids, sql, params) {
       flushes: params[5],
       device_name: params[6],
       photo_key: params[7],
-      created_at: params[8],
+      photo_status: hasStatus ? params[8] : "approved",
+      created_at: hasStatus ? params[9] : params[8],
     };
     tables.grow_reports.push(row);
     return { lastRowId: row.id };
   }
   if (q.startsWith("SELECT * FROM grow_reports WHERE author_id=")) {
     return tables.grow_reports.filter((r) => Number(r.author_id) === Number(params[0]));
+  }
+  if (q.startsWith("SELECT * FROM grow_reports WHERE photo_key=")) {
+    return tables.grow_reports.filter((r) => r.photo_key === params[0]);
+  }
+  if (q.startsWith("INSERT INTO uploaded_media")) {
+    tables.uploaded_media.push({
+      photo_key: params[0],
+      owner_id: params[1],
+      status: params[2],
+      kind: params[3],
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM uploaded_media WHERE photo_key=")) {
+    return tables.uploaded_media.filter((r) => r.photo_key === params[0]);
   }
   if (q.startsWith("SELECT * FROM grow_reports")) {
     return tables.grow_reports.filter((r) => r.profile_id === params[0]).reverse();

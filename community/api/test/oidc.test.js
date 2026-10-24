@@ -1,6 +1,13 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { call, testEnv } from "./helpers.js";
+import {
+  SAMPLE_CULINARY_PROFILE,
+  assertNoPublicPii,
+  assertPublicHandle,
+  call,
+  testEnv,
+} from "./helpers.js";
+import { renderLlms, renderProfilePage, renderSitemap } from "../../web/scripts/generate-seo.js";
 import { resetJwksCache, safeNextPath, sha256B64url, verifyIdToken } from "../src/oidc.js";
 import { capabilities } from "../src/providers.js";
 
@@ -99,6 +106,8 @@ test("happy path: verified Google login creates a verified account and a Lax ses
   assert.equal(r.done.status, 200, JSON.stringify(r.done.data));
   assert.equal(r.done.data.user.email, "grower@gmail.com");
   assert.equal(r.done.data.user.email_verified, true);
+  const created = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@gmail.com"]);
+  assertPublicHandle(created, r.done.data.user);
   assert.ok(r.done.data.access_token);
   const session = r.done.headers.get("set-cookie");
   assert.match(session, /^__Host-sl_session=/);
@@ -184,6 +193,77 @@ test("JWKS is fetched once and cached across logins", async () => {
   assert.equal((await signIn(ctx)).done.status, 200);
   assert.equal((await signIn(ctx)).done.status, 200);
   assert.equal(google.jwksFetches, 1);
+});
+
+test("Google sign-up with grower@gmail.com and a name hint gets a random public handle", async () => {
+  const ctx = liveEnv();
+  google.claims = { name: "Ada Lovelace", given_name: "Ada", family_name: "Lovelace" };
+  const r = await signIn(ctx);
+  assert.equal(r.done.status, 200, JSON.stringify(r.done.data));
+  const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@gmail.com"]);
+  assertPublicHandle(row, r.done.data.user);
+  assert.doesNotMatch(row.username, /ada|lovelace|grower@/i);
+  assert.doesNotMatch(JSON.stringify(r.done.data), /Ada|Lovelace/i);
+});
+
+test("Google sign-up does not put the email local part or name on public API, pages, sitemap, or llms.txt", async () => {
+  const ctx = liveEnv();
+  google.claims = { name: "Ada Lovelace", given_name: "Ada", family_name: "Lovelace" };
+  const r = await signIn(ctx);
+  assert.equal(r.done.status, 200);
+  const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@gmail.com"]);
+  assertPublicHandle(row, r.done.data.user);
+  const extra = ["Ada", "Lovelace"];
+  const leak = (value, label) => assertNoPublicPii(value, "grower@gmail.com", extra, label);
+
+  const token = r.done.data.access_token;
+  const created = await call(ctx, "POST", "/api/profiles", {
+    token,
+    body: { ...SAMPLE_CULINARY_PROFILE, id: "google-privacy-oyster" },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  assert.equal(created.data.author, row.username);
+  leak(created.data, "publish");
+
+  const shown = await call(ctx, "GET", "/api/profiles/google-privacy-oyster");
+  assert.equal(shown.status, 200);
+  assert.equal(shown.data.profile.author, row.username);
+  leak(shown.data, "profile GET");
+
+  const rated = await call(ctx, "POST", "/api/profiles/google-privacy-oyster/rate", {
+    token,
+    body: { stars: 5, comment: "worked" },
+  });
+  assert.equal(rated.status, 200);
+  const afterRate = await call(ctx, "GET", "/api/profiles/google-privacy-oyster");
+  leak(afterRate.data, "ratings");
+  assert.ok(afterRate.data.ratings.some((item) => item.username === row.username));
+  assert.ok(!afterRate.data.ratings.some((item) => item.display_name));
+
+  const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  const card = list.data.find((item) => item.id === "google-privacy-oyster");
+  assert.ok(card);
+  leak(card, "profile list card");
+  leak((await call(ctx, "GET", "/api/search?pack=culinary&q=Privacy")).data, "search");
+  leak((await call(ctx, "GET", "/api/profiles/google-privacy-oyster.json")).data, "profile.json export");
+
+  const hub = await call(ctx, "GET", "/api/hub/pull", { token });
+  assert.equal(hub.status, 200);
+  assert.equal(hub.data.hub_user, row.username);
+  const hubProfile = hub.data.profiles.find((item) => item.id === "google-privacy-oyster");
+  assert.equal(hubProfile.author, row.username);
+  leak(hubProfile, "hub profile");
+  leak({ hub_user: hub.data.hub_user }, "hub user");
+
+  const passkey = await call(ctx, "POST", "/api/auth/webauthn/register/begin", { token, body: {} });
+  assert.equal(passkey.status, 200);
+  assert.equal(passkey.data.user.displayName, row.username);
+  assert.doesNotMatch(JSON.stringify(passkey.data), /Ada|Lovelace/i);
+
+  const published = { ...created.data, author: row.username };
+  leak(renderSitemap([published]), "sitemap");
+  leak(renderLlms([published]), "llms.txt");
+  leak(renderProfilePage(published), "profile page");
 });
 
 test("linking: a repeat Google login reuses the account; an existing verified email account is linked", async () => {
