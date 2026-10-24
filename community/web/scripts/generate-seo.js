@@ -129,7 +129,7 @@ function jsonLd(profile) {
 export const FAQ = [
   {
     q: "How do I apply a Profile to a chamber?",
-    a: "Browse a culinary Profile, pull the JSON to your Hub on the LAN, then apply a stage. The Hub talks to OpenShrooly. No cloud is required to grow.",
+    a: "Browse a culinary Profile, pull the profile to your Hub on the LAN, then apply a stage. The Hub talks to OpenShrooly. No cloud is required to grow.",
   },
   {
     q: "How do I flash OpenShrooly over USB?",
