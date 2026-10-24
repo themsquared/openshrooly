@@ -26,6 +26,9 @@ CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
 CDN_BASE_URL = "https://cdn.shroomlabs.io"
 # Google sign-in. The client ID is public; GOOGLE_CLIENT_SECRET is a Wrangler secret (see docs/AUTH.md).
 GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleusercontent.com"
+# Sign in with Apple: set APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_SERVICES_ID, and APPLE_PRIVATE_KEY
+# as Wrangler secrets once the Developer portal items exist. See docs/AUTH.md.
+# The Worker mints the client secret at runtime. Do not commit the .p8 key.
 # Grow Coach: Workers AI in production; local Node defaults GROW_COACH_STUB=1.
 GROW_COACH_PROVIDER = "workers-ai"
 GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"

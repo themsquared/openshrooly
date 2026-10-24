@@ -26,7 +26,7 @@ Out of scope this pass: on-device signed recipe objects, live Stripe keys, compi
 
 ## Auth summary
 
-- Sign-in: email magic link (primary), Google OIDC + PKCE, Sign in with Apple, WebAuthn passkeys.
+- Sign-in: email magic link (primary), Google OIDC + PKCE, Sign in with Apple (form_post; state cookie is SameSite=None so it survives the cross-site POST; session cookie stays Lax), WebAuthn passkeys.
 - Passwords are optional and discouraged. If set: PBKDF2-SHA-256 **600,000** iterations (Workers have no native argon2id/scrypt) + HIBP k-anonymity range API. **Tradeoff flagged:** WASM argon2id would blow Worker CPU/size; we do not cut passwordless.
 - Sessions: 30-minute `__Host-sl_session` cookie, rotation via `/api/auth/refresh`, server-side revoke, sign-out-everywhere.
 - Verified email required for publish, checkout, fork, rate, report.

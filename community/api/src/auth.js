@@ -19,7 +19,7 @@ import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } fr
 import { renderSignInEmail } from "./email-layout.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, rateLimitClient, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
-import { safeEqual, safeNextPath, sha256B64url, verifyIdToken } from "./oidc.js";
+import { appleClientSecret, safeEqual, safeNextPath, sha256B64url, verifyIdToken } from "./oidc.js";
 import {
   allowedOrigins,
   clientDataOk,
@@ -60,9 +60,17 @@ function cookie(value, maxAge) {
   return parts.join("; ");
 }
 
-/** Browser-binding cookie for an OIDC round trip. Lax so it rides the top-level redirect back from the provider. */
-function oidcCookie(value, maxAgeMs) {
-  return `${OIDC_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`;
+/**
+ * Browser-binding cookie for an OIDC round trip.
+ * Google uses Lax (top-level GET redirect). Apple uses form_post, a cross-site POST, so Lax would drop
+ * the cookie; None keeps it on that POST. The session cookie stays Lax.
+ */
+function oidcCookie(value, maxAgeMs, sameSite = "Lax") {
+  return `${OIDC_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=${sameSite}; Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`;
+}
+
+function oidcSameSite(provider) {
+  return provider === "apple" ? "None" : "Lax";
 }
 
 export function readCookie(request, name = COOKIE) {
@@ -165,9 +173,10 @@ async function findOrCreateByEmail(db, email, usernameHint) {
     candidate = `${username}${n}`;
     n += 1;
   }
+  const display = String(usernameHint || candidate).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 80) || candidate;
   await db.run(
     "INSERT INTO users (username, password_hash, email, email_verified, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [candidate, NO_PASSWORD, normalized, 1, candidate, "user", nowIso()]
+    [candidate, NO_PASSWORD, normalized, 1, display, "user", nowIso()]
   );
   return db.one("SELECT * FROM users WHERE email=?", [normalized]);
 }
@@ -264,6 +273,9 @@ export async function handleAuth(method, path, url, request, env) {
   }
   if (method === "POST" && path === "/api/auth/oidc/complete") {
     return completeOidcHandoff(env, request);
+  }
+  if (method === "POST" && path === "/api/auth/oidc/apple/callback") {
+    return finishOidc(env, request, url, "apple");
   }
   if (method === "GET" && path === "/api/auth/oidc/apple/callback") {
     return finishOidc(env, request, url, "apple");
@@ -475,7 +487,7 @@ function redirect(location, setCookie) {
 async function startOidc(env, request, url, provider) {
   const limited = await rateLimit(env.db, `oidc-${provider}:${rateLimitClient(request)}`, 10, 900);
   if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
-  const cfg = providerConfig(env, provider);
+  const cfg = await providerConfig(env, provider);
   const ready = provider === "google" ? googleConfigured(env) : appleConfigured(env);
   const stubs = devStubsEnabled(env, request);
   if (!ready && !stubs) {
@@ -508,16 +520,44 @@ async function startOidc(env, request, url, provider) {
   auth.searchParams.set("code_challenge", challenge);
   auth.searchParams.set("code_challenge_method", "S256");
   if (provider === "google") auth.searchParams.set("prompt", "select_account");
-  const setCookie = oidcCookie(binding, OIDC_STATE_MS);
+  if (cfg.responseMode) auth.searchParams.set("response_mode", cfg.responseMode);
+  const setCookie = oidcCookie(binding, OIDC_STATE_MS, oidcSameSite(provider));
   if (stubs) {
     return json({ authorize_url: auth.toString(), state, debug_code: `stub-${state}` }, 200, { "set-cookie": setCookie });
   }
   return redirect(auth.toString(), setCookie);
 }
 
+async function callbackParams(request, url) {
+  const params = new URLSearchParams(url.search);
+  if (request.method.toUpperCase() !== "POST") return params;
+  const type = request.headers.get("content-type") || "";
+  if (!type.includes("application/x-www-form-urlencoded")) return params;
+  try {
+    const form = new URLSearchParams(await request.text());
+    for (const [key, value] of form) params.set(key, value);
+  } catch {
+    /* ignore a malformed body; missing fields fail below */
+  }
+  return params;
+}
+
+/** Apple sends name only on the first authorization, as a JSON `user` form field. */
+function appleDisplayName(raw) {
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    const first = String(parsed?.name?.firstName || "").trim();
+    const last = String(parsed?.name?.lastName || "").trim();
+    return [first, last].filter(Boolean).join(" ").slice(0, 80);
+  } catch {
+    return "";
+  }
+}
+
 async function finishOidc(env, request, url, provider) {
   const stubs = devStubsEnabled(env, request);
-  const clear = oidcCookie("", 0);
+  const clear = oidcCookie("", 0, oidcSameSite(provider));
   const fail = async (reason, userId) => {
     // Specific reasons go to the audit log only; the browser always gets the same generic outcome.
     await audit(env.db, userId || null, `oidc_${provider}_fail`, reason, request);
@@ -525,7 +565,8 @@ async function finishOidc(env, request, url, provider) {
   };
   const limited = await rateLimit(env.db, `oidc-cb-${provider}:${rateLimitClient(request)}`, 20, 900);
   if (!limited.ok) return fail("rate limited");
-  const state = url.searchParams.get("state") || "";
+  const params = await callbackParams(request, url);
+  const state = params.get("state") || "";
   const binding = readCookie(request, OIDC_COOKIE);
   if (!state) return fail("missing state");
   if (!binding) return fail("missing browser binding");
@@ -536,8 +577,8 @@ async function finishOidc(env, request, url, provider) {
   const consumed = await env.db.run("DELETE FROM oauth_states WHERE state=?", [state]);
   if (Number(consumed?.meta?.changes ?? consumed?.changes ?? 0) !== 1) return fail("state replay");
   if (row.expires_at < nowIso() || row.provider !== provider) return fail("expired or wrong provider");
-  if (url.searchParams.get("error")) return fail(`provider error ${String(url.searchParams.get("error")).slice(0, 40)}`);
-  const code = url.searchParams.get("code") || "";
+  if (params.get("error")) return fail(`provider error ${String(params.get("error")).slice(0, 40)}`);
+  const code = params.get("code") || "";
   if (!code) return fail("missing code");
 
   let email = "";
@@ -546,7 +587,7 @@ async function finishOidc(env, request, url, provider) {
     email = `${provider}.user@example.com`;
     subject = `stub-${provider}`;
   } else {
-    const cfg = providerConfig(env, provider);
+    const cfg = await providerConfig(env, provider);
     if (!cfg.clientId || !cfg.secret) return fail("not configured");
     let tokens = {};
     try {
@@ -573,7 +614,8 @@ async function finishOidc(env, request, url, provider) {
     email = String(verified.claims.email).trim().toLowerCase();
     subject = String(verified.claims.sub);
   }
-  const resolved = await resolveOidcUser(env.db, provider, subject, email, request);
+  const nameHint = provider === "apple" ? appleDisplayName(params.get("user")) : "";
+  const resolved = await resolveOidcUser(env.db, provider, subject, email, request, nameHint);
   if (!resolved.user) return fail(resolved.reason, resolved.userId);
   const user = resolved.user;
   await audit(env.db, user.id, `oidc_${provider}`, email, request);
@@ -602,7 +644,7 @@ async function finishOidc(env, request, url, provider) {
  *    and it has no other identity from this provider. Unverified accounts are never taken over.
  * 3. Otherwise a new account is created with the provider-verified email.
  */
-async function resolveOidcUser(db, provider, subject, email, request) {
+async function resolveOidcUser(db, provider, subject, email, request, usernameHint) {
   if (!subject || !email) return { reason: "missing subject or email" };
   const identity = await db.one("SELECT * FROM auth_identities WHERE provider=? AND subject=?", [provider, subject]);
   if (identity) {
@@ -623,7 +665,7 @@ async function resolveOidcUser(db, provider, subject, email, request) {
     await audit(db, existing.id, `oidc_${provider}_link`, "linked to existing verified account", request);
     return { user: existing };
   }
-  const created = await findOrCreateByEmail(db, email);
+  const created = await findOrCreateByEmail(db, email, usernameHint);
   await db.run("INSERT INTO auth_identities (user_id, provider, subject, created_at) VALUES (?, ?, ?, ?)", [
     created.id,
     provider,
@@ -652,7 +694,7 @@ async function completeOidcHandoff(env, request) {
   return completeSignIn(env.db, user, request, env, body);
 }
 
-function providerConfig(env, provider) {
+async function providerConfig(env, provider) {
   const api = "https://api.shroomlabs.io";
   if (provider === "google") {
     return {
@@ -665,12 +707,13 @@ function providerConfig(env, provider) {
     };
   }
   return {
-    clientId: env.APPLE_CLIENT_ID,
-    secret: env.APPLE_CLIENT_SECRET,
+    clientId: env.APPLE_SERVICES_ID,
+    secret: await appleClientSecret(env),
     authorize: "https://appleid.apple.com/auth/authorize",
     token: "https://appleid.apple.com/auth/token",
     scope: "name email",
     redirectUri: env.APPLE_REDIRECT_URI || `${api}/api/auth/oidc/apple/callback`,
+    responseMode: "form_post",
   };
 }
 

@@ -291,7 +291,7 @@ async function renderAuth(mode) {
     $("#oidc-soon")?.classList.remove("hidden");
   }
   if (params().get("error") === "oidc") {
-    $("#error").textContent = "Google sign-in didn't finish. Try again, or use an email link.";
+    $("#error").textContent = "Sign-in didn't finish. Try again, or use an email link.";
     $("#error").classList.remove("hidden");
   }
   const oidcNext = params().get("next") ? safeNext(params().get("next"), "") : "";
@@ -334,7 +334,7 @@ async function renderCallback() {
   const handoff = hash.get("oidc");
   try {
     if (handoff) {
-      // One-time handoff from the Google callback. Drop it from the address bar and history first.
+      // One-time handoff from the OIDC callback. Drop it from the address bar and history first.
       history.replaceState(null, "", location.pathname);
       const data = await api("/api/auth/oidc/complete", { method: "POST", jsonBody: { token: handoff } });
       if (data.access_token) setToken(data.access_token);

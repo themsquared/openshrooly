@@ -124,6 +124,17 @@ test("OIDC Google stub and passkey challenge", async () => {
   });
   assert.equal(cb.status, 200);
   assert.equal(cb.data.user.email, "google.user@example.com");
+  const appleStart = await call(ctx, "GET", "/api/auth/oidc/apple/start");
+  assert.equal(appleStart.status, 200);
+  assert.ok(appleStart.data.authorize_url.includes("appleid.apple.com"));
+  assert.match(appleStart.data.authorize_url, /response_mode=form_post/);
+  const appleCookie = String(appleStart.headers.get("set-cookie")).split(";")[0];
+  const appleCb = await call(ctx, "POST", "/api/auth/oidc/apple/callback", {
+    form: { state: appleStart.data.state, code: "stub" },
+    headers: { cookie: appleCookie, origin: "https://appleid.apple.com" },
+  });
+  assert.equal(appleCb.status, 200);
+  assert.equal(appleCb.data.user.email, "apple.user@example.com");
   const { token } = await register(ctx, "passkey@example.com");
   const begin = await call(ctx, "POST", "/api/auth/webauthn/register/begin", { token, body: {} });
   assert.equal(begin.status, 200);
