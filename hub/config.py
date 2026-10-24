@@ -23,11 +23,26 @@ BRIDGE_STATUS_URL = env("BRIDGE_STATUS_URL", "http://127.0.0.1:8091")
 BRIDGE_STATUS_FILE = env("BRIDGE_STATUS_FILE", "")
 NEEDS_WATER_THRESHOLD_PCT = float(env("HUB_NEEDS_WATER_PCT", "15"))
 ADMIN_PASSWORD = env("HUB_ADMIN_PASSWORD", "")
-_BUILTIN_ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "testserver"})
+TRUST_FORWARDED = env("HUB_TRUST_FORWARDED", "0") in {"1", "true", "yes"}
+_BUILTIN_ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
 
 
 class InsecureHubSecret(RuntimeError):
     """The published default session secret must never be used."""
+
+
+def write_private_file(path: Path, text: str) -> None:
+    """Create or replace a file with mode 0600 in one open()."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        os.write(fd, text.encode("utf-8"))
+    finally:
+        os.close(fd)
 
 
 def secret_path(data_dir: Path | None = None) -> Path:
@@ -55,10 +70,8 @@ def resolve_secret(data_dir: Path | None = None) -> str:
         if not stored:
             raise InsecureHubSecret(f"{path} is empty. Delete it and restart the hub.")
         return _reject_default_secret(stored, str(path))
-    directory.mkdir(parents=True, exist_ok=True)
     generated = secrets.token_urlsafe(32)
-    path.write_text(generated + "\n", encoding="utf-8")
-    path.chmod(0o600)
+    write_private_file(path, generated + "\n")
     return generated
 
 

@@ -70,7 +70,20 @@ def get_profile(conn, profile_id: str) -> MushroomProfile:
 
 
 def device_client(row) -> ESPHomeDeviceClient:
-    return ESPHomeDeviceClient(f"http://{row['host']}:{row['port']}")
+    host = row["host"]
+    port = int(row["port"])
+    try:
+        ip = targets.resolve_connect_ip(host)
+    except targets.UnsafeDeviceHost as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if ":" in ip:
+        base = f"http://[{ip}]:{port}"
+    else:
+        base = f"http://{ip}:{port}"
+    headers = {}
+    if targets.parse_ip(host) is None:
+        headers["Host"] = f"{host}:{port}" if port not in (80, 443) else host
+    return ESPHomeDeviceClient(base, extra_headers=headers)
 
 
 def record_sample(conn, device_row, status: dict) -> None:
@@ -278,13 +291,14 @@ def add_device(
     blocked = device_host_rejected(request, host)
     if blocked:
         return blocked
+    cleaned = targets.normalize_device_host(host) or host.strip()
     conn = request.app.state.conn
     conn.execute(
         "INSERT INTO devices (name, host, port, added_at) VALUES (?, ?, ?, ?)",
-        (name.strip(), host.strip(), port, db.now()),
+        (name.strip(), cleaned, port, db.now()),
     )
     conn.commit()
-    db.log_event(conn, "device_added", f"{name} {host}:{port}")
+    db.log_event(conn, "device_added", f"{name} {cleaned}:{port}")
     return RedirectResponse("/devices", status_code=303)
 
 
@@ -588,7 +602,7 @@ def login_submit(
         return auth.login_locked_response(retry_after)
     if username != auth.ADMIN_USER or not auth.passwords_match(password, auth.admin_password()):
         auth.record_login_failure(ip)
-        retry_after = auth.login_retry_after(ip)
+        retry_after = auth.login_retry_after(ip) or auth.login_global_backoff()
         if retry_after:
             return auth.login_locked_response(retry_after)
         return page(
@@ -618,6 +632,7 @@ def logout(request: Request, csrf: str = Form("")):
     blocked = auth.require_write_guard(request, csrf)
     if blocked:
         return blocked
+    auth.revoke_session(request.cookies.get(auth.SESSION_COOKIE))
     response = RedirectResponse("/", status_code=303)
     response.delete_cookie(auth.SESSION_COOKIE, path="/")
     return response

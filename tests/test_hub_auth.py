@@ -25,14 +25,17 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("HUB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("HUB_ADMIN_PASSWORD", PASSWORD)
     config.DB_PATH = tmp_path / "hub.sqlite"
+    config.DATA_DIR = tmp_path
     config.ENABLE_PSILOCYBIN = False
     config.ADMIN_PASSWORD = PASSWORD
     config.BRIDGE_STATUS_URL = "http://127.0.0.1:1"
     config.BRIDGE_STATUS_FILE = ""
     auth.reset_login_guard()
+    auth.reset_sessions()
     with TestClient(app) as test_client:
         yield test_client
     auth.reset_login_guard()
+    auth.reset_sessions()
 
 
 def _login(client, password=PASSWORD, origin="http://testserver", csrf=None, next_path="/smart-home"):
@@ -123,10 +126,12 @@ def test_password_file_is_created_when_env_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     password = auth.admin_password()
     assert len(password) == 12
-    saved = json.loads((tmp_path / "admin.json").read_text())
+    path = tmp_path / "admin.json"
+    saved = json.loads(path.read_text())
     assert saved["username"] == "admin"
     assert saved["password"] == password
     assert auth.admin_password() == password
+    assert path.stat().st_mode & 0o777 == 0o600
 
 
 def test_old_default_secret_is_refused(tmp_path, monkeypatch):
@@ -199,12 +204,71 @@ def test_per_ip_login_lockout(client):
     assert still.status_code == 429
 
 
-def test_global_login_lockout(client):
-    for index in range(auth.LOGIN_GLOBAL_MAX_FAILURES):
+def test_global_failures_do_not_lock_other_ips(client):
+    for index in range(auth.LOGIN_GLOBAL_SOFT_MAX + 5):
         auth.record_login_failure(f"203.0.113.{index}")
-    locked = _login(client, password=PASSWORD)
+    allowed = _login(client, password=PASSWORD)
+    assert allowed.status_code == 303
+
+
+def _basic(client, password=PASSWORD):
+    token = base64.b64encode(f"admin:{password}".encode()).decode()
+    return client.get("/api/smart-home/pairing", headers={"Authorization": f"Basic {token}"})
+
+
+def test_wrong_basic_passwords_hit_login_guard(client):
+    for _ in range(auth.LOGIN_IP_MAX_FAILURES - 1):
+        page = _basic(client, password="nope")
+        assert page.status_code == 401
+    locked = _basic(client, password="nope")
     assert locked.status_code == 429
-    assert locked.json()["error"] == "too_many_login_attempts"
+    still = _basic(client, password=PASSWORD)
+    assert still.status_code == 429
+
+
+def test_form_lockout_blocks_correct_basic(client):
+    for _ in range(auth.LOGIN_IP_MAX_FAILURES - 1):
+        assert _login(client, password="nope").status_code == 200
+    assert _login(client, password="nope").status_code == 429
+    assert _basic(client, password=PASSWORD).status_code == 429
+
+
+def test_logout_invalidates_session_server_side(client):
+    assert _login(client).status_code == 303
+    token = client.cookies.get("hub_session")
+    assert token
+    csrf = client.cookies.get("hub_csrf")
+    client.post(
+        "/logout",
+        data={"csrf": csrf},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    replay = client.get("/api/smart-home/pairing", cookies={auth.SESSION_COOKIE: token})
+    assert replay.status_code == 401
+
+
+def test_testserver_is_not_a_builtin_allowed_host():
+    assert "testserver" not in config.parse_allowed_hosts("")
+    assert "testserver" not in config._BUILTIN_ALLOWED_HOSTS
+
+
+def test_forwarded_headers_are_off_by_default():
+    assert config.TRUST_FORWARDED is False
+
+
+def test_device_add_stores_cleaned_host(client):
+    assert _login(client).status_code == 303
+    token = client.cookies.get("hub_csrf")
+    response = client.post(
+        "/devices/add",
+        data={"name": "Kitchen", "host": "192.168.1.50:80", "port": "80", "csrf": token},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    saved = client.get("/api/devices").json()
+    assert saved[0]["host"] == "192.168.1.50"
 
 
 def test_unknown_host_header_is_rejected(client):

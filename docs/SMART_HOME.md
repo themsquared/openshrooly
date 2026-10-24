@@ -65,7 +65,7 @@ Do not publish port 8091. Do not bind the status server to every interface.
 
 ## Mac mini notes
 
-This hub is meant to stay on Mike's always-on Mac mini.
+This hub is meant to stay on an always-on Mac.
 
 Docker Desktop on macOS runs Linux in a VM. Host networking needs Docker Desktop 4.34 or newer, must be turned on while you are signed in, and does not work with Enhanced Container Isolation. Even then it only carries TCP and UDP. Matter mDNS is multicast, so a bridge container on a Mac will not be found by Apple Home or Google Home.
 

@@ -46,16 +46,24 @@ class ApplyResult:
 class ESPHomeDeviceClient:
     """Talk to the device's existing web_server v3 REST API."""
 
-    def __init__(self, base_url: str, timeout_s: float = DEFAULT_TIMEOUT_S, opener=None):
+    def __init__(
+        self,
+        base_url: str,
+        timeout_s: float = DEFAULT_TIMEOUT_S,
+        opener=None,
+        extra_headers: dict[str, str] | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
         self._opener = opener
+        self.extra_headers = dict(extra_headers or {})
 
     def _request(self, method: str, path: str, query: dict[str, Any] | None = None) -> Any:
         url = f"{self.base_url}{path}"
         if query:
             url = f"{url}?{urlencode(query)}"
-        request = Request(url, method=method, headers={"Accept": "application/json"})
+        headers = {"Accept": "application/json", **self.extra_headers}
+        request = Request(url, method=method, headers=headers)
         if self._opener:
             return self._opener(request, timeout=self.timeout_s)
         with urlopen(request, timeout=self.timeout_s) as response:

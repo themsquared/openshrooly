@@ -116,13 +116,20 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("HUB_ADMIN_PASSWORD", "test-admin-9x")
     from hub import config
 
+    from hub import auth
+
     config.DB_PATH = tmp_path / "hub.sqlite"
+    config.DATA_DIR = tmp_path
     config.ENABLE_PSILOCYBIN = False
     config.ADMIN_PASSWORD = "test-admin-9x"
     config.BRIDGE_STATUS_URL = "http://127.0.0.1:1"
     config.BRIDGE_STATUS_FILE = ""
+    auth.reset_login_guard()
+    auth.reset_sessions()
     with TestClient(app) as test_client:
         yield test_client
+    auth.reset_login_guard()
+    auth.reset_sessions()
 
 
 def _login(client):

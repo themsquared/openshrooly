@@ -20,12 +20,15 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("HUB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("HUB_ADMIN_PASSWORD", "test-admin-9x")
     config.DB_PATH = tmp_path / "hub.sqlite"
+    config.DATA_DIR = tmp_path
     config.ENABLE_PSILOCYBIN = False
     config.ADMIN_PASSWORD = "test-admin-9x"
     auth.reset_login_guard()
+    auth.reset_sessions()
     with TestClient(app) as test_client:
         yield test_client
     auth.reset_login_guard()
+    auth.reset_sessions()
 
 
 def _login(client):

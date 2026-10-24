@@ -21,4 +21,8 @@ export HUB_PORT="${HUB_PORT:-8090}"
 mkdir -p "$HUB_DATA_DIR" "$HOME/shroom-labs-bridge"
 echo "Hub data: $HUB_DATA_DIR"
 echo "Listening on port $HUB_PORT. Open http://<this-mac>:$HUB_PORT from a phone on the same LAN."
-exec python3 -m uvicorn hub.app:app --host "$HUB_HOST" --port "$HUB_PORT"
+FORWARDED_FLAG="--no-proxy-headers"
+if [ "${HUB_TRUST_FORWARDED:-0}" = "1" ]; then
+  FORWARDED_FLAG="--proxy-headers"
+fi
+exec python3 -m uvicorn hub.app:app --host "$HUB_HOST" --port "$HUB_PORT" $FORWARDED_FLAG

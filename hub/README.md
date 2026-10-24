@@ -29,7 +29,7 @@ cd /path/to/openshrooly
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r hub/requirements.txt
-PYTHONPATH=shared python -m uvicorn hub.app:app --host 127.0.0.1 --port 8090
+PYTHONPATH=shared python -m uvicorn hub.app:app --host 127.0.0.1 --port 8090 --no-proxy-headers
 ```
 
 Open http://127.0.0.1:8090
@@ -64,6 +64,7 @@ On a Mac mini, do not run the compose `bridge` service. Docker Desktop host netw
 | `HUB_ADMIN_PASSWORD` | empty | Hub admin password. If empty, the hub writes one to `admin.json` |
 | `HUB_SECRET` | generated | Signs the hub session cookie. If unset, the hub writes a random value to `hub.secret` (mode 0600). The old published default is refused. |
 | `HUB_ALLOWED_HOSTS` | empty | Extra Host names the hub accepts, comma-separated. `localhost`, loopback, `.local`, and LAN IPs are already allowed. |
+| `HUB_TRUST_FORWARDED` | `0` | Set to `1` only behind a trusted reverse proxy. Uvicorn forwarded headers stay off otherwise. |
 
 The psilocybin pack is **off** unless you opt in. Even then, those profiles stay free and never carry affiliate links.
 

@@ -27,7 +27,11 @@ BLOCKED_IPS = frozenset(
 )
 
 
-def _parse_ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+class UnsafeDeviceHost(ValueError):
+    """Resolved device address is missing or not a safe LAN target."""
+
+
+def parse_ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     try:
         return ipaddress.ip_address(text.strip().strip("[]"))
     except ValueError:
@@ -76,16 +80,16 @@ def normalize_device_host(host: str) -> str | None:
     if "/" in raw or "\\" in raw or "@" in raw or "?" in raw or "#" in raw:
         return None
     if raw.startswith("[") and "]" in raw:
-        return raw[1 : raw.index("]")]
+        return raw[1 : raw.index("]")].rstrip(".") or None
     if raw.count(":") == 1:
         name, _, port = raw.rpartition(":")
         if port.isdigit():
             raw = name
-    return raw.strip() or None
+    return raw.strip().rstrip(".") or None
 
 
 def resolved_ips(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address] | None:
-    ip = _parse_ip(host)
+    ip = parse_ip(host)
     if ip is not None:
         return [ip]
     try:
@@ -94,26 +98,46 @@ def resolved_ips(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Addres
         return None
     found: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
     for info in infos:
-        addr = _parse_ip(info[4][0])
+        addr = parse_ip(info[4][0])
         if addr is not None:
             found.append(addr)
-    return found
+    return found or None
+
+
+def resolve_connect_ip(host: str) -> str:
+    """Pick a safe IP for this connect. Unresolvable names are refused here, not at store."""
+    normalized = normalize_device_host(host)
+    if normalized is None:
+        raise UnsafeDeviceHost("Device host must be a hostname or IP on your LAN, not a URL.")
+    if _hostname_blocked(normalized):
+        raise UnsafeDeviceHost("That address is not allowed. Use the chamber's LAN hostname or IP.")
+    addrs = resolved_ips(normalized)
+    if not addrs:
+        raise UnsafeDeviceHost("Device host could not be resolved.")
+    safe = [addr for addr in addrs if not ip_is_blocked(addr)]
+    if not safe:
+        raise UnsafeDeviceHost("That address is not allowed. Use the chamber's LAN hostname or IP.")
+    chosen = next((addr for addr in safe if addr.version == 4), safe[0])
+    return str(_canonical_ip(chosen))
 
 
 def device_host_error(host: str) -> str | None:
-    """Return an error if this host is not a safe LAN chamber address."""
+    """Return an error if this host is not a safe LAN chamber address.
+
+    Unresolvable names are allowed here so an offline .local chamber can be stored.
+    Connect time uses resolve_connect_ip, which refuses those names until they resolve.
+    """
     normalized = normalize_device_host(host)
     if normalized is None:
         return "Device host must be a hostname or IP on your LAN, not a URL."
     if _hostname_blocked(normalized):
         return "That address is not allowed. Use the chamber's LAN hostname or IP."
-    ip = _parse_ip(normalized)
+    ip = parse_ip(normalized)
     if ip is not None:
         if ip_is_blocked(ip):
             return "That address is not allowed. Use the chamber's LAN hostname or IP."
         return None
     addrs = resolved_ips(normalized)
-    if addrs:
-        if any(ip_is_blocked(addr) for addr in addrs):
-            return "That address is not allowed. Use the chamber's LAN hostname or IP."
+    if addrs and any(ip_is_blocked(addr) for addr in addrs):
+        return "That address is not allowed. Use the chamber's LAN hostname or IP."
     return None

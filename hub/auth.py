@@ -24,9 +24,11 @@ CSRF_COOKIE = "hub_csrf"
 SESSION_TTL_S = 7 * 24 * 60 * 60
 _PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
 LOGIN_IP_MAX_FAILURES = 5
-LOGIN_GLOBAL_MAX_FAILURES = 20
 LOGIN_WINDOW_S = 10 * 60
 LOGIN_LOCKOUT_S = 60
+LOGIN_GLOBAL_SOFT_MAX = 40
+LOGIN_GLOBAL_BACKOFF_S = 2
+SESSIONS_FILENAME = "sessions.json"
 
 
 def random_password(length: int = 12) -> str:
@@ -49,10 +51,8 @@ def admin_password() -> str:
                 return password
         except (OSError, json.JSONDecodeError, TypeError):
             pass
-    path.parent.mkdir(parents=True, exist_ok=True)
     password = random_password()
-    path.write_text(json.dumps({"username": ADMIN_USER, "password": password}) + "\n", encoding="utf-8")
-    path.chmod(0o600)
+    config.write_private_file(path, json.dumps({"username": ADMIN_USER, "password": password}) + "\n")
     return password
 
 
@@ -89,21 +89,96 @@ def new_csrf() -> str:
     return secrets.token_urlsafe(24)
 
 
+def sessions_path():
+    return config.DATA_DIR / SESSIONS_FILENAME
+
+
+_session_lock = threading.Lock()
+
+
+def _load_sessions() -> dict[str, int]:
+    path = sessions_path()
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+    raw = payload.get("active") if isinstance(payload, dict) else None
+    if not isinstance(raw, dict):
+        return {}
+    now = int(time.time())
+    active: dict[str, int] = {}
+    for jti, expiry in raw.items():
+        if not isinstance(jti, str) or not isinstance(expiry, int):
+            continue
+        if expiry >= now:
+            active[jti] = expiry
+    return active
+
+
+def _save_sessions(active: dict[str, int]) -> None:
+    config.write_private_file(sessions_path(), json.dumps({"active": active}) + "\n")
+
+
+def remember_session(jti: str, expiry: int) -> None:
+    with _session_lock:
+        active = _load_sessions()
+        active[jti] = expiry
+        _save_sessions(active)
+
+
+def session_is_active(jti: str) -> bool:
+    with _session_lock:
+        return jti in _load_sessions()
+
+
+def revoke_session(token: str | None) -> None:
+    value = _verify(token or "")
+    if not value:
+        return
+    parts = value.split(":")
+    if len(parts) < 3:
+        return
+    jti = parts[2]
+    with _session_lock:
+        active = _load_sessions()
+        if jti in active:
+            del active[jti]
+            _save_sessions(active)
+
+
+def reset_sessions() -> None:
+    with _session_lock:
+        path = sessions_path()
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
 def session_token(username: str = ADMIN_USER, now: int | None = None) -> str:
     expiry = int(now if now is not None else time.time()) + SESSION_TTL_S
-    return _sign(f"{username}:{expiry}")
+    jti = secrets.token_urlsafe(16)
+    remember_session(jti, expiry)
+    return _sign(f"{username}:{expiry}:{jti}")
 
 
 def session_user(token: str | None, now: int | None = None) -> str | None:
     value = _verify(token or "")
-    if not value or ":" not in value:
+    if not value:
         return None
-    username, _, expiry_text = value.partition(":")
+    parts = value.split(":")
+    if len(parts) != 3:
+        return None
+    username, expiry_text, jti = parts
     try:
         expiry = int(expiry_text)
     except ValueError:
         return None
     if expiry < int(now if now is not None else time.time()):
+        return None
+    if not session_is_active(jti):
         return None
     return username
 
@@ -191,11 +266,34 @@ def same_origin(request: Request, require_header: bool = False) -> bool:
 
 
 def basic_ok(request: Request) -> bool:
+    """True when Basic is valid and this IP is not locked. Does not record."""
     parsed = parse_basic(request.headers.get("authorization"))
     if not parsed:
         return False
+    if login_retry_after(client_ip(request)):
+        return False
     user, password = parsed
     return user == ADMIN_USER and passwords_match(password, admin_password())
+
+
+def evaluate_basic(request: Request) -> tuple[str, int]:
+    """Check Basic against LOGIN_GUARD. Returns ok/fail/none/locked and retry-after."""
+    parsed = parse_basic(request.headers.get("authorization"))
+    if not parsed:
+        return "none", 0
+    ip = client_ip(request)
+    wait = login_retry_after(ip)
+    if wait:
+        return "locked", wait
+    user, password = parsed
+    if user == ADMIN_USER and passwords_match(password, admin_password()):
+        record_login_success(ip)
+        return "ok", 0
+    record_login_failure(ip)
+    wait = login_retry_after(ip) or login_global_backoff()
+    if wait:
+        return "locked", wait
+    return "fail", 0
 
 
 def session_ok(request: Request) -> bool:
@@ -237,7 +335,12 @@ def wants_html(request: Request) -> bool:
 
 
 def require_admin(request: Request) -> Response | None:
-    if is_authenticated(request):
+    if session_ok(request):
+        return None
+    status, retry_after = evaluate_basic(request)
+    if status == "locked":
+        return login_locked_response(retry_after)
+    if status == "ok":
         return None
     if wants_html(request):
         nxt = quote(str(request.url.path), safe="/")
@@ -300,11 +403,20 @@ class LoginGuard:
         return wait if wait > 0 else 0
 
     def retry_after(self, ip: str, now: float | None = None) -> int:
+        """Hard lock for this IP only. A burst from other IPs cannot lock the admin."""
         stamp = time.time() if now is None else now
         with self._lock:
-            ip_wait = self._locked(self._ip.get(ip, []), stamp, LOGIN_IP_MAX_FAILURES)
-            global_wait = self._locked(self._global, stamp, LOGIN_GLOBAL_MAX_FAILURES)
-        return max(ip_wait, global_wait)
+            return self._locked(self._ip.get(ip, []), stamp, LOGIN_IP_MAX_FAILURES)
+
+    def global_backoff(self, now: float | None = None) -> int:
+        """Short pause after a lot of failures, not a hub-wide lockout."""
+        stamp = time.time() if now is None else now
+        with self._lock:
+            recent = self._prune(self._global, stamp)
+            if len(recent) < LOGIN_GLOBAL_SOFT_MAX:
+                return 0
+            wait = int(LOGIN_GLOBAL_BACKOFF_S - (stamp - recent[-1]))
+            return wait if wait > 0 else 0
 
     def record_failure(self, ip: str, now: float | None = None) -> None:
         stamp = time.time() if now is None else now
@@ -326,6 +438,10 @@ def reset_login_guard() -> None:
 
 def login_retry_after(ip: str) -> int:
     return LOGIN_GUARD.retry_after(ip)
+
+
+def login_global_backoff() -> int:
+    return LOGIN_GUARD.global_backoff()
 
 
 def record_login_failure(ip: str) -> None:
