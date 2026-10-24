@@ -123,7 +123,7 @@ The component is in the default 1.0.x-sl build (`esphome/components/cloud.yaml`)
 
 ### Flash layout (proposal, not applied)
 
-The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 97.2% full (~52 KB free). OTA still fits. The next feature of this size will not.
+The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 97.2% full (~51 KB free). OTA still fits. The next feature of this size will not.
 
 Do not flash a new table from this pairing ship. A later layout change needs its own design. Rewriting the table from the running app and writing both slots cannot survive a power cut: a bad table cannot be undone by OTA rollback, and a 6 MB ota_0 would overlap the running image and today's NVS at 0x3A0000.
 
