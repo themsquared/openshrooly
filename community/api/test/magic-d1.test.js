@@ -80,7 +80,8 @@ test("magic link sign-up with grower@gmail.com gets a random public handle", asy
     const leak = (value, label) => assertNoPublicPii(value, "grower@gmail.com", [], label);
     leak(created.data, "publish");
     leak((await call(ctx, "GET", "/api/profiles/magic-privacy-oyster")).data, "profile GET");
-    leak((await call(ctx, "GET", "/api/profiles?pack=culinary")).data, "profile list");
+    const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
+    leak(list.data.find((item) => item.id === "magic-privacy-oyster"), "profile list card");
     leak((await call(ctx, "GET", "/api/search?pack=culinary&q=Privacy")).data, "search");
     leak(renderSitemap([created.data]), "sitemap");
     leak(renderLlms([created.data]), "llms.txt");

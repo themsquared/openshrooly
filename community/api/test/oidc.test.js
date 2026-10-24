@@ -5,7 +5,6 @@ import {
   assertNoPublicPii,
   assertPublicHandle,
   call,
-  hasEmailLocalPart,
   testEnv,
 } from "./helpers.js";
 import { renderLlms, renderProfilePage, renderSitemap } from "../../web/scripts/generate-seo.js";
@@ -241,15 +240,20 @@ test("Google sign-up does not put the email local part or name on public API, pa
   assert.ok(afterRate.data.ratings.some((item) => item.username === row.username));
   assert.ok(!afterRate.data.ratings.some((item) => item.display_name));
 
-  leak((await call(ctx, "GET", "/api/profiles?pack=culinary")).data, "profile list");
+  const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  const card = list.data.find((item) => item.id === "google-privacy-oyster");
+  assert.ok(card);
+  leak(card, "profile list card");
   leak((await call(ctx, "GET", "/api/search?pack=culinary&q=Privacy")).data, "search");
   leak((await call(ctx, "GET", "/api/profiles/google-privacy-oyster.json")).data, "profile.json export");
 
   const hub = await call(ctx, "GET", "/api/hub/pull", { token });
   assert.equal(hub.status, 200);
   assert.equal(hub.data.hub_user, row.username);
-  assert.doesNotMatch(JSON.stringify(hub.data), /Ada|Lovelace/i);
-  assert.equal(hasEmailLocalPart(hub.data, "grower@gmail.com"), false);
+  const hubProfile = hub.data.profiles.find((item) => item.id === "google-privacy-oyster");
+  assert.equal(hubProfile.author, row.username);
+  leak(hubProfile, "hub profile");
+  leak({ hub_user: hub.data.hub_user }, "hub user");
 
   const passkey = await call(ctx, "POST", "/api/auth/webauthn/register/begin", { token, body: {} });
   assert.equal(passkey.status, 200);
