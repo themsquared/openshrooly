@@ -43,18 +43,36 @@
       <p class="eyebrow">Account</p>
       <h1>Sign in</h1>
       <p class="muted">Passwordless by default. Email a one-time link, or use a passkey.</p>
-      <p id="error" class="notice hidden"></p>
+      <p id="error" class="notice hidden" role="alert"></p>
       <form id="form">
         <label>Email <input name="email" type="email" required autocomplete="username email"></label>
         <div id="turnstile" class="cf-turnstile"></div>
         <button type="submit">Email me a sign-in link</button>
       </form>
+      <form id="totp-form" class="hidden">
+        <h2>One more step</h2>
+        <p class="muted">Enter the six-digit code from your authenticator app. A recovery code also works.</p>
+        <p id="totp-error" class="notice hidden" data-totp-error role="alert"></p>
+        <label>Sign-in code
+          <input id="totp-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="16" spellcheck="false">
+        </label>
+        <p><button type="button" class="link" data-recovery-toggle>Use a recovery code</button></p>
+        <button type="submit">Continue</button>
+      </form>
       <p id="email-soon" class="muted hidden">Email sign-in is coming soon.</p>
-      <div class="auth-actions">
+      <div class="auth-actions" id="first-factors">
         <a class="button secondary" href="#" id="google">Continue with Google</a>
         <a class="button secondary" href="#" id="apple">Continue with Apple</a>
         <p id="oidc-soon" class="muted hidden">Google and Apple sign-in are coming soon.</p>
         <button type="button" class="ghost" id="passkey">Use a passkey</button>
+        <details class="auth-more">
+          <summary>Use a password</summary>
+          <form id="password-form">
+            <label>Email <input name="email" type="email" autocomplete="username"></label>
+            <label>Password <input name="password" type="password" autocomplete="current-password"></label>
+            <button type="submit">Sign in</button>
+          </form>
+        </details>
       </div>
       <p class="muted">Need an account? The email link creates one if you’re new. <a href="/register.html">More options</a></p>
     </section>

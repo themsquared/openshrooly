@@ -199,8 +199,13 @@ test("TOTP confirm requires a real code and stores an encrypted secret", async (
   assert.equal(await verifyTotp(begin.data.secret, code), true);
   const ok = await call(ctx, "POST", "/api/auth/totp/confirm", { token, body: { code } });
   assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(ok.data.recovery_codes.length, 10);
+  assert.match(ok.data.recovery_codes[0], /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
   const enabled = await ctx.db.one("SELECT * FROM users WHERE id=?", [user.id]);
   assert.equal(Number(enabled.totp_enabled), 1);
+  const me = await call(ctx, "GET", "/api/me", { token });
+  assert.equal(me.data.user.totp_enabled, true);
+  assert.equal(me.data.user.totp_recovery_remaining, 10);
 });
 
 test("Turnstile fails closed without a secret or with a bad stub token", async () => {
@@ -379,6 +384,97 @@ test("TOTP confirm is rate limited", async () => {
     last = await call(ctx, "POST", "/api/auth/totp/confirm", { token, body: { code: "000000" } });
   }
   assert.equal(last.status, 429);
+  assert.equal(last.data.error, "Too many attempts. Try again later.");
+});
+
+test("TOTP verify accepts a recovery code once, then disable consumes another", async () => {
+  const ctx = testEnv();
+  const t0 = Date.now();
+  ctx.NOW_MS = t0;
+  const { token } = await register(ctx, "recover@example.com");
+  const begin = await call(ctx, "POST", "/api/auth/totp/begin", { token, body: {} });
+  const setup = await totpAt(begin.data.secret, Math.floor(t0 / 30_000));
+  const enabled = await call(ctx, "POST", "/api/auth/totp/confirm", { token, body: { code: setup } });
+  assert.equal(enabled.status, 200, JSON.stringify(enabled.data));
+  const [first, second] = enabled.data.recovery_codes;
+
+  const start = await call(ctx, "POST", "/api/auth/magic/start", {
+    body: { email: "recover@example.com", turnstile: "ok" },
+  });
+  const pending = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
+  assert.equal(pending.data.totp_required, true);
+  const wrong = await call(ctx, "POST", "/api/auth/totp/verify", {
+    body: { totp_token: pending.data.totp_token, code: "000000" },
+  });
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.data.error, "That code did not work.");
+  const ok = await call(ctx, "POST", "/api/auth/totp/verify", {
+    body: { totp_token: pending.data.totp_token, code: first },
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(ok.data.user.totp_enabled, true);
+
+  const replay = await call(ctx, "POST", "/api/auth/magic/start", {
+    body: { email: "recover@example.com", turnstile: "ok" },
+  });
+  const pending2 = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: replay.data.debug_token } });
+  const reused = await call(ctx, "POST", "/api/auth/totp/verify", {
+    body: { totp_token: pending2.data.totp_token, code: first },
+  });
+  assert.equal(reused.status, 401);
+
+  const off = await call(ctx, "POST", "/api/auth/totp/disable", { token, body: { code: second } });
+  assert.equal(off.status, 200, JSON.stringify(off.data));
+  const me = await call(ctx, "GET", "/api/me", { token });
+  assert.equal(me.data.user.totp_enabled, false);
+  assert.equal(me.data.user.totp_recovery_remaining, 0);
+});
+
+test("TOTP verify is rate limited and disable is rate limited", async () => {
+  const ctx = testEnv();
+  const { token } = await register(ctx, "vlimit@example.com");
+  const secret = await enableTotp(ctx, token);
+  const start = await call(ctx, "POST", "/api/auth/magic/start", {
+    body: { email: "vlimit@example.com", turnstile: "ok" },
+  });
+  const pending = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
+  let last;
+  for (let i = 0; i < 9; i += 1) {
+    last = await call(ctx, "POST", "/api/auth/totp/verify", {
+      body: { totp_token: pending.data.totp_token, code: "000000" },
+    });
+  }
+  assert.equal(last.status, 429);
+
+  ctx.NOW_MS = Date.now() + 30_000;
+  const later = await totpAt(secret, Math.floor(ctx.NOW_MS / 30_000));
+  let disableLast;
+  for (let i = 0; i < 9; i += 1) {
+    disableLast = await call(ctx, "POST", "/api/auth/totp/disable", { token, body: { code: "000000" } });
+  }
+  assert.equal(disableLast.status, 429);
+  const still = await call(ctx, "GET", "/api/me", { token });
+  assert.equal(still.data.user.totp_enabled, true);
+  const allowed = await call(ctx, "POST", "/api/auth/totp/disable", { token, body: { code: later } });
+  assert.equal(allowed.status, 429);
+});
+
+test("Google callback with sign-in codes sends a browser to the challenge page", async () => {
+  const ctx = testEnv();
+  const { token } = await register(ctx, "google.user@example.com");
+  await enableTotp(ctx, token);
+  const start = await call(ctx, "GET", "/api/auth/oidc/google/start");
+  assert.equal(start.status, 200);
+  const jsonCb = await call(ctx, "GET", `/api/auth/oidc/google/callback?state=${start.data.state}&code=${start.data.debug_code}`);
+  assert.equal(jsonCb.status, 401);
+  assert.equal(jsonCb.data.totp_required, true);
+
+  const start2 = await call(ctx, "GET", "/api/auth/oidc/google/start");
+  const htmlCb = await call(ctx, "GET", `/api/auth/oidc/google/callback?state=${start2.data.state}&code=${start2.data.debug_code}`, {
+    headers: { accept: "text/html" },
+  });
+  assert.equal(htmlCb.status, 302);
+  assert.match(String(htmlCb.headers.get("location") || ""), /\/auth\/callback\.html\?.*totp_token=/);
 });
 
 test("WebAuthn accepts browser DER signatures and rejects a bad origin or low signCount", async () => {

@@ -714,6 +714,65 @@ button.nav-toggle {
 .alert-form .toggle input { width: 20px; height: 20px; padding: 0; flex: none; accent-color: var(--sl-spore-deep); }
 .alert-form input[type="time"], .alert-form input[type="date"] { color-scheme: dark; }
 .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.9rem; }
+.auth-more { margin-top: 0.4rem; }
+.auth-more summary {
+  cursor: pointer;
+  color: var(--sl-ink-dim);
+  font-weight: 700;
+  font-size: 13px;
+}
+.auth-more form { margin-top: 0.7rem; }
+button.link {
+  width: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--sl-mycelium);
+  font-weight: 700;
+  text-decoration: underline;
+}
+.totp-qr {
+  display: grid;
+  place-items: center;
+  margin: 0.8rem 0;
+  padding: 0.8rem;
+  border-radius: 14px;
+  background: #edfff4;
+}
+.totp-qr svg { display: block; max-width: 100%; height: auto; }
+.totp-secret {
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+.totp-secret code {
+  display: block;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--sl-line);
+  background: rgba(7, 17, 14, 0.55);
+}
+.recovery-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.7rem 0;
+  display: grid;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.recovery-list li {
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--sl-line);
+  background: rgba(7, 17, 14, 0.45);
+}
+#totp-code, [data-totp-confirm] input[name="code"] {
+  font-size: 1.35rem;
+  letter-spacing: 0.28em;
+  text-align: center;
+  font-weight: 700;
+}
 .form-actions [role="status"]:empty { display: none; }
 .alert-feed { list-style: none; padding: 0; margin: 0.4rem 0 1.4rem; display: grid; gap: 8px; }
 .alert-feed li {

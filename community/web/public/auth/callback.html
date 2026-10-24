@@ -41,7 +41,17 @@
   <main id="main" class="card auth-panel">
     <h1>Finishing sign in…</h1>
     <p id="status" class="muted">Signing you in. This takes a moment.</p>
-    <p id="error" class="notice hidden"></p>
+    <p id="error" class="notice hidden" role="alert"></p>
+    <form id="totp-form" class="hidden">
+      <h2>One more step</h2>
+      <p class="muted">Enter the six-digit code from your authenticator app. A recovery code also works.</p>
+      <p id="totp-error" class="notice hidden" data-totp-error role="alert"></p>
+      <label>Sign-in code
+        <input id="totp-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="16" spellcheck="false">
+      </label>
+      <p><button type="button" class="link" data-recovery-toggle>Use a recovery code</button></p>
+      <button type="submit">Continue</button>
+    </form>
   </main>
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">

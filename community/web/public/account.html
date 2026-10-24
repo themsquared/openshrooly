@@ -46,6 +46,46 @@
     <p class="muted">Sign out everywhere ends every open session on every device.</p>
     <ul id="sessions"></ul>
     <p><button type="button" class="secondary" id="signout-all">Sign out everywhere</button></p>
+    <h2>Sign-in codes</h2>
+    <p class="muted">An authenticator app can ask for a six-digit code after you sign in.</p>
+    <div id="totp-panel" class="card alert-form">
+      <p id="totp-setup-error" class="notice hidden" data-totp-setup-error role="alert"></p>
+      <div data-totp-off>
+        <p>Sign-in codes are off.</p>
+        <div class="form-actions">
+          <button type="button" data-totp-start>Turn on sign-in codes</button>
+        </div>
+      </div>
+      <div class="hidden" data-totp-setup>
+        <p>Scan this with your authenticator app.</p>
+        <div class="totp-qr" data-totp-qr></div>
+        <p class="muted">If you cannot scan, type this setup code into the app.</p>
+        <p class="totp-secret"><code data-totp-secret></code></p>
+        <form data-totp-confirm>
+          <label>Six-digit code from the app
+            <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" spellcheck="false">
+          </label>
+          <div class="form-actions">
+            <button type="submit">Confirm and turn on</button>
+          </div>
+        </form>
+      </div>
+      <div class="hidden" data-totp-on>
+        <p>Sign-in codes are on.</p>
+        <p class="muted" data-totp-remaining></p>
+        <div class="hidden" data-totp-recovery></div>
+        <form data-totp-disable>
+          <p id="totp-disable-error" class="notice hidden" data-totp-disable-error role="alert"></p>
+          <label>Current app code or a recovery code
+            <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="16" spellcheck="false">
+          </label>
+          <p><button type="button" class="link" data-recovery-toggle>Use a recovery code</button></p>
+          <div class="form-actions">
+            <button type="submit" class="secondary">Turn off sign-in codes</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <h2>Home hub</h2>
     <p>Give your hub a name, then copy the connection once and paste it on that hub so it can reach Shroom Labs.</p>
     <form id="mint" class="card" style="padding:1.2rem">

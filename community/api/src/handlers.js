@@ -223,6 +223,10 @@ async function route(method, path, url, request, env) {
       [user.id]
     );
     const coachSub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
+    const recoveryLeft = await db.one(
+      "SELECT COUNT(*) AS n FROM totp_recovery_codes WHERE user_id=? AND used_at IS NULL",
+      [user.id]
+    );
     return json({
       user: {
         id: user.id,
@@ -230,6 +234,8 @@ async function route(method, path, url, request, env) {
         email: user.email || null,
         email_verified: Boolean(Number(user.email_verified)),
         role: user.role || "user",
+        totp_enabled: Boolean(Number(user.totp_enabled)),
+        totp_recovery_remaining: Number(recoveryLeft?.n || 0),
       },
       tokens,
       entitlements,

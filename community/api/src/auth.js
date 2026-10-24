@@ -138,7 +138,76 @@ function publicUser(user) {
     email: user.email || null,
     email_verified: Boolean(Number(user.email_verified)),
     role: user.role || "user",
+    totp_enabled: Boolean(Number(user.totp_enabled)),
   };
+}
+
+const TOTP_BAD = "That code did not work.";
+const TOTP_LIMIT = "Too many attempts. Try again later.";
+const TOTP_EXPIRED = "This sign-in step expired. Start again.";
+const RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const RECOVERY_COUNT = 10;
+
+export function normalizeRecoveryCode(value) {
+  const clean = String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  if (clean.length < 8 || clean.length > 14) return "";
+  return clean;
+}
+
+function randomRecoveryCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  let out = "";
+  for (let i = 0; i < 8; i += 1) {
+    out += RECOVERY_ALPHABET[bytes[i] % RECOVERY_ALPHABET.length];
+    if (i === 3) out += "-";
+  }
+  return out;
+}
+
+async function issueRecoveryCodes(db, userId) {
+  await db.run("DELETE FROM totp_recovery_codes WHERE user_id=?", [userId]);
+  const codes = [];
+  for (let i = 0; i < RECOVERY_COUNT; i += 1) {
+    const code = randomRecoveryCode();
+    codes.push(code);
+    await db.run("INSERT INTO totp_recovery_codes (user_id, code_hash, used_at, created_at) VALUES (?, ?, ?, ?)", [
+      userId,
+      await sha256Hex(normalizeRecoveryCode(code)),
+      null,
+      nowIso(),
+    ]);
+  }
+  return codes;
+}
+
+async function consumeRecoveryCode(db, userId, presented) {
+  const normalized = normalizeRecoveryCode(presented);
+  if (!normalized) return false;
+  const result = await db.run(
+    "UPDATE totp_recovery_codes SET used_at=? WHERE code_hash=? AND user_id=? AND used_at IS NULL",
+    [nowIso(), await sha256Hex(normalized), userId]
+  );
+  return Number(result?.meta?.changes ?? result?.changes ?? 0) === 1;
+}
+
+function digitsOnly(value) {
+  return String(value || "").replace(/\s+/g, "");
+}
+
+async function consumeSignInFactor(db, user, env, presented) {
+  const raw = digitsOnly(presented);
+  if (/^\d{6}$/.test(raw) && (await consumeUserTotp(db, user, env, raw))) return true;
+  return consumeRecoveryCode(db, user.id, presented);
+}
+
+function totpChallengeRedirect(env, request, payload) {
+  const accept = request.headers.get("accept") || "";
+  if (!payload?.totp_required || !payload?.totp_token || !accept.includes("text/html")) return null;
+  const dest = new URL("/auth/callback.html", env.SITE_ORIGIN || "https://shroomlabs.io");
+  dest.searchParams.set("totp_token", payload.totp_token);
+  return new Response(null, { status: 302, headers: { location: dest.toString() } });
 }
 
 // Production users.password_hash is NOT NULL. Accounts without a password store this marker;
@@ -354,17 +423,20 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/totp/begin") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
+    const limited = await rateLimit(db, `totp-begin:${rateLimitClient(request)}:${user.id}`, 8, 900);
+    if (!limited.ok) return json({ error: TOTP_LIMIT }, 429);
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
     if (Number(fresh.totp_enabled)) {
-      if (!(await consumeUserTotp(db, fresh, env, body.code))) {
-        return json({ error: "current TOTP code required to re-enroll" }, 401);
+      if (!(await consumeSignInFactor(db, fresh, env, body.code || body.totp || body.recovery))) {
+        return json({ error: TOTP_BAD }, 401);
       }
     }
     const secret = randomBase32(20);
     const enc = await encryptSecret(secret, env);
-    if (!enc) return json({ error: "TOTP encryption key is not configured." }, 503);
+    if (!enc) return json({ error: "Sign-in codes are not available right now." }, 503);
     await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=? WHERE id=?", [enc, 0, null, user.id]);
+    await db.run("DELETE FROM totp_recovery_codes WHERE user_id=?", [user.id]);
     return json({ secret, otpauth: `otpauth://totp/ShroomLabs:${user.email || user.username}?secret=${secret}&issuer=ShroomLabs` });
   }
 
@@ -372,26 +444,30 @@ export async function handleAuth(method, path, url, request, env) {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
     const limited = await rateLimit(db, `totp-confirm:${rateLimitClient(request)}:${user.id}`, 8, 900);
-    if (!limited.ok) return json({ error: "Too many TOTP attempts." }, 429);
+    if (!limited.ok) return json({ error: TOTP_LIMIT }, 429);
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
     const secret = await decryptSecret(fresh?.totp_secret_enc, env);
-    const matched = secret ? await matchTotp(secret, body.code, clockMs(env)) : { ok: false };
-    if (!matched.ok) return json({ error: "invalid TOTP code" }, 401);
+    const matched = secret ? await matchTotp(secret, digitsOnly(body.code), clockMs(env)) : { ok: false };
+    if (!matched.ok) return json({ error: TOTP_BAD }, 401);
     await db.run("UPDATE users SET totp_enabled=?, totp_last_step=? WHERE id=?", [1, matched.step, user.id]);
+    const recovery_codes = await issueRecoveryCodes(db, user.id);
     await audit(db, user.id, "totp_enable", "", request);
-    return json({ ok: true });
+    return json({ ok: true, recovery_codes });
   }
 
   if (method === "POST" && path === "/api/auth/totp/disable") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
+    const limited = await rateLimit(db, `totp-disable:${rateLimitClient(request)}:${user.id}`, 8, 900);
+    if (!limited.ok) return json({ error: TOTP_LIMIT }, 429);
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
-    if (!Number(fresh.totp_enabled) || !(await consumeUserTotp(db, fresh, env, body.code))) {
-      return json({ error: "current TOTP code required to disable" }, 401);
+    if (!Number(fresh.totp_enabled) || !(await consumeSignInFactor(db, fresh, env, body.code || body.totp || body.recovery))) {
+      return json({ error: TOTP_BAD }, 401);
     }
     await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=? WHERE id=?", [null, 0, null, user.id]);
+    await db.run("DELETE FROM totp_recovery_codes WHERE user_id=?", [user.id]);
     await audit(db, user.id, "totp_disable", "", request);
     return json({ ok: true });
   }
@@ -399,13 +475,18 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/totp/verify") {
     const body = await request.json().catch(() => ({}));
     const limited = await rateLimit(db, `totp-verify:${rateLimitClient(request)}`, 8, 900);
-    if (!limited.ok) return json({ error: "Too many TOTP attempts." }, 429);
+    if (!limited.ok) return json({ error: TOTP_LIMIT }, 429);
     const hash = await sha256Hex(String(body.totp_token || ""));
     const pending = await db.one("SELECT * FROM totp_pending WHERE token_hash=?", [hash]);
-    if (!pending || pending.expires_at < nowIso()) return json({ error: "totp required" }, 401);
-    await db.run("DELETE FROM totp_pending WHERE token_hash=?", [hash]);
+    if (!pending || pending.expires_at < nowIso()) {
+      if (pending) await db.run("DELETE FROM totp_pending WHERE token_hash=?", [hash]);
+      return json({ error: TOTP_EXPIRED }, 401);
+    }
     const user = await db.one("SELECT * FROM users WHERE id=?", [pending.user_id]);
-    if (!(await consumeUserTotp(db, user, env, body.code || body.totp))) return json({ error: "invalid TOTP code" }, 401);
+    if (!(await consumeSignInFactor(db, user, env, body.code || body.totp || body.recovery))) {
+      return json({ error: TOTP_BAD }, 401);
+    }
+    await db.run("DELETE FROM totp_pending WHERE token_hash=?", [hash]);
     const issued = await issueSession(db, user, request, env);
     await audit(db, user.id, "totp_sign_in", "", request);
     return json({ user: publicUser(user), ...issued }, 200, issued.headers);
@@ -523,8 +604,14 @@ async function finishOidc(env, request, url, provider) {
   );
   await audit(env.db, user.id, `oidc_${provider}`, email, request);
   const completed = await completeSignIn(env.db, user, request, env, {});
+  if (completed.status !== 200) {
+    const payload = await completed.clone().json().catch(() => ({}));
+    const redirected = totpChallengeRedirect(env, request, payload);
+    if (redirected) return redirected;
+    if (devStubsEnabled(env, request)) return completed;
+    return completed;
+  }
   if (devStubsEnabled(env, request)) return completed;
-  if (completed.status !== 200) return completed;
   const dest = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/account.html`;
   return new Response(null, { status: 302, headers: { location: dest, "set-cookie": completed.headers.get("set-cookie") } });
 }
@@ -573,8 +660,8 @@ const base64urlSha256 = true;
 
 async function completeSignIn(db, user, request, env, body = {}) {
   if (Number(user.totp_enabled)) {
-    const code = body.totp || body.code;
-    if (!(await consumeUserTotp(db, user, env, code))) {
+    const code = body.totp || body.code || body.recovery;
+    if (!(await consumeSignInFactor(db, user, env, code))) {
       const token = randomToken() + randomToken();
       await db.run("INSERT INTO totp_pending (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)", [
         await sha256Hex(token),
@@ -582,7 +669,7 @@ async function completeSignIn(db, user, request, env, body = {}) {
         laterIso(5 * 60 * 1000),
         nowIso(),
       ]);
-      return json({ error: "totp required", totp_required: true, totp_token: token }, 401);
+      return json({ error: "A sign-in code is required.", totp_required: true, totp_token: token }, 401);
     }
   }
   const issued = await issueSession(db, user, request, env);
