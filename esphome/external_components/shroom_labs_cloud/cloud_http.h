@@ -93,6 +93,7 @@ class CloudCrypto {
   virtual bool sign(const uint8_t priv[32], const uint8_t *data, size_t len, uint8_t sig[64]) = 0;
   virtual bool make_csr(const uint8_t priv[32], const uint8_t x[32], const uint8_t y[32], const char *cn,
                         std::string *pem) = 0;
+  virtual bool sha256(const uint8_t *data, size_t len, uint8_t out[32]) = 0;
   virtual std::string hardware_id() = 0;
 };
 
@@ -125,6 +126,7 @@ enum class HttpOutcome : uint8_t {
   HardFail,
   CertExpired,
   ProofInvalid,
+  RelinkRequired,
 };
 
 HttpOutcome enroll_outcome(bool transport_ok, int status, const char *body = nullptr);

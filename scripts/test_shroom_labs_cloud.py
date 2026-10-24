@@ -39,6 +39,7 @@ def main():
             str(COMP / "cloud_http.cpp"),
             str(COMP / "cloud_engine.cpp"),
             str(COMP / "cloud_qr.cpp"),
+            "-lcrypto",
             "-o",
             str(exe),
         )

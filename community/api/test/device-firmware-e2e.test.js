@@ -8,6 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Miniflare } from "miniflare";
+import { createD1Db } from "../src/db.js";
 import { handleRequest } from "../src/handlers.js";
 import { SCHEMA_SQL } from "../src/schema.js";
 import { testEnv } from "./helpers.js";
@@ -138,4 +139,93 @@ test("firmware client enroll, claim, CSR, rotate against the Worker", async () =
   assert.equal(rotated.status, 200, JSON.stringify(rotated.data));
   assert.notEqual(rotated.data.serial, issued.data.serial);
   assert.equal(rotated.data.previous_serial, issued.data.serial);
+});
+
+async function withDeviceD1(fn) {
+  const mf = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok'); } }",
+    d1Databases: ["DB"],
+  });
+  try {
+    const d1 = await mf.getD1Database("DB");
+    const extra = readFileSync(new URL("../schema.sql", import.meta.url), "utf8");
+    for (const s of statements(SCHEMA_SQL || extra)) {
+      await d1.prepare(s).run().catch(() => {});
+    }
+    await fn(d1, testEnv({ db: createD1Db(d1), DEVICE_ISSUER: "worker", SITE_ORIGIN: "https://shroomlabs.io" }));
+  } finally {
+    await mf.dispose();
+  }
+}
+
+test("claim-status, grace refuse, and self-revoke against Miniflare D1", async () => {
+  await withDeviceD1(async (d1, ctx) => {
+    const device = await firmwareDevice();
+    const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+      body: enrollBody({ hardware_id: "aabbccddeeffd101", public_jwk: device.public_jwk }),
+    });
+    assert.equal(enrolled.status, 200, JSON.stringify(enrolled.data));
+    const deviceId = enrolled.data.device_id;
+    const waiting = await call(ctx, "POST", `/api/devices/${deviceId}/claim-status`, {
+      body: { enroll_token: enrolled.data.enroll_token },
+    });
+    assert.equal(waiting.status, 200, JSON.stringify(waiting.data));
+    assert.equal(waiting.data.claimed, false);
+
+    const serial = "d1grace01";
+    const ninety = new Date(Date.now() - 90 * 86400000).toISOString().replace(/\.\d+Z$/, "Z");
+    await d1
+      .prepare(
+        "UPDATE cloud_devices SET status=?, owner_id=?, cloud_enabled=? WHERE id=?"
+      )
+      .bind("active", 1, 1, deviceId)
+      .run();
+    await d1
+      .prepare(
+        "INSERT INTO device_certs (device_id, serial, fingerprint, pem, issuer, status, cf_id, not_before, not_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(deviceId, serial, "ff".repeat(32), "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n", "worker-ca", "active", null, ninety, ninety, ninety)
+      .run();
+
+    const rotPath = `/api/devices/${deviceId}/rotate`;
+    const csr = await makeCsr(device.keys, deviceId);
+    const rotRaw = JSON.stringify(rotateBody({ csr }));
+    const nonce1 = await call(ctx, "POST", `/api/devices/${deviceId}/nonce`, { body: {} });
+    assert.equal(nonce1.status, 200, JSON.stringify(nonce1.data));
+    const refused = await call(ctx, "POST", rotPath, {
+      headers: await firmwareHeaders({
+        deviceId,
+        key: device.keys.privateKey,
+        method: "POST",
+        path: rotPath,
+        body: rotRaw,
+        nonce: nonce1.data.nonce,
+        serial,
+      }),
+      body: rotRaw,
+    });
+    assert.equal(refused.status, 401, JSON.stringify(refused.data));
+    assert.equal(refused.data.code, "relink_required");
+
+    const nonce2 = await call(ctx, "POST", `/api/devices/${deviceId}/nonce`, { body: {} });
+    const revPath = `/api/devices/${deviceId}/self-revoke`;
+    const revRaw = "{}";
+    const revoked = await call(ctx, "POST", revPath, {
+      headers: await firmwareHeaders({
+        deviceId,
+        key: device.keys.privateKey,
+        method: "POST",
+        path: revPath,
+        body: revRaw,
+        nonce: nonce2.data.nonce,
+        serial,
+      }),
+      body: revRaw,
+    });
+    assert.equal(revoked.status, 200, JSON.stringify(revoked.data));
+    assert.equal(revoked.data.status, "revoked");
+    const row = await d1.prepare("SELECT status FROM cloud_devices WHERE id=?").bind(deviceId).first();
+    assert.equal(row.status, "revoked");
+  });
 });

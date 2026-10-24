@@ -27,6 +27,7 @@ enum class CloudState : uint8_t {
   Revoked,
   Owned,
   WaitClaim,
+  Relink,
   Error,
 };
 
@@ -48,6 +49,7 @@ enum class CloudEvent : uint8_t {
   LinkAuthFail,  // legacy wipe
   LinkRevoked,   // explicit revoked
   CertExpired,
+  RelinkRequired,
   ProofInvalid,
   ReclaimOk,
   ReclaimFail,
@@ -83,6 +85,8 @@ std::string reclaim_body_json(const char *jwk);
 
 bool json_get_string(const char *json, const char *key, std::string *out);
 bool json_get_int64(const char *json, const char *key, int64_t *out);
+bool json_get_bool(const char *json, const char *key, bool *out);
+std::string claim_status_body_json(const char *enroll_token);
 
 // PKCS#10 for P-256 + ecdsa-with-SHA256. sign() must write raw 64-byte r||s over SHA-256(info).
 using SignSha256 = bool (*)(const uint8_t *data, size_t len, uint8_t sig_raw[64], void *ctx);

@@ -119,7 +119,8 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
       {status?.linked && (
         <div className="cloud-linked" role="status">Linked to your Shroom Labs account</div>
       )}
-      {status?.enabled && !status.linked && code && status.state !== 'owned' && status.state !== 'wait_claim' && (
+      {status?.enabled && !status.linked && code && status.state !== 'owned' && status.state !== 'wait_claim' &&
+        status.state !== 'relink' && (
         <div className="cloud-claim">
           <div className="cloud-code" aria-label="Claim code">{code}</div>
           {url && (

@@ -54,12 +54,17 @@ class CloudEngine {
   size_t request_count() const { return request_count_; }
 
   bool run_job(CloudJob job);
+  bool try_begin(CloudJob job);
+  void finish();
+  void drain_queued() { drain_queued_(); }
+  bool busy() const { return busy_; }
   bool enroll_now();
   bool csr_now();
   bool rotate_now();
   bool reclaim_now();
   bool probe_now();
   bool revoke_now();
+  bool revoke_failed() const { return revoke_failed_; }
 
  protected:
   struct JobSnap {
@@ -83,7 +88,10 @@ class CloudEngine {
   void save_cert_(const std::string &pem);
   void clear_cert_();
   void wipe_();
+  void relink_();
   void zero_key_();
+  bool discard_job_() const { return pending_wipe_; }
+  void drain_queued_();
   bool ensure_key_();
   bool sign_(const uint8_t *data, size_t len, uint8_t sig[64]);
   bool make_csr_(std::string *pem);
@@ -142,7 +150,9 @@ class CloudEngine {
   std::atomic<bool> busy_{false};
   std::atomic<bool> show_claim_{false};
   std::atomic<bool> pending_wipe_{false};
+  std::atomic<bool> revoke_failed_{false};
   CloudJob job_{CloudJob::NONE};
+  CloudJob queued_{CloudJob::NONE};
   mutable std::mutex lock_;
 };
 

@@ -26,6 +26,7 @@
 #include <cstring>
 #include <ctime>
 #include <memory>
+#include <strings.h>
 
 namespace esphome {
 namespace shroom_labs {
@@ -237,6 +238,10 @@ bool EspCrypto::make_csr(const uint8_t priv[32], const uint8_t x[32], const uint
   return build_p256_csr_pem(x, y, cn, cb, &ctx, pem);
 }
 
+bool EspCrypto::sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
+  return mbedtls_sha256(data, len, out, 0) == 0;
+}
+
 std::string EspCrypto::hardware_id() {
   uint8_t mac[6] = {};
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
@@ -267,6 +272,9 @@ HttpResponse IdfTransport::execute(const HttpRequest &req) {
   const std::string host = host_of(req.url);
   if (!api_url_allowed(req.url.c_str(), host.c_str()))
     return out;
+  struct HdrCtx {
+    int retry_after_s = 0;
+  } hdr;
   esp_http_client_config_t cfg = {};
   cfg.url = req.url.c_str();
   cfg.crt_bundle_attach = esp_crt_bundle_attach;
@@ -275,6 +283,14 @@ HttpResponse IdfTransport::execute(const HttpRequest &req) {
   cfg.buffer_size = 2048;
   cfg.user_agent = "ShroomLabs-chamber";
   cfg.method = (req.method != nullptr && std::strcmp(req.method, "GET") == 0) ? HTTP_METHOD_GET : HTTP_METHOD_POST;
+  cfg.user_data = &hdr;
+  cfg.event_handler = [](esp_http_client_event_t *evt) -> esp_err_t {
+    if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->header_key != nullptr && evt->header_value != nullptr &&
+        strcasecmp(evt->header_key, "Retry-After") == 0) {
+      static_cast<HdrCtx *>(evt->user_data)->retry_after_s = parse_retry_after(evt->header_value);
+    }
+    return ESP_OK;
+  };
   HttpClient client(esp_http_client_init(&cfg));
   if (!client)
     return out;
@@ -290,17 +306,20 @@ HttpResponse IdfTransport::execute(const HttpRequest &req) {
   if (!idf_headers_ok(length, st))
     return out;
   out.status = st;
-  char *retry_hdr = nullptr;
-  if (esp_http_client_get_header(client.get(), "Retry-After", &retry_hdr) == ESP_OK && retry_hdr != nullptr)
-    out.retry_after_s = parse_retry_after(retry_hdr);
+  out.retry_after_s = hdr.retry_after_s;
   if (length > static_cast<int64_t>(MAX_DEVICE_BODY))
     return out;
+  if (length == 0 && (st == 204 || st == 205 || st == 304)) {
+    out.complete = true;
+    out.ok = true;
+    return out;
+  }
   auto read_fn = [](void *ctx, char *buf, int max) -> int {
     return esp_http_client_read(static_cast<esp_http_client_handle_t>(ctx), buf, max);
   };
   if (!read_capped_body(read_fn, client.get(), MAX_DEVICE_BODY, &out.body))
     return out;
-  out.complete = esp_http_client_is_complete_data_received(client.get());
+  out.complete = esp_http_client_is_complete_data_received(client.get()) || (length == 0 && out.body.empty());
   out.ok = out.complete;
   return out;
 }
@@ -313,10 +332,12 @@ ShroomLabsCloud::ShroomLabsCloud(web_server_base::WebServerBase *base)
 
 bool ShroomLabsCloud::start_job(void *ctx, CloudJob job) {
   auto *self = static_cast<ShroomLabsCloud *>(ctx);
-  if (self->busy_.exchange(true))
+  if (!self->engine_.try_begin(job))
     return false;
+  self->busy_ = true;
   self->pending_job_ = job;
   if (xTaskCreate(task_entry_, "shl_cloud", 16384, self, 1, nullptr) != pdPASS) {
+    self->engine_.finish();
     self->busy_ = false;
     self->pending_job_ = CloudJob::NONE;
     ESP_LOGW(TAG, "Could not start the cloud task");
@@ -329,7 +350,9 @@ void ShroomLabsCloud::task_entry_(void *arg) {
   auto *self = static_cast<ShroomLabsCloud *>(arg);
   self->engine_.run_job(self->pending_job_);
   self->pending_job_ = CloudJob::NONE;
+  self->engine_.finish();
   self->busy_ = false;
+  self->engine_.drain_queued();
   vTaskDelete(nullptr);
 }
 

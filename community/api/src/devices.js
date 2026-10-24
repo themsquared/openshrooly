@@ -32,6 +32,9 @@ export const PROOF_VERSION = "shroomlabs-device-pop-v1";
 export const CERT_GRACE_MS = 30 * 24 * 3600 * 1000;
 export const CSR_POLL_LIMIT = 240;
 export const CSR_POLL_WINDOW_S = 900;
+export const CLAIM_STATUS_LIMIT = 240;
+export const CLAIM_STATUS_WINDOW_S = 900;
+export const CLAIM_STATUS_IP_LIMIT = 720;
 const te = new TextEncoder();
 
 /** Read a request body as text with a hard size cap (413 above it). */
@@ -63,6 +66,10 @@ function json(body, status = 200, headers = {}) {
     status,
     headers: { "content-type": "application/json; charset=utf-8", ...headers },
   });
+}
+
+function rateLimited(windowSec) {
+  return json({ error: "rate limited", code: "rate_limited" }, 429, { "retry-after": String(Math.max(1, windowSec)) });
 }
 
 function claimCode() {
@@ -307,6 +314,17 @@ function withinCertGrace(notAfter) {
   return Date.now() - end <= CERT_GRACE_MS;
 }
 
+async function deviceHasRenewableCert(db, deviceId) {
+  const rows = await db.all("SELECT * FROM device_certs WHERE device_id=?", [deviceId]);
+  const now = nowIso();
+  for (const cert of rows) {
+    if (cert.status === "revoked") continue;
+    if (cert.status === "active" && cert.not_after && cert.not_after >= now) return true;
+    if ((cert.status === "active" || cert.status === "superseded") && withinCertGrace(cert.not_after)) return true;
+  }
+  return false;
+}
+
 /**
  * Classify a device request. Distinguishes revoke from an expired or superseded cert and from a bad proof.
  * Proof is checked against the key on file and the nonce is consumed at most once.
@@ -322,25 +340,35 @@ export async function diagnoseDeviceAuth(request, db, deviceId, bodyBytes) {
   if (device.status !== "active") return { ok: false, code: "revoked", status: 403, device, proofOk: true };
 
   const serial = presentedSerial(request);
-  const cert = serial && serial.length <= 64 ? await db.one("SELECT * FROM device_certs WHERE serial=?", [serial]) : null;
-  if (cert && cert.device_id !== device.id) {
-    return { ok: false, code: "cert_expired", status: 401, device, proofOk: true, grace: true };
+  if (!serial || serial.length > 64) {
+    return { ok: false, code: "relink_required", status: 401, device, proofOk: true, grace: false };
+  }
+  const cert = await db.one("SELECT * FROM device_certs WHERE serial=?", [serial]);
+  if (!cert || cert.device_id !== device.id) {
+    return { ok: false, code: "relink_required", status: 401, device, proofOk: true, grace: false };
+  }
+  if (cert.status === "revoked") {
+    return { ok: false, code: "relink_required", status: 401, device, cert, proofOk: true, grace: false };
   }
   const fingerprint = (request.headers.get("x-device-cert-fingerprint") || "").toLowerCase().replace(/:/g, "");
-  if (cert && fingerprint && cert.fingerprint && !timingSafeEqual(fingerprint, cert.fingerprint)) {
+  if (fingerprint && cert.fingerprint && !timingSafeEqual(fingerprint, cert.fingerprint)) {
+    return { ok: false, code: "relink_required", status: 401, device, cert, proofOk: true, grace: false };
+  }
+  const expired = Boolean(cert.not_after && cert.not_after < nowIso());
+  if (cert.status === "active" && !expired) return { ok: true, device, cert, proofOk: true };
+
+  const renewable = cert.status === "active" || cert.status === "superseded";
+  if (renewable && withinCertGrace(cert.not_after)) {
     return { ok: false, code: "cert_expired", status: 401, device, cert, proofOk: true, grace: true };
   }
-  const expired = Boolean(cert?.not_after && cert.not_after < nowIso());
-  if (cert && cert.status === "active" && !expired) return { ok: true, device, cert, proofOk: true };
-
-  const grace = !cert || cert.status === "superseded" || withinCertGrace(cert.not_after);
-  return { ok: false, code: "cert_expired", status: 401, device, cert, proofOk: true, grace };
+  return { ok: false, code: "relink_required", status: 401, device, cert, proofOk: true, grace: false };
 }
 
 function throwDeviceAuth(auth) {
   if (auth.code === "revoked") throw new ValidationError("device revoked", 403, "revoked");
   if (auth.code === "proof_invalid") throw new ValidationError("device proof required", 401, "proof_invalid");
   if (auth.code === "cert_expired") throw new ValidationError("device certificate expired", 401, "cert_expired");
+  if (auth.code === "relink_required") throw new ValidationError("certificate grace ended. Link the chamber again", 401, "relink_required");
   if (auth.code === "not_found") throw new ValidationError("device not found", 404);
   throw new ValidationError("device certificate required", 401, auth.code || "cert_required");
 }
@@ -429,7 +457,7 @@ export async function handleDevices(method, path, url, request, env) {
 
   if (method === "POST" && path === "/api/devices/enroll") {
     const limited = await rateLimit(db, `enroll:${rateLimitClient(request)}`, 20, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
+    if (!limited.ok) return rateLimited(3600);
     const { data: body } = await readBody(request);
     const hardwareId = String(body.hardware_id || "").slice(0, 64);
     if (hardwareId.length < 8) throw new ValidationError("hardware_id required");
@@ -451,7 +479,11 @@ export async function handleDevices(method, path, url, request, env) {
     const enrollHash = await sha256Hex(enrollToken);
     const expires = laterIso(CLAIM_MS);
     if (existing && existing.status !== "revoked" && existing.owner_id) {
-      throw new ValidationError("device already claimed. Revoke it or use reclaim", 409, "already_claimed");
+      if (await deviceHasRenewableCert(db, existing.id)) {
+        throw new ValidationError("device already claimed. Revoke it or use reclaim", 409, "already_claimed");
+      }
+      // Past the 30-day grace window the chamber must enroll again (Relink). Free the row.
+      await revokeDeviceCerts(env, db, existing.id, "revoked");
     }
     const id = existing?.id || `sldev_${randomToken().slice(0, 16)}`;
     const name = String(body.name || "OpenShrooly").slice(0, 80);
@@ -482,7 +514,7 @@ export async function handleDevices(method, path, url, request, env) {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
     const limited = await rateLimit(db, `claim:${user.id}`, 30, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
+    if (!limited.ok) return rateLimited(3600);
     const body = await request.json().catch(() => ({}));
     const code = normalizeCode(body.code);
     if (code.length !== 6) throw new ValidationError("enter the 6-character code from the device");
@@ -504,12 +536,26 @@ export async function handleDevices(method, path, url, request, env) {
   if (nonceMatch && method === "POST") {
     const deviceId = decodeURIComponent(nonceMatch[1]).slice(0, 64);
     const client = await rateLimit(db, `device-nonce-ip:${rateLimitClient(request)}`, 120, 600);
-    if (!client.ok) return json({ error: "rate limited" }, 429);
+    if (!client.ok) return rateLimited(600);
     const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [deviceId]);
     if (!device) throw new ValidationError("device not found", 404);
     const perDevice = await rateLimit(db, `device-nonce:${device.id}`, 60, 600);
-    if (!perDevice.ok) return json({ error: "rate limited" }, 429);
+    if (!perDevice.ok) return rateLimited(600);
     return json(await issueNonce(db, device.id));
+  }
+
+  const claimStatusMatch = path.match(/^\/api\/devices\/([^/]+)\/claim-status$/);
+  if (claimStatusMatch && method === "POST") {
+    const ipLimited = await rateLimit(db, `device-claim-status-ip:${rateLimitClient(request)}`, CLAIM_STATUS_IP_LIMIT, CLAIM_STATUS_WINDOW_S);
+    if (!ipLimited.ok) return rateLimited(CLAIM_STATUS_WINDOW_S);
+    const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [decodeURIComponent(claimStatusMatch[1])]);
+    if (!device) throw new ValidationError("device not found", 404);
+    const { data: body } = await readBody(request);
+    if (!(await enrollProofOk(body, device))) throw new ValidationError("enroll token required", 401, "proof_invalid");
+    const limited = await rateLimit(db, `device-claim-status:${device.id}`, CLAIM_STATUS_LIMIT, CLAIM_STATUS_WINDOW_S);
+    if (!limited.ok) return rateLimited(CLAIM_STATUS_WINDOW_S);
+    const claimed = device.status === "claimed" || device.status === "active";
+    return json({ claimed });
   }
 
   const csrMatch = path.match(/^\/api\/devices\/([^/]+)\/csr$/);
@@ -523,11 +569,11 @@ export async function handleDevices(method, path, url, request, env) {
     }
     if (device.status !== "claimed" && device.status !== "active") {
       const poll = await rateLimit(db, `device-csr-poll:${device.id}`, CSR_POLL_LIMIT, CSR_POLL_WINDOW_S);
-      if (!poll.ok) return json({ error: "rate limited", code: "rate_limited" }, 429);
+      if (!poll.ok) return rateLimited(CSR_POLL_WINDOW_S);
       throw new ValidationError("claim this device in Shroom Labs before a certificate can be issued", 403);
     }
     const limited = await rateLimit(db, `device-csr:${device.id}`, 10, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
+    if (!limited.ok) return rateLimited(3600);
     await checkCsr(device, body.csr);
     const issued = await replaceCert(env, db, device.id, body.csr, request);
     await db.run("UPDATE cloud_devices SET status=?, cloud_enabled=? WHERE id=?", ["active", 1, device.id]);
@@ -546,13 +592,13 @@ export async function handleDevices(method, path, url, request, env) {
   const rotateMatch = path.match(/^\/api\/devices\/([^/]+)\/rotate$/);
   if (rotateMatch && method === "POST") {
     const deviceId = decodeURIComponent(rotateMatch[1]);
-    const limited = await rateLimit(db, `device-rotate:${deviceId.slice(0, 64)}`, 10, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
     const { data: body, bytes } = await readBody(request);
     const auth = await diagnoseDeviceAuth(request, db, deviceId, bytes);
     if (!auth.ok && !(auth.code === "cert_expired" && auth.grace && auth.proofOk && auth.device)) {
       throwDeviceAuth(auth);
     }
+    const limited = await rateLimit(db, `device-rotate:${auth.device.id}`, 10, 3600);
+    if (!limited.ok) return rateLimited(3600);
     const bound = { device: auth.device, cert: auth.cert || {} };
     // Validate the new CSR before touching the current cert so a bad CSR cannot lock the device out.
     // A new key is allowed here: the old key signed the proof and the CSR proves the new key.
@@ -577,12 +623,12 @@ export async function handleDevices(method, path, url, request, env) {
   if (selfRevokeMatch && method === "POST") {
     const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [decodeURIComponent(selfRevokeMatch[1])]);
     if (!device) throw new ValidationError("device not found", 404);
-    const limited = await rateLimit(db, `device-self-revoke:${device.id}`, 10, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
     const { bytes } = await readBody(request);
     if (!(await verifyRequestProof(request, db, device, bytes))) {
       throw new ValidationError("device proof required", 401, "proof_invalid");
     }
+    const limited = await rateLimit(db, `device-self-revoke:${device.id}`, 10, 3600);
+    if (!limited.ok) return rateLimited(3600);
     await revokeDeviceCerts(env, db, device.id, "revoked");
     await db.run("UPDATE cloud_devices SET status=?, cloud_enabled=?, claim_code_hash=?, enroll_hash=? WHERE id=?", [
       "revoked",
@@ -621,7 +667,7 @@ export async function handleDevices(method, path, url, request, env) {
     const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [decodeURIComponent(reclaimMatch[1])]);
     if (!device) throw new ValidationError("device not found", 404);
     const limited = await rateLimit(db, `device-reclaim:${device.id}`, 10, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
+    if (!limited.ok) return rateLimited(3600);
     const { data: body, bytes } = await readBody(request);
     if (device.status !== "revoked" && !(await enrollProofOk(body, device))) {
       throw new ValidationError("revoke from the account first, or present the enroll token", 403);

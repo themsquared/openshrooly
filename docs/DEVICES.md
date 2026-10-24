@@ -66,7 +66,7 @@ shroomlabs-device-pop-v1
 
 Rotate validates the new CSR first, so a bad CSR never kills the working cert. On the Worker CA path the new cert is issued and then the old serial is marked `superseded`. On the Cloudflare path the old Cloudflare id is deleted **before** the new cert is minted (zero overlap). The rotate call authenticates with the current serial plus PoP at the app layer, so the device can still prove possession after the Cloudflare slot is freed.
 
-Rate limits: nonce 120 per 10 minutes per client and 60 per 10 minutes per device; pending-claim CSR polls 240 per 15 minutes (`device-csr-poll`); CSR issue, rotate, reclaim, and self-revoke 10 per hour per device.
+Rate limits: nonce 120 per 10 minutes per client and 60 per 10 minutes per device; claim-status (no nonce) 240 per 15 minutes per device and 720 per 15 minutes per IP; pending-claim CSR polls 240 per 15 minutes (`device-csr-poll`); CSR issue, rotate, reclaim, and self-revoke 10 per hour per device. 429 responses send `Retry-After`. Rotate and self-revoke count the hourly limit only after a valid device proof.
 
 ### Why not multi-zone?
 
@@ -99,12 +99,12 @@ Trust boundaries:
 
 1. `POST /api/devices/enroll` `{ hardware_id, public_jwk }` → `claim_code`, `enroll_token`, `claim_url` (QR payload).
 2. Owner signs in (verified email) → `POST /api/devices/claim` `{ code }`.
-3. Device `GET /api/devices/ca` (optional pin), gets a nonce, then `POST /api/devices/:id/csr` `{ csr, enroll_token }` with PoP → 7-day client cert (`issuer` is `worker-ca` or `cloudflare-managed`).
+3. Device polls `POST /api/devices/:id/claim-status` `{ enroll_token }` (no nonce) every ~5 s. The reply is only `{ claimed }`. After `claimed: true` it gets a nonce and `POST /api/devices/:id/csr` `{ csr, enroll_token }` with PoP → 7-day client cert (`issuer` is `worker-ca` or `cloudflare-managed`). Optional `GET /api/devices/ca` pins the Worker CA.
 4. Device calls `GET /api/devices/:id/inbox` and `POST /api/devices/:id/telemetry` with `x-device-cert-serial` plus a fresh nonce and proof on every request.
-5. Silent rotate at ~3.5 days: new CSR + current serial + PoP → new cert, then the predecessor is superseded.
+5. Silent rotate at ~3.5 days: new CSR + current serial + PoP → new cert, then the predecessor is superseded. Renewal needs that device's current serial, issued to it, not revoked, and either still valid or expired less than 30 days ago (superseded is allowed in that same window). Otherwise `relink_required`.
 6. Account `POST /api/devices/:id/revoke` (session). Device Disconnect calls `POST /api/devices/:id/self-revoke` with the same nonce + key proof as other device routes. Both set status=revoked, revoke certs, and audit. The chamber then wipes its key. A later Connect enrolls a new key (allowed once the row is revoked).
-7. Auth errors are distinguishable JSON `code` values: `revoked` (403, wipe the key), `cert_expired` (401, keep the key and renew by proof for 30 days), `proof_invalid` (401, back off and retry). Do not treat every 401 as a revoke.
-8. Pending-claim CSR polls are rate-limited separately (`device-csr-poll`, 240 / 15 min) and do not count against the 10/hour issue limit. The chamber polls about every 5 s until the code expires.
+7. Auth errors are distinguishable JSON `code` values: `revoked` (403, wipe the key), `cert_expired` (401, keep the key and renew by proof for 30 days), `relink_required` (401, wipe the key and show Link again), `proof_invalid` (401, back off and retry). Do not treat every 401 as a revoke.
+8. Claim-status polls do not use a nonce and do not count against the CSR issue limit. A leftover CSR poll while unclaimed is still capped at 240 / 15 min (`device-csr-poll`). The chamber polls about every 5 s until the code expires.
 
 Commands the SaaS may queue: `apply_profile`, `setpoints`, `schedule`, `firmware_notice`. The device decides whether to apply.
 
@@ -163,4 +163,4 @@ Local / CI uses the Worker CA (`DEVICE_ISSUER=worker`). Never commit the CA key.
 
 - Device: large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. The component is in the default 1.0.x-sl build and stays off until that toggle.
 - Site: `/claim.html` explains pairing. The code form is shown for `?code=` (camera / typed) or when `deviceClaiming` is on. Account list + revoke.
-- Copy: scan the QR code first. Typing the letters is the fallback. The chamber still works on your own network if cloud is off or down.
+- Copy: scan the QR code first. Typing the letters is the fallback. The chamber still works on your own network if cloud is off or down. If the cert is past the 30-day grace window the chamber shows Link again: "This chamber was offline too long. Press Connect to link it again."

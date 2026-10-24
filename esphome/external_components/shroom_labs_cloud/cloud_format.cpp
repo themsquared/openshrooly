@@ -29,6 +29,8 @@ const char *state_name(CloudState state) {
       return "owned";
     case CloudState::WaitClaim:
       return "wait_claim";
+    case CloudState::Relink:
+      return "relink";
     case CloudState::Error:
     default:
       return "error";
@@ -55,6 +57,8 @@ const char *state_message(CloudState state) {
       return "Already linked to an account. Remove it at shroomlabs.io, then press Refresh.";
     case CloudState::WaitClaim:
       return "Wait a few minutes, then press Refresh.";
+    case CloudState::Relink:
+      return "This chamber was offline too long. Press Connect to link it again.";
     case CloudState::Error:
     default:
       return "Could not reach Shroom Labs. Press Refresh to try again. Your chamber still works on its own.";
@@ -109,15 +113,23 @@ CloudState next_state(CloudState state, CloudEvent event) {
         return CloudState::Revoked;
       if (event == CloudEvent::CertExpired || event == CloudEvent::ProofInvalid || event == CloudEvent::Enable)
         return CloudState::Linked;
+      if (event == CloudEvent::RelinkRequired)
+        return CloudState::Relink;
       break;
     case CloudState::Rotating:
       if (event == CloudEvent::RotateOk)
         return CloudState::Linked;
       if (event == CloudEvent::LinkAuthFail || event == CloudEvent::LinkRevoked)
         return CloudState::Revoked;
+      if (event == CloudEvent::RelinkRequired)
+        return CloudState::Relink;
       if (event == CloudEvent::CsrFail || event == CloudEvent::RateLimited || event == CloudEvent::NetworkFail ||
           event == CloudEvent::CertExpired || event == CloudEvent::ProofInvalid)
         return CloudState::Linked;
+      break;
+    case CloudState::Relink:
+      if (event == CloudEvent::Refresh || event == CloudEvent::Enable)
+        return CloudState::Connecting;
       break;
     case CloudState::Revoked:
       if (event == CloudEvent::ReclaimOk)
@@ -348,6 +360,10 @@ std::string csr_body_json(const char *csr_pem, const char *enroll_token) {
 
 std::string rotate_body_json(const char *csr_pem) { return std::string("{\"csr\":\"") + json_escape(csr_pem) + "\"}"; }
 
+std::string claim_status_body_json(const char *enroll_token) {
+  return std::string("{\"enroll_token\":\"") + json_escape(enroll_token) + "\"}";
+}
+
 std::string reclaim_body_json(const char *jwk) {
   if (jwk == nullptr || !jwk[0])
     return "{}";
@@ -389,6 +405,23 @@ bool json_get_string(const char *json, const char *key, std::string *out) {
     }
   }
   return *p == '"';
+}
+
+bool json_get_bool(const char *json, const char *key, bool *out) {
+  const char *p = find_key(json, key);
+  if (p == nullptr || out == nullptr)
+    return false;
+  while (*p == ' ' || *p == '\n' || *p == '\t')
+    p++;
+  if (std::strncmp(p, "true", 4) == 0) {
+    *out = true;
+    return true;
+  }
+  if (std::strncmp(p, "false", 5) == 0) {
+    *out = false;
+    return true;
+  }
+  return false;
 }
 
 bool json_get_int64(const char *json, const char *key, int64_t *out) {

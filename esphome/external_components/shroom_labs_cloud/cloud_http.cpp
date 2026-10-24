@@ -69,6 +69,8 @@ static HttpOutcome auth_from_body(int status, const char *body, HttpOutcome fall
     return HttpOutcome::AuthFail;
   if (code == "cert_expired")
     return HttpOutcome::CertExpired;
+  if (code == "relink_required")
+    return HttpOutcome::RelinkRequired;
   if (code == "proof_invalid")
     return HttpOutcome::ProofInvalid;
   return fallback;
@@ -168,6 +170,7 @@ CloudEvent event_for_csr(HttpOutcome o) {
     case HttpOutcome::ProofInvalid:
     case HttpOutcome::TransientFail:
     case HttpOutcome::CertExpired:
+    case HttpOutcome::RelinkRequired:
       return CloudEvent::NetworkFail;
     default:
       return CloudEvent::CsrFail;
@@ -182,6 +185,8 @@ CloudEvent event_for_rotate(HttpOutcome o) {
       return CloudEvent::LinkRevoked;
     case HttpOutcome::CertExpired:
       return CloudEvent::CertExpired;
+    case HttpOutcome::RelinkRequired:
+      return CloudEvent::RelinkRequired;
     case HttpOutcome::ProofInvalid:
       return CloudEvent::ProofInvalid;
     case HttpOutcome::RateLimited:
@@ -212,6 +217,8 @@ CloudEvent event_for_probe(HttpOutcome o) {
       return CloudEvent::LinkRevoked;
     case HttpOutcome::CertExpired:
       return CloudEvent::CertExpired;
+    case HttpOutcome::RelinkRequired:
+      return CloudEvent::RelinkRequired;
     case HttpOutcome::ProofInvalid:
       return CloudEvent::ProofInvalid;
     default:

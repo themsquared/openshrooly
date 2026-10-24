@@ -36,6 +36,7 @@ class EspCrypto : public CloudCrypto {
   bool sign(const uint8_t priv[32], const uint8_t *data, size_t len, uint8_t sig[64]) override;
   bool make_csr(const uint8_t priv[32], const uint8_t x[32], const uint8_t y[32], const char *cn,
                 std::string *pem) override;
+  bool sha256(const uint8_t *data, size_t len, uint8_t out[32]) override;
   std::string hardware_id() override;
 };
 

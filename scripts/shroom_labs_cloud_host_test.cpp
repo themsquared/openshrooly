@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <openssl/sha.h>
 #include <string>
 #include <vector>
 
@@ -401,6 +402,10 @@ int main() {
     bool make_csr(const uint8_t *, const uint8_t *x, const uint8_t *y, const char *cn, std::string *pem) override {
       return build_p256_csr_pem(x, y, cn, dummy_sign, nullptr, pem);
     }
+    bool sha256(const uint8_t *data, size_t len, uint8_t out[32]) override {
+      SHA256(data, len, out);
+      return true;
+    }
     std::string hardware_id() override { return "aabbccddeeff"; }
   };
   struct ScriptTransport : CloudTransport {
@@ -412,9 +417,31 @@ int main() {
     std::vector<std::string> urls;
     size_t i = 0;
     bool auto_nonce = true;
+    bool auto_status = true;
+    bool status_claimed = true;
+    int nonce_limit = 60;
+    int nonce_count = 0;
     HttpResponse execute(const HttpRequest &req) override {
       urls.push_back(req.url);
+      if (auto_status && req.url.find("/claim-status") != std::string::npos) {
+        HttpResponse s;
+        s.ok = true;
+        s.status = 200;
+        s.complete = true;
+        s.body = status_claimed ? "{\"claimed\":true}" : "{\"claimed\":false}";
+        return s;
+      }
       if (auto_nonce && req.url.find("/nonce") != std::string::npos) {
+        nonce_count++;
+        if (nonce_count > nonce_limit) {
+          HttpResponse limited;
+          limited.ok = true;
+          limited.status = 429;
+          limited.complete = true;
+          limited.retry_after_s = 60;
+          limited.body = "{\"error\":\"rate limited\"}";
+          return limited;
+        }
         HttpResponse n;
         n.ok = true;
         n.status = 200;
@@ -460,21 +487,31 @@ int main() {
   expect(eng.claim_code() == "AB2C3D", "engine stores code");
   expect(eng.device_id() == "sldev_x", "engine stores id");
 
-  tr.steps = {{"/csr", ok_body(403, "{\"error\":\"claim this device\"}")}};
+  tr.status_claimed = false;
   tr.i = 0;
   clk.now = 1000;
   eng.csr_now();
   expect(eng.state() == CloudState::PendingClaim, "engine poll stays");
   uint32_t poll_at = eng.next_csr_ms();
   expect(poll_at >= 1000 + CLAIM_POLL_MS && poll_at <= 1000 + CLAIM_POLL_MS + CLAIM_POLL_JITTER_MS, "engine poll 5s");
+  expect(tr.nonce_count == 0, "engine poll uses no nonce");
 
-  tr.steps = {{"/csr", ok_body(503, "{}")}};
+  tr.status_claimed = true;
+  tr.auto_status = false;
+  tr.steps = {{"/claim-status", ok_body(503, "{}")}};
   tr.i = 0;
   clk.now = 2000;
   eng.csr_now();
   expect(eng.state() == CloudState::PendingClaim, "engine poll fail stays");
   expect(eng.next_csr_ms() >= 2000 + BACKOFF_MIN_MS, "engine fail backoff");
+  tr.auto_status = true;
+  // Backoff reset after a later wait: set claimed false then true.
+  tr.status_claimed = false;
+  clk.now = 3000;
+  eng.csr_now();
+  expect(eng.next_csr_ms() <= 3000 + CLAIM_POLL_MS + CLAIM_POLL_JITTER_MS, "engine wait resets backoff");
 
+  tr.status_claimed = true;
   tr.steps = {{"/csr", ok_body(200, cert_ok)}};
   tr.i = 0;
   eng.csr_now();
@@ -687,6 +724,147 @@ int main() {
   clk.now = 30000 + CLAIM_MS + 1;
   expect(eng17.display_code().empty(), "expired code hidden");
   expect(std::strstr(eng17.display_expiry().c_str(), "expired") != nullptr, "expired copy");
+
+  HostStore store18;
+  ScriptTransport tr18;
+  tr18.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                {"/csr", ok_body(200, cert_ok)},
+                {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng18(&tr18, &clk, &store18, &crypto);
+  eng18.connect();
+  eng18.csr_now();
+  expect(eng18.state() == CloudState::Linked, "relink start linked");
+  eng18.rotate_now();
+  expect(eng18.state() == CloudState::Relink, "relink_required is Relink");
+  expect(!eng18.has_key(), "relink wipes key");
+  expect(!eng18.has_cert(), "relink wipes cert");
+  expect(!eng18.cloud_enabled(), "relink is unlinked");
+  expect(eng18.display_title() == "Unlinked", "relink title");
+  expect(eng18.display_code().empty(), "relink hides code");
+  expect(std::strstr(eng18.display_hint().c_str(), "offline too long") != nullptr, "relink copy");
+  expect(std::strstr(eng18.status_json().c_str(), "Press Connect") != nullptr, "relink json copy");
+  eng18.connect();
+  expect(eng18.state() == CloudState::PendingClaim, "relink connect enrolls");
+
+  HostStore store19;
+  ScriptTransport tr19;
+  tr19.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                {"/csr", ok_body(200, cert_ok)},
+                {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine eng19(&tr19, &clk, &store19, &crypto);
+  eng19.connect();
+  eng19.csr_now();
+  expect(eng19.state() == CloudState::Linked, "busy disconnect start");
+  expect(eng19.try_begin(CloudJob::CSR), "busy begin");
+  expect(eng19.busy(), "busy flag");
+  eng19.disconnect();
+  expect(eng19.has_key(), "busy disconnect keeps key");
+  expect(eng19.state() != CloudState::Off, "busy disconnect waits");
+  eng19.run_job(CloudJob::CSR);
+  expect(eng19.state() == CloudState::Off, "busy disconnect wipes after job");
+  expect(!eng19.has_key(), "busy disconnect zeros key");
+  expect(!eng19.has_cert(), "busy disconnect discards cert");
+  bool saw_busy_revoke = false;
+  for (const auto &u : tr19.urls)
+    saw_busy_revoke = saw_busy_revoke || u.find("/self-revoke") != std::string::npos;
+  expect(saw_busy_revoke, "busy disconnect still revokes");
+  eng19.finish();
+  eng19.drain_queued();
+
+  HostStore store20;
+  ScriptTransport tr20;
+  tr20.nonce_limit = 60;
+  tr20.status_claimed = false;
+  tr20.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+  CloudEngine eng20(&tr20, &clk, &store20, &crypto);
+  clk.now = 40000;
+  eng20.connect();
+  for (int i = 0; i < 80; i++) {
+    clk.now = eng20.next_csr_ms();
+    eng20.csr_now();
+  }
+  expect(eng20.state() == CloudState::PendingClaim, "nonce-limit poll stays");
+  expect(tr20.nonce_count == 0, "claim-status uses no nonce");
+  expect(eng20.next_csr_ms() <= clk.now + CLAIM_POLL_MS + CLAIM_POLL_JITTER_MS, "wait stays at 5s");
+  tr20.status_claimed = true;
+  clk.now = eng20.next_csr_ms();
+  eng20.csr_now();
+  expect(eng20.state() == CloudState::Linked, "claim after long wait");
+  expect(tr20.nonce_count == 1, "one nonce after claimed");
+
+  HostStore store21a;
+  HostStore store21b;
+  ScriptTransport tr21;
+  tr21.status_claimed = false;
+  tr21.nonce_limit = 60;
+  tr21.steps = {{"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine a(&tr21, &clk, &store21a, &crypto);
+  CloudEngine b(&tr21, &clk, &store21b, &crypto);
+  a.connect();
+  tr21.steps = {{"/enroll", ok_body(200, enroll_ok)}};
+  tr21.i = 0;
+  b.connect();
+  for (int i = 0; i < 40; i++) {
+    clk.now += CLAIM_POLL_MS;
+    a.csr_now();
+    b.csr_now();
+  }
+  expect(tr21.nonce_count == 0, "two chambers poll without nonce");
+  expect(a.state() == CloudState::PendingClaim && b.state() == CloudState::PendingClaim, "two chambers wait");
+
+  HostStore store22;
+  ScriptTransport tr22;
+  tr22.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                {"/csr", ok_body(200, cert_ok)},
+                {"/self-revoke", ok_body(503, "{}")}};
+  CloudEngine eng22(&tr22, &clk, &store22, &crypto);
+  eng22.connect();
+  eng22.csr_now();
+  eng22.disconnect();
+  expect(eng22.state() == CloudState::Off, "failed revoke still wipes");
+  expect(eng22.revoke_failed(), "failed revoke flagged");
+  expect(std::strstr(eng22.display_hint().c_str(), "shroomlabs.io") != nullptr, "failed revoke copy");
+
+  HostStore store23;
+  ScriptTransport tr23;
+  tr23.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng23(&tr23, &clk, &store23, &crypto);
+  eng23.connect();
+  expect(eng23.try_begin(CloudJob::CSR), "queue begin");
+  size_t queued_before = eng23.request_count();
+  eng23.refresh();
+  expect(eng23.request_count() == queued_before, "refresh while busy queues");
+  eng23.finish();
+  eng23.drain_queued();
+  expect(eng23.request_count() > queued_before, "queued refresh runs");
+
+  const char *empty_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  const char *abc_sha = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+  uint8_t digest[32];
+  char hex[65];
+  expect(crypto.sha256(nullptr, 0, digest), "sha empty call");
+  hex_encode_to(digest, 32, hex);
+  expect(std::strcmp(hex, empty_sha) == 0, "sha empty FIPS");
+  expect(crypto.sha256(reinterpret_cast<const uint8_t *>("abc"), 3, digest), "sha abc call");
+  hex_encode_to(digest, 32, hex);
+  expect(std::strcmp(hex, abc_sha) == 0, "sha abc FIPS");
+  int sha_bad = 0;
+  for (int n = 0; n <= 300; n++) {
+    std::vector<uint8_t> buf(static_cast<size_t>(n));
+    for (int i = 0; i < n; i++)
+      buf[static_cast<size_t>(i)] = static_cast<uint8_t>(i & 0xff);
+    uint8_t got[32];
+    uint8_t exp[32];
+    if (!crypto.sha256(n ? buf.data() : nullptr, static_cast<size_t>(n), got)) {
+      sha_bad++;
+      continue;
+    }
+    SHA256(n ? buf.data() : nullptr, static_cast<size_t>(n), exp);
+    if (std::memcmp(got, exp, 32) != 0)
+      sha_bad++;
+  }
+  expect(sha_bad == 0, "sha known-answer 0-300");
 
   return fails ? 1 : 0;
 }
