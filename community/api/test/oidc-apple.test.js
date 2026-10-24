@@ -94,7 +94,8 @@ test("authorize redirect carries Services ID, form_post, PKCE S256, state, nonce
   assert.equal(p.get("redirect_uri"), "https://api.shroomlabs.io/api/auth/oidc/apple/callback");
   assert.equal(p.get("response_type"), "code");
   assert.equal(p.get("response_mode"), "form_post");
-  assert.equal(p.get("scope"), "name email");
+  assert.equal(p.get("scope"), "email");
+  assert.doesNotMatch(s.auth.toString(), /[?&]scope=[^&]*name/);
   assert.equal(p.get("code_challenge_method"), "S256");
   assert.ok(p.get("nonce").length >= 32);
   const row = await ctx.db.one("SELECT * FROM oauth_states WHERE state=?", [p.get("state")]);

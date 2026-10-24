@@ -703,7 +703,7 @@ async function providerConfig(env, provider) {
     secret: await appleClientSecret(env),
     authorize: "https://appleid.apple.com/auth/authorize",
     token: "https://appleid.apple.com/auth/token",
-    scope: "name email",
+    scope: "email",
     redirectUri: env.APPLE_REDIRECT_URI || `${api}/api/auth/oidc/apple/callback`,
     responseMode: "form_post",
   };
