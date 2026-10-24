@@ -5,6 +5,9 @@ import { requireVerified, userFromRequest } from "./auth.js";
 import { ValidationError, isPsilocybin } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
 import { comingSoonBody, capabilities, devStubsEnabled, paymentsConfigured } from "./providers.js";
+import { bytesToBase64, decodePhotoBase64, sanitizeGrowPhoto } from "./image.js";
+import { readJsonLimited } from "./http-body.js";
+import { insertMedia, pendingPhotoKey } from "./media-acl.js";
 import {
   COACH_ITEM,
   COACH_PERIOD_DAYS,
@@ -313,19 +316,20 @@ export async function handleCoach(method, path, url, request, env) {
 
   if (method === "POST" && path === "/api/coach/photo") {
     const user = await requireCoach(request, db);
-    const body = await request.json().catch(() => ({}));
+    const body = await readJsonLimited(request);
     if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
       throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
     }
     await assertCap(db, user.id, "photos");
     if (!body.photo_base64) throw new ValidationError("photo_base64 required");
-    const raw = Uint8Array.from(atob(body.photo_base64), (c) => c.charCodeAt(0));
-    const key = `coach/${user.id}/${randomToken()}.${body.photo_ext || "jpg"}`;
-    await storage.put(key, raw, body.photo_type || "image/jpeg");
+    const photo = sanitizeGrowPhoto(decodePhotoBase64(body.photo_base64));
     const caps = capabilities(env, request);
     if (!caps.photos) return json({ error: "Photo checks are coming later.", coming_soon: true }, 503);
+    const key = pendingPhotoKey("coach", String(user.id), photo.ext);
+    await storage.put(key, photo.bytes, photo.contentType);
+    await insertMedia(db, { photo_key: key, owner_id: user.id, status: "pending", kind: "coach" });
     const provider = createModelProvider(env, request);
-    const result = await provider.vision({ imageBase64: body.photo_base64, hint: body.hint || body.notes || "" });
+    const result = await provider.vision({ imageBase64: bytesToBase64(photo.bytes), hint: body.hint || body.notes || "" });
     if (result.unavailable) return json(comingSoonBody("Grow Coach"), 503);
     const neurons = estimateNeurons({
       inputTokens: result.input_tokens,

@@ -1,0 +1,15 @@
+{
+  "name": "shroom-labs-matter-bridge",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test --test-timeout=90000 test/*.test.js"
+  },
+  "dependencies": {
+    "@matter/main": "0.18.0"
+  }
+}

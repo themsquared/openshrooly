@@ -26,9 +26,12 @@ from openshrooly_lib.schema import ValidationError, validate_profile  # noqa: E4
 from openshrooly_lib.sync import build_push  # noqa: E402
 from openshrooly_lib.webutil import json_dumps  # noqa: E402
 
+from . import auth  # noqa: E402
 from . import config  # noqa: E402
 from . import db  # noqa: E402
+from . import targets  # noqa: E402
 from .discover import discover_esphome  # noqa: E402
+from .smart_home import pairing_qr_svg, smart_home_state  # noqa: E402
 from .species_art import species_photo  # noqa: E402
 
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
@@ -66,8 +69,53 @@ def get_profile(conn, profile_id: str) -> MushroomProfile:
     return validate_profile(json.loads(row["document"]))
 
 
+PUBLIC_DEVICE_FIELDS = (
+    "id",
+    "name",
+    "host",
+    "port",
+    "added_at",
+    "last_seen",
+    "current_profile_id",
+    "current_stage_id",
+)
+
+
 def device_client(row) -> ESPHomeDeviceClient:
-    return ESPHomeDeviceClient(f"http://{row['host']}:{row['port']}")
+    host = row["host"]
+    port = int(row["port"])
+    try:
+        ip = targets.resolve_connect_ip(host)
+    except targets.UnsafeDeviceHost as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if ":" in ip:
+        base = f"http://[{ip}]:{port}"
+    else:
+        base = f"http://{ip}:{port}"
+    headers = {}
+    if targets.parse_ip(host) is None:
+        headers["Host"] = f"{host}:{port}" if port not in (80, 443) else host
+    return ESPHomeDeviceClient(base, extra_headers=headers)
+
+
+def unavailable_status(reason: str, *, blocked: bool) -> dict:
+    return {"online": False, "blocked": blocked, "reason": reason, "entities": {}}
+
+
+def fetch_device_status(row) -> dict:
+    """Poll one chamber. Blocked or offline hosts never abort the rest of the fleet."""
+    try:
+        return device_client(row).fetch_status()
+    except HTTPException as exc:
+        blocked = getattr(exc.__cause__, "blocked", True)
+        return unavailable_status(str(exc.detail), blocked=blocked)
+    except (OSError, TimeoutError) as exc:
+        return unavailable_status(str(exc) or "unreachable", blocked=False)
+
+
+def public_device(row) -> dict:
+    data = dict(row)
+    return {key: data.get(key) for key in PUBLIC_DEVICE_FIELDS}
 
 
 def record_sample(conn, device_row, status: dict) -> None:
@@ -99,9 +147,10 @@ def record_sample(conn, device_row, status: dict) -> None:
 
 def poll_once(conn) -> None:
     for row in conn.execute("SELECT * FROM devices").fetchall():
-        client = device_client(row)
-        status = client.fetch_status()
-        record_sample(conn, row, status)
+        try:
+            record_sample(conn, row, fetch_device_status(row))
+        except Exception:
+            continue
 
 
 def poll_loop(conn) -> None:
@@ -134,7 +183,10 @@ def maybe_advance_grow(conn, device_id: int) -> None:
     stage = profile.stage_at_day(elapsed)
     if stage.id != grow["current_stage_id"]:
         device = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
-        result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
+        try:
+            result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
+        except HTTPException:
+            return
         conn.execute("UPDATE grows SET current_stage_id=? WHERE id=?", (stage.id, grow["id"]))
         conn.execute(
             "UPDATE devices SET current_profile_id=?, current_stage_id=? WHERE id=?",
@@ -150,6 +202,10 @@ def maybe_advance_grow(conn, device_id: int) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if config.SECRET == config.FORBIDDEN_DEFAULT_SECRET:
+        raise config.InsecureHubSecret(
+            "HUB_SECRET is the published default. Unset it or set a new random value."
+        )
     conn = db.init_db(config.DB_PATH)
     seed_library(conn)
     app.state.conn = conn
@@ -183,14 +239,40 @@ def entity_reading(status: dict) -> dict:
     return {"temperature": val("temperature"), "humidity": val("humidity"), "water": val("water_level")}
 
 
+@app.middleware("http")
+async def allowlisted_host(request: Request, call_next):
+    if not auth.host_allowed(request.headers.get("host")):
+        return JSONResponse({"ok": False, "error": "unknown_host"}, status_code=400)
+    return await call_next(request)
+
+
 def page(request: Request, name: str, **context):
+    token = context.get("csrf") or request.cookies.get(auth.CSRF_COOKIE) or auth.new_csrf()
     context.update(
         {
             "enable_psilocybin": config.ENABLE_PSILOCYBIN,
             "community_url": config.COMMUNITY_URL,
+            "admin_signed_in": auth.is_authenticated(request),
+            "csrf": token,
         }
     )
-    return templates.TemplateResponse(request, name, context)
+    response = templates.TemplateResponse(request, name, context)
+    if request.cookies.get(auth.CSRF_COOKIE) != token:
+        response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
+    return response
+
+
+def saved_devices(conn):
+    return [public_device(row) for row in conn.execute("SELECT * FROM devices ORDER BY name")]
+
+
+def device_host_rejected(request: Request, host: str) -> Response | None:
+    message = targets.device_host_error(host)
+    if not message:
+        return None
+    if auth.wants_html(request):
+        return page(request, "devices.html", devices=saved_devices(request.app.state.conn), discovered=[], error=message)
+    return JSONResponse({"ok": False, "error": message}, status_code=400)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -199,14 +281,15 @@ def home(request: Request):
     devices = []
     for row in conn.execute("SELECT * FROM devices ORDER BY name").fetchall():
         status = json.loads(row["last_status"] or "{}")
-        devices.append(
+        item = public_device(row)
+        item.update(
             {
-                **dict(row),
-                "status": status,
+                "status": {"online": status.get("online", False), "blocked": bool(status.get("blocked"))},
                 "online": status.get("online", False),
                 "reading": entity_reading(status),
             }
         )
+        devices.append(item)
     grows = conn.execute(
         """
         SELECT grows.*, devices.name AS device_name
@@ -237,19 +320,30 @@ def add_device(
     name: str = Form(...),
     host: str = Form(...),
     port: int = Form(80),
+    csrf: str = Form(""),
 ):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
+    blocked = device_host_rejected(request, host)
+    if blocked:
+        return blocked
+    cleaned = targets.normalize_device_host(host) or host.strip()
     conn = request.app.state.conn
     conn.execute(
         "INSERT INTO devices (name, host, port, added_at) VALUES (?, ?, ?, ?)",
-        (name.strip(), host.strip(), port, db.now()),
+        (name.strip(), cleaned, port, db.now()),
     )
     conn.commit()
-    db.log_event(conn, "device_added", f"{name} {host}:{port}")
+    db.log_event(conn, "device_added", f"{name} {cleaned}:{port}")
     return RedirectResponse("/devices", status_code=303)
 
 
 @app.post("/devices/{device_id}/delete")
-def delete_device(request: Request, device_id: int):
+def delete_device(request: Request, device_id: int, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     conn.execute("DELETE FROM devices WHERE id=?", (device_id,))
     conn.commit()
@@ -257,14 +351,17 @@ def delete_device(request: Request, device_id: int):
 
 
 @app.post("/devices/discover")
-def discover_devices(request: Request):
+def discover_devices(request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     discovered = discover_esphome()
     existing = {row["host"] for row in conn.execute("SELECT host FROM devices")}
     return page(
         request,
         "devices.html",
-        devices=[dict(row) for row in conn.execute("SELECT * FROM devices ORDER BY name")],
+        devices=saved_devices(conn),
         discovered=[d for d in discovered if d.addresses and d.addresses[0] not in existing],
     )
 
@@ -275,14 +372,18 @@ def device_detail(request: Request, device_id: int):
     row = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
     if not row:
         raise HTTPException(404)
-    client = device_client(row)
-    status = client.fetch_status()
+    status = fetch_device_status(row)
     record_sample(conn, row, status)
-    maybe_advance_grow(conn, device_id)
+    if not status.get("blocked"):
+        maybe_advance_grow(conn, device_id)
     samples = conn.execute(
         "SELECT * FROM samples WHERE device_id=? ORDER BY id DESC LIMIT 48",
         (device_id,),
     ).fetchall()
+    apply_notices = {
+        "blocked": "The profile was not applied. That address is not allowed.",
+        "offline": "The profile was not applied. The chamber is offline.",
+    }
     return page(
         request,
         "device.html",
@@ -292,11 +393,15 @@ def device_detail(request: Request, device_id: int):
         samples=samples,
         preview=None,
         reading=entity_reading(status),
+        apply_error=apply_notices.get(request.query_params.get("apply", "")),
     )
 
 
 @app.post("/devices/{device_id}/refresh")
-def refresh_device(device_id: int, request: Request):
+def refresh_device(device_id: int, request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     return RedirectResponse(f"/devices/{device_id}", status_code=303)
 
 
@@ -307,14 +412,22 @@ def apply_profile(
     profile_id: str = Form(...),
     stage_id: str = Form(""),
     start_grow: str = Form("1"),
+    csrf: str = Form(""),
 ):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     device = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
     if not device:
         raise HTTPException(404, "device not found")
     profile = get_profile(conn, profile_id)
     stage = profile.stage_by_id(stage_id) if stage_id else profile.stages[0]
-    result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
+    try:
+        result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
+    except HTTPException as exc:
+        kind = "blocked" if getattr(exc.__cause__, "blocked", True) else "offline"
+        return RedirectResponse(f"/devices/{device_id}?apply={kind}", status_code=303)
     if start_grow == "1":
         conn.execute("UPDATE grows SET ended_at=? WHERE device_id=? AND ended_at IS NULL", (db.now(), device_id))
         conn.execute(
@@ -359,7 +472,10 @@ def api_profile(request: Request, profile_id: str):
 
 
 @app.post("/profiles/import")
-async def import_profile(request: Request, document: str = Form(...)):
+async def import_profile(request: Request, document: str = Form(...), csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     try:
         payload = json.loads(document)
@@ -387,7 +503,10 @@ def history_page(request: Request):
 
 
 @app.post("/sync/push")
-def sync_push(request: Request):
+def sync_push(request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     if not config.COMMUNITY_TOKEN:
         raise HTTPException(400, "COMMUNITY_TOKEN is not set")
@@ -431,7 +550,10 @@ def sync_push(request: Request):
 
 
 @app.post("/sync/pull")
-def sync_pull(request: Request):
+def sync_pull(request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     if not config.COMMUNITY_TOKEN:
         raise HTTPException(400, "COMMUNITY_TOKEN is not set")
@@ -463,7 +585,136 @@ def sync_pull(request: Request):
 
 @app.get("/api/devices")
 def api_devices(request: Request):
-    return [dict(row) for row in request.app.state.conn.execute("SELECT * FROM devices")]
+    return [public_device(row) for row in request.app.state.conn.execute("SELECT * FROM devices")]
+
+
+def _status_from_payload(payload) -> dict:
+    if not isinstance(payload, dict):
+        return {"ok": False, "reachable": False}
+    payload["ok"] = True
+    payload["reachable"] = True
+    return payload
+
+
+def read_bridge_status_file() -> dict | None:
+    path = config.BRIDGE_STATUS_FILE
+    if not path:
+        return None
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    return _status_from_payload(payload)
+
+
+def fetch_bridge_status() -> dict:
+    """Ask the Matter sidecar for pairing state. Never log the body."""
+    from_file = read_bridge_status_file()
+    if from_file and from_file.get("reachable"):
+        return from_file
+
+    import urllib.error
+    import urllib.request
+
+    url = config.BRIDGE_STATUS_URL.rstrip("/") + "/status"
+    request = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        return {"ok": False, "reachable": False}
+    return _status_from_payload(payload)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, next: str = "/smart-home"):
+    return page(request, "login.html", error=None, next_path=auth.safe_next_path(next), csrf=auth.new_csrf())
+
+
+@app.post("/login")
+def login_submit(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+    csrf: str = Form(""),
+    next: str = Form("/smart-home"),
+):
+    blocked = auth.require_write_guard(request, csrf)
+    if blocked:
+        return blocked
+    ip = auth.client_ip(request)
+    retry_after = auth.login_retry_after(ip) or auth.login_global_backoff(ip)
+    if retry_after:
+        return auth.login_locked_response(retry_after)
+    if username != auth.ADMIN_USER or not auth.passwords_match(password, auth.admin_password()):
+        auth.record_login_failure(ip)
+        retry_after = auth.login_retry_after(ip) or auth.login_global_backoff(ip)
+        if retry_after:
+            return auth.login_locked_response(retry_after)
+        return page(
+            request,
+            "login.html",
+            error="Wrong user name or password.",
+            next_path=auth.safe_next_path(next),
+            csrf=auth.new_csrf(),
+        )
+    auth.record_login_success(ip)
+    target = auth.safe_next_path(next)
+    response = RedirectResponse(target, status_code=303)
+    response.set_cookie(
+        auth.SESSION_COOKIE,
+        auth.session_token(),
+        httponly=True,
+        samesite="lax",
+        path="/",
+        max_age=auth.SESSION_TTL_S,
+    )
+    response.set_cookie(auth.CSRF_COOKIE, auth.new_csrf(), httponly=True, samesite="lax", path="/")
+    return response
+
+
+@app.post("/logout")
+def logout(request: Request, csrf: str = Form("")):
+    blocked = auth.require_write_guard(request, csrf)
+    if blocked:
+        return blocked
+    auth.revoke_session(request.cookies.get(auth.SESSION_COOKIE))
+    response = RedirectResponse("/", status_code=303)
+    response.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return response
+
+
+@app.get("/api/smart-home/state")
+def api_smart_home_state(request: Request):
+    rows = request.app.state.conn.execute("SELECT * FROM devices ORDER BY name").fetchall()
+    return smart_home_state(rows, config.NEEDS_WATER_THRESHOLD_PCT)
+
+
+@app.get("/api/smart-home/pairing")
+def api_smart_home_pairing(request: Request):
+    denied = auth.require_admin(request)
+    if denied:
+        return denied
+    status = fetch_bridge_status()
+    if not status.get("reachable"):
+        return JSONResponse({"ok": False, "reachable": False}, status_code=503)
+    return auth.public_pairing(status)
+
+
+@app.get("/smart-home", response_class=HTMLResponse)
+def smart_home_page(request: Request):
+    denied = auth.require_admin(request)
+    if denied:
+        return denied
+    status = auth.public_pairing(fetch_bridge_status())
+    qr_payload = status.get("qr") if status.get("reachable") else None
+    return page(
+        request,
+        "smart_home.html",
+        bridge=status,
+        qr_svg=pairing_qr_svg(qr_payload) if qr_payload else None,
+        csrf=request.cookies.get(auth.CSRF_COOKIE) or "",
+    )
 
 
 @app.get("/api/profiles")

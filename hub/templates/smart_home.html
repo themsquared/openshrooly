@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Smart Home · OpenShrooly Hub{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Smart Home</h1>
+  <p>Pair this hub once. Each chamber then shows temperature, humidity, and a water contact sensor in Apple Home and Google Home. The grow light switch comes in a later step.</p>
+</section>
+
+{% if not bridge.reachable %}
+<article class="card">
+  <p class="bad">The Matter bridge is not running.</p>
+  <p>Start the Matter bridge on this computer, then reload this page. On a Mac, run <code>scripts/macos/run-matter-bridge.sh</code>. On Linux, use the compose <code>linux</code> profile. See <code>docs/SMART_HOME.md</code>.</p>
+</article>
+{% else %}
+<div class="cards">
+  <article class="card pairing-card">
+    <h2>Pairing code</h2>
+    <p class="muted">Shown after you sign in on this hub. Hidden after the first pair. Do not send it to shroomlabs.io or paste it into a chat.</p>
+    {% if qr_svg %}
+    <div class="pairing-qr" role="img" aria-label="Matter pairing QR code">{{ qr_svg|safe }}</div>
+    {% endif %}
+    {% if bridge.manual_code %}
+    <p class="pairing-code">{{ bridge.manual_code }}</p>
+    {% elif bridge.commissioned %}
+    <p>This hub is already paired. The setup code is hidden. Use Turn On Pairing Mode in Apple Home if you need to add Google Home.</p>
+    {% else %}
+    <p>No pairing code from the bridge yet.</p>
+    {% endif %}
+    <p class="muted">Test vendor {{ bridge.vendor_id or "0xFFF1" }} / product {{ bridge.product_id or "0x8000" }}. Apple and Google will call this an uncertified accessory.</p>
+  </article>
+  <article class="card">
+    <h2>Status</h2>
+    <p class="{% if bridge.commissioned %}ok live{% else %}muted{% endif %}">
+      {% if bridge.commissioned %}Paired with {{ bridge.fabrics or 1 }} home app{% if (bridge.fabrics or 1) != 1 %}s{% endif %}{% else %}Waiting for the first pair{% endif %}
+    </p>
+    <p>{{ bridge.chambers or 0 }} chamber{% if (bridge.chambers or 0) != 1 %}s{% endif %} on the bridge.</p>
+  </article>
+</div>
+{% endif %}
+
+<h2>Apple Home</h2>
+<ol class="plain-list">
+  <li>Leave this page open so the QR stays on screen.</li>
+  <li>On the iPhone: Home app, +, Add Accessory, scan the QR.</li>
+  <li>Tap Add Anyway when it says Uncertified Accessory.</li>
+  <li>Pick a room. Each chamber should show temperature, humidity, and water (contact: open means add water).</li>
+</ol>
+
+<h2>Google Home</h2>
+<p>Once, on a computer signed into the same Google account the Google Home app uses:</p>
+<ol class="plain-list">
+  <li>Open the Google Home Developer Console.</li>
+  <li>Create a project and add a Matter integration with vendor ID <code>0xFFF1</code> and product ID <code>0x8000</code>, named Shroom Labs Hub.</li>
+</ol>
+<p>Then on the phone:</p>
+<ol class="plain-list">
+  <li>If Apple Home already paired this hub, open the bridge in Apple Home, then Turn On Pairing Mode, and use that code in Google Home.</li>
+  <li>If this is the first pair, Google Home app: Devices, + Add, Matter-enabled device, scan the QR on this page.</li>
+  <li>Accept the uncertified-device notice and pick a room.</li>
+</ol>
+
+<h2>What this step does not do</h2>
+<p class="muted">The grow light cannot be switched from Home yet. The humidifier stays on the chamber's own loop. The bridge talks only to this hub, never to a chamber directly.</p>
+{% endblock %}

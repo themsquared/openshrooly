@@ -6,12 +6,23 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .mapping import DeviceCommand, stage_to_commands
 from .models import LightRecipe, ProfileStage
 
 DEFAULT_TIMEOUT_S = 5.0
+
+
+class RefuseRedirects(HTTPRedirectHandler):
+    """Chambers must not send the hub to another host (including loopback)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise HTTPError(req.full_url, code, "redirect refused", headers, fp)
+
+
+def no_redirect_opener():
+    return build_opener(RefuseRedirects)
 
 # Read paths used for the hub status dashboard. Each logical sensor lists
 # name-slug and yaml-id fallbacks because ESPHome matches both.
@@ -28,6 +39,7 @@ STATUS_ENTITIES: dict[str, tuple[str, str, ...]] = {
     "light_status": ("text_sensor", "light_status",),
     "target_humidity": ("number", "target_humidity",),
     "temperature_target": ("number", "temperature_target", "temperature__target"),
+    "grow_lights": ("binary_sensor", "grow_lights", "grow_lights_on"),
 }
 
 
@@ -45,19 +57,27 @@ class ApplyResult:
 class ESPHomeDeviceClient:
     """Talk to the device's existing web_server v3 REST API."""
 
-    def __init__(self, base_url: str, timeout_s: float = DEFAULT_TIMEOUT_S, opener=None):
+    def __init__(
+        self,
+        base_url: str,
+        timeout_s: float = DEFAULT_TIMEOUT_S,
+        opener=None,
+        extra_headers: dict[str, str] | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
         self._opener = opener
+        self.extra_headers = dict(extra_headers or {})
 
     def _request(self, method: str, path: str, query: dict[str, Any] | None = None) -> Any:
         url = f"{self.base_url}{path}"
         if query:
             url = f"{url}?{urlencode(query)}"
-        request = Request(url, method=method, headers={"Accept": "application/json"})
+        headers = {"Accept": "application/json", **self.extra_headers}
+        request = Request(url, method=method, headers=headers)
         if self._opener:
             return self._opener(request, timeout=self.timeout_s)
-        with urlopen(request, timeout=self.timeout_s) as response:
+        with no_redirect_opener().open(request, timeout=self.timeout_s) as response:
             body = response.read()
             if not body:
                 return {"ok": True, "status": response.status}

@@ -10,6 +10,7 @@ export function createMemoryDb() {
     profiles: [],
     ratings: [],
     grow_reports: [],
+    uploaded_media: [],
     entitlements: [],
     checkouts: [],
     affiliate_clicks: [],
@@ -269,7 +270,10 @@ function dispatch(mode, tables, ids, sql, params) {
     return tables.magic_links.filter((s) => s.token_hash === params[0]);
   }
   if (q.startsWith("UPDATE magic_links SET used_at=")) {
-    const row = tables.magic_links.find((s) => s.token_hash === params[1] && !s.used_at && s.expires_at > params[2]);
+    // used_at=?, token_hash=?, expires_at > ?, purpose=? (purpose optional)
+    const row = tables.magic_links.find(
+      (s) => s.token_hash === params[1] && !s.used_at && s.expires_at > params[2] && (params[3] === undefined || s.purpose === params[3])
+    );
     if (row) row.used_at = params[0];
     return { meta: { changes: row ? 1 : 0 } };
   }
@@ -375,10 +379,29 @@ function dispatch(mode, tables, ids, sql, params) {
     });
     return {};
   }
+  if (q.startsWith("DELETE FROM oauth_states WHERE state=")) {
+    const before = tables.oauth_states.length;
+    tables.oauth_states = tables.oauth_states.filter((s) => s.state !== params[0]);
+    const changes = before - tables.oauth_states.length;
+    return { changes, meta: { changes } };
+  }
+  if (q.startsWith("DELETE FROM oauth_states WHERE expires_at <")) {
+    tables.oauth_states = tables.oauth_states.filter((s) => s.expires_at >= params[0]);
+    return { changes: 0, meta: { changes: 0 } };
+  }
+  if (q.startsWith("SELECT * FROM auth_identities WHERE provider=? AND subject=")) {
+    return tables.auth_identities.filter((s) => s.provider === params[0] && s.subject === params[1]);
+  }
+  if (q.startsWith("SELECT * FROM auth_identities WHERE user_id=? AND provider=")) {
+    return tables.auth_identities.filter((s) => Number(s.user_id) === Number(params[0]) && s.provider === params[1]);
+  }
   if (q.startsWith("SELECT * FROM oauth_states WHERE state=")) {
     return tables.oauth_states.filter((s) => s.state === params[0]);
   }
   if (q.startsWith("INSERT INTO auth_identities")) {
+    if (tables.auth_identities.some((s) => s.provider === params[1] && s.subject === params[2])) {
+      throw new Error("UNIQUE constraint failed: auth_identities.provider, auth_identities.subject");
+    }
     tables.auth_identities.push({
       id: ids.auth_identities++,
       user_id: params[0],
@@ -540,6 +563,7 @@ function dispatch(mode, tables, ids, sql, params) {
     return [{ a: rows.reduce((s, r) => s + r.stars, 0) / rows.length }];
   }
   if (q.startsWith("INSERT INTO grow_reports")) {
+    const hasStatus = q.includes("photo_status");
     const row = {
       id: ids.grow_reports++,
       profile_id: params[0],
@@ -550,13 +574,30 @@ function dispatch(mode, tables, ids, sql, params) {
       flushes: params[5],
       device_name: params[6],
       photo_key: params[7],
-      created_at: params[8],
+      photo_status: hasStatus ? params[8] : "approved",
+      created_at: hasStatus ? params[9] : params[8],
     };
     tables.grow_reports.push(row);
     return { lastRowId: row.id };
   }
   if (q.startsWith("SELECT * FROM grow_reports WHERE author_id=")) {
     return tables.grow_reports.filter((r) => Number(r.author_id) === Number(params[0]));
+  }
+  if (q.startsWith("SELECT * FROM grow_reports WHERE photo_key=")) {
+    return tables.grow_reports.filter((r) => r.photo_key === params[0]);
+  }
+  if (q.startsWith("INSERT INTO uploaded_media")) {
+    tables.uploaded_media.push({
+      photo_key: params[0],
+      owner_id: params[1],
+      status: params[2],
+      kind: params[3],
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM uploaded_media WHERE photo_key=")) {
+    return tables.uploaded_media.filter((r) => r.photo_key === params[0]);
   }
   if (q.startsWith("SELECT * FROM grow_reports")) {
     return tables.grow_reports.filter((r) => r.profile_id === params[0]).reverse();

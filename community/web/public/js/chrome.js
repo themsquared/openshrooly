@@ -12,7 +12,6 @@ export const NAV_ITEMS = [
   { id: "profiles", href: "/", label: "Profiles" },
   { id: "faq", href: "/faq.html", label: "FAQ" },
   { id: "coach", href: "/coach.html", label: "Grow Coach" },
-  { id: "claim", href: "/claim.html", label: "Claim device" },
   { id: "docs", href: "/docs.html", label: "Docs" },
 ];
 

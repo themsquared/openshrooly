@@ -47,10 +47,15 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 
 ## Cloud claim
 
-- The chamber shows a **large 6-character code** (and a QR that is just `https://shroomlabs.io/claim.html?code=…`). No password typed on the device.
-- `/claim.html` is a single field, one button, an error that names the next step (expired → refresh on device; revoked → re-claim).
-- Account lists chambers and a **Revoke** action that explains local growing still works.
-- Copy: cloud is optional; local controls win if we are down.
+Cloud linking is optional and needs a firmware update that is not shipped yet. Until then, `/claim.html` explains pairing in plain words and does **not** show the code form unless the URL has `?code=` (the future QR path) or `deviceClaiming` is true in site config (one-line flip in `write-config.js` / `DEVICE_CLAIMING=1`).
+
+When firmware ships:
+
+- Owner turns on **Connect to Shroom Labs** on the chamber local page. Cloud stays off unless they do.
+- Chamber shows a **large 6-character code** and a QR (`https://shroomlabs.io/claim.html?code=…`) on the screen and local page. The code lasts 15 minutes. No password on the device.
+- `/claim.html` then shows one field, one button, and an error that names the next step (expired → refresh on the chamber; revoked → pair again).
+- Account lists chambers and a remove action. Local growing still works. A new owner pairs again.
+- Copy: cloud is optional; local controls win if we are down. Never imply a shipped chamber already shows a code.
 
 ## On-device first run
 
