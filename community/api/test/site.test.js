@@ -37,6 +37,7 @@ test("every public page has shared nav, title, and description", () => {
       last = at;
     }
     assert.doesNotMatch(header, /Restricted|psilocybin|Off-menu/i);
+    assert.match(html, /off the printed menu/);
   }
 });
 

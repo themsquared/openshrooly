@@ -15,8 +15,8 @@ Site: https://shroomlabs.io
 - [Enoki](https://shroomlabs.io/profiles/enoki.html): Enoki fruits at 15 C and 93% RH with low FAE and 4 h light. About 43 days from start to fruit. Needs cold fruiting and low FAE for supermarket-long stems.
 - [Golden Oyster](https://shroomlabs.io/profiles/golden-oyster.html): Golden Oyster fruits at 21 C and 87% RH with high FAE and 12 h light. About 24 days from start to fruit. Warm oyster with dense golden clusters. Needs strong FAE to keep stems short.
 - [King Oyster](https://shroomlabs.io/profiles/king-oyster.html): King Oyster fruits at 15 C and 82% RH with moderate FAE and 10 h light. About 38 days from start to fruit. Thick-stem oyster. Cooler, slightly drier, and less FAE than cluster oysters.
-- [King Oyster — thick-stem method](https://shroomlabs.io/profiles/king-oyster-thick-stem.html): King Oyster — thick-stem method fruits at 14 C and 80% RH with low FAE and 8 h light. About 43 days from start to fruit. Paid example recipe: cooler, drier fruiting to favor thick stems.
-- [Lion's Mane](https://shroomlabs.io/profiles/lions-mane.html): Lion's Mane fruits at 17 C and 90% RH with moderate FAE and 10 h light. About 33 days from start to fruit. Tooth fungus. Moderate FAE — too much air yellows spines.
+- [King Oyster .  thick-stem method](https://shroomlabs.io/profiles/king-oyster-thick-stem.html): King Oyster .  thick-stem method fruits at 14 C and 80% RH with low FAE and 8 h light. About 43 days from start to fruit. Paid example recipe: cooler, drier fruiting to favor thick stems.
+- [Lion's Mane](https://shroomlabs.io/profiles/lions-mane.html): Lion's Mane fruits at 17 C and 90% RH with moderate FAE and 10 h light. About 33 days from start to fruit. Tooth fungus. Moderate FAE .  too much air yellows spines.
 - [Maitake](https://shroomlabs.io/profiles/maitake.html): Maitake fruits at 16 C and 88% RH with moderate FAE and 10 h light. About 54 days from start to fruit. Slow woodlover. Primordia look like brains; do not dry them out.
 - [Nameko](https://shroomlabs.io/profiles/nameko.html): Nameko fruits at 14 C and 93% RH with moderate FAE and 10 h light. About 39 days from start to fruit. Cool, very wet fruiting. The slime coat is normal.
 - [Pearl Oyster](https://shroomlabs.io/profiles/pearl-oyster.html): Pearl Oyster fruits at 16 C and 88% RH with moderate FAE and 12 h light. About 29 days from start to fruit. Forgiving beginner oyster. Fast, high FAE, cool-to-room fruiting.
@@ -39,6 +39,16 @@ Psilocybin mushrooms are illegal to grow, possess or sell in most countries and 
 - [Penis Envy](https://shroomlabs.io/profiles/penis-envy.html): Penis Envy fruits at 22 C and 90% RH with moderate FAE and 12 h light. About 50 days from start to fruit. Slower cubensis. Same climate band as Golden Teacher with longer stage timers.
 - [Psilocybe cyanescens](https://shroomlabs.io/profiles/p-cyanescens.html): Psilocybe cyanescens fruits at 15 C and 90% RH with moderate FAE and 10 h light. About 52 days from start to fruit. Cool-weather woodlover. Indoor chambers are a poor substitute for outdoor beds.
 - [Psilocybe natalensis](https://shroomlabs.io/profiles/p-natalensis.html): Psilocybe natalensis fruits at 23 C and 90% RH with moderate FAE and 12 h light. About 29 days from start to fruit. Cubensis-adjacent climate; often described as a bit more vigorous.
+
+## Microscopy and research resources
+
+These are plain third-party outbound links. We do not endorse the vendors or publishers, we do not profit from them, and there are no affiliate codes or tracking parameters.
+
+Spore purchase and possession laws vary by state and country. Some US states ban spores outright. Where they are sold, spores are offered for microscopy only.
+
+- [PNW Spore](https://pnwspore.com/). Pacific Northwest Spore Co. (Spokane). Cubensis spore syringes and prints labeled for microscopy.
+- [Sporeworks](https://sporeworks.com/). Long-running US microscopy catalog (The Spore Works). Notes CA, ID, FL, and GA spore restrictions.
+- [Johns Hopkins Center for Psychedelic and Consciousness Research](https://www.hopkinspsychedelic.org/publications). Peer-reviewed psilocybin publications from Johns Hopkins Medicine.
 
 ## Product
 

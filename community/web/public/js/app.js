@@ -2,6 +2,7 @@ import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken }
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav, mountChrome } from "./chrome.js";
+import { isOffMenu, packLabel, profilePath, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -65,6 +66,30 @@ function selectPack(pack) {
   return renderHome();
 }
 
+function renderResources(el, resources) {
+  if (!el || !resources) return;
+  const links = resources.links || PSI_RESOURCES;
+  el.hidden = false;
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <h2 id="microscopy-heading">Microscopy and research resources</h2>
+    <p class="muted">${escapeHtml(resources.disclaimer || PSI_RESOURCE_DISCLAIMER)}</p>
+    <p>${escapeHtml(resources.spore_law || PSI_SPORE_LAW)}</p>
+    <ul>${links
+      .map(
+        (r) =>
+          `<li><a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${escapeHtml(r.name)}</a>. ${escapeHtml(r.note)}</li>`
+      )
+      .join("")}</ul>`;
+}
+
+function profileIdFromLocation() {
+  const q = params().get("id");
+  if (q) return q;
+  const match = location.pathname.match(/^\/profiles\/([^/]+)\.html$/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
 async function renderHome() {
   const canvas = $("#mycelium");
   if (canvas && !canvas.dataset.hero) {
@@ -90,10 +115,10 @@ async function renderHome() {
     ? profiles
         .map(
           (p) => `
-    <a class="profile-card" href="${off ? `/profile.html?id=${encodeURIComponent(p.id)}` : `/profiles/${encodeURIComponent(p.id)}.html`}">
+    <a class="profile-card" href="${profilePath(p.id)}">
       <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack)}</div>
       <div class="profile-body">
-        <p><span class="chip">${escapeHtml(off ? "Off-menu" : "Culinary")}</span>${
+        <p><span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>${
           p.pricing?.kind === "paid"
             ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
             : `<span class="chip">free</span>`
@@ -115,20 +140,28 @@ async function renderHome() {
 }
 
 async function renderProfile() {
-  const id = params().get("id");
+  const id = profileIdFromLocation();
   if (!id) return;
   const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
   const p = data.profile;
+  const off = isOffMenu(p);
+  const label = p.pack_label || packLabel(p.pack);
   $("#title").textContent = p.name;
-  $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${p.pack}`;
+  $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
-  $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack || "")}</span>`;
+  $("#chips").innerHTML = `<span class="chip">${escapeHtml(label)}</span>`;
   $("#art").innerHTML = speciesArt(p.species, p.strain, p.name, p.pack);
-  if (p.legal_notice) {
-    $("#legal").textContent = p.legal_notice;
-    $("#legal").classList.remove("hidden");
+  const legal = $("#legal");
+  if (legal && (off || p.legal_notice)) {
+    legal.textContent = off ? PSI_LEGAL_NOTICE : p.legal_notice;
+    legal.classList.remove("hidden");
+    legal.classList.add("legal-prominent");
   }
-  $("#nav-coach")?.classList.toggle("hidden", p.pack === "psilocybin");
+  $("#nav-coach")?.classList.toggle("hidden", off);
+  if (off) {
+    $("#affiliates")?.replaceChildren();
+    renderResources($("#resources"), data.resources || { links: PSI_RESOURCES });
+  }
   const caps = await capabilities();
   if (!caps.photos) {
     document.querySelector('input[name="photo"]')?.closest("label")?.classList.add("hidden");
@@ -169,7 +202,7 @@ async function renderProfile() {
   $("#sources").innerHTML = (p.source_notes || [])
     .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
     .join("");
-  if (data.links?.length) {
+  if (!off && data.links?.length) {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
       data.links
@@ -178,7 +211,7 @@ async function renderProfile() {
       "</ul>";
   }
   $("#ratings").innerHTML =
-    data.ratings.map((r) => `<li>${escapeHtml(r.username)}, ${r.stars}/5. ${escapeHtml(r.comment || "")}</li>`).join("") ||
+    data.ratings.map((r) => `<li>${escapeHtml(r.username)} · ${r.stars}/5 · ${escapeHtml(r.comment || "")}</li>`).join("") ||
     "<li class='muted'>No ratings yet.</li>";
   $("#reports").innerHTML =
     data.reports

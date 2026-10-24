@@ -14,7 +14,7 @@ USB installer: [`/install.html`](https://shroomlabs.io/install.html) uses ESP We
 
 Opt-in device cloud: claim at `/claim.html`, mTLS on `link.shroomlabs.io`. See [`docs/DEVICES.md`](../docs/DEVICES.md). Default firmware does not open a cloud socket.
 
-**Grow Coach** (`/coach.html`) is a $3.99/month culinary subscription: per-chamber learning, chat, photo checks, alerts. Not marketed with the restricted pack. See [`docs/COACH.md`](../docs/COACH.md).
+**Grow Coach** (`/coach.html`) is a $3.99/month culinary subscription: per-chamber learning, chat, photo checks, alerts. Not marketed with off-menu varieties. See [`docs/COACH.md`](../docs/COACH.md).
 
 Psilocybin profiles are tagged, free-only, and never carry affiliate links or payment providers.
 

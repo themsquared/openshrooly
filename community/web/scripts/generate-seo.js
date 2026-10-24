@@ -5,6 +5,15 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DISCLOSURE, NAV_ITEMS, POSITIONING, PRODUCT, SITE, TAGLINE, renderFooter, renderHeader } from "../public/js/chrome.js";
+import {
+  isOffMenu,
+  PSI_LEGAL_NOTICE,
+  PSI_RESOURCE_DISCLAIMER,
+  PSI_RESOURCES,
+  PSI_SPORE_LAW,
+  seoDescription as packSeoDescription,
+  seoTitle as packSeoTitle,
+} from "../../api/src/pack.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
@@ -18,8 +27,12 @@ export function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+export function undash(value) {
+  return String(value ?? "").replaceAll("\u2014", ". ").replaceAll("\u2013", "-");
+}
+
 export function isPsi(profile) {
-  return profile?.pack === "psilocybin" || profile?.restricted || (profile?.tags || []).includes("psilocybin");
+  return isOffMenu(profile);
 }
 
 export function loadProfiles() {
@@ -55,15 +68,17 @@ export function answerFirst(profile) {
   const light = stage.light?.duration_hours ?? 0;
   const temp = stage.temperature_c ?? "";
   const rh = stage.humidity_percent ?? "";
-  return `${profile.name} fruits at ${temp} C and ${rh}% RH with ${faeLabel(stage)} and ${light} h light. About ${days} days from start to fruit. ${profile.summary || ""}`.trim();
+  return undash(
+    `${profile.name} fruits at ${temp} C and ${rh}% RH with ${faeLabel(stage)} and ${light} h light. About ${days} days from start to fruit. ${profile.summary || ""}`
+  ).trim();
 }
 
 export function seoTitle(profile) {
-  const species = profile.species ? ` (${profile.species})` : "";
-  return `${profile.name}${species} grow profile · Shroom Labs`;
+  return packSeoTitle(profile);
 }
 
 export function seoDescription(profile) {
+  if (isOffMenu(profile)) return packSeoDescription(profile);
   return answerFirst(profile).slice(0, 160);
 }
 
@@ -83,7 +98,7 @@ function jsonLd(profile) {
     isAccessibleForFree: profile.pricing?.kind !== "paid",
     author: { "@type": "Organization", name: "Shroom Labs", url: SITE },
   };
-  if (isPsi(profile) && profile.legal_notice) article.usageInfo = profile.legal_notice;
+  if (isOffMenu(profile)) article.usageInfo = PSI_LEGAL_NOTICE;
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -150,9 +165,25 @@ export const FAQ = [
   },
   {
     q: "Where are Golden Teacher and other Psilocybe climate recipes?",
-    a: "They are Off-menu Profiles, fully indexed on this site. Psilocybin mushrooms are illegal to grow, possess or sell in most countries and in most US states under federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
+    a: `A few chamber recipes stay off the printed menu. They are educational setpoints, indexed for search, and hidden from the default catalog until you opt in. ${PSI_LEGAL_NOTICE}`,
   },
 ];
+
+function resourceList() {
+  return PSI_RESOURCES.map(
+    (r) =>
+      `<li><a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${escapeHtml(r.name)}</a>. ${escapeHtml(r.note)}</li>`
+  ).join("");
+}
+
+export function microscopySection() {
+  return `<section class="resources" aria-labelledby="microscopy-heading">
+    <h2 id="microscopy-heading">Microscopy and research resources</h2>
+    <p class="muted">${escapeHtml(PSI_RESOURCE_DISCLAIMER)}</p>
+    <p>${escapeHtml(PSI_SPORE_LAW)}</p>
+    <ul>${resourceList()}</ul>
+  </section>`;
+}
 
 function siteJsonLd() {
   return {
@@ -231,29 +262,29 @@ function shell({ title, description, canonical, image, jsonLd, robots = "index,f
 }
 
 export function renderProfilePage(profile) {
-  const psi = isPsi(profile);
+  const psi = isOffMenu(profile);
   const stages = (profile.stages || [])
     .map(
       (s) => `<li>
       <strong>${escapeHtml(s.name)}</strong>
       <span class="muted"> ${s.duration_days} d, ${s.humidity_percent}% RH, ${s.temperature_c} C</span>
-      <p>${escapeHtml(s.notes || "")}</p>
+      <p>${escapeHtml(undash(s.notes || ""))}</p>
     </li>`
     )
     .join("");
   const legal = psi
-    ? `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(profile.legal_notice || "")}</p></aside>`
+    ? `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside>`
     : "";
   const body = `
     <article class="profile-page">
       <p class="eyebrow">${psi ? "Educational setpoints" : "Culinary Profile"}</p>
-      <h1>${escapeHtml(profile.name)}</h1>
+      <h1>${escapeHtml(undash(profile.name))}</h1>
       <p class="lede answer-first">${escapeHtml(answerFirst(profile))}</p>
       <p class="muted">${escapeHtml(profile.species || "")}${profile.strain ? ", " + escapeHtml(profile.strain) : ""}</p>
       ${legal}
       <h2>Grow parameters</h2>
       <ol class="grow-timeline">${stages}</ol>
-      ${psi ? "" : `<p class="muted">${escapeHtml(DISCLOSURE)}</p>`}
+      ${psi ? microscopySection() : `<p class="muted">${escapeHtml(DISCLOSURE)}</p>`}
     </article>`;
   return shell({
     title: seoTitle(profile),
@@ -271,7 +302,7 @@ export function renderFaqPage(profiles = []) {
   const culinary = profiles.filter((p) => !isPsi(p));
   const off = profiles.filter(isPsi);
   const linkList = (rows) =>
-    `<ul>${rows.map((p) => `<li><a href="/profiles/${escapeHtml(p.id)}.html">${escapeHtml(p.name)}</a>: ${escapeHtml(answerFirst(p))}</li>`).join("")}</ul>`;
+    `<ul>${rows.map((p) => `<li><a href="/profiles/${escapeHtml(p.id)}.html">${escapeHtml(undash(p.name))}</a>: ${escapeHtml(answerFirst(p))}</li>`).join("")}</ul>`;
   const items = FAQ.map((item) => `<h2>${escapeHtml(item.q)}</h2><p class="answer-first">${escapeHtml(item.a)}</p>`).join("");
   return shell({
     title: "FAQ · Shroom Labs",
@@ -288,7 +319,7 @@ export function renderFaqPage(profiles = []) {
       })),
     },
     activeId: "faq",
-    body: `<article class="profile-page"><p class="eyebrow">FAQ</p><h1>Answers, then the chamber.</h1>${items}<h2>Culinary Profiles</h2>${linkList(culinary)}<h2>Off-menu Profiles</h2>${linkList(off)}</article>`,
+    body: `<article class="profile-page"><p class="eyebrow">FAQ</p><h1>Answers, then the chamber.</h1>${items}<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside><h2>Culinary Profiles</h2>${linkList(culinary)}<h2>Off-menu Profiles</h2>${linkList(off)}</article>`,
   });
 }
 
@@ -304,7 +335,7 @@ ${urls.map((path) => `  <url><loc>${SITE}${path}</loc><changefreq>weekly</change
 export function renderLlms(profiles) {
   const culinary = profiles.filter((p) => !isPsi(p));
   const off = profiles.filter(isPsi);
-  const line = (p) => `- [${p.name}](${SITE}/profiles/${p.id}.html): ${answerFirst(p)}`;
+  const line = (p) => `- [${undash(p.name)}](${SITE}/profiles/${p.id}.html): ${answerFirst(p)}`;
   return `# Shroom Labs
 
 > ${PRODUCT}
@@ -323,6 +354,14 @@ Psilocybin mushrooms are illegal to grow, possess or sell in most countries and 
 
 ${off.map(line).join("\n")}
 
+## Microscopy and research resources
+
+${PSI_RESOURCE_DISCLAIMER}
+
+${PSI_SPORE_LAW}
+
+${PSI_RESOURCES.map((r) => `- [${r.name}](${r.url}). ${r.note}`).join("\n")}
+
 ## Product
 
 - ${TAGLINE}
@@ -332,8 +371,8 @@ ${off.map(line).join("\n")}
 }
 
 export function renderOgSvg(profile) {
-  const title = escapeHtml(profile?.name || "Shroom Labs");
-  const line = escapeHtml(profile ? answerFirst(profile).slice(0, 120) : PRODUCT);
+  const title = escapeHtml(undash(profile?.name || "Shroom Labs"));
+  const line = escapeHtml(profile ? undash(answerFirst(profile).slice(0, 120)) : PRODUCT);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <rect width="1200" height="630" fill="#07110e"/>
   <text x="72" y="120" fill="#c9a45c" font-size="28" font-family="Georgia, serif">Shroom Labs</text>

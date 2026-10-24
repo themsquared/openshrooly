@@ -58,4 +58,4 @@ The chamber page must not open on a wall of unlabeled sliders. AP mode names the
 
 ## Copy
 
-Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Off-menu legality notice is always visible on that pack. The pack is not in the main header; owners open it with the library filter.
+Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Off-menu legality notice is always visible on those pages. The pack is not in the main header; owners open it with the quiet library filter.

@@ -27,7 +27,7 @@ function stubProvider() {
       const text = String(message || "");
       const device = grounding.device_model || {};
       const reply = [
-        "Grow Coach (stub — no live model). Culinary cultivation only.",
+        "Grow Coach (stub, no live model). Culinary cultivation only.",
         device.sample_count
           ? `This chamber’s humidity error is ${(device.humidity_error ?? 0).toFixed(1)}% and temperature offset is ${(device.temperature_offset ?? 0).toFixed(1)}°C.`
           : "I do not have telemetry for this chamber yet.",

@@ -17,6 +17,7 @@ import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js
 import { capabilities } from "./providers.js";
 import { latestFirmwareMeta, refuseUnsignedOta, validateManifest } from "./firmware-sign.js";
 import { originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
+import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 
@@ -237,6 +238,7 @@ async function route(method, path, url, request, env) {
         species: profile.species,
         strain: profile.strain,
         pack: profile.pack,
+        pack_label: packLabel(profile.pack),
         restricted: profile.restricted,
         summary: profile.summary,
         tags: profile.tags,
@@ -547,14 +549,22 @@ async function showProfile(request, db, env, profileId) {
         pack: profile.pack,
         stages: profile.stages.map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
       };
+  const offMenu = isOffMenu(profile) || isPsilocybin(profile);
   return json({
-    profile: publicDoc,
+    profile: {
+      ...publicDoc,
+      pack_label: packLabel(profile.pack),
+      legal_notice: offMenu ? PSI_LEGAL_NOTICE : publicDoc.legal_notice,
+    },
     unlocked,
     ratings,
     avg: avgRow?.a ?? null,
     reports,
-    links: unlocked ? affiliateLinksFor(profile) : [],
-    disclosure: DISCLOSURE,
+    links: offMenu ? [] : unlocked ? affiliateLinksFor(profile) : [],
+    disclosure: offMenu ? "" : DISCLOSURE,
+    resources: offMenu
+      ? { disclaimer: PSI_RESOURCE_DISCLAIMER, spore_law: PSI_SPORE_LAW, links: PSI_RESOURCES }
+      : null,
   });
 }
 
