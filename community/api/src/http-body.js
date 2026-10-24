@@ -2,7 +2,9 @@
 
 import { ValidationError } from "./profile.js";
 
-export const MAX_JSON_BODY_BYTES = 8 * 1024 * 1024;
+export const MAX_DECODED_PHOTO_BYTES = 8 * 1024 * 1024;
+/** Base64 inflates by 4/3; leave room for the JSON wrapper around photo_base64. */
+export const MAX_JSON_BODY_BYTES = Math.ceil((MAX_DECODED_PHOTO_BYTES * 4) / 3) + 256 * 1024;
 
 export async function readBodyLimited(request, maxBytes = MAX_JSON_BODY_BYTES) {
   const declared = Number(request.headers.get("content-length"));

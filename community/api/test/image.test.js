@@ -154,9 +154,11 @@ test("progressive JPEG drops FFF0 HTML before SOF and between scans", () => {
 });
 
 test("APP14 Adobe is kept only for CMYK and dropped otherwise", () => {
-  const rgb = buildJpeg({ apps: [jpegSegment(0xee, "Adobe\0")] });
+  const shortAdobe = new Uint8Array([0x41, 0x64, 0x6f, 0x62, 0x65, 0x00]);
+  const adobe12 = new Uint8Array([0x41, 0x64, 0x6f, 0x62, 0x65, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00]);
+  const rgb = buildJpeg({ apps: [jpegSegment(0xee, shortAdobe)] });
   assert.equal(includesAscii(sanitizeGrowPhoto(rgb).bytes, "Adobe"), false);
-  const cmyk = buildJpeg({ components: 4, apps: [jpegSegment(0xee, "Adobe\0")] });
+  const cmyk = buildJpeg({ components: 4, apps: [jpegSegment(0xee, adobe12)] });
   assert.ok(includesAscii(sanitizeGrowPhoto(cmyk).bytes, "Adobe"));
 });
 

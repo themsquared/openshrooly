@@ -66,7 +66,15 @@ def env(name: str, default: str) -> str:
 
 
 def json_dumps(data: Any) -> str:
-    return json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    """JSON that is safe to embed in a <script> tag (HTML and U+2028/2029 escaped)."""
+    text = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    return (
+        text.replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
 
 def rows(conn: sqlite3.Connection, sql: str, params: Iterable[Any] = ()) -> list[sqlite3.Row]:

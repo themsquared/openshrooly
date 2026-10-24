@@ -36,6 +36,8 @@ test("DEV_STUBS is refused on shroomlabs.io and api.shroomlabs.io", () => {
   assert.equal(devStubsEnabled({ DEV_STUBS: "" }, local), false);
   assert.equal(capabilities(env, prod).stubs, false);
   assert.equal(capabilities(env, local).stubs, true);
+  assert.equal(capabilities({ SHOW_PSILOCYBIN: "0" }, prod).show_psilocybin, false);
+  assert.equal(capabilities({}, prod).show_psilocybin, true);
 });
 
 test("stubs are inert in a prod-like config even when leftover stub flags are set", async () => {

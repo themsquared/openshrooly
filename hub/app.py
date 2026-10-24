@@ -62,6 +62,13 @@ def all_profiles(conn) -> list[MushroomProfile]:
     return [validate_profile(json.loads(row["document"])) for row in rows]
 
 
+def authored_profiles(conn) -> list[MushroomProfile]:
+    rows = conn.execute(
+        "SELECT document FROM profiles WHERE source NOT IN ('seed', 'community') ORDER BY id"
+    ).fetchall()
+    return [validate_profile(json.loads(row["document"])) for row in rows]
+
+
 def get_profile(conn, profile_id: str) -> MushroomProfile:
     row = conn.execute("SELECT document FROM profiles WHERE id=?", (profile_id,)).fetchone()
     if not row:
@@ -246,6 +253,9 @@ async def allowlisted_host(request: Request, call_next):
     return await call_next(request)
 
 
+HUB_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+
+
 def page(request: Request, name: str, **context):
     token = context.get("csrf") or request.cookies.get(auth.CSRF_COOKIE) or auth.new_csrf()
     context.update(
@@ -257,6 +267,7 @@ def page(request: Request, name: str, **context):
         }
     )
     response = templates.TemplateResponse(request, name, context)
+    response.headers["Content-Security-Policy"] = HUB_CSP
     if request.cookies.get(auth.CSRF_COOKIE) != token:
         response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
     return response
@@ -450,9 +461,27 @@ def apply_profile(
     return RedirectResponse(f"/devices/{device_id}", status_code=303)
 
 
+def catalog_payload(conn):
+    return json_dumps([p.to_dict() for p in all_profiles(conn)])
+
+
 @app.get("/profiles", response_class=HTMLResponse)
 def profiles_page(request: Request):
-    return page(request, "profiles.html", profiles=all_profiles(request.app.state.conn), error=None)
+    profiles = all_profiles(request.app.state.conn)
+    return page(request, "profiles.html", profiles=profiles, error=None, catalog_json=json_dumps([p.to_dict() for p in profiles]))
+
+
+@app.get("/profiles/{profile_id}/edit", response_class=HTMLResponse)
+def profile_edit(request: Request, profile_id: str):
+    profile = get_profile(request.app.state.conn, profile_id)
+    return page(
+        request,
+        "profile_edit.html",
+        profile=profile,
+        profile_json=json_dumps(profile.to_dict()),
+        catalog_json=catalog_payload(request.app.state.conn),
+        error=None,
+    )
 
 
 @app.get("/profiles/{profile_id}", response_class=HTMLResponse)
@@ -484,7 +513,8 @@ async def import_profile(request: Request, document: str = Form(...), csrf: str 
             raise ValidationError("Psilocybin pack is disabled. Set HUB_ENABLE_PSILOCYBIN=1 to import it.")
         db.upsert_profile(conn, profile.id, profile.to_dict(), "import")
     except (json.JSONDecodeError, ValidationError, KeyError) as exc:
-        return page(request, "profiles.html", profiles=all_profiles(conn), error=str(exc))
+        profiles = all_profiles(conn)
+        return page(request, "profiles.html", profiles=profiles, error=str(exc), catalog_json=json_dumps([p.to_dict() for p in profiles]))
     return RedirectResponse(f"/profiles/{profile.id}", status_code=303)
 
 
@@ -514,7 +544,7 @@ def sync_push(request: Request, csrf: str = Form("")):
 
     envelope = build_push(
         hub_id="local-hub",
-        profiles=all_profiles(conn),
+        profiles=authored_profiles(conn),
         reports=[
             GrowReport(
                 profile_id=row["profile_id"],
@@ -577,7 +607,16 @@ def sync_pull(request: Request, csrf: str = Form("")):
             continue
         if profile.is_psilocybin and not config.ENABLE_PSILOCYBIN:
             continue
-        db.upsert_profile(conn, profile.id, profile.to_dict(), "community")
+        existing = conn.execute("SELECT source FROM profiles WHERE id=?", (profile.id,)).fetchone()
+        hub_user = payload.get("hub_user")
+        existing_source = existing["source"] if existing else None
+        if existing_source and existing_source not in ("seed", "community"):
+            source = existing_source
+        elif hub_user and profile.author == hub_user:
+            source = "import"
+        else:
+            source = "community"
+        db.upsert_profile(conn, profile.id, profile.to_dict(), source)
         imported += 1
     db.log_event(conn, "sync_pull", f"imported {imported}")
     return RedirectResponse("/profiles", status_code=303)

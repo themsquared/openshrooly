@@ -13,6 +13,7 @@ export function createMemoryStorage() {
     },
     async delete(key) {
       files.delete(key);
+      return true;
     },
   };
 }
@@ -35,6 +36,7 @@ export function createR2Storage(bucket) {
     },
     async delete(key) {
       await bucket.delete(key);
+      return true;
     },
   };
 }
@@ -49,7 +51,7 @@ export function createDisabledStorage() {
       return null;
     },
     async delete() {
-      return null;
+      return false;
     },
   };
 }
@@ -78,7 +80,7 @@ export function createOptionalStorage(bucket, { allowMemory = false } = {}) {
       try {
         return await inner.delete(key);
       } catch {
-        return null;
+        return false;
       }
     },
   };

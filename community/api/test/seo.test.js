@@ -11,6 +11,7 @@ import {
 } from "../src/pack.js";
 import {
   FAQ,
+  isIndexableProfile,
   httpsSourceHref,
   loadProfiles,
   seoDescription,
@@ -23,6 +24,17 @@ import {
 } from "../../web/scripts/generate-seo.js";
 
 const DASH = /[\u2013\u2014]/;
+
+test("pending community profiles never enter the sitemap or llms.txt", () => {
+  const pending = { id: "pending-community", name: "Pending community", summary: "hidden" };
+  assert.equal(isIndexableProfile(pending, { status: "pending", published_live: 0 }), false);
+  assert.equal(isIndexableProfile(pending, { status: "rejected", published_live: 0 }), false);
+  assert.equal(isIndexableProfile(pending, { status: "pending", published_live: 1 }), true);
+  const sitemap = renderSitemap(loadProfiles().filter((p) => isIndexableProfile(p)));
+  assert.doesNotMatch(sitemap, /pending-community/);
+  assert.match(sitemap, /pearl-oyster/);
+  assert.doesNotMatch(renderLlms(loadProfiles()), /pending-community/);
+});
 
 test("visitor label is Off-menu and pages stay indexable", () => {
   const gt = loadProfiles().find((p) => p.id === "golden-teacher");

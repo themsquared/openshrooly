@@ -5,6 +5,7 @@ import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { encodePhotoForUpload, resolveMediaUrl } from "./photo-upload.js";
+import { queueItemHtml } from "./moderate-queue.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -39,7 +40,8 @@ function renderNav() {
       <summary>Account</summary>
       <div class="account-menu-links">
         <a href="/account.html">Account</a>
-        <a href="/publish.html">Publish</a>
+        <a href="/publish.html">Build a profile</a>
+        <a href="/moderate.html" id="nav-moderate" class="hidden">Review queue</a>
         <button class="link" id="logout" type="button">Log out</button>
       </div>
     </details>`;
@@ -224,7 +226,7 @@ async function renderProfile() {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
       data.links
-        .map((l) => `<li><a href="${apiBase()}/api/go/${id}/${l.id}">${escapeHtml(l.label)}</a></li>`)
+        .map((l) => `<li><a href="${escapeHtml(apiBase())}/api/go/${encodeURIComponent(id)}/${encodeURIComponent(l.id)}">${escapeHtml(l.label)}</a></li>`)
         .join("") +
       "</ul>";
   }
@@ -266,8 +268,17 @@ async function renderProfile() {
   });
   $("#fork")?.addEventListener("click", async () => {
     const forked = await api(`/api/profiles/${id}/fork`, { method: "POST", jsonBody: {} });
-    location.href = `/profile.html?id=${encodeURIComponent(forked.id)}`;
+    location.href = `/publish.html?id=${encodeURIComponent(forked.id)}`;
   });
+  if (data.unlocked) {
+    $("#flag-box")?.classList.remove("hidden");
+    $("#flag")?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      await api(`/api/profiles/${id}/moderation-report`, { method: "POST", jsonBody: { reason: fd.get("reason") } });
+      location.reload();
+    });
+  }
 }
 
 function mountTurnstile() {
@@ -373,6 +384,17 @@ async function renderAccount() {
   $("#ents").innerHTML =
     me.entitlements.map((e) => `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`).join("") ||
     "<li class='muted'>No paid items yet.</li>";
+  if (me.user.role === "moderator" || me.user.role === "admin") {
+    $("#nav-moderate")?.classList.remove("hidden");
+  }
+  const mine = await api("/api/me/profiles").catch(() => ({ profiles: [] }));
+  const stateLabel = { draft: "Draft", pending: "In review", published: "Published", rejected: "Not approved", changes_requested: "Not approved" };
+  $("#my-profiles").innerHTML =
+    (mine.profiles || [])
+      .map(
+        (item) => `<li><a href="/publish.html?id=${encodeURIComponent(item.profile.id)}">${escapeHtml(item.profile.name)}</a> · ${escapeHtml(stateLabel[item.review?.status] || "Draft")}${item.review?.reason ? ` · ${escapeHtml(item.review.reason)}` : ""}</li>`
+      )
+      .join("") || "<li class='muted'>No profiles yet.</li>";
   if ($("#coach-account") && me.grow_coach) {
     $("#coach-account").textContent = me.grow_coach.entitled
       ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
@@ -421,28 +443,6 @@ async function renderAccount() {
   });
 }
 
-async function renderPublish() {
-  $("#form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    try {
-      const doc = JSON.parse($("#document").value);
-      const saved = await api("/api/profiles", { method: "POST", jsonBody: doc });
-      location.href = `/profile.html?id=${encodeURIComponent(saved.id)}`;
-    } catch (err) {
-      $("#error").textContent = err.message;
-      $("#error").classList.remove("hidden");
-    }
-  });
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 function httpsSourceHref(url) {
   if (url == null || String(url).trim() === "") return "";
   try {
@@ -451,6 +451,210 @@ function httpsSourceHref(url) {
   } catch {
     return "";
   }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.split(",")[1] || "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function ownerPhotoUrl(profileId, photoId) {
+  const res = await fetch(`${apiBase()}/api/profiles/${encodeURIComponent(profileId)}/photos/${encodeURIComponent(photoId)}`, {
+    headers: { authorization: `Bearer ${getToken()}`, accept: "image/*" },
+  });
+  if (!res.ok) return "";
+  return URL.createObjectURL(await res.blob());
+}
+
+async function loadBuilderSources(builder) {
+  const caps = await capabilities().catch(() => ({ show_psilocybin: true }));
+  builder.setShowPsilocybin(caps.show_psilocybin !== false);
+  const [library, mine] = await Promise.all([
+    api("/api/profiles?pack=culinary").catch(() => []),
+    api("/api/me/profiles").catch(() => ({ profiles: [] })),
+  ]);
+  const off = caps.show_psilocybin === false ? [] : await api("/api/profiles?pack=psilocybin").catch(() => []);
+  const summaries = [...(library || []), ...(off || [])];
+  builder.resolveSource = async (id) => {
+    const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
+    return { ...(data.profile || data), unlocked: Boolean(data.unlocked) };
+  };
+  const full = await Promise.all(
+    summaries.map(async (item) => {
+      try {
+        return await builder.resolveSource(item.id);
+      } catch {
+        return item;
+      }
+    })
+  );
+  builder.setCatalog(full);
+  builder.setOwnProfiles((mine.profiles || []).map((item) => ({ ...item.profile, unlocked: true, author: item.profile.author || "you" })));
+}
+
+async function renderPublish() {
+  const builder = $("#builder");
+  if (!builder) return;
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  await customElements.whenDefined("profile-builder").catch(() => {});
+  await loadBuilderSources(builder);
+  const id = params().get("id");
+  if (id) {
+    try {
+      const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
+      builder.setProfile(data.profile, { locked: Boolean(data.profile.locked) || !data.unlocked });
+      if (data.review) {
+        const photos = [];
+        for (const photo of data.review.photos || []) {
+          const preview = await ownerPhotoUrl(id, photo.id);
+          photos.push({ ...photo, preview });
+        }
+        builder.setPublishState({
+          status: data.review.status || "draft",
+          reason: data.review.reason || "",
+          title: data.review.title || data.profile.name,
+          description: data.review.description || data.profile.summary || "",
+          published_live: Boolean(data.review.published_live),
+          photos,
+        });
+      }
+    } catch (err) {
+      $("#error").textContent = err.message;
+      $("#error").classList.remove("hidden");
+    }
+  }
+  const showErr = (err) => {
+    $("#error").textContent = err.message || String(err);
+    $("#error").classList.remove("hidden");
+  };
+  $("#save-private")?.addEventListener("click", async () => {
+    const built = builder.getDocument();
+    if (!built.ok) {
+      showErr(new Error(built.issues[0]?.message || "Fix the marked fields first."));
+      return;
+    }
+    try {
+      const existing = params().get("id");
+      const saved = existing
+        ? await api(`/api/profiles/${encodeURIComponent(existing)}`, { method: "PUT", jsonBody: built.profile })
+        : await api("/api/profiles", { method: "POST", jsonBody: built.profile });
+      const nextId = saved.id || built.profile.id;
+      location.href = `/publish.html?id=${encodeURIComponent(nextId)}`;
+    } catch (err) {
+      showErr(err);
+    }
+  });
+  $("#submit-review")?.addEventListener("click", async () => {
+    const built = builder.getPublishPayload();
+    if (!built.ok) {
+      showErr(new Error(built.issues[0]?.message || "Fix the marked fields first."));
+      return;
+    }
+    if (built.publishIssues.length) {
+      showErr(new Error(built.publishIssues[0].message));
+      return;
+    }
+    try {
+      const existing = params().get("id");
+      const saved = existing
+        ? await api(`/api/profiles/${encodeURIComponent(existing)}`, { method: "PUT", jsonBody: built.profile })
+        : await api("/api/profiles", { method: "POST", jsonBody: built.profile });
+      const nextId = saved.id || built.profile.id;
+      for (const photo of built.publish.photos || []) {
+        if (!photo.file) continue;
+        await api(`/api/profiles/${encodeURIComponent(nextId)}/photos`, {
+          method: "POST",
+          jsonBody: {
+            photo_base64: await fileToBase64(photo.file),
+            photo_type: photo.file.type,
+          },
+        });
+      }
+      await api(`/api/profiles/${encodeURIComponent(nextId)}/publish`, {
+        method: "POST",
+        jsonBody: { title: built.publish.title, description: built.publish.description },
+      });
+      location.href = `/publish.html?id=${encodeURIComponent(nextId)}`;
+    } catch (err) {
+      showErr(err);
+    }
+  });
+}
+
+async function renderModerate() {
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  try {
+    const data = await api("/api/moderation/queue");
+    const box = $("#queue");
+    const items = [];
+    for (const item of data.items || []) {
+      try {
+        if (item?.kind === "report-photo") {
+          const html = queueItemHtml(item, { mediaSrc: mediaUrl(item.photo_key) });
+          if (html) items.push(html);
+          continue;
+        }
+        if (item?.kind && item.kind !== "profile") continue;
+        if (!item?.profile) continue;
+        const thumbs = [];
+        for (const photo of item.review?.photos || []) {
+          const src = await ownerPhotoUrl(item.profile.id, photo.id);
+          if (src) thumbs.push(`<img src="${src}" alt="Submitted photo">`);
+        }
+        const html = queueItemHtml(item, { thumbs });
+        if (html) items.push(html);
+      } catch {
+        continue;
+      }
+    }
+    box.innerHTML = items.length ? items.join("") : `<p class="muted">Nothing waiting.</p>`;
+    box.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-mod]");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const action = btn.dataset.mod;
+      const reasonBox = document.getElementById(`reason-${id}`) || document.getElementById(`reason-report-photo-${id}`);
+      const reason = reasonBox?.value || "";
+      try {
+        if (action === "report-photo-approve") {
+          await api(`/api/moderation/report-photos/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: {} });
+        } else if (action === "report-photo-reject") {
+          await api(`/api/moderation/report-photos/${encodeURIComponent(id)}/reject`, { method: "POST", jsonBody: { reason } });
+        } else if (action === "approve") await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: {} });
+        else if (action === "confirm-culinary") {
+          await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: { pack: "culinary" } });
+        } else await api(`/api/moderation/${encodeURIComponent(id)}/${action}`, { method: "POST", jsonBody: { reason } });
+        location.reload();
+      } catch (err) {
+        $("#error").textContent = err.message;
+        $("#error").classList.remove("hidden");
+      }
+    });
+  } catch (err) {
+    $("#error").textContent = err.status === 403 ? "This page is for moderators." : err.message;
+    $("#error").classList.remove("hidden");
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 bindMobileNav();
@@ -475,6 +679,7 @@ if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
 if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
 if (page === "publish") renderPublish();
+if (page === "moderate") renderModerate();
 if (page === "device") renderDevice().catch((err) => {
   if (err.status === 401) {
     location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;

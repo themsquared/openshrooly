@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node scripts/write-config.js && node scripts/generate-seo.js",
     "dev": "API_BASE_URL=${API_BASE_URL:-http://127.0.0.1:8787} node scripts/write-config.js && python3 -m http.server 8888 --directory public",
-    "test": "node --test scripts/write-config.test.js scripts/hero-contrast.test.js scripts/home-lcp.test.js scripts/install-verify.test.js scripts/species-photos.test.js scripts/photo-upload.test.js",
+    "test": "node --test scripts/write-config.test.js scripts/hero-contrast.test.js scripts/home-lcp.test.js scripts/install-verify.test.js scripts/profile-builder.test.js scripts/species-photos.test.js scripts/photo-upload.test.js scripts/moderate-queue.test.js",
     "deploy": "API_BASE_URL=${API_BASE_URL:-https://api.shroomlabs.io} node scripts/write-config.js && node scripts/generate-seo.js && npx --yes netlify-cli deploy --prod --dir=public"
   },
   "devDependencies": {

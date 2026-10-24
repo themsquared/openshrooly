@@ -69,6 +69,7 @@ export function capabilities(env = {}, request) {
     photos: photosConfigured(env) || stubs,
     coach: coachAiConfigured(env) || stubs,
     push: pushConfigured() || stubs,
+    show_psilocybin: String(env.SHOW_PSILOCYBIN ?? "1") !== "0",
     stubs,
   };
 }
