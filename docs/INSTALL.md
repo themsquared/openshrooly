@@ -48,7 +48,14 @@ Releases are static files on the Netlify site, not in this repo and not in R2.
   switched only if the size and hash match the signed values. Any failure aborts the write and
   the device stays on its current version.
 - If a new image fails to boot, the bootloader returns to the previous one (app rollback plus
-  `safe_mode`, which marks a new image good after it has run for a minute).
+  `safe_mode`, which marks a new image good after it has run for a minute). The Arduino core
+  would otherwise mark the image good as it starts, so `signed_update` overrides
+  `verifyRollbackLater()`; without that override rollback never happens. Tested on hardware with
+  an image that restarts before it is confirmed: the Shrooly came back on the previous version
+  and said "The last update did not start correctly, so this Shrooly went back to version X."
+- During that first minute an install is refused with "Your Shrooly restarted less than a minute
+  ago and is still checking itself. Try again in a minute." The LAN `/update` page fails the same
+  way in that window.
 
 Plain messages the device shows include "You have the latest version (1.0.3-sl.1).",
 "Could not reach shroomlabs.io. Check the Wi-Fi connection and try again.", and "This update

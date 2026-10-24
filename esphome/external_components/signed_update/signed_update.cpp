@@ -196,6 +196,16 @@ void SignedUpdate::run_(bool install) {
     }
     return;
   }
+  // A version that just started is confirmed by safe_mode after a minute of
+  // good running. Until then the bootloader keeps the previous version as the
+  // way back, and an install would be refused, so say so plainly.
+  esp_ota_img_states_t running_state;
+  if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &running_state) == ESP_OK &&
+      running_state == ESP_OTA_IMG_PENDING_VERIFY) {
+    this->report_(State::FAILED, std::string("Your Shrooly restarted less than a minute ago and is still checking itself. "
+                                             "Try again in a minute.") + still_on(this->current_version_));
+    return;
+  }
   this->download_and_apply_(rel);
 }
 
