@@ -42,23 +42,53 @@ export function httpsSourceHref(url) {
   return new URL(String(url).trim()).href;
 }
 
-const OFFMENU_GENERA = ["psilocybe"];
+export const AFFILIATE_ID_RE = /^[a-z0-9-]{1,40}$/;
+export const LIGHT_PHASE_IDS = new Set(["colonization", "pinning", "fruiting"]);
+
+export function isAffiliateId(id) {
+  return typeof id === "string" && AFFILIATE_ID_RE.test(id);
+}
+
+export function isHttpsAffiliateUrl(url) {
+  if (url == null || String(url).trim() === "") return false;
+  return isHttpsSourceUrl(url);
+}
+
+export function stripCommunityAffiliates(profile) {
+  const next = structuredClone(profile);
+  next.affiliate_links = [];
+  return next;
+}
+
+const OFFMENU_GENERA = ["psilocybe", "panaeolus", "copelandia", "gymnopilus", "pholiotina", "conocybe"];
+const OFFMENU_EPITHETS = [
+  "cubensis",
+  "cyanescens",
+  "semilanceata",
+  "azurescens",
+  "natalensis",
+  "cyanopus",
+  "salicinus",
+  "aeruginascens",
+  "tropicalis",
+  "cambodginiensis",
+  "cinctulus",
+  "subbalteatus",
+  "junonius",
+  "spectabilis",
+];
 const OFFMENU_BINOMIALS = [
-  "psilocybe cubensis",
-  "psilocybe semilanceata",
-  "psilocybe cyanescens",
-  "psilocybe natalensis",
-  "panaeolus cyanescens",
-  "copelandia cyanescens",
-  "gymnopilus junonius",
-  "gymnopilus spectabilis",
+  "stropharia cubensis",
   "pluteus salicinus",
   "inocybe aeruginascens",
   "conocybe cyanopus",
-  "panaeolus tropicalis",
-  "panaeolus cambodginiensis",
+  "pholiotina cyanopus",
 ];
-const OFFMENU_COMMON = [
+const OFFMENU_PHRASES = [
+  "psilocybin",
+  "psilocin",
+  "magic mushroom",
+  "magic mushrooms",
   "golden teacher",
   "penis envy",
   "albino penis envy",
@@ -66,29 +96,86 @@ const OFFMENU_COMMON = [
   "liberty cap",
   "wavy cap",
   "flying saucer",
-  "b+",
 ];
+const OFFMENU_WORDS = ["ape", "b+"];
+
+const CONFUSABLES = {
+  а: "a",
+  е: "e",
+  о: "o",
+  р: "p",
+  с: "c",
+  у: "y",
+  х: "x",
+  і: "i",
+  ѕ: "s",
+  ј: "j",
+  ԝ: "w",
+  А: "a",
+  В: "b",
+  Е: "e",
+  К: "k",
+  М: "m",
+  Н: "h",
+  О: "o",
+  Р: "p",
+  С: "c",
+  Т: "t",
+  Х: "x",
+  І: "i",
+  α: "a",
+  ο: "o",
+  ρ: "p",
+  τ: "t",
+  υ: "y",
+  χ: "x",
+  ι: "i",
+  ν: "v",
+  κ: "k",
+  η: "n",
+  Α: "a",
+  Ο: "o",
+  Ρ: "p",
+  Τ: "t",
+  Υ: "y",
+  Χ: "x",
+};
 
 export function normalizeTaxonText(value) {
-  return String(value || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+  const mapped = [...String(value || "").normalize("NFKC")].map((ch) => CONFUSABLES[ch] || ch).join("");
+  return mapped
+    .replace(/\p{Cf}/gu, "")
+    .replace(/\p{Mn}/gu, "")
     .toLowerCase()
-    .replace(/[\u00a0\u2000-\u200b]/g, " ")
-    .replace(/[^a-z0-9+ ]/g, " ")
+    .replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000]/g, " ")
+    .replace(/[^a-z0-9+]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-export function detectsRestrictedTaxon(profile) {
+export function detectsRestrictedTaxon(profile, extra = {}) {
   const hay = normalizeTaxonText(
-    [profile?.name, profile?.species, profile?.strain, profile?.variety_group, ...(profile?.tags || [])].join(" ")
+    [
+      profile?.name,
+      profile?.species,
+      profile?.strain,
+      profile?.variety_group,
+      profile?.summary,
+      profile?.notes,
+      profile?.chamber_notes,
+      extra.title,
+      extra.description,
+      ...(Array.isArray(profile?.tags) ? profile.tags : []),
+    ].join(" ")
   );
   if (!hay) return false;
   const words = hay.split(" ");
-  if (OFFMENU_GENERA.some((genus) => words.includes(genus) || hay.startsWith(`${genus} `))) return true;
-  if (OFFMENU_BINOMIALS.some((name) => hay.includes(name))) return true;
-  if (OFFMENU_COMMON.some((name) => hay.includes(name))) return true;
+  const compact = hay.replace(/ /g, "");
+  if (OFFMENU_GENERA.some((genus) => words.includes(genus) || compact.includes(genus))) return true;
+  if (OFFMENU_EPITHETS.some((name) => words.includes(name) || compact.includes(name))) return true;
+  if (OFFMENU_BINOMIALS.some((name) => hay.includes(name) || compact.includes(name.replace(/ /g, "")))) return true;
+  if (OFFMENU_PHRASES.some((name) => hay.includes(name) || compact.includes(name.replace(/ /g, "")))) return true;
+  if (OFFMENU_WORDS.some((name) => words.includes(name))) return true;
   return false;
 }
 
@@ -126,13 +213,8 @@ function require(condition, message) {
   if (!condition) throw new ValidationError(message);
 }
 
-export function isPsilocybin(profile) {
-  return (
-    detectsRestrictedTaxon(profile) ||
-    profile.pack === "psilocybin" ||
-    Boolean(profile.restricted) ||
-    (profile.tags || []).includes("psilocybin")
-  );
+export function isPsilocybin(profile, extra = {}) {
+  return detectsRestrictedTaxon(profile, extra) || profile.pack === "psilocybin" || Boolean(profile.restricted);
 }
 
 export function isFree(profile) {
@@ -253,7 +335,14 @@ export function applyPackRules(profile) {
     next.allowed_payment_providers = [];
     next.affiliates_allowed = false;
     next.affiliate_links = [];
-    next.legal_notice = next.legal_notice || PSILOCYBIN_LEGAL_NOTICE;
+    next.legal_notice = PSILOCYBIN_LEGAL_NOTICE;
+  } else {
+    next.legal_notice = null;
+  }
+  if (next.light_recipe?.phases) {
+    for (const key of Object.keys(next.light_recipe.phases)) {
+      if (!LIGHT_PHASE_IDS.has(key)) delete next.light_recipe.phases[key];
+    }
   }
   return next;
 }
@@ -411,10 +500,14 @@ export function collectProfileIssues(profile) {
     if ((profile.affiliate_links || []).length) {
       addIssue(issues, "affiliate_links", "Off-menu profiles cannot carry affiliate links.");
     }
-    if (!profile.legal_notice) addIssue(issues, "legal_notice", "Off-menu profiles need the legal note.");
+    if (profile.legal_notice !== PSILOCYBIN_LEGAL_NOTICE) addIssue(issues, "legal_notice", "Off-menu profiles need the legal note.");
   }
   if (profile.affiliates_allowed === false && (profile.affiliate_links || []).length) {
     addIssue(issues, "affiliate_links", "Turn off affiliate links or remove them.");
+  }
+  for (const [i, link] of (profile.affiliate_links || []).entries()) {
+    if (!isAffiliateId(link?.id)) addIssue(issues, `affiliate_links.${i}.id`, "Affiliate ids must be short lowercase letters, numbers, or hyphens.");
+    if (!isHttpsAffiliateUrl(link?.url)) addIssue(issues, `affiliate_links.${i}.url`, "Affiliate links must use https.");
   }
   return issues;
 }
@@ -439,6 +532,10 @@ export function collectLightRecipeIssues(recipe) {
   if (!phases.colonization) addIssue(issues, "light_recipe.phases.colonization", "Add a colonization light mix.");
   if (!phases.fruiting) addIssue(issues, "light_recipe.phases.fruiting", "Add a fruiting light mix.");
   for (const [name, phase] of Object.entries(phases)) {
+    if (!LIGHT_PHASE_IDS.has(name)) {
+      addIssue(issues, `light_recipe.phases.${name}`, "Light recipe phases must be colonization, pinning, or fruiting.");
+      continue;
+    }
     if (!inRange(phase.photoperiod_hours, 0, 24)) {
       addIssue(issues, `light_recipe.phases.${name}.photoperiod_hours`, `${name} hours on must be 0 to 24.`);
     }

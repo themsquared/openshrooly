@@ -147,7 +147,7 @@ export async function submitForReview(db, env, request, { profile, user, title, 
     description: String(description).trim(),
     live_document: existing?.live_document || null,
     blocklist_hit: hits.length > 0,
-    offmenu_flag: isPsilocybin(profile),
+    offmenu_flag: isPsilocybin(profile, { title, description }),
     published_live: Number(existing?.published_live) === 1,
     created_at: existing?.created_at,
   });
@@ -201,8 +201,18 @@ export async function rejectReview(db, env, request, { profile, user, row, reaso
 
 export async function takedownReview(db, env, request, { profile, user, row, reason }) {
   if (!String(reason || "").trim()) throw new ValidationError("Add a reason for the owner.");
-  const review = await getReview(db, profile.id);
-  if (!review) throw new ValidationError("This profile is not waiting for review.");
+  const existing = await getReview(db, profile.id);
+  const review = existing || {
+    profile_id: profile.id,
+    status: REVIEW_PUBLISHED,
+    reason: "",
+    title: profile.name || "",
+    description: profile.summary || "",
+    live_document: JSON.stringify(profile),
+    blocklist_hit: 0,
+    offmenu_flag: isPsilocybin(profile) ? 1 : 0,
+    published_live: 1,
+  };
   const ts = nowIso();
   await db.run("UPDATE profiles SET published=0, updated_at=? WHERE id=?", [ts, profile.id]);
   await upsertReview(db, {
@@ -240,18 +250,49 @@ export async function reportProfile(db, { profileId, user, reason }) {
 export async function maybeResetOnPublicEdit(db, profile, { title, description }) {
   const review = await getReview(db, profile.id);
   if (!review || Number(review.published_live) !== 1) return review;
-  const titleChanged = title != null && String(title) !== String(review.title || "");
-  const descChanged = description != null && String(description) !== String(review.description || "");
-  if (!titleChanged && !descChanged) return review;
   await upsertReview(db, {
     ...review,
     status: REVIEW_PENDING,
     title: title != null ? String(title) : review.title,
     description: description != null ? String(description) : review.description,
-    reason: "Waiting for review of the new title or description.",
+    offmenu_flag: isPsilocybin(profile, { title, description }),
+    reason: "Waiting for review of an edit.",
   });
-  await logModeration(db, { profileId: profile.id, actorId: null, action: "edit_resubmit", reason: "title_or_description" });
+  await logModeration(db, { profileId: profile.id, actorId: null, action: "edit_resubmit", reason: "body" });
   return getReview(db, profile.id);
+}
+
+export async function stashReportPhoto(db, env, { profileId, raw }) {
+  if (!raw || !raw.byteLength) throw new ValidationError("Add a photo file.");
+  const processed = processPhoto(raw);
+  const pendingKey = photoObjectKey("pending");
+  const stored = await env.storage.put(pendingKey, processed.bytes, processed.contentType);
+  if (!stored) throw new ValidationError("Photo storage is not enabled yet. See the deploy note for the media bucket.", 503);
+  const ts = nowIso();
+  await db.run(
+    "INSERT INTO profile_photos (profile_id, object_key, content_type, width, height, status, prescreen, withdrawn, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
+    [
+      profileId,
+      pendingKey,
+      processed.contentType,
+      processed.width,
+      processed.height,
+      "pending",
+      JSON.stringify({ provider: "stub", flagged: false, labels: [], kind: "grow_report" }),
+      ts,
+      ts,
+    ]
+  );
+  const review = await getReview(db, profileId);
+  if (review && Number(review.published_live) === 1) {
+    await upsertReview(db, {
+      ...review,
+      status: REVIEW_PENDING,
+      reason: "Waiting for review of a grow report photo.",
+    });
+    await logModeration(db, { profileId, actorId: null, action: "edit_resubmit", reason: "grow_report_photo" });
+  }
+  return pendingKey;
 }
 
 export async function storePhoto(db, env, request, { profile, user, raw, contentType }) {

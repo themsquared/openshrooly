@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { affiliateLinksFor, isPsilocybin, validateProfile, ValidationError } from "../src/profile.js";
+import { detectsRestrictedTaxon } from "../src/profile-schema.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -76,6 +77,32 @@ test("light recipe validation rejects bad ranges and missing sources", () => {
   }
 });
 
+const OFFMENU_CASES = [
+  { field: "species", value: "P. cubensis" },
+  { field: "species", value: "cubensis" },
+  { field: "species", value: "Stropharia cubensis" },
+  { field: "species", value: "Panaeolus cinctulus" },
+  { field: "species", value: "Panaeolus subbalteatus" },
+  { field: "species", value: "Panaeolus cyanescens" },
+  { field: "species", value: "Copelandia tropicalis" },
+  { field: "species", value: "Copelandia cyanescens" },
+  { field: "species", value: "Gymnopilus junonius" },
+  { field: "species", value: "Gymnopilus spectabilis" },
+  { field: "species", value: "Pluteus salicinus" },
+  { field: "species", value: "Inocybe aeruginascens" },
+  { field: "species", value: "Conocybe cyanopus" },
+  { field: "species", value: "Psilocybe cubensis".replace("c", "\u0441") },
+  { field: "species", value: "Psilo\u200dcybe cubensis" },
+  { field: "species", value: "Psilo\u00adcybe cubensis" },
+  { field: "species", value: "Psilocybecubensis" },
+  { field: "name", value: "Psilocybin cubes" },
+  { field: "summary", value: "Notes about Golden Teacher only" },
+  { field: "notes", value: "This grow used APE" },
+  { field: "notes", value: "Penis Envy clone" },
+  { field: "summary", value: "B+ spore print" },
+  { field: "tags", value: ["Psilocybin"] },
+];
+
 test("a culinary label cannot hide a restricted species", () => {
   const sneak = structuredClone(load("data/profiles/culinary/pearl-oyster.json"));
   sneak.id = "sneaky-teacher";
@@ -91,6 +118,7 @@ test("a culinary label cannot hide a restricted species", () => {
   assert.equal(forced.restricted, true);
   assert.equal(forced.affiliates_allowed, false);
   assert.equal(forced.pricing.kind, "free");
+  assert.ok(forced.legal_notice);
   for (const species of [
     "Panaeolus cyanescens",
     "Gymnopilus junonius",
@@ -106,6 +134,36 @@ test("a culinary label cannot hide a restricted species", () => {
     labeled.restricted = false;
     assert.equal(validateProfile(labeled).pack, "psilocybin", species);
   }
+});
+
+test("off-menu classifier catches short names, synonyms, hidden characters, and other fields", () => {
+  for (const [i, row] of OFFMENU_CASES.entries()) {
+    const labeled = structuredClone(load("data/profiles/culinary/pearl-oyster.json"));
+    labeled.id = `taxon-${i}`;
+    labeled.name = row.field === "name" ? row.value : "Garden mix";
+    labeled.species = row.field === "species" ? row.value : "Pleurotus ostreatus";
+    labeled.summary = row.field === "summary" ? row.value : labeled.summary;
+    labeled.notes = row.field === "notes" ? row.value : "";
+    labeled.tags = row.field === "tags" ? row.value : ["culinary"];
+    labeled.pack = "culinary";
+    labeled.restricted = false;
+    assert.equal(detectsRestrictedTaxon(labeled), true, `${row.field}=${row.value}`);
+    assert.equal(validateProfile(labeled).pack, "psilocybin", `${row.field}=${row.value}`);
+  }
+  const oyster = structuredClone(load("data/profiles/culinary/pearl-oyster.json"));
+  assert.equal(detectsRestrictedTaxon(oyster), false);
+  assert.equal(validateProfile(oyster).pack, "culinary");
+  const wine = structuredClone(load("data/profiles/culinary/wine-cap.json"));
+  assert.equal(detectsRestrictedTaxon(wine), false);
+});
+
+test("affiliate ids and urls must be safe https slugs", () => {
+  const pearl = structuredClone(load("data/profiles/culinary/pearl-oyster.json"));
+  pearl.affiliate_links = [{ id: `bags"><img src=x>`, label: "x", merchant: "x", url: "https://evil.example" }];
+  assert.throws(() => validateProfile(pearl), /Affiliate ids/);
+  const badUrl = structuredClone(load("data/profiles/culinary/pearl-oyster.json"));
+  badUrl.affiliate_links = [{ id: "bags", label: "x", merchant: "x", url: "javascript:alert(1)" }];
+  assert.throws(() => validateProfile(badUrl), /https/);
 });
 
 test("psilocybin pack rejects payments and affiliates", () => {

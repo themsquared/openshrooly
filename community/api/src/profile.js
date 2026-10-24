@@ -8,6 +8,7 @@ export {
   isPaid,
   isHttpsSourceUrl,
   httpsSourceHref,
+  stripCommunityAffiliates,
   validateProfile,
   validateLightRecipe,
   collectProfileIssues,

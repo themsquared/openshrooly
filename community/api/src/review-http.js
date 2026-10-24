@@ -1,7 +1,7 @@
 /** Review, photo, and moderator HTTP routes. */
 
 import { requireVerified, userFromRequest } from "./auth.js";
-import { validateProfile, ValidationError } from "./profile.js";
+import { stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
 import {
   approveReview,
   canSeePhoto,
@@ -78,10 +78,16 @@ export async function handleReview(method, path, url, request, env, { seeds, par
       const row = await db.one("SELECT * FROM profiles WHERE id=?", [review.profile_id]);
       if (!row) continue;
       const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [review.profile_id]);
+      const queued = parseProfileRow(row);
       items.push({
         id: review.profile_id,
-        profile: parseProfileRow(row),
+        profile: queued,
         review: reviewView(review, photos),
+        affiliate_links: (queued.affiliate_links || []).map((link) => ({
+          id: link.id,
+          label: link.label,
+          url: link.url,
+        })),
       });
     }
     return json({ items });
@@ -107,6 +113,14 @@ export async function handleReview(method, path, url, request, env, { seeds, par
       photoId,
       profileId,
     ]);
+    if (isModerator(user)) {
+      await logModeration(db, {
+        profileId,
+        actorId: user.id,
+        action: "photo_delete",
+        reason: Number(row.author_id) === Number(user.id) ? "owner" : "moderator",
+      });
+    }
     return json({ ok: true });
   }
 
@@ -218,10 +232,10 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const existing = await db.one("SELECT * FROM profiles WHERE id=?", [id]);
     if (!existing) return json({ error: "profile not found" }, 404);
     if (Number(existing.author_id) !== Number(user.id)) return json({ error: "forbidden" }, 403);
-    const profile = validateProfile(await readJson(request));
+    const profile = validateProfile(stripCommunityAffiliates(await readJson(request)));
     if (profile.id !== id) throw new ValidationError("profile id cannot change");
     profile.author = user.username;
-    await upsertProfile(db, profile, user.id, { published: Number(existing.published) });
+    await upsertProfile(db, profile, user, { published: Number(existing.published) });
     const bodyTitle = profile.name;
     const bodyDesc = profile.summary;
     await maybeResetOnPublicEdit(db, profile, { title: bodyTitle, description: bodyDesc });

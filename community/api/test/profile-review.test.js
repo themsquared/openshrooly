@@ -382,6 +382,140 @@ test("a stranger cannot delete another user's profile photo", async () => {
   assert.equal(Number(still.withdrawn), 0);
 });
 
+test("a signed-in user cannot overwrite official or another user's profile", async () => {
+  const ctx = testEnv();
+  const mallory = await register(ctx, "mallory@example.com");
+  const alice = await register(ctx, "alice-ow@example.com");
+  const official = draftFrom(pearl, "beech-shimeji");
+  official.name = "PWNED official";
+  const stealOfficial = await call(ctx, "POST", "/api/profiles", { token: mallory.token, body: official });
+  assert.equal(stealOfficial.status, 409);
+  const stillOfficial = await call(ctx, "GET", "/api/profiles/beech-shimeji");
+  assert.equal(stillOfficial.status, 200);
+  assert.notEqual(stillOfficial.data.profile.name, "PWNED official");
+  const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(list.data.some((p) => p.id === "beech-shimeji"), true);
+  const aliceDoc = draftFrom(pearl, "alice-live");
+  await call(ctx, "POST", "/api/profiles", { token: alice.token, body: aliceDoc });
+  const stealAlice = draftFrom(pearl, "alice-live");
+  stealAlice.name = "PWNED alice";
+  const steal = await call(ctx, "POST", "/api/profiles", { token: mallory.token, body: stealAlice });
+  assert.equal(steal.status, 409);
+  const mine = await call(ctx, "GET", "/api/profiles/alice-live", { token: alice.token });
+  assert.equal(mine.data.profile.name, aliceDoc.name);
+  const hubOfficial = await call(ctx, "POST", "/api/hub/push", {
+    token: mallory.token,
+    body: { profiles: [draftFrom(pearl, "button-cremini")] },
+  });
+  assert.equal(hubOfficial.status, 409);
+  const hubAlice = await call(ctx, "POST", "/api/hub/push", {
+    token: mallory.token,
+    body: { profiles: [draftFrom(pearl, "alice-live")] },
+  });
+  assert.equal(hubAlice.status, 409);
+});
+
+test("go and checkout use the approved snapshot for strangers", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "go-owner@example.com");
+  const stranger = await register(ctx, "go-stranger@example.com");
+  const mod = await makeModerator(ctx, "go-mod@example.com");
+  const doc = draftFrom(pearl, "go-oyster");
+  await call(ctx, "POST", "/api/profiles", { token: owner.token, body: doc });
+  await call(ctx, "POST", "/api/profiles/go-oyster/photos", {
+    token: owner.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/go-oyster/publish", {
+    token: owner.token,
+    body: { title: "Go oyster", description: "Public snapshot" },
+  });
+  await call(ctx, "POST", "/api/moderation/go-oyster/approve", { token: mod.token, body: {} });
+  const review = await ctx.db.one("SELECT * FROM profile_review WHERE profile_id=?", ["go-oyster"]);
+  const live = JSON.parse(review.live_document);
+  live.affiliate_links = [{ id: "bags", label: "Bags", merchant: "x", url: "https://good.example/bags" }];
+  live.affiliates_allowed = true;
+  review.live_document = JSON.stringify(live);
+  const row = await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["go-oyster"]);
+  const working = JSON.parse(row.document);
+  working.affiliate_links = [{ id: "bags", label: "Bags", merchant: "x", url: "https://evil.example/phish" }];
+  working.affiliates_allowed = true;
+  working.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  working.allowed_payment_providers = ["stripe"];
+  row.document = JSON.stringify(working);
+  const go = await call(ctx, "GET", "/api/go/go-oyster/bags");
+  assert.equal(go.status, 302);
+  assert.equal(go.headers.get("location"), "https://good.example/bags");
+  const checkout = await call(ctx, "POST", "/api/profiles/go-oyster/checkout", { token: stranger.token, body: {} });
+  assert.equal(checkout.status, 400);
+  assert.match(checkout.data.error, /free/i);
+});
+
+test("grow report photos are sanitized and stay private until approved", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "rep-owner@example.com");
+  const stranger = await register(ctx, "rep-stranger@example.com");
+  const html = new TextEncoder().encode("<html>payload</html>");
+  const clean = jpeg({ exif: true, gps: "GPSLatitude" });
+  const poly = new Uint8Array(clean.length + html.length);
+  poly.set(clean);
+  poly.set(html, clean.length);
+  const report = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+    token: owner.token,
+    body: { outcome: "success", photo_base64: b64(poly), photo_type: "text/html", photo_ext: "html" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  assert.match(report.data.photo_key, /^profile-photos\/pending\//);
+  const media = await call(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(media.status, 404);
+  const stored = await ctx.storage.get(report.data.photo_key);
+  const text = new TextDecoder("latin1").decode(stored.bytes);
+  assert.doesNotMatch(text, /<html>|payload|GPSLatitude|Exif/);
+  const publicView = await call(ctx, "GET", "/api/profiles/pearl-oyster", { token: stranger.token });
+  assert.equal(publicView.data.reports.some((r) => r.photo_url), false);
+});
+
+test("moderators can take down an official profile", async () => {
+  const ctx = testEnv();
+  const mod = await makeModerator(ctx, "td-official@example.com");
+  const down = await call(ctx, "POST", "/api/moderation/button-cremini/takedown", {
+    token: mod.token,
+    body: { reason: "Official copy needs a pause" },
+  });
+  assert.equal(down.status, 200, JSON.stringify(down.data));
+  const publicGet = await call(ctx, "GET", "/api/profiles/button-cremini");
+  assert.equal(publicGet.status, 404);
+  const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(list.data.some((p) => p.id === "button-cremini"), false);
+});
+
+test("community profiles drop author affiliate links and show leftovers in the queue", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "aff-owner@example.com");
+  const mod = await makeModerator(ctx, "aff-mod@example.com");
+  const doc = draftFrom(pearl, "aff-oyster");
+  doc.affiliate_links = [{ id: "bags", label: "Bags", merchant: "x", url: "https://evil.example/bags" }];
+  const created = await call(ctx, "POST", "/api/profiles", { token: owner.token, body: doc });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  assert.deepEqual(created.data.affiliate_links, []);
+  await call(ctx, "POST", "/api/profiles/aff-oyster/photos", {
+    token: owner.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/aff-oyster/publish", {
+    token: owner.token,
+    body: { title: "Aff oyster", description: "No commerce" },
+  });
+  const row = await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["aff-oyster"]);
+  const working = JSON.parse(row.document);
+  working.affiliate_links = [{ id: "bags", label: "Bags", merchant: "x", url: "https://evil.example/bags" }];
+  row.document = JSON.stringify(working);
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.id === "aff-oyster");
+  assert.ok(item);
+  assert.equal(item.affiliate_links[0].url, "https://evil.example/bags");
+});
+
 test("miniflare R2 stores processed photos", async () => {
   const mf = new Miniflare({
     modules: true,

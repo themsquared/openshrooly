@@ -244,7 +244,7 @@ async function renderProfile() {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
       data.links
-        .map((l) => `<li><a href="${apiBase()}/api/go/${id}/${l.id}">${escapeHtml(l.label)}</a></li>`)
+        .map((l) => `<li><a href="${escapeHtml(apiBase())}/api/go/${encodeURIComponent(id)}/${encodeURIComponent(l.id)}">${escapeHtml(l.label)}</a></li>`)
         .join("") +
       "</ul>";
   }
@@ -628,6 +628,13 @@ async function renderModerate() {
               <h2>${escapeHtml(r.title || p.name)}</h2>
               <p>${escapeHtml(r.description || p.summary || "")}</p>
               <p class="muted">${escapeHtml(p.species || "")}</p>
+              ${
+                (item.affiliate_links || []).length
+                  ? `<p class="notice">Affiliate links: ${item.affiliate_links
+                      .map((link) => `${escapeHtml(link.label || link.id)} (${escapeHtml(link.url || "")})`)
+                      .join("; ")}</p>`
+                  : ""
+              }
               ${thumbs.length ? `<div class="pb-photos">${thumbs.join("")}</div>` : ""}
               <label>Reason <input id="reason-${escapeHtml(p.id)}" placeholder="Required to reject or ask for changes"></label>
               <p class="pb-actions">

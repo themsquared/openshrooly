@@ -72,6 +72,10 @@ function concat(chunks) {
   return out;
 }
 
+function isRestartMarker(marker) {
+  return marker >= 0xd0 && marker <= 0xd7;
+}
+
 export function stripJpeg(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new ValidationError("That JPEG is damaged.");
   const out = [new Uint8Array([0xff, 0xd8])];
@@ -80,38 +84,46 @@ export function stripJpeg(bytes) {
   let height = 0;
   while (i < bytes.length) {
     if (bytes[i] !== 0xff) throw new ValidationError("That JPEG is damaged.");
+    while (i + 1 < bytes.length && bytes[i] === 0xff && bytes[i + 1] === 0xff) i += 1;
+    if (i + 1 >= bytes.length) break;
     const marker = bytes[i + 1];
     if (marker === 0xd9) {
       out.push(bytes.slice(i, i + 2));
       break;
     }
     if (marker === 0xda) {
+      if (i + 4 > bytes.length) throw new ValidationError("That JPEG is damaged.");
       const headerLen = 2 + readU16(bytes, i + 2);
-      if (headerLen < 8 || i + headerLen >= bytes.length) throw new ValidationError("That JPEG is damaged.");
-      let j = i + headerLen;
-      let found = false;
-      while (j < bytes.length - 1) {
-        if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
-          out.push(bytes.slice(i, j + 2));
-          found = true;
-          break;
-        }
-        if (bytes[j] === 0xff && bytes[j + 1] === 0x00) {
-          j += 2;
+      if (headerLen < 8 || i + headerLen > bytes.length) throw new ValidationError("That JPEG is damaged.");
+      out.push(bytes.slice(i, i + headerLen));
+      i += headerLen;
+      const entropyStart = i;
+      while (i < bytes.length) {
+        if (bytes[i] !== 0xff) {
+          i += 1;
           continue;
         }
-        j += 1;
+        if (i + 1 >= bytes.length) break;
+        const next = bytes[i + 1];
+        if (next === 0x00 || isRestartMarker(next)) {
+          i += 2;
+          continue;
+        }
+        out.push(bytes.slice(entropyStart, i));
+        break;
       }
-      if (!found) throw new ValidationError("That JPEG is damaged.");
-      break;
+      if (i >= bytes.length) out.push(bytes.slice(entropyStart, i));
+      continue;
     }
-    if (marker === 0xd0 || marker === 0xd1 || marker === 0xd2 || marker === 0xd3 || marker === 0xd4 || marker === 0xd5 || marker === 0xd6 || marker === 0xd7 || marker === 0x01) {
+    if (isRestartMarker(marker) || marker === 0x01) {
       out.push(bytes.slice(i, i + 2));
       i += 2;
       continue;
     }
+    if (i + 4 > bytes.length) throw new ValidationError("That JPEG is damaged.");
     const len = readU16(bytes, i + 2);
     const end = i + 2 + len;
+    if (end > bytes.length) throw new ValidationError("That JPEG is damaged.");
     const isApp = marker >= 0xe0 && marker <= 0xef;
     const isCom = marker === 0xfe;
     if (!isApp && !isCom) {
@@ -157,43 +169,59 @@ export function stripPng(bytes) {
   return { bytes: concat(out), width, height, contentType: PHOTO_TYPES.png };
 }
 
+const WEBP_FLAG_XMP = 0x04;
+const WEBP_FLAG_ANIM = 0x02;
+const WEBP_FLAG_EXIF = 0x08;
+const WEBP_FLAG_ALPHA = 0x10;
+const WEBP_FLAG_ICC = 0x20;
+
 export function stripWebp(bytes) {
   if (sniffImage(bytes) !== "webp") throw new ValidationError("That WebP is damaged.");
-  const chunks = [];
+  const parsed = [];
   let i = 12;
-  let width = 0;
-  let height = 0;
+  let hasAlpha = false;
   while (i + 8 <= bytes.length) {
     const type = String.fromCharCode(bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]);
     const len = readU32(bytes, i + 4, true) >>> 0;
     const start = i;
     const dataEnd = i + 8 + len;
     const end = dataEnd + (len % 2);
-    const keep = new Set(["VP8 ", "VP8L", "VP8X", "ALPH"]);
-    if (!keep.has(type)) {
-      i = end;
-      continue;
+    if (type === "ANIM" || type === "ANMF") throw new ValidationError("Animated WebP photos are not allowed.");
+    if (type === "VP8X" && bytes[i + 8] & WEBP_FLAG_ANIM) {
+      throw new ValidationError("Animated WebP photos are not allowed.");
     }
-    if (type === "VP8X") {
-      width = 1 + (bytes[i + 12] | (bytes[i + 13] << 8) | (bytes[i + 14] << 16));
-      height = 1 + (bytes[i + 15] | (bytes[i + 16] << 8) | (bytes[i + 17] << 16));
-      const flags = bytes[i + 8] & ~0x08 & ~0x10;
-      const copy = bytes.slice(start, Math.min(end, bytes.length));
+    if (type === "ALPH") hasAlpha = true;
+    parsed.push({ type, start, end });
+    i = end;
+  }
+  const keep = new Set(["VP8 ", "VP8L", "VP8X", "ALPH"]);
+  const chunks = [];
+  let width = 0;
+  let height = 0;
+  for (const chunk of parsed) {
+    if (!keep.has(chunk.type)) continue;
+    const start = chunk.start;
+    if (chunk.type === "VP8X") {
+      width = 1 + (bytes[start + 12] | (bytes[start + 13] << 8) | (bytes[start + 14] << 16));
+      height = 1 + (bytes[start + 15] | (bytes[start + 16] << 8) | (bytes[start + 17] << 16));
+      let flags = bytes[start + 8] & ~WEBP_FLAG_XMP & ~WEBP_FLAG_EXIF & ~WEBP_FLAG_ICC & ~WEBP_FLAG_ANIM;
+      if (hasAlpha) flags |= WEBP_FLAG_ALPHA;
+      else flags &= ~WEBP_FLAG_ALPHA;
+      const copy = bytes.slice(start, Math.min(chunk.end, bytes.length));
       copy[8] = flags;
       chunks.push(copy);
     } else {
-      if (type === "VP8 ") {
-        width = readU16(bytes, i + 14, true) & 0x3fff;
-        height = readU16(bytes, i + 16, true) & 0x3fff;
+      if (chunk.type === "VP8 ") {
+        width = readU16(bytes, start + 14, true) & 0x3fff;
+        height = readU16(bytes, start + 16, true) & 0x3fff;
       }
-      if (type === "VP8L") {
-        const bits = readU32(bytes, i + 9, true) >>> 0;
+      if (chunk.type === "VP8L") {
+        const bits = readU32(bytes, start + 9, true) >>> 0;
         width = (bits & 0x3fff) + 1;
         height = ((bits >> 14) & 0x3fff) + 1;
       }
-      chunks.push(bytes.slice(start, Math.min(end, bytes.length)));
+      chunks.push(bytes.slice(start, Math.min(chunk.end, bytes.length)));
     }
-    i = end;
   }
   if (width > PHOTO_MAX_EDGE || height > PHOTO_MAX_EDGE) {
     throw new ValidationError(`Photos must be ${PHOTO_MAX_EDGE} pixels or smaller on each side.`);

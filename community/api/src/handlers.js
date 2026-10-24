@@ -5,9 +5,11 @@ import {
   assertAffiliateAllowed,
   isFree,
   isPsilocybin,
+  stripCommunityAffiliates,
   validateProfile,
   ValidationError,
 } from "./profile.js";
+import { decodeBase64Photo, processPhoto } from "./photos.js";
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
@@ -31,6 +33,7 @@ import {
   requireVisibleRow,
   reviewView,
   saveDraftReview,
+  stashReportPhoto,
 } from "./review.js";
 
 const DISCLOSURE =
@@ -325,9 +328,9 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
-    const profile = validateProfile(await readJson(request));
+    const profile = validateProfile(stripCommunityAffiliates(await readJson(request)));
     profile.author = user.username;
-    await upsertProfile(db, profile, user.id, { published: 0 });
+    await upsertProfile(db, profile, user, { published: 0 });
     await saveDraftReview(db, profile);
     const review = await getReview(db, profile.id);
     return json({ ...profile, review: reviewView(review) }, 201);
@@ -376,8 +379,9 @@ async function route(method, path, url, request, env) {
       forked.affiliates_allowed = false;
       forked.affiliate_links = [];
     }
-    validateProfile(forked);
-    await upsertProfile(db, forked, user.id, { published: 0 });
+    const cleaned = validateProfile(stripCommunityAffiliates(forked));
+    Object.assign(forked, cleaned);
+    await upsertProfile(db, forked, user, { published: 0 });
     await saveDraftReview(db, forked);
     return json(forked, 201);
   }
@@ -393,13 +397,12 @@ async function route(method, path, url, request, env) {
     if (!["success", "partial", "fail"].includes(body.outcome)) throw new ValidationError("bad outcome");
     let photoKey = null;
     if (body.photo_base64) {
-      const raw = Uint8Array.from(atob(body.photo_base64), (c) => c.charCodeAt(0));
+      const raw = decodeBase64Photo(body.photo_base64);
       const caps = capabilities(env, request);
-      if (!caps.photos) {
-        photoKey = null;
+      if (caps.photos) {
+        photoKey = await stashReportPhoto(db, env, { profileId, raw });
       } else {
-        photoKey = `reports/${profileId}/${randomToken()}.${body.photo_ext || "jpg"}`;
-        await storage.put(photoKey, raw, body.photo_type || "image/jpeg");
+        processPhoto(raw);
       }
     }
     await db.run(
@@ -425,7 +428,7 @@ async function route(method, path, url, request, env) {
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
     const checkoutRow = await requireVisibleRow(db, user, decodeURIComponent(checkoutMatch[1]));
-    const profile = await requireProfile(db, checkoutRow.id);
+    const profile = await profileForAction(db, user, checkoutRow);
     if (isPsilocybin(profile)) {
       throw new ValidationError("Psilocybin pack is free-only. Card processors cannot be attached.");
     }
@@ -474,7 +477,7 @@ async function route(method, path, url, request, env) {
   if (goMatch && method === "GET") {
     const user = await userFromAuth(request, db);
     const goRow = await requireVisibleRow(db, user, decodeURIComponent(goMatch[1]));
-    const profile = await requireProfile(db, goRow.id);
+    const profile = await profileForAction(db, user, goRow);
     const link = affiliateLinksFor(profile).find((item) => item.id === decodeURIComponent(goMatch[2]));
     if (!link) return json({ error: "no affiliate link" }, 404);
     assertAffiliateAllowed(profile, link);
@@ -490,6 +493,7 @@ async function route(method, path, url, request, env) {
     const key = decodeURIComponent(mediaMatch[1]);
     const photo = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [key]);
     if (photo && !photoIsPublic(photo)) return json({ error: "not found" }, 404);
+    if (!photo && String(key).startsWith("reports/")) return json({ error: "not found" }, 404);
     const file = await storage.get(key);
     if (!file) return json({ error: "not found" }, 404);
     return new Response(file.bytes, { headers: { "content-type": file.contentType } });
@@ -518,14 +522,14 @@ async function route(method, path, url, request, env) {
     const payload = await readJson(request);
     let imported = 0;
     for (const item of payload.profiles || []) {
-      const profile = validateProfile(item);
+      const profile = validateProfile(stripCommunityAffiliates(item));
       if (isPsilocybin(profile)) {
         profile.affiliates_allowed = false;
         profile.affiliate_links = [];
         profile.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
         profile.allowed_payment_providers = [];
       }
-      await upsertProfile(db, profile, user.id, { published: 0 });
+      await upsertProfile(db, profile, user, { published: 0 });
       await saveDraftReview(db, profile);
       imported += 1;
     }
@@ -582,10 +586,17 @@ async function mintToken(db, userId, name) {
   return token;
 }
 
-async function upsertProfile(db, profile, authorId, { published = 0 } = {}) {
+async function upsertProfile(db, profile, user, { published = 0 } = {}) {
   const ts = nowIso();
+  const authorId = user?.id ?? user;
   const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
   if (existing) {
+    const official = existing.author_id == null;
+    const owner = Number(existing.author_id) === Number(authorId);
+    const staff = isModerator(user);
+    if ((official && !staff) || (!official && !owner && !staff)) {
+      throw new ValidationError("That profile id is already used.", 409);
+    }
     await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(profile), ts, profile.id]);
     return;
   }
@@ -593,6 +604,15 @@ async function upsertProfile(db, profile, authorId, { published = 0 } = {}) {
     "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
     [profile.id, JSON.stringify(profile), authorId, published, ts, ts]
   );
+}
+
+async function profileForAction(db, user, row) {
+  const working = parseProfile(row);
+  const review = await getReview(db, row.id);
+  const staff = isModerator(user) || (user && Number(user.id) === Number(row.author_id));
+  const doc = staff ? working : publicDocument(row, review, working);
+  if (!doc) throw new ValidationError("not found", 404);
+  return validateProfile(doc);
 }
 
 async function requireProfile(db, profileId) {
@@ -620,9 +640,17 @@ async function showProfile(request, db, env, profileId) {
     [profileId]
   );
   const avgRow = await db.one("SELECT AVG(stars) AS a FROM ratings WHERE profile_id=?", [profileId]);
-  const reports = (await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId])).map(
-    (report) => ({ ...report, photo_url: mediaUrl(env, report.photo_key) })
-  );
+  const staff = owner || (user && (user.role === "moderator" || user.role === "admin"));
+  const reportRows = await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId]);
+  const reports = [];
+  for (const report of reportRows) {
+    let photoUrl = null;
+    if (report.photo_key) {
+      const photo = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [report.photo_key]);
+      if (photoIsPublic(photo) || staff) photoUrl = mediaUrl(env, report.photo_key);
+    }
+    reports.push({ ...report, photo_url: photoUrl });
+  }
   const lockedDoc = unlocked
     ? profile
     : {
@@ -637,7 +665,6 @@ async function showProfile(request, db, env, profileId) {
       };
   const offMenu = isOffMenu(profile) || isPsilocybin(profile);
   const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profileId]);
-  const staff = owner || (user && (user.role === "moderator" || user.role === "admin"));
   return json({
     profile: {
       ...lockedDoc,

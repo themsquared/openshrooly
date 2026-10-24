@@ -168,11 +168,35 @@ test("scientific and common names force Off-menu even when labeled culinary", ()
   const oyster = blankProfile({ id: "still-oyster", name: "Pearl Oyster", pack: "culinary" });
   oyster.species = "Pleurotus ostreatus";
   assert.equal(detectsRestrictedTaxon(oyster), false);
-  for (const species of ["Panaeolus cyanescens", "Gymnopilus junonius", "Pluteus salicinus"]) {
+  for (const species of [
+    "P. cubensis",
+    "cubensis",
+    "Stropharia cubensis",
+    "Panaeolus cinctulus",
+    "Panaeolus subbalteatus",
+    "Panaeolus cyanescens",
+    "Copelandia",
+    "Gymnopilus junonius",
+    "Gymnopilus spectabilis",
+    "Pluteus salicinus",
+    "Inocybe aeruginascens",
+    "Conocybe cyanopus",
+    "Psilocybecubensis",
+  ]) {
     const labeled = blankProfile({ id: "taxon-check", name: "Garden mix", pack: "culinary" });
     labeled.species = species;
     assert.equal(detectsRestrictedTaxon(labeled), true, species);
   }
+  const hidden = blankProfile({ id: "hidden-taxon", name: "Garden mix", pack: "culinary" });
+  hidden.species = "Psilo\u00adcybe cubensis";
+  assert.equal(detectsRestrictedTaxon(hidden), true);
+  const cubes = blankProfile({ id: "cubes", name: "Psilocybin cubes", pack: "culinary" });
+  cubes.species = "Unknown garden mushroom";
+  assert.equal(detectsRestrictedTaxon(cubes), true);
+  const tagged = blankProfile({ id: "tagged", name: "Garden mix", pack: "culinary" });
+  tagged.species = "Pleurotus ostreatus";
+  tagged.tags = ["Psilocybin"];
+  assert.equal(detectsRestrictedTaxon(tagged), true);
 });
 
 test("list summaries with a stage count do not crash validation or clone", () => {
