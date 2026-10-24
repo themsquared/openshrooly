@@ -353,7 +353,7 @@ async function renderAccount() {
   const me = await api("/api/me");
   $("#who").textContent = me.user.email || me.user.username;
   $("#verified").textContent = me.user.email_verified
-    ? "Email verified. You can publish, buy, and claim devices."
+    ? "Email verified. You can publish and buy."
     : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
   $("#ents").innerHTML =
