@@ -25,6 +25,20 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 https://cdn.shroomlabs.io https://challenges.cloudflare.com; img-src 'self' data: https://cdn.shroomlabs.io; style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; font-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.shroomlabs.io http://127.0.0.1:8787"
 
+[[headers]]
+  for = "/install.html"
+  [headers.values]
+    # The installer loads ESP Web Tools from this site and hands it the checked
+    # image as an in-page blob. Nothing is loaded from other sites.
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' blob: https://api.shroomlabs.io; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+[[headers]]
+  for = "/firmware/*"
+  [headers.values]
+    # Release info must never be served stale from a cache.
+    Cache-Control = "no-cache"
+    X-Content-Type-Options = "nosniff"
+
 [[redirects]]
   from = "/profiles/:id"
   to = "/profile.html?id=:id"

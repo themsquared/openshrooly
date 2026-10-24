@@ -328,6 +328,11 @@ input[type="number"]:focus,
 .ota-message { margin-top: 8px; font-size: 14px; color: var(--sl-muted); }
 .ota-message.is-success { color: var(--sl-ok); }
 .ota-message.is-error { color: var(--sl-bad); }
+.update-install { margin-left: 8px; }
+.update-advanced { margin-top: 16px; }
+.update-advanced summary { cursor: pointer; font-size: 14px; color: var(--sl-muted); }
+.update-advanced[open] summary { margin-bottom: 8px; }
+@media (max-width: 480px) { .update-install { margin-left: 0; display: block; } }
 
 @media (max-width: 600px) {
   .connection-banner { flex-direction: column; align-items: stretch; }
@@ -412,7 +417,25 @@ input[type="number"]:focus,
   border-color: var(--sl-line-strong);
 }
 
-.card-icon { font-size: 36px; margin-bottom: 8px; }
+.card-icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 10px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1px solid var(--sl-line);
+  background: rgba(125, 255, 179, 0.06);
+  color: var(--sl-spore);
+}
+.card-temp .card-icon { color: var(--sl-heat); background: rgba(255, 138, 106, 0.08); }
+.card-humidity .card-icon { color: var(--sl-humid); background: rgba(94, 228, 255, 0.08); }
+.card-light .card-icon { color: var(--sl-mycelium); background: rgba(201, 164, 92, 0.1); }
+.card-water .card-icon { color: var(--sl-humid); background: rgba(94, 228, 255, 0.08); }
+.card-settings .card-icon { color: var(--sl-ink-dim); background: rgba(232, 243, 234, 0.05); }
+.card-value.card-value-text { font-size: 24px; letter-spacing: -0.01em; }
+.heading-icon { vertical-align: -3px; margin-right: 10px; color: var(--sl-spore); }
+.slider-icon svg { display: block; }
 
 .card-label {
   font-size: 11px;
@@ -1080,6 +1103,7 @@ input[type="range"]::-moz-range-thumb {
   .timeline-card { width: calc(100% - 24px); }
   .modal { padding: 22px; }
   .card-value { font-size: 30px; }
+  .card-value.card-value-text { font-size: 22px; }
 }
 
 /* Shroom Labs type: Atkinson for reading, Fraunces for headings. */

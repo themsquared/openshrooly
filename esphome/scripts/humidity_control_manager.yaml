@@ -204,7 +204,7 @@
 
       const float actual_humidity = raw_humidity;
       const std::string status = str_sprintf(
-        "%s — humidity %.1f%% (ctrl %.1f%%, band %.1f%%-%.1f%%)",
+        "%s, humidity %.1f%% (ctrl %.1f%%, band %.1f%%-%.1f%%)",
         id(humidifier_on_flag) ? "ON" : "OFF",
         actual_humidity,
         control_humidity,

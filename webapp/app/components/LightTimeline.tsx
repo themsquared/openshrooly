@@ -1,3 +1,5 @@
+import { scheduleText } from '../../lib/card-text'
+
 type LightTimelineProps = {
   sunrise: number
   sunset: number
@@ -6,10 +8,6 @@ type LightTimelineProps = {
   onClick?: () => void
 }
 
-function hourLabel(hour: number) {
-  const h = Math.floor(((hour % 24) + 24) % 24)
-  return `${h.toString().padStart(2, '0')}:00`
-}
 
 export default function LightTimeline({ sunrise, sunset, nowHour, lightsOn, onClick }: LightTimelineProps) {
   const wraps = sunrise > sunset
@@ -25,7 +23,7 @@ export default function LightTimeline({ sunrise, sunset, nowHour, lightsOn, onCl
           <div className="timeline-title">{lightsOn ? 'Photoperiod on' : 'Night cycle'}</div>
         </div>
         <div className="timeline-meta">
-          {hourLabel(sunrise)} → {hourLabel(sunset)}
+          {scheduleText(sunrise, sunset)}
         </div>
       </div>
       <div className="timeline-track" aria-hidden="true">

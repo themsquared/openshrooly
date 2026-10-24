@@ -44,7 +44,7 @@ function presetSummary(preset) {
 }
 
 /** Must match device_version in esphome/openshrooly.yaml (a test checks this). */
-const DEVICE_VERSION = "1.0.2";
+const DEVICE_VERSION = "1.0.3-sl.1";
 
 function connectionLabel(wifiMode) {
   const mode = String(wifiMode || "");
