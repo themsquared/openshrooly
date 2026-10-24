@@ -159,10 +159,33 @@
               text_color: paper_white
               text_font: font_ui
 
+    # Wi-Fi setup details. Shown only while the setup network is on.
+    - obj:
+        id: setup_overlay
+        x: 0
+        y: 20
+        width: 296
+        height: 86
+        bg_color: paper_white
+        border_width: 2
+        border_color: paper_black
+        radius: 0
+        pad_all: 0
+        hidden: true
+        widgets:
+          - label:
+              id: setup_overlay_text
+              text: ""
+              align: TOP_LEFT
+              x: 4
+              y: 3
+              text_font: font1
+              text_line_space: 3
+
     # Kept so apply_display_layout can skip it when flipping the panel.
     - label:
         id: main_status_message
-        text: "Join OpenShrooly, then 192.168.4.1"
+        text: ""
         align: TOP_LEFT
         x: 5
         y: 112

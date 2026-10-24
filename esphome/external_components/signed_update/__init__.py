@@ -92,6 +92,7 @@ async def to_code(config):
     cg.add(var.set_current_version(config[CONF_CURRENT_VERSION]))
     cg.add(var.set_product(config[CONF_PRODUCT]))
     cg.add(var.set_channel(config[CONF_CHANNEL]))
+    cg.add_define("USE_SIGNED_UPDATE")
     key = bytes.fromhex(config[CONF_PUBLIC_KEY])
     cg.add(var.set_public_key(cg.RawExpression("std::array<uint8_t, 32>{" + ", ".join(f"0x{b:02x}" for b in key) + "}")))
     for conf_key, setter in (

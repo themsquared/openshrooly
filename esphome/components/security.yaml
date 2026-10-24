@@ -1,0 +1,17 @@
+# Per-device passwords, web login for changes, and the Wi-Fi setup network.
+# See docs/SECURITY.md.
+device_security:
+  id: device_sec
+
+button:
+  # Turns on the Wi-Fi setup network (same as System menu, Wi-Fi setup).
+  - platform: template
+    name: "Start Wi-Fi setup"
+    icon: mdi:wifi-cog
+    id: start_wifi_setup
+    entity_category: config
+    on_press:
+      - lambda: 'id(device_sec)->enter_setup();'
+    web_server:
+      sorting_group_id: grp_hidden
+      sorting_weight: 2

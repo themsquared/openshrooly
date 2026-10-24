@@ -94,7 +94,7 @@
 
 ## WiFi Configuration
 
-- Creates AP "OpenShrooly" at 192.168.4.1 when not connected
+- Creates the WPA2 setup network "OpenShrooly-XXXX" at 192.168.4.1 only while Wi-Fi setup is on (password on the screen, see docs/SECURITY.md)
 - Supports station mode for home network connection
 - Captive portal for easy setup
 

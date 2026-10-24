@@ -67,7 +67,10 @@ static const char *rollback_support() {
   return "not reported";
 }
 
+SignedUpdate *global_signed_update = nullptr;  // NOLINT
+
 void SignedUpdate::setup() {
+  global_signed_update = this;
   if (this->installed_sensor_ != nullptr)
     this->installed_sensor_->publish_state(this->current_version_);
   if (esp_ota_get_last_invalid_partition() != nullptr) {

@@ -44,7 +44,7 @@ function presetSummary(preset) {
 }
 
 /** Must match device_version in esphome/openshrooly.yaml (a test checks this). */
-const DEVICE_VERSION = "1.0.3-sl.1";
+const DEVICE_VERSION = "1.0.3-sl.2";
 
 function connectionLabel(wifiMode) {
   const mode = String(wifiMode || "");
@@ -78,7 +78,7 @@ function firstRunSteps(state) {
   if (state === "unreachable") {
     return {
       title: "Cannot reach the chamber",
-      body: "Make sure you are on the same Wi-Fi as the chamber. If the chamber is in setup mode, join the OpenShrooly Wi-Fi network and open 192.168.4.1.",
+      body: "Make sure you are on the same Wi-Fi as the chamber. If Wi-Fi setup is on, join the network shown on the chamber screen and open 192.168.4.1.",
       action: "retry",
     };
   }

@@ -196,9 +196,15 @@
             id(current_ui_page) = PAGE_MENU;
             id(page_just_changed) = true;
           } else if (button == 4) {
-            id(settings_selection) = (id(settings_selection) + 1) % 2;
+            id(settings_selection) = (id(settings_selection) + 1) % 3;
           } else if (button == 2 || button == 3) {
-            if (id(settings_selection) == 0) {
+            if (id(settings_selection) == 2) {
+              if (id(device_sec)->in_setup()) {
+                id(device_sec)->exit_setup();
+              } else {
+                id(device_sec)->enter_setup();
+              }
+            } else if (id(settings_selection) == 0) {
               static const char *const TIMEZONES[] = {
                 "America/Los_Angeles",
                 "America/Denver",
@@ -629,24 +635,25 @@
                          ? std::string("On")
                          : std::string("Off");
           - lvgl.label.update:
-              id: system_voltage_value
+              id: system_setup_marker
               text: !lambda |-
-                char value[16];
-                if (id(vbus_voltage).has_state()) {
-                  snprintf(value, sizeof(value), "%.2fV", id(vbus_voltage).state);
-                } else {
-                  snprintf(value, sizeof(value), "--.--V");
-                }
-                return std::string(value);
+                return id(settings_selection) == 2
+                         ? std::string(">")
+                         : std::string(" ");
           - lvgl.label.update:
-              id: system_ssid_value
+              id: system_setup_value
               text: !lambda |-
-                const std::string ssid = id(wifi_ssid).state;
-                if (ssid.empty()) return id(wifi_mode).state;
-                return ssid.size() > 24 ? ssid.substr(0, 24) : ssid;
+                return id(device_sec)->in_setup()
+                         ? std::string("On")
+                         : std::string("Off");
           - lvgl.label.update:
               id: system_ip_value
-              text: !lambda 'return id(ip_address).state;'
+              text: !lambda |-
+                const std::string ip = id(ip_address).state;
+                return ip.empty() ? std::string("--") : ip;
+          - lvgl.label.update:
+              id: system_web_password_value
+              text: !lambda 'return id(device_sec)->web_password();'
 
     - delay: 25ms
     - component.update: my_display

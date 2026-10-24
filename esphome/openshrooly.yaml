@@ -1,5 +1,5 @@
 substitutions:
-  device_version: "1.0.3-sl.1"
+  device_version: "1.0.3-sl.2"
 
 esphome:
   name: openshrooly
@@ -95,9 +95,11 @@ logger:
 
 api:
   reboot_timeout: 0s
+  # Each chamber makes its own key on first boot. See docs/SECURITY.md.
+  encryption: {}
 
-ota:
-  platform: esphome
+# No "ota: platform: esphome": it installs files without checking who made them.
+# Updates come through the web page (signed files only) or USB.
 
 # Listed deviations from grahamsz/openshrooly: recovery after a bad OTA,
 # and USB serial Wi-Fi provisioning for the browser installer.
@@ -112,8 +114,11 @@ external_components:
 # LVGL is now a native component in ESPHome 2024.8.0+
 
 wifi:
+  # The setup network only runs in Wi-Fi setup mode, with this chamber's own
+  # name and password (set by device_security). It never starts by itself
+  # when the home network drops.
   ap:
-    ssid: "OpenShrooly"
+    ap_timeout: 0s
     manual_ip:
       static_ip: 192.168.4.1
       gateway: 192.168.4.1
@@ -127,7 +132,11 @@ wifi:
 
   on_disconnect:
     then:
-      - script.execute: wifi_ap_bounce
+      - if:
+          condition:
+            lambda: 'return id(device_sec)->in_setup();'
+          then:
+            - script.execute: wifi_ap_bounce
 
 captive_portal:
 
@@ -180,7 +189,7 @@ interval:
       - lambda: |-
           const uint32_t now = millis();
 
-          if (wifi::global_wifi_component->is_connected()) {
+          if (wifi::global_wifi_component->is_connected() || !id(device_sec)->in_setup()) {
             return;
           }
 
@@ -249,4 +258,5 @@ script: !include_dir_merge_list scripts/
 # '<<' merge, so its buttons and switch are added to the existing lists.
 packages:
   updates: !include components/updates.yaml
+  security: !include components/security.yaml
   daily_range: !include components/daily_range.yaml

@@ -393,7 +393,7 @@ export default function Dashboard() {
           }, 5000)
         } else {
           setOtaStatus('error')
-          setOtaMessage('The chamber did not accept this file. Check that it is an OpenShrooly update and try again.')
+          setOtaMessage('The chamber did not accept this file. Only signed Shroom Labs releases (files ending in .signed.bin) can be installed here.')
         }
       })
 
@@ -1768,7 +1768,7 @@ export default function Dashboard() {
                   <div className="control-group">
                     <label>Install from a file on this computer</label>
                     <div className="control-help">
-                      For recovery only. Files installed this way are not checked for the Shroom Labs signature, so use only files you trust.
+                      Only signed Shroom Labs releases are accepted here: the file ending in .signed.bin from shroomlabs.io. To install anything else, use a USB cable.
                     </div>
                     <input
                       type="file"
@@ -1808,6 +1808,13 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )}
+                  </div>
+                  <div className="control-group">
+                    <label>Passwords and Home Assistant key</label>
+                    <div className="control-help">
+                      Anyone on your home network can view this page. Changing settings asks you to log in: the user name is admin and the password is on the chamber screen under Menu, System.{' '}
+                      <a href="/security">Show this chamber&apos;s passwords and Home Assistant key</a>
+                    </div>
                   </div>
                 </details>
               </div>

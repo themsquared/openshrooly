@@ -7,6 +7,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "update_logic.h"
 
 namespace esphome {
 namespace signed_update {
@@ -49,6 +50,12 @@ class SignedUpdate : public Component {
 
   void set_allow_older(bool allow) { this->allow_older_ = allow; }
   void check();
+  // Checks an image uploaded on the local network against the release key (see update_logic.h).
+  bool lan_image_valid(const uint8_t *block, size_t len, uint32_t size, const std::string &sha256_hex,
+                       std::string *version) const {
+    return signed_update::lan_image_valid(this->public_key_.data(), this->product_, this->channel_,
+                                          this->download_prefix_, block, len, size, sha256_hex, version);
+  }
   void install();
 
  protected:
@@ -87,6 +94,8 @@ class SignedUpdate : public Component {
   std::string message_;
   std::string available_;
 };
+
+extern SignedUpdate *global_signed_update;  // NOLINT
 
 }  // namespace signed_update
 }  // namespace esphome
