@@ -2,9 +2,17 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { api } from '../lib/esphome-api'
+import {
+  applyPresetWrites,
+  deviceSurfaceState,
+  entityPatchFromWrites,
+} from '../lib/setup-state'
+import type { GrowPreset } from '../lib/setup-state'
 import LiveGauge from './components/LiveGauge'
 import LightTimeline from './components/LightTimeline'
 import ProfileStrip from './components/ProfileStrip'
+import ConnectionBanner from './components/ConnectionBanner'
+import FirstRun from './components/FirstRun'
 import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
 import type { EntityState } from './entity-types'
 
@@ -38,6 +46,11 @@ export default function Dashboard() {
   const [otaStatus, setOtaStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
   const [otaMessage, setOtaMessage] = useState<string>('')
   const [demoMode, setDemoMode] = useState(false)
+  const [reachable, setReachable] = useState<boolean | undefined>(undefined)
+  const [lastError, setLastError] = useState('')
+  const [applyingPreset, setApplyingPreset] = useState(false)
+  const [wifiMode, setWifiMode] = useState('')
+  const [wifiSsid, setWifiSsid] = useState('')
 
   // Track humidity values during drag to avoid stale state issues
   const humidityDragValues = useRef<{ target: number; hysteresis: number }>({ target: 70, hysteresis: 2 })
@@ -49,32 +62,75 @@ export default function Dashboard() {
     if (isDemo) {
       setDemoMode(true)
       setEntities(DEMO_ENTITIES)
+      setReachable(true)
+      setLastError('')
       setLoading(false)
       return
     }
 
     const fetchData = async () => {
+      let ok = false
       try {
         const numbers = await api.getAllNumbers()
-        setEntities((prev) => ({ ...prev, ...numbers }))
+        if (Object.keys(numbers).length) {
+          setEntities((prev) => ({ ...prev, ...numbers }))
+          ok = true
+        }
       } catch (e) {
-        // Ignore errors during initial fetch - EventSource will populate data
+        setLastError('Could not read setpoints')
+      }
+
+      try {
+        const grow = await api.getGrowCaption()
+        setEntities((prev) => ({
+          ...prev,
+          ...(grow.phase ? { 'select-grow_phase': { state: grow.phase, value: grow.phase } } : {}),
+          ...(grow.day != null ? { 'number-grow_day': { state: String(grow.day), value: grow.day } } : {}),
+          ...(grow.total != null ? { 'number-grow_days_total': { state: String(grow.total), value: grow.total } } : {}),
+        }))
+        if (grow.phase || grow.day != null) ok = true
+      } catch (e) {
+        // Caption is optional until Ship 5a firmware is flashed
+      }
+
+      try {
+        const wifi = await api.getWifiStatus()
+        if (wifi.mode) setWifiMode(String(wifi.mode))
+        if (wifi.ssid) setWifiSsid(String(wifi.ssid))
+        setEntities((prev) => ({
+          ...prev,
+          ...(wifi.mode ? { 'text_sensor-wifi_mode': { state: wifi.mode, value: wifi.mode } } : {}),
+          ...(wifi.ssid ? { 'text_sensor-wifi_ssid': { state: wifi.ssid, value: wifi.ssid } } : {}),
+          ...(wifi.ip ? { 'text_sensor-ip_address': { state: wifi.ip, value: wifi.ip } } : {}),
+        }))
+        if (wifi.mode || wifi.ssid) ok = true
+      } catch (e) {
+        // Wi-Fi text sensors still arrive over /events
       }
 
       try {
         const tz = await api.getSelect('timezone')
-        if (tz?.state) setTimezone(tz.state)
+        if (tz?.state) {
+          setTimezone(tz.state)
+          ok = true
+        }
       } catch (e) {
         // Ignore errors during initial fetch - EventSource will populate data
       }
 
       try {
         const flip = await api.getSwitch('flip_screen')
-        if (flip) setFlipScreen(flip.state === 'ON' || flip.value === true)
+        if (flip) {
+          setFlipScreen(flip.state === 'ON' || flip.value === true)
+          ok = true
+        }
       } catch (e) {
         // Ignore errors during initial fetch - EventSource will populate data
       }
 
+      setReachable(ok)
+      if (!ok) setLastError((prev) => prev || 'Cannot reach the chamber')
+      else setLastError('')
       setLoading(false)
     }
 
@@ -82,6 +138,8 @@ export default function Dashboard() {
 
     const handleEvent = (event: any) => {
       if (event.id) {
+        setReachable(true)
+        setLastError('')
         setEntities((prev) => ({
           ...prev,
           [event.id]: {
@@ -102,6 +160,12 @@ export default function Dashboard() {
         if (event.id === 'switch-flip_screen') {
           setFlipScreen(event.state === 'ON' || event.value === true)
         }
+        if (event.id === 'text_sensor-wifi_mode' && event.state) setWifiMode(event.state)
+        if (event.id === 'text_sensor-wifi_ssid' && event.state) setWifiSsid(event.state)
+        if (event.id === 'select-grow_phase' || event.id === 'number-grow_day' || event.id === 'number-grow_days_total') {
+          setReachable(true)
+          setLastError('')
+        }
       }
     }
 
@@ -114,7 +178,10 @@ export default function Dashboard() {
 
     const connectEvents = () => {
       if (document.visibilityState === 'visible' && !eventSource) {
-        eventSource = api.subscribeToEvents(handleEvent)
+        eventSource = api.subscribeToEvents(handleEvent, () => {
+          setReachable((prev) => (prev === true ? prev : false))
+          setLastError((prev) => prev || 'Lost the live connection')
+        })
       }
     }
 
@@ -137,6 +204,21 @@ export default function Dashboard() {
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer))
     }
   }, [])
+
+  const applyPreset = async (preset: GrowPreset) => {
+    if (applyingPreset) return
+    setApplyingPreset(true)
+    const writes = applyPresetWrites(preset)
+    const ok = demoMode ? true : await api.applyWrites(writes)
+    if (ok) {
+      setEntities((prev) => ({ ...prev, ...entityPatchFromWrites(writes) }))
+      setLastError('')
+      setReachable(true)
+    } else {
+      setLastError('The chamber did not accept the grow caption')
+    }
+    setApplyingPreset(false)
+  }
 
   const handleNumberChange = useCallback((id: string, value: number) => {
     setEntities((prev) => ({
@@ -566,11 +648,41 @@ export default function Dashboard() {
   // Helper to get alert values
   const getAlert = (id: string) => entities[`binary_sensor-alert__${id}`]?.value === true
 
+  const growPhase = String(entities['select-grow_phase']?.state || entities['select-grow_phase']?.value || '')
+  const growDayValue = parseFloat((getNumber('grow_day') || getSensor('grow_day') || '') as string)
+  const growTotalValue = parseFloat((getNumber('grow_days_total') || getSensor('stage_days') || '') as string)
+  const wifiModeValue = wifiMode || String(entities['text_sensor-wifi_mode']?.state || '')
+  const wifiSsidValue = wifiSsid || String(entities['text_sensor-wifi_ssid']?.state || '')
+  const surface = demoMode
+    ? 'ready'
+    : deviceSurfaceState({
+        wifiMode: wifiModeValue,
+        ssid: wifiSsidValue,
+        phase: growPhase,
+        totalDays: growTotalValue,
+        reachable,
+        lastError,
+      })
+
   if (loading) {
     return (
       <div className="loading-screen">
         <div className="spinner"></div>
         <div>Connecting to chamber…</div>
+      </div>
+    )
+  }
+
+  if (surface === 'unreachable') {
+    return (
+      <div className="dashboard">
+        <div className="loading-screen">
+          <ConnectionBanner
+            state="unreachable"
+            ssid={wifiSsidValue}
+            onRetry={() => window.location.reload()}
+          />
+        </div>
       </div>
     )
   }
@@ -591,9 +703,9 @@ export default function Dashboard() {
   const co2Raw = getSensor('co2') ?? getSensor('co2_ppm') ?? getSensor('carbon_dioxide')
   const co2 = co2Raw == null || co2Raw === '' ? null : parseFloat(co2Raw as string)
   const profileName = String(entities['text_sensor-current_profile']?.state || entities['text_sensor-current_profile']?.value || '')
-  const stageName = String(entities['text_sensor-current_stage']?.state || entities['text_sensor-current_stage']?.value || '')
-  const growDay = parseFloat((getSensor('grow_day') || '') as string)
-  const stageDays = parseFloat((getSensor('stage_days') || '') as string)
+  const stageName = growPhase || String(entities['text_sensor-current_stage']?.state || entities['text_sensor-current_stage']?.value || '')
+  const growDay = growDayValue
+  const stageDays = growTotalValue
 
   // Temperature control values
   const tempControlEnabled = entities['switch-temperature_control_enabled']?.state === 'ON' || entities['switch-temperature_control_enabled']?.value === true
@@ -662,10 +774,19 @@ export default function Dashboard() {
         </h1>
         <div className="header-right">
           {demoMode && <span className="demo-chip">Demo</span>}
-          <span className="live-dot" aria-hidden="true" />
+          {surface === 'first-run-wifi' && <span className="demo-chip">Setup</span>}
+          <span className={`live-dot${surface === 'first-run-wifi' ? ' is-setup' : ''}`} aria-hidden="true" />
           <div className="header-time">{lastUpdate.toLocaleTimeString()}</div>
         </div>
       </div>
+
+      <ConnectionBanner
+        state={surface}
+        ssid={wifiSsidValue}
+        onRetry={() => window.location.reload()}
+      />
+
+      <FirstRun state={surface} applying={applyingPreset} onApply={applyPreset} />
 
       {alerts.length > 0 && (
         <div className="alerts-banner">
@@ -729,7 +850,7 @@ export default function Dashboard() {
         stage={stageName || undefined}
         day={Number.isFinite(growDay) ? growDay : undefined}
         stageDays={Number.isFinite(stageDays) ? stageDays : undefined}
-        stages={demoMode || profileName ? DEMO_STAGES : []}
+        stages={demoMode || profileName || (stageName && stageName !== 'Idle') ? DEMO_STAGES : []}
       />
 
       <LightTimeline

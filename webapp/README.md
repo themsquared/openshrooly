@@ -4,13 +4,13 @@ A Next.js-based web dashboard for monitoring OpenShrooly sensor data in real-tim
 
 ## Features
 
-- 📊 Real-time sensor data display
-- 🌡️ Temperature monitoring
-- 💧 Humidity tracking
-- 💦 Water level indicator
-- 💡 Light intensity display
-- 🔄 Auto-refresh every 5 seconds
-- ⚡ EventSource support for real-time updates
+- First-run Wi-Fi, empty-grow presets, and an unreachable retry
+- Culinary presets that write `grow_phase` / day plus existing setpoint numbers
+- Real-time gauges over ESPHome REST + `/events`
+- Temperature, humidity, water, lights
+- No webfonts or CDN (flash budget)
+
+See [`docs/device-web.md`](../docs/device-web.md).
 
 ## Development
 
@@ -18,6 +18,7 @@ Install dependencies:
 
 ```bash
 npm install
+npm test
 ```
 
 Run the development server:
