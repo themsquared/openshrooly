@@ -16,6 +16,7 @@ function env() {
     HIBP_DISABLED: "1",
     SITE_ORIGIN: "http://127.0.0.1:8888",
     OIDC_STUB: "1",
+    TURNSTILE_STUB: "1",
     DEVICE_ISSUER: "worker",
   };
 }
@@ -38,7 +39,7 @@ async function call(ctx, method, path, { token, body, device } = {}) {
 }
 
 async function register(ctx, email = "mike@example.com") {
-  const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email } });
+  const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email, turnstile: "ok" } });
   const res = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
   return { token: res.data.access_token, user: res.data.user };
 }

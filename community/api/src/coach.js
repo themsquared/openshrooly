@@ -211,7 +211,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/coach/complete-entitlement") {
-    return json({ error: "use /api/pay/{id}/complete" }, 400);
+    return json({ error: "entitlements are granted by a signed payment webhook" }, 400);
   }
 
   if (method === "GET" && path === "/api/coach/model") {

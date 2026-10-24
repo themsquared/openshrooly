@@ -14,7 +14,7 @@ Cloud control is still opt-in. Coach can only *queue* setpoints; the chamber app
 
 ## Gating
 
-`POST /api/coach/subscribe` writes a Stripe-stub checkout (`item_id=grow-coach`, `item_type=subscription`). Completing `/api/pay/{id}/complete` calls `activateCoachSub` (30-day `coach_subs` + entitlement). Chat / photo / model / suggest / alerts return **402** until then.
+`POST /api/coach/subscribe` writes a Stripe-stub checkout (`item_id=grow-coach`, `item_type=subscription`). A signed `POST /api/payments/webhook` calls `activateCoachSub` (30-day `coach_subs` + entitlement). Chat / photo / model / suggest / alerts return **402** until then. There is no client `/api/pay/{id}/complete` route.
 
 `pack=psilocybin` on subscribe, chat, photo, or suggest is **400**.
 
