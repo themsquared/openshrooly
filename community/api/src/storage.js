@@ -33,9 +33,21 @@ export function createR2Storage(bucket) {
   };
 }
 
+export function createDisabledStorage() {
+  return {
+    driver: "disabled",
+    async put() {
+      return null;
+    },
+    async get() {
+      return null;
+    },
+  };
+}
+
 /** R2 is optional until the account enables it. Missing/broken bindings must not crash the Worker. */
-export function createOptionalStorage(bucket) {
-  if (!bucket) return createMemoryStorage();
+export function createOptionalStorage(bucket, { allowMemory = false } = {}) {
+  if (!bucket) return allowMemory ? createMemoryStorage() : createDisabledStorage();
   const inner = createR2Storage(bucket);
   return {
     driver: "r2",
@@ -43,7 +55,7 @@ export function createOptionalStorage(bucket) {
       try {
         return await inner.put(key, bytes, contentType);
       } catch {
-        return key;
+        return null;
       }
     },
     async get(key) {

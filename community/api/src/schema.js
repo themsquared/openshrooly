@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'user',
     totp_secret_enc TEXT,
     totp_enabled INTEGER NOT NULL DEFAULT 0,
+    totp_last_step INTEGER,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS api_tokens (
@@ -214,5 +215,17 @@ CREATE TABLE IF NOT EXISTS coach_cache (
     cache_key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS totp_pending (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS payment_events (
+    event_id TEXT PRIMARY KEY,
+    checkout_id TEXT,
+    type TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 `;

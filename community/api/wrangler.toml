@@ -40,3 +40,4 @@ custom_domain = true
 #   npx wrangler secret put TURNSTILE_SECRET_KEY
 #   npx wrangler secret put CF_API_TOKEN            # client certs, SSL Edit
 # Optional: CF_ZONE_ID in [vars] once DNS is on Cloudflare. See docs/DEVICES.md.
+# Do not set DEV_STUBS on this Worker. Completing stubs refuse api.shroomlabs.io.

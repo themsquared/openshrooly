@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pickCorsOrigin, withCors } from "../src/handlers.js";
-import { call, register, signedWebhook, testEnv } from "./helpers.js";
+import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 function env() {
   return testEnv();
@@ -41,11 +41,14 @@ test("accounts, paid checkout stub, hub sync", async () => {
   assert.equal(locked.data.unlocked, false);
   const session = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
   assert.equal(session.status, 200);
-  const paid = await signedWebhook(ctx, {
-    session_id: session.data.id,
-    item_id: "king-oyster-thick-stem",
-    user_id: me.data.user.id,
-  });
+  const paid = await signedWebhook(
+    ctx,
+    stripeCheckoutEvent({
+      sessionId: session.data.id,
+      itemId: "king-oyster-thick-stem",
+      userId: me.data.user.id,
+    })
+  );
   assert.equal(paid.status, 200);
   const unlocked = await call(ctx, "GET", "/api/profiles/king-oyster-thick-stem", { token });
   assert.equal(unlocked.data.unlocked, true);

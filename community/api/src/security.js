@@ -1,6 +1,7 @@
 /** Rate limits, Turnstile, HIBP k-anonymity, security headers. */
 
 import { hex, hmacSha256Hex, timingSafeEqual } from "./crypto.js";
+import { devStubsEnabled } from "./providers.js";
 
 const te = new TextEncoder();
 
@@ -36,11 +37,11 @@ export async function passwordPwned(password, env) {
   return text.split("\n").some((line) => line.split(":")[0]?.trim() === suffix);
 }
 
-export async function verifyTurnstile(env, token, ip) {
+export async function verifyTurnstile(env, token, ip, request) {
   const secret = env.TURNSTILE_SECRET_KEY;
   const presented = String(token || "");
   if (!secret) {
-    if (String(env.TURNSTILE_STUB || "") === "1") {
+    if (devStubsEnabled(env, request)) {
       return { ok: presented === "ok", stub: true };
     }
     return { ok: false, error: "Turnstile is not configured" };

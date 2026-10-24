@@ -159,14 +159,23 @@ export async function totpAt(secretBase32, step) {
   return String(bin % 1_000_000).padStart(6, "0");
 }
 
-export async function verifyTotp(secretBase32, code, nowMs = Date.now()) {
+export function clockMs(env) {
+  const n = Number(env?.NOW_MS);
+  return Number.isFinite(n) ? n : Date.now();
+}
+
+export async function matchTotp(secretBase32, code, nowMs = Date.now()) {
   const presented = String(code || "");
-  if (!/^\d{6}$/.test(presented)) return false;
+  if (!/^\d{6}$/.test(presented)) return { ok: false, step: null };
   const step = Math.floor(nowMs / 30_000);
   for (const candidate of [step - 1, step, step + 1]) {
-    if (timingSafeEqual(await totpAt(secretBase32, candidate), presented)) return true;
+    if (timingSafeEqual(await totpAt(secretBase32, candidate), presented)) return { ok: true, step: candidate };
   }
-  return false;
+  return { ok: false, step: null };
+}
+
+export async function verifyTotp(secretBase32, code, nowMs = Date.now()) {
+  return (await matchTotp(secretBase32, code, nowMs)).ok;
 }
 
 function totpKeyBytes(env) {

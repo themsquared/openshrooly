@@ -1,10 +1,23 @@
-/** Swappable model providers. Workers AI in prod; stub in tests. */
+/** Swappable model providers. Workers AI in prod; completing stub only under DEV_STUBS. */
 
-export function createModelProvider(env) {
-  const name = String(env.GROW_COACH_PROVIDER || "").toLowerCase();
-  if (name === "stub" || env.GROW_COACH_STUB === "1") return stubProvider();
-  if (env.AI && name !== "stub") return workersAiProvider(env);
-  return stubProvider();
+import { coachAiConfigured, comingSoonBody, devStubsEnabled } from "./providers.js";
+
+export function createModelProvider(env, request) {
+  if (coachAiConfigured(env)) return workersAiProvider(env);
+  if (devStubsEnabled(env, request)) return stubProvider();
+  return disabledProvider();
+}
+
+function disabledProvider() {
+  return {
+    name: "disabled",
+    async chat() {
+      return { unavailable: true, ...comingSoonBody("Grow Coach") };
+    },
+    async vision() {
+      return { unavailable: true, ...comingSoonBody("Grow Coach") };
+    },
+  };
 }
 
 function stubProvider() {

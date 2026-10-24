@@ -62,7 +62,7 @@ npx wrangler secret put RESEND_API_KEY
 
 Optional var: `EMAIL_FROM=Shroom Labs <noreply@shroomlabs.io>`
 
-Until the key exists, the API stubs send and (when `AUTH_DEBUG=1`) returns `debug_token` for local complete.
+Until the key exists, email sign-in is hidden as Coming soon and the endpoint fails closed. Local completing stubs (fake outbox + `debug_token`) need `DEV_STUBS=1` and refuse `shroomlabs.io` / `api.shroomlabs.io`.
 
 ### Cloudflare Turnstile
 
@@ -72,7 +72,7 @@ Create a widget for `shroomlabs.io` + `www.shroomlabs.io` + localhost.
 npx wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
-Netlify env: `TURNSTILE_SITE_KEY` (public, for the login form widget later).
+Netlify env: `TURNSTILE_SITE_KEY` (public). `community/web/scripts/write-config.js` writes it onto login and register as `turnstileSiteKey`. Production site key: `0x4AAAAAAFjd0Rzec6mAd5y6`.
 
 Also enable **Cloudflare Rate Limiting** on `api.shroomlabs.io/api/auth/*` (e.g. 20 req / 1 min / IP) in the dashboard. The Worker has an application-level limiter too.
 
@@ -80,7 +80,7 @@ Also enable **Cloudflare Rate Limiting** on `api.shroomlabs.io/api/auth/*` (e.g.
 
 Worker var: `SITE_ORIGIN=https://shroomlabs.io` (magic-link landing: `/auth/callback.html?token=`).
 
-Production: `AUTH_DEBUG` unset, `OIDC_STUB` unset, `HIBP_DISABLED` unset.
+Production: `AUTH_DEBUG` unset, `DEV_STUBS` unset, `OIDC_STUB` unset, `HIBP_DISABLED` unset. Completing stubs never run on the production hosts.
 
 ## Apply on D1
 
@@ -92,6 +92,7 @@ Existing D1:
 npx wrangler d1 execute shroomlabs --remote --file=schema-auth.sql
 npx wrangler d1 execute shroomlabs --remote --file=schema-devices.sql
 npx wrangler d1 execute shroomlabs --remote --file=schema-coach.sql
+npx wrangler d1 execute shroomlabs --remote --command "ALTER TABLE users ADD COLUMN totp_last_step INTEGER;"
 cd community/api && npm run db:seed:remote
 ```
 

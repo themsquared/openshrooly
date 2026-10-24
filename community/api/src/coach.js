@@ -4,6 +4,7 @@ import { laterIso, nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { requireVerified, userFromRequest } from "./auth.js";
 import { ValidationError, isPsilocybin } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
+import { comingSoonBody, capabilities, devStubsEnabled, paymentsConfigured } from "./providers.js";
 import {
   COACH_ITEM,
   COACH_PERIOD_DAYS,
@@ -170,13 +171,17 @@ export async function handleCoach(method, path, url, request, env) {
     const { user } = await userFromRequest(request, db);
     const entitled = user ? await hasGrowCoach(db, user) : false;
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
+    const caps = capabilities(env, request);
     return json({
       product: coachCatalog(),
       entitled,
       auto_tune: Boolean(Number(sub?.auto_tune)),
       period_end: sub?.period_end || null,
-      marketing:
-        "Grow Coach learns each culinary chamber and suggests safer humidity and temperature. It is not sold with the restricted pack.",
+      waitlist: !caps.coach,
+      preview: !caps.coach,
+      marketing: caps.coach
+        ? "Grow Coach learns each culinary chamber and suggests safer humidity and temperature. It is not sold with the restricted pack."
+        : "Grow Coach is in preview. Chat, photo checks, and checkout wait until the model is connected.",
     });
   }
 
@@ -186,6 +191,11 @@ export async function handleCoach(method, path, url, request, env) {
     const body = await request.json().catch(() => ({}));
     if (body.pack === "psilocybin") {
       throw new ValidationError("Grow Coach is not sold or marketed with the restricted pack.", 400);
+    }
+    const caps = capabilities(env, request);
+    if (!caps.coach) return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
+    if (!paymentsConfigured(env) && !devStubsEnabled(env, request)) {
+      return json(comingSoonBody("Payments"), 503);
     }
     const sessionId = `cs_test_${randomToken().slice(0, 16)}`;
     await db.run(
@@ -197,7 +207,7 @@ export async function handleCoach(method, path, url, request, env) {
         "stripe",
         "requires_payment",
         COACH_PRICE_CENTS,
-        JSON.stringify({ item_type: "subscription", note: "Stripe stub. Culinary Grow Coach only." }),
+        JSON.stringify({ item_type: "subscription", note: "Culinary Grow Coach only." }),
         nowIso(),
       ]
     );
@@ -206,7 +216,7 @@ export async function handleCoach(method, path, url, request, env) {
       provider: "stripe",
       amount_cents: COACH_PRICE_CENTS,
       item_id: COACH_ITEM,
-      checkout_url: `/pay/stub/${sessionId}`,
+      checkout_url: devStubsEnabled(env, request) ? `/pay/stub/${sessionId}` : null,
     });
   }
 
@@ -273,8 +283,9 @@ export async function handleCoach(method, path, url, request, env) {
     const cacheKey = await sha256Hex(`chat:${user.id}:${body.device_id || ""}:${body.message || ""}`);
     const hit = await cacheGet(db, cacheKey);
     if (hit) return json({ ...hit, cached: true });
-    const provider = createModelProvider(env);
+    const provider = createModelProvider(env, request);
     const result = await provider.chat({ message: body.message, grounding: slimGrounding(grounding) });
+    if (result.unavailable) return json(comingSoonBody("Grow Coach"), 503);
     const neurons = estimateNeurons({ inputTokens: result.input_tokens, outputTokens: result.output_tokens });
     await bumpUsage(db, user.id, "chats", neurons);
     const payload = {
@@ -311,8 +322,11 @@ export async function handleCoach(method, path, url, request, env) {
     const raw = Uint8Array.from(atob(body.photo_base64), (c) => c.charCodeAt(0));
     const key = `coach/${user.id}/${randomToken()}.${body.photo_ext || "jpg"}`;
     await storage.put(key, raw, body.photo_type || "image/jpeg");
-    const provider = createModelProvider(env);
+    const caps = capabilities(env, request);
+    if (!caps.photos) return json({ error: "Photo checks use generated species art until storage is connected.", coming_soon: true }, 503);
+    const provider = createModelProvider(env, request);
     const result = await provider.vision({ imageBase64: body.photo_base64, hint: body.hint || body.notes || "" });
+    if (result.unavailable) return json(comingSoonBody("Grow Coach"), 503);
     const neurons = estimateNeurons({
       inputTokens: result.input_tokens,
       outputTokens: result.output_tokens,
@@ -339,9 +353,18 @@ export async function handleCoach(method, path, url, request, env) {
   return null;
 }
 
-export async function activateCoachSub(db, userId) {
-  const periodEnd = laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
+export async function activateCoachSub(db, userId, { replaySafe = false } = {}) {
   const existing = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [userId]);
+  if (replaySafe && existing && existing.status === "active" && existing.period_end >= nowIso()) {
+    await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
+      userId,
+      COACH_ITEM,
+      "subscription",
+      nowIso(),
+    ]);
+    return existing.period_end;
+  }
+  const periodEnd = laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
   if (existing) {
     await db.run("UPDATE coach_subs SET status=?, period_end=? WHERE user_id=?", ["active", periodEnd, userId]);
   } else {

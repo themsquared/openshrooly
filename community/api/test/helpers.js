@@ -14,20 +14,23 @@ export function testEnv(extra = {}) {
     SHOW_PSILOCYBIN: "1",
     SITE_NAME: "test",
     AUTH_DEBUG: "1",
+    DEV_STUBS: "1",
     HIBP_DISABLED: "1",
     SITE_ORIGIN: "http://127.0.0.1:8888",
     OIDC_STUB: "1",
     TURNSTILE_STUB: "1",
+    GROW_COACH_STUB: "1",
     PAYMENTS_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
     TOTP_ENC_KEY: TEST_TOTP_KEY,
     ...extra,
   };
 }
 
-export async function call(ctx, method, path, { token, body, headers: extra = {}, rawBody } = {}) {
+export async function call(ctx, method, path, { token, body, headers: extra = {}, rawBody, host } = {}) {
   const headers = { "content-type": "application/json", ...extra };
   if (token) headers.authorization = `Bearer ${token}`;
-  const request = new Request(`http://test${path}`, {
+  if (host) headers.host = host;
+  const request = new Request(`${host ? `https://${host}` : "http://test"}${path}`, {
     method,
     headers,
     body: rawBody !== undefined ? rawBody : body ? JSON.stringify(body) : undefined,
@@ -41,6 +44,26 @@ export async function register(ctx, email = "grower@example.com") {
   const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email, turnstile: "ok" } });
   const res = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
   return { ...res.data, token: res.data.access_token, user: res.data.user };
+}
+
+export function stripeCheckoutEvent({ sessionId, userId, itemId, eventId = `evt_${sessionId}`, type = "checkout.session.completed" }) {
+  return {
+    id: eventId,
+    object: "event",
+    type,
+    data: {
+      object: {
+        id: sessionId,
+        object: "checkout.session",
+        client_reference_id: userId != null ? String(userId) : undefined,
+        metadata: {
+          user_id: userId != null ? String(userId) : undefined,
+          item_id: itemId,
+        },
+        mode: itemId === "grow-coach" ? "subscription" : "payment",
+      },
+    },
+  };
 }
 
 export async function signedWebhook(ctx, payload, { secret = TEST_WEBHOOK_SECRET, signature } = {}) {

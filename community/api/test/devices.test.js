@@ -13,6 +13,7 @@ function env() {
     SHOW_PSILOCYBIN: "1",
     SITE_NAME: "test",
     AUTH_DEBUG: "1",
+    DEV_STUBS: "1",
     HIBP_DISABLED: "1",
     SITE_ORIGIN: "http://127.0.0.1:8888",
     OIDC_STUB: "1",

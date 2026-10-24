@@ -30,7 +30,8 @@ Out of scope this pass: on-device signed recipe objects, live Stripe keys, compi
 - Passwords are optional and discouraged. If set: PBKDF2-SHA-256 **600,000** iterations (Workers have no native argon2id/scrypt) + HIBP k-anonymity range API. **Tradeoff flagged:** WASM argon2id would blow Worker CPU/size; we do not cut passwordless.
 - Sessions: 30-minute `__Host-sl_session` cookie, rotation via `/api/auth/refresh`, server-side revoke, sign-out-everywhere.
 - Verified email required for publish, checkout, fork, rate, report.
-- Rate limits on magic/password; Turnstile when `TURNSTILE_SECRET_KEY` is set.
+- Rate limits on magic/password/WebAuthn begin/TOTP confirm. Turnstile widget on login/register; Worker fails closed without a secret.
+- TOTP is enforced on every sign-in path once enabled. Passkeys verify origin, rpIdHash, UP, signCount, and browser DER signatures.
 - Audit rows in `security_events`.
 
 Credentials Mike must create: see [`docs/AUTH.md`](docs/AUTH.md). **Never commit secrets.**
@@ -51,7 +52,5 @@ Implemented: authn, session, CSRF-via-Origin allowlist + cookie flags, headers/C
 
 Flagged (needs live keys / later firmware):
 
-- Full WebAuthn assertion crypto (challenge + credential store is in; ES256 attestation verification against packed authenticator data is the next hardening step).
-- TOTP confirm currently enables the flag after a 6-digit shape check; HMAC-SHA1 window verify lands with the first creator payouts.
-- Live Turnstile / Resend / Google / Apple — stubbed until keys exist.
+- Live Turnstile / Resend / Google / Apple — widget and fail-closed verify are in; production still needs the Wrangler secret and Netlify site key.
 - Signed OTA — firmware work, not this API.

@@ -1,10 +1,5 @@
--- Auth tables and user columns. Safe to run on existing D1 (IF NOT EXISTS / ADD COLUMN).
-ALTER TABLE users ADD COLUMN email TEXT;
-ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE users ADD COLUMN display_name TEXT;
-ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
-ALTER TABLE users ADD COLUMN totp_secret_enc TEXT;
-ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+-- Additive auth tables. Idempotent on a fresh schema.sql database.
+-- User columns live in schema.sql; do not ALTER ADD them here (duplicate column on fresh DBs).
 
 CREATE TABLE IF NOT EXISTS auth_identities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +53,6 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
     expires_at TEXT NOT NULL,
     used_at TEXT
 );
-ALTER TABLE webauthn_challenges ADD COLUMN used_at TEXT;
 CREATE TABLE IF NOT EXISTS oauth_states (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     state TEXT NOT NULL UNIQUE,
@@ -80,4 +74,16 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     key TEXT PRIMARY KEY,
     count INTEGER NOT NULL,
     window_start TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS totp_pending (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS payment_events (
+    event_id TEXT PRIMARY KEY,
+    checkout_id TEXT,
+    type TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );

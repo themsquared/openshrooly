@@ -1,4 +1,4 @@
-import { api, apiBase, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
+import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
 
@@ -99,9 +99,19 @@ async function renderProfile() {
     $("#legal").classList.remove("hidden");
   }
   $("#nav-coach")?.classList.toggle("hidden", p.pack === "psilocybin");
+  const caps = await capabilities();
+  if (!caps.photos) {
+    document.querySelector('input[name="photo"]')?.closest("label")?.classList.add("hidden");
+  }
   if (!data.unlocked) {
     $("#locked").classList.remove("hidden");
     $("#price").textContent = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
+    if (!caps.payments) {
+      const notice = $("#locked")?.querySelector("p");
+      if (notice) notice.textContent = "Paid culinary recipe. Checkout is coming soon.";
+      $("#buy")?.classList.add("hidden");
+      return;
+    }
     $("#buy")?.addEventListener("click", async () => {
       const session = await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
       const notice = $("#locked")?.querySelector("p");
@@ -182,13 +192,42 @@ async function renderProfile() {
   });
 }
 
+function mountTurnstile() {
+  const host = $("#turnstile");
+  const key = String(cfg().turnstileSiteKey || "");
+  if (!host || !key || host.dataset.mounted === "1") return;
+  host.dataset.sitekey = key;
+  host.dataset.mounted = "1";
+  const script = document.createElement("script");
+  script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+  script.async = true;
+  document.head.appendChild(script);
+}
+
 async function renderAuth(mode) {
+  mountTurnstile();
+  const caps = await capabilities();
+  if (!caps.email) {
+    $("#form")?.classList.add("hidden");
+    $("#email-soon")?.classList.remove("hidden");
+  }
+  if (!caps.google) {
+    $("#google")?.classList.add("hidden");
+  }
+  if (!caps.apple) {
+    $("#apple")?.classList.add("hidden");
+  }
+  if (!caps.google && !caps.apple) {
+    $("#oidc-soon")?.classList.remove("hidden");
+  }
   $("#google")?.addEventListener("click", (ev) => {
     ev.preventDefault();
+    if (!caps.google) return;
     location.href = oidcStart("google");
   });
   $("#apple")?.addEventListener("click", (ev) => {
     ev.preventDefault();
+    if (!caps.apple) return;
     location.href = oidcStart("apple");
   });
   $("#passkey")?.addEventListener("click", async () => {
@@ -374,6 +413,11 @@ async function renderCoach() {
   $("#coach-status").textContent = catalog.entitled
     ? `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
     : catalog.marketing;
+  if (catalog.waitlist) {
+    $("#subscribe-panel")?.classList.add("hidden");
+    $("#gated")?.classList.add("hidden");
+    return;
+  }
   if (!isSignedIn()) {
     $("#subscribe-panel").classList.remove("hidden");
     $("#subscribe").textContent = "Sign in to subscribe";

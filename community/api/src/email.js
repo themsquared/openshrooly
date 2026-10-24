@@ -1,9 +1,11 @@
-/** Cheap email interface. Resend in production; stub until keys exist. */
+/** Email provider. Resend when keyed; completing stub only under DEV_STUBS on a non-prod host. */
 
-export async function sendEmail(env, { to, subject, text, html }) {
-  const key = env.RESEND_API_KEY || env.EMAIL_API_KEY;
+import { comingSoonBody, devStubsEnabled, emailConfigured } from "./providers.js";
+
+export async function sendEmail(env, { to, subject, text, html }, request) {
   const from = env.EMAIL_FROM || "Shroom Labs <noreply@shroomlabs.io>";
-  if (key) {
+  if (emailConfigured(env)) {
+    const key = env.RESEND_API_KEY || env.EMAIL_API_KEY;
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
@@ -12,9 +14,12 @@ export async function sendEmail(env, { to, subject, text, html }) {
     if (!res.ok) throw new Error("email provider rejected the message");
     return { ok: true, provider: "resend" };
   }
-  return {
-    ok: true,
-    provider: "stub",
-    debug: String(env.AUTH_DEBUG || "") === "1" ? { to, subject, text } : undefined,
-  };
+  if (devStubsEnabled(env, request)) {
+    return {
+      ok: true,
+      provider: "stub",
+      debug: { to, subject, text },
+    };
+  }
+  return { ok: false, provider: "disabled", ...comingSoonBody("Email") };
 }

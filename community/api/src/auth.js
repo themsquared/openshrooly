@@ -3,7 +3,6 @@
 import {
   decryptSecret,
   encryptSecret,
-  fromBase64Url,
   hashPassword,
   laterIso,
   nowIso,
@@ -12,11 +11,25 @@ import {
   randomToken,
   sha256Hex,
   verifyPassword,
-  verifyTotp,
+  matchTotp,
+  clockMs,
 } from "./crypto.js";
 import { sendEmail } from "./email.js";
+import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } from "./providers.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
+import {
+  allowedOrigins,
+  clientDataOk,
+  hashesEqual,
+  parseAttestationObject,
+  parseAuthenticatorData,
+  parseClientData,
+  rpIdFor,
+  rpIdHash,
+  signCountOk,
+  verifyEs256,
+} from "./webauthn.js";
 
 const SESSION_MS = 30 * 60 * 1000;
 const REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -155,7 +168,7 @@ export async function handleAuth(method, path, url, request, env) {
     const ip = clientIp(request);
     const limited = await rateLimit(db, `magic:${ip}:${email}`, 5, 900);
     if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
-    const turnstile = await verifyTurnstile(env, body.turnstile, ip);
+    const turnstile = await verifyTurnstile(env, body.turnstile, ip, request);
     if (!turnstile.ok) return json({ error: "Turnstile check failed." }, 400);
     const token = randomToken() + randomToken();
     await db.run(
@@ -163,11 +176,16 @@ export async function handleAuth(method, path, url, request, env) {
       [email, await sha256Hex(token), "login", laterIso(MAGIC_MS), nowIso()]
     );
     const link = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/auth/callback.html?token=${token}`;
-    const sent = await sendEmail(env, {
-      to: email,
-      subject: "Your Shroom Labs sign-in link",
-      text: `Sign in (expires in 15 minutes):\n${link}\nIf you did not request this, ignore the email.`,
-    });
+    const sent = await sendEmail(
+      env,
+      {
+        to: email,
+        subject: "Your Shroom Labs sign-in link",
+        text: `Sign in (expires in 15 minutes):\n${link}\nIf you did not request this, ignore the email.`,
+      },
+      request
+    );
+    if (!sent.ok) return json({ error: sent.error || "Email sign-in is not configured yet.", coming_soon: true }, 503);
     await audit(db, null, "magic_start", email, request);
     const payload = { ok: true, message: "Check your email for a sign-in link." };
     if (sent.debug) payload.debug_token = token;
@@ -183,9 +201,8 @@ export async function handleAuth(method, path, url, request, env) {
     const user = await findOrCreateByEmail(db, row.email);
     await db.run("UPDATE users SET email_verified=1 WHERE id=?", [user.id]);
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
-    const issued = await issueSession(db, fresh, request, env);
     await audit(db, fresh.id, "magic_complete", row.email, request);
-    return json({ user: publicUser(fresh), ...issued }, 200, issued.headers);
+    return completeSignIn(db, fresh, request, env, body);
   }
 
   if (method === "POST" && path === "/api/auth/login") {
@@ -203,9 +220,8 @@ export async function handleAuth(method, path, url, request, env) {
       return json({ error: "This password appears in a breach. Use a passkey or magic link instead." }, 400);
     }
     if (!Number(user.email_verified)) return json({ error: "verified email required" }, 403);
-    const issued = await issueSession(db, user, request, env);
     await audit(db, user.id, "login_password", "", request);
-    return json({ user: publicUser(user), deprecated: "prefer passkey or magic link", ...issued }, 200, issued.headers);
+    return completeSignIn(db, user, request, env, body);
   }
 
   if (method === "POST" && path === "/api/auth/password/set") {
@@ -236,6 +252,9 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/webauthn/register/begin") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
+    const limited = await rateLimit(db, `webauthn-reg:${clientIp(request)}:${user.id}`, 10, 900);
+    if (!limited.ok) return json({ error: "Too many passkey attempts." }, 429);
+    await cleanupChallenges(db);
     const challenge = randomBase64Url(32);
     await db.run("INSERT INTO webauthn_challenges (challenge, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)", [
       challenge,
@@ -245,7 +264,7 @@ export async function handleAuth(method, path, url, request, env) {
     ]);
     return json({
       challenge,
-      rp: { id: env.WEBAUTHN_RP_ID || "shroomlabs.io", name: "Shroom Labs" },
+      rp: { id: rpIdFor(env), name: "Shroom Labs" },
       user: { id: String(user.id), name: user.email || user.username, displayName: user.display_name || user.username },
       pubKeyCredParams: [{ type: "public-key", alg: -7 }],
       timeout: 60000,
@@ -258,21 +277,34 @@ export async function handleAuth(method, path, url, request, env) {
     requireVerified(user);
     const body = await request.json().catch(() => ({}));
     const parsed = parseClientData(body.clientDataJSON);
-    if (!parsed || parsed.json.type !== "webauthn.create") return json({ error: "invalid authenticator data" }, 400);
-    const challengeValue = String(parsed.json.challenge || body.challenge || "");
+    const challengeValue = String(parsed?.json?.challenge || body.challenge || "");
     const row = await consumeChallenge(db, challengeValue, "register", user.id);
     if (!row) return json({ error: "challenge expired or already used" }, 400);
-    if (!body.credentialId || !body.publicKey) throw new ValidationError("credentialId and publicKey required");
-    if (!jwkIsEs256(body.publicKey)) throw new ValidationError("ES256 public key required");
+    if (!clientDataOk(parsed, "webauthn.create", challengeValue, allowedOrigins(env, request))) {
+      return json({ error: "invalid authenticator data" }, 400);
+    }
+    const attestation = parseAttestationObject(body.attestationObject);
+    if (!attestation || (attestation.fmt && attestation.fmt !== "none")) {
+      return json({ error: "attestation object required" }, 400);
+    }
+    const expectedHash = await rpIdHash(rpIdFor(env));
+    if (!hashesEqual(attestation.authData.rpIdHash, expectedHash) || !attestation.authData.up || !attestation.authData.at) {
+      return json({ error: "invalid authenticator data" }, 400);
+    }
+    const attested = attestation.authData.attested;
+    if (!attested?.credentialId || !attested.publicKey) return json({ error: "attestation missing credential" }, 400);
     await db.run(
       "INSERT INTO webauthn_credentials (user_id, credential_id, public_key, sign_count, created_at) VALUES (?, ?, ?, ?, ?)",
-      [user.id, body.credentialId, typeof body.publicKey === "string" ? body.publicKey : JSON.stringify(body.publicKey), 0, nowIso()]
+      [user.id, attested.credentialId, JSON.stringify(attested.publicKey), attestation.authData.signCount, nowIso()]
     );
     await audit(db, user.id, "passkey_register", "", request);
     return json({ ok: true });
   }
 
   if (method === "POST" && path === "/api/auth/webauthn/login/begin") {
+    const limited = await rateLimit(db, `webauthn-login:${clientIp(request)}`, 10, 900);
+    if (!limited.ok) return json({ error: "Too many passkey attempts." }, 429);
+    await cleanupChallenges(db);
     const challenge = randomBase64Url(32);
     await db.run("INSERT INTO webauthn_challenges (challenge, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)", [
       challenge,
@@ -282,7 +314,7 @@ export async function handleAuth(method, path, url, request, env) {
     ]);
     return json({
       challenge,
-      rpId: env.WEBAUTHN_RP_ID || "shroomlabs.io",
+      rpId: rpIdFor(env),
       timeout: 60000,
       userVerification: "preferred",
     });
@@ -291,40 +323,85 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/webauthn/login/finish") {
     const body = await request.json().catch(() => ({}));
     const parsed = parseClientData(body.clientDataJSON);
-    if (!parsed || parsed.json.type !== "webauthn.get") return json({ error: "invalid authenticator data" }, 401);
-    const challengeValue = String(parsed.json.challenge || body.challenge || "");
+    const challengeValue = String(parsed?.json?.challenge || body.challenge || "");
     const challenge = await consumeChallenge(db, challengeValue, "login");
     if (!challenge) return json({ error: "challenge expired or already used" }, 401);
+    if (!clientDataOk(parsed, "webauthn.get", challengeValue, allowedOrigins(env, request))) {
+      return json({ error: "invalid authenticator data" }, 401);
+    }
+    const auth = parseAuthenticatorData(body.authenticatorData);
+    if (!auth || !auth.up) return json({ error: "invalid authenticator data" }, 401);
+    const expectedHash = await rpIdHash(rpIdFor(env));
+    if (!hashesEqual(auth.rpIdHash, expectedHash)) return json({ error: "invalid authenticator data" }, 401);
     const cred = await db.one("SELECT * FROM webauthn_credentials WHERE credential_id=?", [body.credentialId]);
     if (!cred) return json({ error: "unknown passkey" }, 401);
-    const valid = await verifyAssertion(cred.public_key, body.authenticatorData, parsed.bytes, body.signature);
+    if (!signCountOk(cred.sign_count, auth.signCount)) return json({ error: "passkey verification failed" }, 401);
+    const valid = await verifyEs256(cred.public_key, body.authenticatorData, parsed.bytes, body.signature);
     if (!valid) return json({ error: "passkey verification failed" }, 401);
+    await db.run("UPDATE webauthn_credentials SET sign_count=? WHERE credential_id=?", [auth.signCount, cred.credential_id]);
     const user = await db.one("SELECT * FROM users WHERE id=?", [cred.user_id]);
-    const issued = await issueSession(db, user, request, env);
     await audit(db, user.id, "passkey_login", "", request);
-    return json({ user: publicUser(user), ...issued }, 200, issued.headers);
+    return completeSignIn(db, user, request, env, body);
   }
 
   if (method === "POST" && path === "/api/auth/totp/begin") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
+    const body = await request.json().catch(() => ({}));
+    const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
+    if (Number(fresh.totp_enabled)) {
+      if (!(await consumeUserTotp(db, fresh, env, body.code))) {
+        return json({ error: "current TOTP code required to re-enroll" }, 401);
+      }
+    }
     const secret = randomBase32(20);
     const enc = await encryptSecret(secret, env);
     if (!enc) return json({ error: "TOTP encryption key is not configured." }, 503);
-    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=? WHERE id=?", [enc, 0, user.id]);
+    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=? WHERE id=?", [enc, 0, null, user.id]);
     return json({ secret, otpauth: `otpauth://totp/ShroomLabs:${user.email || user.username}?secret=${secret}&issuer=ShroomLabs` });
   }
 
   if (method === "POST" && path === "/api/auth/totp/confirm") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
+    const limited = await rateLimit(db, `totp-confirm:${clientIp(request)}:${user.id}`, 8, 900);
+    if (!limited.ok) return json({ error: "Too many TOTP attempts." }, 429);
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
     const secret = await decryptSecret(fresh?.totp_secret_enc, env);
-    if (!secret || !(await verifyTotp(secret, body.code))) return json({ error: "invalid TOTP code" }, 401);
-    await db.run("UPDATE users SET totp_enabled=? WHERE id=?", [1, user.id]);
+    const matched = secret ? await matchTotp(secret, body.code, clockMs(env)) : { ok: false };
+    if (!matched.ok) return json({ error: "invalid TOTP code" }, 401);
+    await db.run("UPDATE users SET totp_enabled=?, totp_last_step=? WHERE id=?", [1, matched.step, user.id]);
     await audit(db, user.id, "totp_enable", "", request);
     return json({ ok: true });
+  }
+
+  if (method === "POST" && path === "/api/auth/totp/disable") {
+    const { user } = await userFromRequest(request, db);
+    requireVerified(user);
+    const body = await request.json().catch(() => ({}));
+    const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
+    if (!Number(fresh.totp_enabled) || !(await consumeUserTotp(db, fresh, env, body.code))) {
+      return json({ error: "current TOTP code required to disable" }, 401);
+    }
+    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=? WHERE id=?", [null, 0, null, user.id]);
+    await audit(db, user.id, "totp_disable", "", request);
+    return json({ ok: true });
+  }
+
+  if (method === "POST" && path === "/api/auth/totp/verify") {
+    const body = await request.json().catch(() => ({}));
+    const limited = await rateLimit(db, `totp-verify:${clientIp(request)}`, 8, 900);
+    if (!limited.ok) return json({ error: "Too many TOTP attempts." }, 429);
+    const hash = await sha256Hex(String(body.totp_token || ""));
+    const pending = await db.one("SELECT * FROM totp_pending WHERE token_hash=?", [hash]);
+    if (!pending || pending.expires_at < nowIso()) return json({ error: "totp required" }, 401);
+    await db.run("DELETE FROM totp_pending WHERE token_hash=?", [hash]);
+    const user = await db.one("SELECT * FROM users WHERE id=?", [pending.user_id]);
+    if (!(await consumeUserTotp(db, user, env, body.code || body.totp))) return json({ error: "invalid TOTP code" }, 401);
+    const issued = await issueSession(db, user, request, env);
+    await audit(db, user.id, "totp_sign_in", "", request);
+    return json({ user: publicUser(user), ...issued }, 200, issued.headers);
   }
 
   if (method === "POST" && path === "/api/auth/refresh") {
@@ -366,9 +443,12 @@ export async function handleAuth(method, path, url, request, env) {
 }
 
 async function startOidc(env, request, provider) {
+  const limited = await rateLimit(env.db, `oidc-${provider}:${clientIp(request)}`, 10, 900);
+  if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
   const cfg = providerConfig(env, provider);
-  if (!cfg.clientId && String(env.OIDC_STUB || "") !== "1") {
-    return json({ error: `${provider} OAuth is not configured.`, redirect_uris: cfg.redirectUris }, 503);
+  const ready = provider === "google" ? googleConfigured(env) : appleConfigured(env);
+  if (!ready && !devStubsEnabled(env, request)) {
+    return json(comingSoonBody(`${provider} sign-in`), 503);
   }
   if (!originAllowed(env, request) && request.headers.get("origin")) {
     return json({ error: "origin not allowed" }, 403);
@@ -390,7 +470,7 @@ async function startOidc(env, request, provider) {
   auth.searchParams.set("nonce", nonce);
   auth.searchParams.set("code_challenge", challenge);
   auth.searchParams.set("code_challenge_method", "S256");
-  if (String(env.OIDC_STUB || "") === "1") {
+  if (devStubsEnabled(env, request)) {
     return json({ authorize_url: auth.toString(), state, debug_code: `stub-${state}` });
   }
   return new Response(null, { status: 302, headers: { location: auth.toString() } });
@@ -404,7 +484,7 @@ async function finishOidc(env, request, url, provider) {
   if (!row || row.expires_at < nowIso() || row.provider !== provider) return json({ error: "invalid OIDC state" }, 401);
   let email = "";
   let subject = "";
-  if (String(env.OIDC_STUB || "") === "1") {
+  if (devStubsEnabled(env, request)) {
     email = `${provider}.user@example.com`;
     subject = `stub-${provider}`;
   } else {
@@ -434,11 +514,12 @@ async function finishOidc(env, request, url, provider) {
     "INSERT INTO auth_identities (user_id, provider, subject, created_at) VALUES (?, ?, ?, ?)",
     [user.id, provider, subject || email, nowIso()]
   );
-  const issued = await issueSession(env.db, user, request, env);
   await audit(env.db, user.id, `oidc_${provider}`, email, request);
+  const completed = await completeSignIn(env.db, user, request, env, {});
+  if (devStubsEnabled(env, request)) return completed;
+  if (completed.status !== 200) return completed;
   const dest = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/account.html`;
-  if (String(env.OIDC_STUB || "") === "1") return json({ user: publicUser(user), ...issued }, 200, issued.headers);
-  return new Response(null, { status: 302, headers: { location: dest, "set-cookie": issued.headers["set-cookie"] } });
+  return new Response(null, { status: 302, headers: { location: dest, "set-cookie": completed.headers.get("set-cookie") } });
 }
 
 function providerConfig(env, provider) {
@@ -451,7 +532,6 @@ function providerConfig(env, provider) {
       token: "https://oauth2.googleapis.com/token",
       scope: "openid email profile",
       redirectUri: env.GOOGLE_REDIRECT_URI || `${api}/api/auth/oidc/google/callback`,
-      redirectUris: [`${api}/api/auth/oidc/google/callback`, "http://127.0.0.1:8787/api/auth/oidc/google/callback"],
     };
   }
   return {
@@ -461,7 +541,6 @@ function providerConfig(env, provider) {
     token: "https://appleid.apple.com/auth/token",
     scope: "name email",
     redirectUri: env.APPLE_REDIRECT_URI || `${api}/api/auth/oidc/apple/callback`,
-    redirectUris: [`${api}/api/auth/oidc/apple/callback`, "http://127.0.0.1:8787/api/auth/oidc/apple/callback"],
   };
 }
 
@@ -485,55 +564,57 @@ async function sha256b64(value) {
 
 const base64urlSha256 = true;
 
+async function completeSignIn(db, user, request, env, body = {}) {
+  if (Number(user.totp_enabled)) {
+    const code = body.totp || body.code;
+    if (!(await consumeUserTotp(db, user, env, code))) {
+      const token = randomToken() + randomToken();
+      await db.run("INSERT INTO totp_pending (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)", [
+        await sha256Hex(token),
+        user.id,
+        laterIso(5 * 60 * 1000),
+        nowIso(),
+      ]);
+      return json({ error: "totp required", totp_required: true, totp_token: token }, 401);
+    }
+  }
+  const issued = await issueSession(db, user, request, env);
+  return json({ user: publicUser(user), ...issued }, 200, issued.headers);
+}
+
+async function consumeUserTotp(db, user, env, code) {
+  const secret = await decryptSecret(user?.totp_secret_enc, env);
+  if (!secret) return false;
+  const matched = await matchTotp(secret, code, clockMs(env));
+  if (!matched.ok) return false;
+  const result = await db.run(
+    "UPDATE users SET totp_last_step=? WHERE id=? AND (totp_last_step IS NULL OR totp_last_step < ?)",
+    [matched.step, user.id, matched.step]
+  );
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+  if (!changes) return false;
+  user.totp_last_step = matched.step;
+  return true;
+}
+
+async function cleanupChallenges(db) {
+  await db.run("DELETE FROM webauthn_challenges WHERE expires_at < ?", [nowIso()]);
+}
+
 async function consumeChallenge(db, challenge, purpose, userId) {
   const value = String(challenge || "");
   if (!value) return null;
+  await cleanupChallenges(db);
   const row = await db.one("SELECT * FROM webauthn_challenges WHERE challenge=?", [value]);
-  if (!row || row.used_at || row.expires_at < nowIso()) return null;
+  if (!row) return null;
   if (purpose && row.purpose !== purpose) return null;
   if (userId != null && row.user_id != null && Number(row.user_id) !== Number(userId)) return null;
-  await db.run("UPDATE webauthn_challenges SET used_at=? WHERE challenge=?", [nowIso(), value]);
+  const result = await db.run(
+    "UPDATE webauthn_challenges SET used_at=? WHERE challenge=? AND used_at IS NULL AND expires_at > ?",
+    [nowIso(), value, nowIso()]
+  );
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+  if (!changes) return null;
+  await db.run("DELETE FROM webauthn_challenges WHERE challenge=?", [value]);
   return row;
-}
-
-function parseClientData(encoded) {
-  try {
-    const bytes = fromBase64Url(encoded);
-    const json = JSON.parse(new TextDecoder().decode(bytes));
-    if (!json || typeof json !== "object") return null;
-    return { bytes, json };
-  } catch {
-    return null;
-  }
-}
-
-function jwkIsEs256(value) {
-  const jwk = typeof value === "string" ? safeJson(value) : value;
-  return Boolean(jwk && jwk.kty === "EC" && (jwk.crv === "P-256" || jwk.crv === "P256") && jwk.x && jwk.y);
-}
-
-function safeJson(value) {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-async function verifyAssertion(publicKey, authenticatorData, clientDataBytes, signature) {
-  try {
-    const jwk = typeof publicKey === "string" ? JSON.parse(publicKey) : publicKey;
-    if (!jwkIsEs256(jwk) || !authenticatorData || !signature) return false;
-    const authData = fromBase64Url(authenticatorData);
-    const clientHash = new Uint8Array(await crypto.subtle.digest("SHA-256", clientDataBytes));
-    const signed = new Uint8Array(authData.length + clientHash.length);
-    signed.set(authData, 0);
-    signed.set(clientHash, authData.length);
-    const key = await crypto.subtle.importKey("jwk", { ...jwk, ext: true }, { name: "ECDSA", namedCurve: "P-256" }, false, [
-      "verify",
-    ]);
-    return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, fromBase64Url(signature), signed);
-  } catch {
-    return false;
-  }
 }

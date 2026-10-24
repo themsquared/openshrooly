@@ -29,6 +29,8 @@ export function createMemoryDb() {
     coach_subs: [],
     coach_usage: [],
     coach_cache: [],
+    totp_pending: [],
+    payment_events: [],
   };
   let ids = {
     users: 1,
@@ -116,6 +118,7 @@ function dispatch(mode, tables, ids, sql, params) {
             role: params[5],
             totp_secret_enc: null,
             totp_enabled: 0,
+            totp_last_step: null,
             created_at: params[6],
           }
         : {
@@ -128,6 +131,7 @@ function dispatch(mode, tables, ids, sql, params) {
             role: "user",
             totp_secret_enc: null,
             totp_enabled: 0,
+            totp_last_step: null,
             created_at: params[2],
           };
     if (tables.users.some((u) => u.username === row.username)) throw new Error("UNIQUE");
@@ -153,6 +157,15 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.password_hash = params[0];
     return {};
   }
+  if (q.startsWith("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=")) {
+    const row = tables.users.find((u) => u.id === Number(params[3]));
+    if (row) {
+      row.totp_secret_enc = params[0];
+      row.totp_enabled = params[1];
+      row.totp_last_step = params[2];
+    }
+    return {};
+  }
   if (q.startsWith("UPDATE users SET totp_secret_enc=?, totp_enabled=")) {
     const row = tables.users.find((u) => u.id === Number(params[2]));
     if (row) {
@@ -166,10 +179,31 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.totp_secret_enc = params[0];
     return {};
   }
+  if (q.startsWith("UPDATE users SET totp_enabled=?, totp_last_step=")) {
+    const row = tables.users.find((u) => u.id === Number(params[2]));
+    if (row) {
+      row.totp_enabled = params[0];
+      row.totp_last_step = params[1];
+    }
+    return {};
+  }
   if (q.startsWith("UPDATE users SET totp_enabled=")) {
     const row = tables.users.find((u) => u.id === Number(params[1]));
     if (row) row.totp_enabled = params[0];
     return {};
+  }
+  if (q.startsWith("UPDATE users SET totp_last_step=? WHERE id=? AND")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    const next = Number(params[0]);
+    const last = row?.totp_last_step;
+    if (!row || (last != null && last !== "" && Number(last) >= next)) return { changes: 0, meta: { changes: 0 } };
+    row.totp_last_step = next;
+    return { changes: 1, meta: { changes: 1 } };
+  }
+  if (q.startsWith("UPDATE users SET totp_last_step=")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    if (row) row.totp_last_step = params[0];
+    return { changes: 1 };
   }
   if (q.includes("FROM users JOIN sessions")) {
     const session = tables.sessions.find((s) => s.session_hash === params[0] && !s.revoked_at);
@@ -246,10 +280,64 @@ function dispatch(mode, tables, ids, sql, params) {
     });
     return {};
   }
+  if (q.startsWith("UPDATE webauthn_challenges SET used_at=? WHERE challenge=? AND used_at IS NULL AND expires_at > ?")) {
+    const row = tables.webauthn_challenges.find(
+      (s) => s.challenge === params[1] && !s.used_at && s.expires_at > params[2]
+    );
+    if (!row) return { changes: 0, meta: { changes: 0 } };
+    row.used_at = params[0];
+    return { changes: 1, meta: { changes: 1 } };
+  }
   if (q.startsWith("UPDATE webauthn_challenges SET used_at=")) {
     const row = tables.webauthn_challenges.find((s) => s.challenge === params[1] && !s.used_at);
-    if (row) row.used_at = params[0];
+    if (!row) return { changes: 0, meta: { changes: 0 } };
+    row.used_at = params[0];
+    return { changes: 1, meta: { changes: 1 } };
+  }
+  if (q.startsWith("DELETE FROM webauthn_challenges WHERE expires_at <")) {
+    tables.webauthn_challenges = tables.webauthn_challenges.filter((s) => s.expires_at >= params[0]);
+    return { changes: 0, meta: { changes: 0 } };
+  }
+  if (q.startsWith("DELETE FROM webauthn_challenges WHERE challenge=")) {
+    const before = tables.webauthn_challenges.length;
+    tables.webauthn_challenges = tables.webauthn_challenges.filter((s) => s.challenge !== params[0]);
+    const changes = before - tables.webauthn_challenges.length;
+    return { changes, meta: { changes } };
+  }
+  if (q.startsWith("UPDATE webauthn_credentials SET sign_count=")) {
+    const row = tables.webauthn_credentials.find((s) => s.credential_id === params[1]);
+    if (row) row.sign_count = params[0];
     return {};
+  }
+  if (q.startsWith("INSERT INTO totp_pending")) {
+    tables.totp_pending.push({
+      token_hash: params[0],
+      user_id: params[1],
+      expires_at: params[2],
+      created_at: params[3],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM totp_pending WHERE token_hash=")) {
+    return tables.totp_pending.filter((s) => s.token_hash === params[0]);
+  }
+  if (q.startsWith("DELETE FROM totp_pending WHERE token_hash=")) {
+    tables.totp_pending = tables.totp_pending.filter((s) => s.token_hash !== params[0]);
+    return {};
+  }
+  if (q.startsWith("INSERT OR IGNORE INTO payment_events") || q.startsWith("INSERT INTO payment_events")) {
+    if (!tables.payment_events.some((e) => e.event_id === params[0])) {
+      tables.payment_events.push({
+        event_id: params[0],
+        checkout_id: params[1],
+        type: params[2],
+        created_at: params[3],
+      });
+    }
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM payment_events WHERE event_id=")) {
+    return tables.payment_events.filter((e) => e.event_id === params[0]);
   }
   if (q.startsWith("SELECT * FROM webauthn_challenges WHERE challenge=? AND user_id=")) {
     return tables.webauthn_challenges.filter((s) => s.challenge === params[0] && s.user_id === Number(params[1]));
