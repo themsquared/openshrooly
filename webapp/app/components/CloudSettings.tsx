@@ -98,6 +98,7 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
       <h3>Shroom Labs cloud</h3>
       <div className="control-help">
         Cloud is optional. Your chamber still works if we are down.
+        Disconnect removes the link from this chamber. Remove it from your account too if it still appears.
       </div>
       <div className="control-group">
         <label className="checkbox-label">
@@ -118,12 +119,13 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
       {status?.linked && (
         <div className="cloud-linked" role="status">Linked to your Shroom Labs account</div>
       )}
-      {status?.enabled && !status.linked && code && (
+      {status?.enabled && !status.linked && code && status.state !== 'owned' && (
         <div className="cloud-claim">
           <div className="cloud-code" aria-label="Claim code">{code}</div>
           {url && (
             <div className="control-help">
-              Scan the code or open <a href={url}>{url.replace('https://', '')}</a>
+              Scan the QR code. Or type the letters at{' '}
+              <a href={url}>{url.replace('https://', '')}</a>
             </div>
           )}
           {status.qr_size > 0 && (
@@ -138,27 +140,29 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
           <div className="control-help">
             {minutes > 0 ? `This code expires in ${minutes} min.` : 'This code has expired. Refresh for a new one.'}
           </div>
+        </div>
+      )}
+      {status?.message && <div className="control-help">{status.message}</div>}
+      {error && <div className="control-error">{error}</div>}
+      {status?.enabled && !status.linked && (
+        <div className="cloud-claim">
           <button
             type="button"
             className="charts-button ota-button"
             disabled={busy || demo}
             onClick={() => void post('/cloud/refresh')}
           >
-            Refresh code
+            Refresh
+          </button>
+          <button
+            type="button"
+            className="charts-button ota-button"
+            disabled={busy || demo}
+            onClick={() => void post('/cloud/disconnect')}
+          >
+            Disconnect
           </button>
         </div>
-      )}
-      {status?.message && <div className="control-help">{status.message}</div>}
-      {error && <div className="control-error">{error}</div>}
-      {status?.enabled && !status.linked && (
-        <button
-          type="button"
-          className="charts-button ota-button"
-          disabled={busy || demo}
-          onClick={() => void post('/cloud/disconnect')}
-        >
-          Disconnect
-        </button>
       )}
     </div>
   )

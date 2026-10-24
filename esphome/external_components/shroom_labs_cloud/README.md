@@ -8,7 +8,7 @@ Outbound Shroom Labs pairing. Compiled into this firmware, **off until someone t
 2. `POST /api/devices/enroll` with `{ hardware_id, public_jwk, name }`.
 3. Shows the 6-character claim code and `https://shroomlabs.io/claim.html?code=...` as a QR on the e-paper screen and on the local web page (behind the admin login). The code lasts 15 minutes. Refresh asks for a new one.
 4. After the owner claims the code, `POST /api/devices/:id/csr` with the enroll token and proof of possession. Stores the 7-day client cert and schedules a silent rotate at 3.5 days.
-5. Local Disconnect stops the cloud link. Revoke on the account is noticed on the next inbox probe or rotate. Reclaim follows the Worker contract.
+5. Local Disconnect asks the server to revoke (best effort; the API is account-authenticated so this often returns 401), then wipes the `shlcloud` NVS namespace and zeroes the key. Revoke on the account is noticed on the next inbox probe or rotate (401). After that the chamber wipes the cert and key and shows Unlinked. Refresh then enrolls again (allowed once the account row is revoked).
 
 Telemetry and applying remote commands are not in this ship. `cloud_ready()`, `note_local_change()`, and the inbox probe are the hooks.
 

@@ -25,6 +25,8 @@ const char *state_name(CloudState state) {
       return "rotating";
     case CloudState::Revoked:
       return "revoked";
+    case CloudState::Owned:
+      return "owned";
     case CloudState::Error:
     default:
       return "error";
@@ -38,7 +40,7 @@ const char *state_message(CloudState state) {
     case CloudState::Connecting:
       return "Connecting to Shroom Labs.";
     case CloudState::PendingClaim:
-      return "Scan the code or open shroomlabs.io/claim and type the letters.";
+      return "Scan the QR code. Or type the letters at shroomlabs.io/claim.html";
     case CloudState::Issuing:
       return "Finishing the link.";
     case CloudState::Linked:
@@ -47,9 +49,11 @@ const char *state_message(CloudState state) {
       return "Refreshing the cloud link.";
     case CloudState::Revoked:
       return "Unlinked from the account. Refresh on this chamber to claim it again.";
+    case CloudState::Owned:
+      return "Already linked to an account. Remove it at shroomlabs.io, then press Refresh.";
     case CloudState::Error:
     default:
-      return "Could not reach Shroom Labs. Your chamber still works on its own.";
+      return "Could not reach Shroom Labs. Press Refresh to try again. Your chamber still works on its own.";
   }
 }
 
@@ -62,38 +66,33 @@ CloudState next_state(CloudState state, CloudEvent event) {
         return CloudState::Connecting;
       break;
     case CloudState::Connecting:
-      if (event == CloudEvent::EnrollOk)
+      if (event == CloudEvent::EnrollOk || event == CloudEvent::ReclaimOk)
         return CloudState::PendingClaim;
       if (event == CloudEvent::EnrollOwned)
-        return CloudState::Issuing;
+        return CloudState::Owned;
+      if (event == CloudEvent::NetworkFail || event == CloudEvent::RateLimited)
+        return CloudState::Connecting;
       if (event == CloudEvent::EnrollFail || event == CloudEvent::ReclaimFail)
         return CloudState::Error;
-      if (event == CloudEvent::ReclaimOk)
-        return CloudState::PendingClaim;
       break;
     case CloudState::PendingClaim:
-      if (event == CloudEvent::CsrWaiting || event == CloudEvent::RateLimited)
+      if (event == CloudEvent::CsrWaiting || event == CloudEvent::RateLimited || event == CloudEvent::NetworkFail ||
+          event == CloudEvent::CsrFail)
         return CloudState::PendingClaim;
       if (event == CloudEvent::CsrOk)
         return CloudState::Linked;
       if (event == CloudEvent::CsrAuthFail)
         return CloudState::Revoked;
-      if (event == CloudEvent::CsrFail)
-        return CloudState::Error;
-      if (event == CloudEvent::Refresh || event == CloudEvent::Expired)
-        return CloudState::Connecting;
-      if (event == CloudEvent::Enable)
+      if (event == CloudEvent::Refresh || event == CloudEvent::Expired || event == CloudEvent::Enable)
         return CloudState::Connecting;
       break;
     case CloudState::Issuing:
       if (event == CloudEvent::CsrOk)
         return CloudState::Linked;
-      if (event == CloudEvent::CsrWaiting)
+      if (event == CloudEvent::CsrWaiting || event == CloudEvent::NetworkFail || event == CloudEvent::CsrFail)
         return CloudState::PendingClaim;
       if (event == CloudEvent::CsrAuthFail)
         return CloudState::Revoked;
-      if (event == CloudEvent::CsrFail || event == CloudEvent::EnrollFail)
-        return CloudState::Error;
       if (event == CloudEvent::RateLimited)
         return CloudState::Issuing;
       break;
@@ -110,16 +109,20 @@ CloudState next_state(CloudState state, CloudEvent event) {
         return CloudState::Linked;
       if (event == CloudEvent::LinkAuthFail)
         return CloudState::Revoked;
-      if (event == CloudEvent::CsrFail || event == CloudEvent::RateLimited)
-        return CloudState::Linked;  // keep the working cert
+      if (event == CloudEvent::CsrFail || event == CloudEvent::RateLimited || event == CloudEvent::NetworkFail)
+        return CloudState::Linked;
       break;
     case CloudState::Revoked:
       if (event == CloudEvent::ReclaimOk)
         return CloudState::PendingClaim;
       if (event == CloudEvent::Refresh || event == CloudEvent::Enable)
         return CloudState::Connecting;
-      if (event == CloudEvent::ReclaimFail)
+      if (event == CloudEvent::ReclaimFail || event == CloudEvent::NetworkFail)
         return CloudState::Revoked;
+      break;
+    case CloudState::Owned:
+      if (event == CloudEvent::Refresh || event == CloudEvent::Enable)
+        return CloudState::Connecting;
       break;
     case CloudState::Error:
       if (event == CloudEvent::Enable || event == CloudEvent::Refresh)

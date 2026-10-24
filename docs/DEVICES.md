@@ -76,7 +76,7 @@ Spreading 100-cert shards across `link-a.`, `link-b.`, extra CF zones, or extra 
 
 | Asset | Threat | Control |
 | --- | --- | --- |
-| Device private key | Extract from flash / swap firmware | Generated on-device (P-256); stored in encrypted NVS; never in CSR, logs, or the hub |
+| Device private key | Extract from flash / swap firmware | Generated on-device (P-256); stored in the `shlcloud` NVS namespace; never in CSR, logs, or the hub. Stock images do not enable flash encryption, so a USB dump can read the key (same as the Ship 9 admin password). |
 | Enrollment | Attacker claims a stranger’s chamber | 6-char code, 15-minute TTL, hashed at rest, rate-limited; verified email required to claim |
 | Cloud impersonation | Stolen hub token used as a device | Devices authenticate with a cert serial plus a proof signed by the device key, not the browser session |
 | Stolen serial / PEM | Replay headers without the key | Proof is always required, over a single-use 2-minute server nonce, bound to device, method, path, and body |
@@ -114,10 +114,23 @@ Telemetry and `last_seen_at` are the data source for a later **email alerts** sh
 | --- | --- | --- | --- |
 | mbedTLS client (already common if HTTPS is on) | ~155 KB if newly linked | ~42 KB default, **~22 KB** with `CONFIG_MBEDTLS_DYNAMIC_BUFFER` + free CA/config | Espressif https_request figures |
 | One WSS + TLS |: | ~24 KB idle, ~30 KB under traffic (measured WSS on S2/S3-class) | Keep **one** socket. App-layer proof is one ECDSA sign, not a second handshake |
-| P-256 key + cert in NVS | < 2 KB |: | Encrypted NVS / flash encryption |
-| This component vs default firmware | **0** unless `shroom_labs_cloud:` is in YAML | 0 | Default OpenShrooly YAML does not include it |
+| P-256 key + cert in NVS | < 2 KB |: | Ordinary NVS on stock images. Encrypted NVS only when flash encryption is on. USB can dump the key. |
+| This component vs default firmware | ~43 KB flash when compiled in | 16 KB task + ~22 KB QR canvas | Compiled into the default YAML, **off until Connect to Shroom Labs** |
 
-Do **not** enable the component on the default 1.0.x build. The web UI gzip budget is already ~161 KB.
+The component is in the default 1.0.x-sl build (`esphome/components/cloud.yaml`) and stays off until the local admin toggle. That costs flash even while unused. The web UI gzip budget is already ~161 KB.
+
+### Flash layout (proposal, not applied)
+
+The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 96.8% full (~58 KB free). OTA still fits. The next feature of this size will not.
+
+Do not flash a new table from this pairing ship. A later layout change should keep OTA and rollback working for chambers already in the field:
+
+1. Keep the 4 MB table until a dedicated layout ship.
+2. That ship boots on the old table, copies NVS (Wi-Fi, admin password, setpoints) to RAM, writes a 16 MB table with two ~6 MB OTA slots, writes the new image to both slots, and restores NVS to the new offset.
+3. Chambers that never got that migrator can still USB-restore a full 16 MB backup.
+4. Do not move NVS without a migrator: today's NVS lives at 0x3A0000-0x400000. A new table that just sets `flash_size: 16MB` would look like a factory reset.
+
+Until that ship, leave the 4 MB table. If an image does not fit, stop and cut scope rather than the OTA slots.
 
 ## Mike’s production checklist
 
@@ -142,6 +155,6 @@ Local / CI uses the Worker CA (`DEVICE_ISSUER=worker`). Never commit the CA key.
 
 ## UX
 
-- Device (next firmware): large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. Not in shipped firmware yet.
+- Device: large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. The component is in the default 1.0.x-sl build and stays off until that toggle.
 - Site: `/claim.html` explains pairing. The code form is shown for `?code=` (camera / typed) or when `deviceClaiming` is on. Account list + revoke.
-- Copy: cloud linking needs a firmware update that is not out yet; the chamber still works on your own network.
+- Copy: scan the QR code first. Typing the letters is the fallback. The chamber still works on your own network if cloud is off or down.

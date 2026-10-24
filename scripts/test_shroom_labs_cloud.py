@@ -33,6 +33,7 @@ def main():
             str(COMP),
             str(REPO / "scripts/shroom_labs_cloud_host_test.cpp"),
             str(COMP / "cloud_format.cpp"),
+            str(COMP / "cloud_http.cpp"),
             str(COMP / "cloud_qr.cpp"),
             "-o",
             str(exe),

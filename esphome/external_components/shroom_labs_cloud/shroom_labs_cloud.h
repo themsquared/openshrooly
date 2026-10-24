@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cloud_format.h"
+#include "cloud_http.h"
 #include "cloud_qr.h"
 #include "esphome/core/component.h"
 #include "esphome/components/web_server_base/web_server_base.h"
@@ -49,31 +50,46 @@ class ShroomLabsCloud : public Component {
   uint32_t last_local_change_ms() const { return last_local_change_ms_; }
 
  protected:
-  enum class Job : uint8_t { NONE, ENROLL, CSR, ROTATE, RECLAIM, PROBE };
+  enum class Job : uint8_t { NONE, ENROLL, CSR, ROTATE, RECLAIM, PROBE, REVOKE };
+
+  struct JobSnap {
+    std::string device_id;
+    std::string enroll_token;
+    std::string serial;
+    uint8_t pub_x[32]{};
+    uint8_t pub_y[32]{};
+    bool has_key{false};
+    bool has_cert{false};
+  };
 
   void load_();
   void save_identity_();
   void save_cert_(const std::string &pem);
   void clear_cert_();
+  void wipe_();
+  void zero_key_();
   bool ensure_key_();
   bool sign_(const uint8_t *data, size_t len, uint8_t sig[64]);
   bool make_csr_(std::string *pem);
   std::string hardware_id_() const;
+  JobSnap snap_() const;
   void apply_(CloudEvent event);
-  void queue_(Job job);
+  bool queue_(Job job);
+  void bump_backoff_(int retry_after_s);
+  bool rotate_slot_open_();
   static void task_entry_(void *arg);
   void run_job_();
   bool http_(const char *method, const char *path, const std::string &body, bool pop, bool with_serial, int *status,
-             std::string *response);
+             std::string *response, int *retry_after_s);
   bool fetch_nonce_(std::string *nonce);
   bool handle_enroll_();
   bool handle_csr_();
   bool handle_rotate_();
   bool handle_reclaim_();
   bool handle_probe_();
+  bool handle_revoke_();
   void store_enroll_(const std::string &body);
   void store_cert_(const std::string &body);
-  int64_t now_ms_() const;
   uint32_t claim_seconds_left_() const;
 
   web_server_base::WebServerBase *base_;
@@ -99,17 +115,24 @@ class ShroomLabsCloud : public Component {
   std::string not_after_;
   int64_t rotate_after_ms_{ROTATE_AFTER_MS};
   int64_t issued_ms_{0};
-  int64_t claim_deadline_ms_{0};
+  uint32_t claim_deadline_mono_{0};
+  uint8_t claim_cycles_{0};
 
   CloudState state_{CloudState::Off};
   bool cloud_enabled_{false};
   uint32_t last_local_change_ms_{0};
   uint32_t next_csr_ms_{0};
   uint32_t next_probe_ms_{0};
-  uint32_t backoff_ms_{20000};
+  uint32_t next_rotate_ms_{0};
+  uint32_t next_retry_ms_{0};
+  uint32_t backoff_ms_{BACKOFF_MIN_MS};
+  uint32_t rotate_hour_start_ms_{0};
+  uint8_t rotate_attempts_hour_{0};
+  int last_retry_after_s_{0};
 
   std::atomic<bool> busy_{false};
   std::atomic<bool> show_claim_{false};
+  std::atomic<bool> pending_wipe_{false};
   Job job_{Job::NONE};
   mutable std::mutex lock_;
 };

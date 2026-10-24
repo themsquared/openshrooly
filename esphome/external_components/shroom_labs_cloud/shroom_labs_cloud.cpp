@@ -32,7 +32,7 @@ namespace shroom_labs {
 
 static const char *const TAG = "shroom_labs_cloud";
 static const char *const NVS_NS = "shlcloud";
-static constexpr uint32_t MAGIC = 0x53484c32;  // SHL2
+static constexpr uint32_t MAGIC = 0x53484c33;  // SHL3
 
 ShroomLabsCloud *global_shroom_labs_cloud = nullptr;  // NOLINT
 
@@ -51,7 +51,8 @@ struct SavedIdentity {
   char not_after[32];
   int64_t rotate_after_ms;
   int64_t issued_ms;
-  int64_t claim_deadline_ms;
+  uint32_t claim_deadline_mono;
+  uint8_t claim_cycles;
   uint8_t state;
   uint8_t enabled;
   uint8_t has_key;
@@ -152,6 +153,7 @@ bool ShroomLabsCloud::sign_(const uint8_t *data, size_t len, uint8_t sig[64]) {
   mbedtls_ecp_group_free(&grp);
   mbedtls_ctr_drbg_free(&ctr);
   mbedtls_entropy_free(&entropy);
+  secure_clear(hash, sizeof(hash));
   return ok;
 }
 
@@ -179,7 +181,7 @@ bool ShroomLabsCloud::ensure_key_() {
       break;
     if (mbedtls_mpi_write_binary(&priv, this->priv_, 32) != 0)
       break;
-    uint8_t xy[65];
+    uint8_t xy[65]{};
     size_t olen = 0;
     if (mbedtls_ecp_point_write_binary(&grp, &Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &olen, xy, sizeof(xy)) != 0 || olen != 65)
       break;
@@ -187,6 +189,7 @@ bool ShroomLabsCloud::ensure_key_() {
     std::memcpy(this->pub_y_, xy + 33, 32);
     this->has_key_ = true;
     ok = true;
+    secure_clear(xy, sizeof(xy));
     ESP_LOGI(TAG, "Created this chamber's cloud key");
   } while (false);
   mbedtls_ecp_point_free(&Q);
@@ -260,12 +263,16 @@ void ShroomLabsCloud::load_() {
   this->not_after_ = s.not_after;
   this->rotate_after_ms_ = s.rotate_after_ms ? s.rotate_after_ms : ROTATE_AFTER_MS;
   this->issued_ms_ = s.issued_ms;
-  this->claim_deadline_ms_ = s.claim_deadline_ms;
+  this->claim_deadline_mono_ = s.claim_deadline_mono;
+  this->claim_cycles_ = s.claim_cycles;
   this->has_cert_ = s.has_cert && !this->cert_pem_.empty() && !this->serial_.empty();
   this->cloud_enabled_ = s.enabled != 0;
-  this->state_ = static_cast<CloudState>(s.state);
+  this->state_ = persist_state(static_cast<CloudState>(s.state));
   if (!this->cloud_enabled_)
     this->state_ = CloudState::Off;
+  if (this->state_ == CloudState::PendingClaim && !this->claim_code_.empty())
+    this->claim_deadline_mono_ = millis() + CLAIM_MS;
+  secure_clear(&s, sizeof(s));
 }
 
 void ShroomLabsCloud::save_identity_() {
@@ -287,16 +294,20 @@ void ShroomLabsCloud::save_identity_() {
   std::snprintf(s.not_after, sizeof(s.not_after), "%s", this->not_after_.c_str());
   s.rotate_after_ms = this->rotate_after_ms_;
   s.issued_ms = this->issued_ms_;
-  s.claim_deadline_ms = this->claim_deadline_ms_;
-  s.state = static_cast<uint8_t>(this->state_);
+  s.claim_deadline_mono = this->claim_deadline_mono_;
+  s.claim_cycles = this->claim_cycles_;
+  s.state = static_cast<uint8_t>(persist_state(this->state_));
   s.enabled = this->cloud_enabled_ ? 1 : 0;
   s.has_cert = this->has_cert_ ? 1 : 0;
   nvs_handle_t h;
-  if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK)
+  if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK) {
+    secure_clear(&s, sizeof(s));
     return;
+  }
   nvs_write_blob(h, "id", &s, sizeof(s));
   nvs_commit(h);
   nvs_close(h);
+  secure_clear(&s, sizeof(s));
 }
 
 void ShroomLabsCloud::save_cert_(const std::string &pem) {
@@ -322,6 +333,70 @@ void ShroomLabsCloud::clear_cert_() {
   this->save_cert_("");
 }
 
+void ShroomLabsCloud::zero_key_() {
+  secure_clear(this->priv_, sizeof(this->priv_));
+  secure_clear(this->pub_x_, sizeof(this->pub_x_));
+  secure_clear(this->pub_y_, sizeof(this->pub_y_));
+  this->has_key_ = false;
+}
+
+void ShroomLabsCloud::wipe_() {
+  this->zero_key_();
+  this->device_id_.clear();
+  if (!this->enroll_token_.empty())
+    secure_clear(&this->enroll_token_[0], this->enroll_token_.size());
+  this->enroll_token_.clear();
+  this->claim_code_.clear();
+  this->claim_url_.clear();
+  this->claim_expires_.clear();
+  this->claim_deadline_mono_ = 0;
+  this->claim_cycles_ = 0;
+  this->cert_pem_.clear();
+  this->serial_.clear();
+  this->fingerprint_.clear();
+  this->not_after_.clear();
+  this->has_cert_ = false;
+  this->issued_ms_ = 0;
+  this->cloud_enabled_ = false;
+  this->state_ = CloudState::Off;
+  nvs_handle_t h;
+  if (nvs_open(NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+    nvs_erase_all(h);
+    nvs_commit(h);
+    nvs_close(h);
+  }
+}
+
+ShroomLabsCloud::JobSnap ShroomLabsCloud::snap_() const {
+  JobSnap s;
+  s.device_id = this->device_id_;
+  s.enroll_token = this->enroll_token_;
+  s.serial = this->serial_;
+  if (this->has_key_) {
+    std::memcpy(s.pub_x, this->pub_x_, 32);
+    std::memcpy(s.pub_y, this->pub_y_, 32);
+    s.has_key = true;
+  }
+  s.has_cert = this->has_cert_;
+  return s;
+}
+
+void ShroomLabsCloud::bump_backoff_(int retry_after_s) {
+  this->backoff_ms_ = retry_after_backoff_ms(retry_after_s, this->backoff_ms_, esp_random());
+  this->next_retry_ms_ = millis() + this->backoff_ms_;
+  this->next_csr_ms_ = this->next_retry_ms_;
+  this->next_rotate_ms_ = this->next_retry_ms_;
+}
+
+bool ShroomLabsCloud::rotate_slot_open_() {
+  const uint32_t now = millis();
+  if (now - this->rotate_hour_start_ms_ >= ROTATE_HOUR_MS || this->rotate_hour_start_ms_ == 0) {
+    this->rotate_hour_start_ms_ = now;
+    this->rotate_attempts_hour_ = 0;
+  }
+  return rotate_allowed(this->rotate_attempts_hour_);
+}
+
 void ShroomLabsCloud::setup() {
   global_shroom_labs_cloud = this;
   this->load_();
@@ -332,10 +407,10 @@ void ShroomLabsCloud::setup() {
   if (!this->flash_encrypted_ && !this->nvs_encrypted_) {
     ESP_LOGW(TAG, "The cloud private key is in NVS without flash encryption on this build");
   }
-  if (this->cloud_enabled_ && this->state_ == CloudState::PendingClaim)
-    this->show_claim_ = true;
   if (this->cloud_enabled_ && this->state_ == CloudState::Linked)
     this->next_probe_ms_ = millis() + 60000;
+  if (this->cloud_enabled_ && this->state_ == CloudState::Connecting)
+    this->next_retry_ms_ = millis() + 1000;
 }
 
 void ShroomLabsCloud::dump_config() {
@@ -352,9 +427,7 @@ void ShroomLabsCloud::apply_(CloudEvent event) {
   CloudState next = next_state(this->state_, event);
   if (next != this->state_) {
     ESP_LOGI(TAG, "Cloud state %s -> %s", state_name(this->state_), state_name(next));
-    this->state_ = next;
-    if (next == CloudState::PendingClaim)
-      this->show_claim_ = true;
+    this->state_ = persist_state(next);
     this->save_identity_();
   } else if (event == CloudEvent::Disable) {
     this->state_ = CloudState::Off;
@@ -362,16 +435,19 @@ void ShroomLabsCloud::apply_(CloudEvent event) {
   }
 }
 
-void ShroomLabsCloud::queue_(Job job) {
+bool ShroomLabsCloud::queue_(Job job) {
   if (this->busy_.exchange(true)) {
     ESP_LOGD(TAG, "Cloud job already running");
-    return;
+    return false;
   }
   this->job_ = job;
   if (xTaskCreate(task_entry_, "shl_cloud", 16384, this, 1, nullptr) != pdPASS) {
     this->busy_ = false;
+    this->job_ = Job::NONE;
     ESP_LOGW(TAG, "Could not start the cloud task");
+    return false;
   }
+  return true;
 }
 
 void ShroomLabsCloud::task_entry_(void *arg) {
@@ -404,49 +480,74 @@ void ShroomLabsCloud::run_job_() {
     case Job::PROBE:
       ok = this->handle_probe_();
       break;
+    case Job::REVOKE:
+      ok = this->handle_revoke_();
+      break;
     default:
       break;
   }
   (void) ok;
+  if (this->pending_wipe_.exchange(false) && job != Job::REVOKE)
+    this->handle_revoke_();
 }
 
 void ShroomLabsCloud::connect() {
-  std::lock_guard<std::mutex> g(this->lock_);
-  this->cloud_enabled_ = true;
-  this->apply_(CloudEvent::Enable);
-  this->backoff_ms_ = 20000;
-  this->save_identity_();
-  if (this->state_ == CloudState::Linked)
-    return;
-  if (this->state_ == CloudState::Revoked)
-    this->queue_(Job::RECLAIM);
-  else
-    this->queue_(Job::ENROLL);
+  Job job = Job::ENROLL;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    this->cloud_enabled_ = true;
+    this->claim_cycles_ = 0;
+    this->backoff_ms_ = BACKOFF_MIN_MS;
+    this->show_claim_ = true;
+    if (this->state_ == CloudState::Linked) {
+      this->save_identity_();
+      return;
+    }
+    if (this->state_ == CloudState::Revoked && !this->device_id_.empty() && this->has_key_) {
+      job = Job::RECLAIM;
+    } else {
+      this->apply_(CloudEvent::Enable);
+      job = Job::ENROLL;
+    }
+    this->save_identity_();
+  }
+  this->queue_(job);
 }
 
 void ShroomLabsCloud::disconnect() {
-  std::lock_guard<std::mutex> g(this->lock_);
-  this->cloud_enabled_ = false;
-  this->claim_code_.clear();
-  this->claim_url_.clear();
-  this->claim_expires_.clear();
-  this->claim_deadline_ms_ = 0;
-  this->clear_cert_();
-  this->apply_(CloudEvent::Disable);
-  ESP_LOGI(TAG, "Cloud disconnected locally. Growing still works here.");
+  bool had_id = false;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    had_id = !this->device_id_.empty() && this->has_key_;
+    this->pending_wipe_ = true;
+  }
+  if (had_id && this->queue_(Job::REVOKE))
+    return;
+  if (!this->busy_) {
+    std::lock_guard<std::mutex> g(this->lock_);
+    this->wipe_();
+    this->pending_wipe_ = false;
+    ESP_LOGI(TAG, "Cloud disconnected here. Growing still works.");
+  }
 }
 
 void ShroomLabsCloud::refresh() {
-  std::lock_guard<std::mutex> g(this->lock_);
-  if (!this->cloud_enabled_)
-    return;
-  this->backoff_ms_ = 20000;
-  if (this->state_ == CloudState::Revoked) {
-    this->queue_(Job::RECLAIM);
-    return;
+  Job job = Job::ENROLL;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    if (!this->cloud_enabled_)
+      return;
+    this->claim_cycles_ = 0;
+    this->backoff_ms_ = BACKOFF_MIN_MS;
+    this->show_claim_ = true;
+    if (this->state_ == CloudState::Revoked && !this->device_id_.empty() && this->has_key_) {
+      job = Job::RECLAIM;
+    } else {
+      this->apply_(CloudEvent::Refresh);
+      job = Job::ENROLL;
+    }
   }
-  this->apply_(CloudEvent::Refresh);
-  this->queue_(Job::ENROLL);
+  this->queue_(job);
 }
 
 CloudState ShroomLabsCloud::state() const {
@@ -486,6 +587,8 @@ std::string ShroomLabsCloud::display_title() const {
       return "Linked";
     case CloudState::Revoked:
       return "Unlinked";
+    case CloudState::Owned:
+      return "Remove first";
     case CloudState::Off:
       return "Cloud off";
     default:
@@ -520,23 +623,12 @@ std::string ShroomLabsCloud::display_expiry() const {
 
 uint32_t ShroomLabsCloud::claim_seconds_left_() const {
   std::lock_guard<std::mutex> g(this->lock_);
-  int64_t now = this->now_ms_();
-  if (this->claim_deadline_ms_ <= 0)
+  if (this->claim_deadline_mono_ == 0)
     return 0;
-  if (now <= 0) {
-    // No wall clock yet: use the stored remaining window from enroll time if we can.
-    return CLAIM_MS / 1000;
-  }
-  if (now >= this->claim_deadline_ms_)
+  const uint32_t now = millis();
+  if (now >= this->claim_deadline_mono_)
     return 0;
-  return static_cast<uint32_t>((this->claim_deadline_ms_ - now) / 1000);
-}
-
-int64_t ShroomLabsCloud::now_ms_() const {
-  time_t t = time(nullptr);
-  if (t < 1700000000)
-    return 0;
-  return static_cast<int64_t>(t) * 1000;
+  return (this->claim_deadline_mono_ - now) / 1000;
 }
 
 bool ShroomLabsCloud::fill_qr(QrCode *out) const {
@@ -565,12 +657,10 @@ std::string ShroomLabsCloud::status_json() const {
     qr_bits = qr_modules_string(qr);
   }
   uint32_t left = 0;
-  if (this->claim_deadline_ms_ > 0) {
-    int64_t now = this->now_ms_();
-    if (now > 0 && now < this->claim_deadline_ms_)
-      left = static_cast<uint32_t>((this->claim_deadline_ms_ - now) / 1000);
-    else if (now <= 0)
-      left = CLAIM_MS / 1000;
+  if (this->claim_deadline_mono_ > 0) {
+    const uint32_t now = millis();
+    if (now < this->claim_deadline_mono_)
+      left = (this->claim_deadline_mono_ - now) / 1000;
   }
   std::string out = "{";
   out += "\"enabled\":";
@@ -612,11 +702,21 @@ struct HttpClientDeleter {
 using HttpClient = std::unique_ptr<std::remove_pointer<esp_http_client_handle_t>::type, HttpClientDeleter>;
 
 bool ShroomLabsCloud::http_(const char *method, const char *path, const std::string &body, bool pop, bool with_serial,
-                            int *status, std::string *response) {
+                            int *status, std::string *response, int *retry_after_s) {
+  if (retry_after_s)
+    *retry_after_s = 0;
+  this->last_retry_after_s_ = 0;
   std::string url = https_url(this->api_host_.c_str(), path);
   if (!api_url_allowed(url.c_str(), this->api_host_.c_str())) {
     ESP_LOGW(TAG, "Refusing a cloud URL that is not this host");
     return false;
+  }
+  std::string device_id;
+  std::string serial;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    device_id = this->device_id_;
+    serial = this->serial_;
   }
   std::string nonce, proof;
   if (pop) {
@@ -626,11 +726,13 @@ bool ShroomLabsCloud::http_(const char *method, const char *path, const std::str
     mbedtls_sha256(reinterpret_cast<const uint8_t *>(body.data()), body.size(), hash, 0);
     char hex[65];
     hex_encode_to(hash, 32, hex);
-    std::string payload = proof_payload(this->device_id_.c_str(), nonce.c_str(), method, path, hex);
+    std::string payload = proof_payload(device_id.c_str(), nonce.c_str(), method, path, hex);
     uint8_t sig[64];
     if (!this->sign_(reinterpret_cast<const uint8_t *>(payload.data()), payload.size(), sig))
       return false;
     proof = base64_encode(sig, 64);
+    secure_clear(sig, sizeof(sig));
+    secure_clear(hash, sizeof(hash));
   }
 
   esp_http_client_config_t cfg = {};
@@ -649,38 +751,54 @@ bool ShroomLabsCloud::http_(const char *method, const char *path, const std::str
     esp_http_client_set_header(client.get(), "x-device-nonce", nonce.c_str());
   if (!proof.empty())
     esp_http_client_set_header(client.get(), "x-device-proof", proof.c_str());
-  if (with_serial && !this->serial_.empty())
-    esp_http_client_set_header(client.get(), "x-device-cert-serial", this->serial_.c_str());
-  if (!body.empty())
-    esp_http_client_set_post_field(client.get(), body.c_str(), static_cast<int>(body.size()));
-  if (esp_http_client_perform(client.get()) != ESP_OK)
+  if (with_serial && !serial.empty())
+    esp_http_client_set_header(client.get(), "x-device-cert-serial", serial.c_str());
+
+  const int wlen = body.empty() ? 0 : static_cast<int>(body.size());
+  if (esp_http_client_open(client.get(), wlen) != ESP_OK)
     return false;
+  if (wlen > 0) {
+    const int wrote = esp_http_client_write(client.get(), body.c_str(), wlen);
+    if (wrote < wlen)
+      return false;
+  }
+  int64_t length = esp_http_client_fetch_headers(client.get());
   int st = esp_http_client_get_status_code(client.get());
   if (status)
     *status = st;
-  int64_t length = esp_http_client_get_content_length(client.get());
-  if (length < 0)
-    length = 0;
+  char *retry_hdr = nullptr;
+  if (esp_http_client_get_header(client.get(), "Retry-After", &retry_hdr) == ESP_OK && retry_hdr != nullptr) {
+    this->last_retry_after_s_ = parse_retry_after(retry_hdr);
+    if (retry_after_s)
+      *retry_after_s = this->last_retry_after_s_;
+  }
   if (length > static_cast<int64_t>(MAX_DEVICE_BODY))
     return false;
+
+  auto read_fn = [](void *ctx, char *buf, int max) -> int {
+    return esp_http_client_read(static_cast<esp_http_client_handle_t>(ctx), buf, max);
+  };
   std::string out;
-  out.resize(MAX_DEVICE_BODY);
-  int got = esp_http_client_read_response(client.get(), out.data(), out.size());
-  if (got < 0)
+  if (!read_capped_body(read_fn, client.get(), MAX_DEVICE_BODY, &out))
     return false;
-  out.resize(static_cast<size_t>(got));
   if (response)
     *response = std::move(out);
   return true;
 }
 
 bool ShroomLabsCloud::fetch_nonce_(std::string *nonce) {
-  if (this->device_id_.empty())
+  std::string device_id;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    device_id = this->device_id_;
+  }
+  if (device_id.empty())
     return false;
-  std::string path = "/api/devices/" + this->device_id_ + "/nonce";
+  std::string path = "/api/devices/" + device_id + "/nonce";
   int status = 0;
   std::string body;
-  if (!this->http_("POST", path.c_str(), "", false, false, &status, &body))
+  int retry = 0;
+  if (!this->http_("POST", path.c_str(), "", false, false, &status, &body, &retry))
     return false;
   if (status != 200)
     return false;
@@ -688,6 +806,13 @@ bool ShroomLabsCloud::fetch_nonce_(std::string *nonce) {
 }
 
 void ShroomLabsCloud::store_enroll_(const std::string &body) {
+  this->device_id_.clear();
+  this->claim_code_.clear();
+  if (!this->enroll_token_.empty())
+    secure_clear(&this->enroll_token_[0], this->enroll_token_.size());
+  this->enroll_token_.clear();
+  this->claim_url_.clear();
+  this->claim_expires_.clear();
   json_get_string(body.c_str(), "device_id", &this->device_id_);
   json_get_string(body.c_str(), "claim_code", &this->claim_code_);
   this->claim_code_ = format_claim_code(this->claim_code_.c_str());
@@ -698,11 +823,7 @@ void ShroomLabsCloud::store_enroll_(const std::string &body) {
   if (this->claim_url_.empty() && !this->claim_code_.empty())
     this->claim_url_ = claim_url_for(this->site_origin_.c_str(), this->claim_code_.c_str());
   json_get_string(body.c_str(), "claim_expires_at", &this->claim_expires_);
-  int64_t exp = parse_iso8601_ms(this->claim_expires_.c_str());
-  int64_t now = this->now_ms_();
-  this->claim_deadline_ms_ = exp > 0 ? exp : (now > 0 ? now + CLAIM_MS : 0);
-  if (this->claim_deadline_ms_ == 0)
-    this->claim_deadline_ms_ = static_cast<int64_t>(millis()) + CLAIM_MS;  // fallback, not wall time
+  this->claim_deadline_mono_ = millis() + CLAIM_MS;
 }
 
 void ShroomLabsCloud::store_cert_(const std::string &body) {
@@ -714,7 +835,8 @@ void ShroomLabsCloud::store_cert_(const std::string &body) {
   int64_t rot = 0;
   if (json_get_int64(body.c_str(), "rotate_after_ms", &rot) && rot > 0)
     this->rotate_after_ms_ = rot;
-  this->issued_ms_ = this->now_ms_();
+  time_t t = time(nullptr);
+  this->issued_ms_ = (t >= 1700000000) ? static_cast<int64_t>(t) * 1000 : 0;
   this->save_cert_(pem);
 }
 
@@ -724,156 +846,207 @@ bool ShroomLabsCloud::handle_enroll_() {
     this->apply_(CloudEvent::EnrollFail);
     return false;
   }
-  std::string jwk = jwk_json(this->pub_x_, this->pub_y_);
+  JobSnap snap;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    snap = this->snap_();
+  }
+  std::string jwk = jwk_json(snap.pub_x, snap.pub_y);
   std::string body = enroll_body_json(this->hardware_id_().c_str(), jwk.c_str(), "Chamber");
   int status = 0;
   std::string res;
-  if (!this->http_("POST", "/api/devices/enroll", body, false, false, &status, &res)) {
-    std::lock_guard<std::mutex> g(this->lock_);
-    this->apply_(CloudEvent::EnrollFail);
+  int retry = 0;
+  const bool ok = this->http_("POST", "/api/devices/enroll", body, false, false, &status, &res, &retry);
+  std::lock_guard<std::mutex> g(this->lock_);
+  const HttpOutcome o = enroll_outcome(ok, status);
+  const CloudEvent ev = event_for_enroll(o);
+  if (o == HttpOutcome::Success) {
+    this->store_enroll_(res);
+    if (this->claim_cycles_ < 255)
+      this->claim_cycles_++;
+    this->backoff_ms_ = BACKOFF_MIN_MS;
+    this->apply_(ev);
+    this->next_csr_ms_ = millis() + 3000;
+    this->save_identity_();
+    return true;
+  }
+  this->apply_(ev);
+  if (o == HttpOutcome::AlreadyOwned) {
+    ESP_LOGW(TAG, "This chamber is already linked to an account. Remove it there first.");
     return false;
   }
-  {
-    std::lock_guard<std::mutex> g(this->lock_);
-    if (status == 200) {
-      this->store_enroll_(res);
-      this->apply_(CloudEvent::EnrollOk);
-      this->next_csr_ms_ = millis() + 3000;
-      this->save_identity_();
-      return true;
-    }
-    if (status == 409) {
-      this->apply_(CloudEvent::EnrollOwned);
-    } else {
-      this->apply_(CloudEvent::EnrollFail);
-      return false;
-    }
-  }
-  // 409: this MAC is already claimed. Continue inline; busy_ is still held.
-  if (!this->enroll_token_.empty())
-    return this->handle_csr_();
-  return this->handle_reclaim_();
+  this->bump_backoff_(retry);
+  return false;
 }
 
 bool ShroomLabsCloud::handle_csr_() {
-  if (this->device_id_.empty() || this->enroll_token_.empty()) {
+  JobSnap snap;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    snap = this->snap_();
+  }
+  if (snap.device_id.empty() || snap.enroll_token.empty()) {
+    std::lock_guard<std::mutex> g(this->lock_);
+    this->apply_(CloudEvent::NetworkFail);
+    this->bump_backoff_(0);
+    return false;
+  }
+  std::string csr;
+  if (!this->make_csr_(&csr)) {
+    std::lock_guard<std::mutex> g(this->lock_);
+    this->apply_(CloudEvent::NetworkFail);
+    this->bump_backoff_(0);
+    return false;
+  }
+  std::string path = "/api/devices/" + snap.device_id + "/csr";
+  std::string body = csr_body_json(csr.c_str(), snap.enroll_token.c_str());
+  secure_clear(&snap.enroll_token[0], snap.enroll_token.size());
+  int status = 0;
+  std::string res;
+  int retry = 0;
+  const bool ok = this->http_("POST", path.c_str(), body, true, false, &status, &res, &retry);
+  std::lock_guard<std::mutex> g(this->lock_);
+  const HttpOutcome o = csr_outcome(ok, status);
+  const CloudEvent ev = event_for_csr(o);
+  if (o == HttpOutcome::Success) {
+    this->store_cert_(res);
+    this->claim_code_.clear();
+    this->claim_url_.clear();
+    this->claim_expires_.clear();
+    this->claim_deadline_mono_ = 0;
+    this->backoff_ms_ = BACKOFF_MIN_MS;
+    this->apply_(ev);
+    this->next_probe_ms_ = millis() + 3600000;
+    return true;
+  }
+  this->apply_(ev);
+  if (o == HttpOutcome::AuthFail)
+    return false;
+  this->bump_backoff_(retry);
+  return o == HttpOutcome::WaitingClaim || o == HttpOutcome::RateLimited || o == HttpOutcome::TransientFail;
+}
+
+bool ShroomLabsCloud::handle_rotate_() {
+  JobSnap snap;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    snap = this->snap_();
+  }
+  if (snap.device_id.empty() || !snap.has_cert) {
     std::lock_guard<std::mutex> g(this->lock_);
     this->apply_(CloudEvent::CsrFail);
+    this->bump_backoff_(0);
     return false;
   }
   std::string csr;
   if (!this->make_csr_(&csr)) {
     std::lock_guard<std::mutex> g(this->lock_);
     this->apply_(CloudEvent::CsrFail);
+    this->bump_backoff_(0);
     return false;
   }
-  std::string path = "/api/devices/" + this->device_id_ + "/csr";
-  std::string body = csr_body_json(csr.c_str(), this->enroll_token_.c_str());
-  int status = 0;
-  std::string res;
-  if (!this->http_("POST", path.c_str(), body, true, false, &status, &res)) {
-    std::lock_guard<std::mutex> g(this->lock_);
-    this->apply_(CloudEvent::CsrFail);
-    return false;
-  }
-  std::lock_guard<std::mutex> g(this->lock_);
-  if (status == 200) {
-    this->store_cert_(res);
-    this->claim_code_.clear();
-    this->claim_url_.clear();
-    this->apply_(CloudEvent::CsrOk);
-    this->next_probe_ms_ = millis() + 3600000;
-    return true;
-  }
-  if (status == 403) {
-    this->apply_(CloudEvent::CsrWaiting);
-    this->next_csr_ms_ = millis() + this->backoff_ms_;
-    return true;
-  }
-  if (status == 429) {
-    this->apply_(CloudEvent::RateLimited);
-    this->backoff_ms_ = 360000;
-    this->next_csr_ms_ = millis() + this->backoff_ms_;
-    return true;
-  }
-  if (status == 401) {
-    this->apply_(CloudEvent::CsrAuthFail);
-    return false;
-  }
-  this->apply_(CloudEvent::CsrFail);
-  return false;
-}
-
-bool ShroomLabsCloud::handle_rotate_() {
-  if (this->device_id_.empty() || !this->has_cert_)
-    return false;
-  std::string csr;
-  if (!this->make_csr_(&csr))
-    return false;
-  std::string path = "/api/devices/" + this->device_id_ + "/rotate";
+  std::string path = "/api/devices/" + snap.device_id + "/rotate";
   std::string body = rotate_body_json(csr.c_str());
   int status = 0;
   std::string res;
-  if (!this->http_("POST", path.c_str(), body, true, true, &status, &res))
-    return false;
+  int retry = 0;
+  const bool ok = this->http_("POST", path.c_str(), body, true, true, &status, &res, &retry);
   std::lock_guard<std::mutex> g(this->lock_);
-  if (status == 200) {
+  const HttpOutcome o = rotate_outcome(ok, status);
+  const CloudEvent ev = event_for_rotate(o);
+  if (o == HttpOutcome::Success) {
     this->store_cert_(res);
-    this->apply_(CloudEvent::RotateOk);
+    this->backoff_ms_ = BACKOFF_MIN_MS;
+    this->apply_(ev);
     return true;
   }
-  if (status == 401) {
-    this->apply_(CloudEvent::LinkAuthFail);
+  this->apply_(ev);
+  if (o == HttpOutcome::AuthFail) {
+    this->zero_key_();
+    this->clear_cert_();
     return false;
   }
-  this->apply_(CloudEvent::CsrFail);
+  this->bump_backoff_(retry);
   return false;
 }
 
 bool ShroomLabsCloud::handle_reclaim_() {
-  if (this->device_id_.empty() && !this->ensure_key_())
-    return false;
-  if (this->device_id_.empty()) {
-    return this->handle_enroll_();
+  JobSnap snap;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    snap = this->snap_();
   }
-  std::string jwk = jwk_json(this->pub_x_, this->pub_y_);
-  std::string path = "/api/devices/" + this->device_id_ + "/reclaim";
-  std::string body = reclaim_body_json(jwk.c_str());
-  int status = 0;
-  std::string res;
-  if (!this->http_("POST", path.c_str(), body, true, false, &status, &res)) {
+  if (snap.device_id.empty() || !snap.has_key) {
     std::lock_guard<std::mutex> g(this->lock_);
     this->apply_(CloudEvent::ReclaimFail);
     return false;
   }
+  std::string jwk = jwk_json(snap.pub_x, snap.pub_y);
+  std::string path = "/api/devices/" + snap.device_id + "/reclaim";
+  std::string body = reclaim_body_json(jwk.c_str());
+  int status = 0;
+  std::string res;
+  int retry = 0;
+  const bool ok = this->http_("POST", path.c_str(), body, true, false, &status, &res, &retry);
   std::lock_guard<std::mutex> g(this->lock_);
-  if (status == 200) {
+  const HttpOutcome o = reclaim_outcome(ok, status);
+  const CloudEvent ev = event_for_reclaim(o);
+  if (o == HttpOutcome::Success) {
     this->clear_cert_();
     this->store_enroll_(res);
-    this->apply_(CloudEvent::ReclaimOk);
+    this->claim_cycles_ = 1;
+    this->backoff_ms_ = BACKOFF_MIN_MS;
+    this->apply_(ev);
     this->next_csr_ms_ = millis() + 3000;
     this->save_identity_();
     return true;
   }
-  this->apply_(CloudEvent::ReclaimFail);
+  this->apply_(ev);
+  this->bump_backoff_(retry);
   return false;
 }
 
 bool ShroomLabsCloud::handle_probe_() {
-  // Phase 2 hook: read inbox to notice revoke. Do not apply commands.
-  if (this->device_id_.empty() || !this->has_cert_)
+  JobSnap snap;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    snap = this->snap_();
+  }
+  if (snap.device_id.empty() || !snap.has_cert)
     return false;
-  std::string path = "/api/devices/" + this->device_id_ + "/inbox";
+  std::string path = "/api/devices/" + snap.device_id + "/inbox";
   int status = 0;
   std::string res;
-  if (!this->http_("GET", path.c_str(), "", true, true, &status, &res))
-    return false;
-  if (status == 401) {
+  int retry = 0;
+  const bool ok = this->http_("GET", path.c_str(), "", true, true, &status, &res, &retry);
+  const HttpOutcome o = probe_outcome(ok, status);
+  if (o == HttpOutcome::AuthFail) {
     std::lock_guard<std::mutex> g(this->lock_);
     this->apply_(CloudEvent::LinkAuthFail);
+    this->zero_key_();
+    this->clear_cert_();
     return false;
   }
-  return status == 200;
+  return o == HttpOutcome::Success;
+}
+
+bool ShroomLabsCloud::handle_revoke_() {
+  JobSnap snap;
+  {
+    std::lock_guard<std::mutex> g(this->lock_);
+    snap = this->snap_();
+  }
+  if (!snap.device_id.empty() && snap.has_key) {
+    std::string path = "/api/devices/" + snap.device_id + "/revoke";
+    int status = 0;
+    std::string res;
+    int retry = 0;
+    (void) this->http_("POST", path.c_str(), "{}", true, snap.has_cert, &status, &res, &retry);
+  }
+  std::lock_guard<std::mutex> g(this->lock_);
+  this->wipe_();
+  ESP_LOGI(TAG, "Cloud disconnected here. Remove it from the account too if it still appears.");
+  return true;
 }
 
 void ShroomLabsCloud::loop() {
@@ -883,12 +1056,28 @@ void ShroomLabsCloud::loop() {
   CloudState st;
   {
     std::lock_guard<std::mutex> g(this->lock_);
-    st = this->state_;
+    st = persist_state(this->state_);
+    this->state_ = st;
+  }
+  if (st == CloudState::Connecting) {
+    if (now >= this->next_retry_ms_) {
+      this->next_retry_ms_ = now + this->backoff_ms_;
+      this->queue_(Job::ENROLL);
+    }
+    return;
   }
   if (st == CloudState::PendingClaim || st == CloudState::Issuing) {
     uint32_t left = this->claim_seconds_left_();
-    if (st == CloudState::PendingClaim && left == 0 && this->now_ms_() > 0) {
-      this->refresh();
+    if (st == CloudState::PendingClaim && left == 0) {
+      bool again = false;
+      {
+        std::lock_guard<std::mutex> g(this->lock_);
+        again = should_auto_enroll(this->claim_cycles_);
+        if (again)
+          this->apply_(CloudEvent::Expired);
+      }
+      if (again)
+        this->queue_(Job::ENROLL);
       return;
     }
     if (now >= this->next_csr_ms_) {
@@ -897,11 +1086,24 @@ void ShroomLabsCloud::loop() {
     }
     return;
   }
-  if (st == CloudState::Linked) {
-    int64_t wall = this->now_ms_();
-    if (wall > 0 && this->issued_ms_ > 0 && wall >= this->issued_ms_ + this->rotate_after_ms_) {
+  if (st == CloudState::Error) {
+    return;
+  }
+  if (st == CloudState::Linked || st == CloudState::Rotating) {
+    time_t t = time(nullptr);
+    const int64_t wall = (t >= 1700000000) ? static_cast<int64_t>(t) * 1000 : 0;
+    bool due = false;
+    {
       std::lock_guard<std::mutex> g(this->lock_);
-      this->apply_(CloudEvent::RotateDue);
+      due = wall > 0 && this->issued_ms_ > 0 && wall >= this->issued_ms_ + this->rotate_after_ms_ &&
+            now >= this->next_rotate_ms_ && this->rotate_slot_open_();
+      if (due) {
+        this->rotate_attempts_hour_++;
+        this->next_rotate_ms_ = now + this->backoff_ms_;
+        this->apply_(CloudEvent::RotateDue);
+      }
+    }
+    if (due) {
       this->queue_(Job::ROTATE);
       return;
     }

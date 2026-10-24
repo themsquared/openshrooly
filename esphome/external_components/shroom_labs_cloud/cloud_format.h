@@ -25,6 +25,7 @@ enum class CloudState : uint8_t {
   Linked,
   Rotating,
   Revoked,
+  Owned,
   Error,
 };
 
@@ -32,12 +33,13 @@ enum class CloudEvent : uint8_t {
   Enable,
   Disable,
   EnrollOk,
-  EnrollOwned,
+  EnrollOwned,  // 409: already claimed. Stop. Do not enroll or reclaim again.
   EnrollFail,
   CsrWaiting,  // 403: not claimed yet
   CsrOk,
   CsrAuthFail,  // 401
   CsrFail,
+  NetworkFail,  // transport or 5xx. Stay and back off.
   RateLimited,
   RotateDue,
   RotateOk,
