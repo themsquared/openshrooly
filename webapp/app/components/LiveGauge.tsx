@@ -45,7 +45,7 @@ export default function LiveGauge({
       </svg>
       <div className="gauge-readout">
         <div className="gauge-value">
-          {Number.isFinite(value) ? (unit === '%' || unit === 'ppm' ? value.toFixed(0) : value.toFixed(1)) : '—'}
+          {Number.isFinite(value) ? (unit === '%' || unit === 'ppm' ? value.toFixed(0) : value.toFixed(1)) : '…'}
           <span className="gauge-unit">{unit}</span>
         </div>
         <div className="gauge-label">{label}</div>

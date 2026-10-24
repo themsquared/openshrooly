@@ -2,9 +2,18 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { api } from '../lib/esphome-api'
+import {
+  applyPresetWrites,
+  deviceSurfaceState,
+  entityPatchFromWrites,
+} from '../lib/setup-state'
+import { DEVICE_VERSION, connectionLabel } from '../lib/setup-state'
+import type { GrowPreset } from '../lib/setup-state'
 import LiveGauge from './components/LiveGauge'
 import LightTimeline from './components/LightTimeline'
 import ProfileStrip from './components/ProfileStrip'
+import ConnectionBanner from './components/ConnectionBanner'
+import FirstRun from './components/FirstRun'
 import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
 import type { EntityState } from './entity-types'
 
@@ -38,6 +47,11 @@ export default function Dashboard() {
   const [otaStatus, setOtaStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
   const [otaMessage, setOtaMessage] = useState<string>('')
   const [demoMode, setDemoMode] = useState(false)
+  const [reachable, setReachable] = useState<boolean | undefined>(undefined)
+  const [lastError, setLastError] = useState('')
+  const [applyingPreset, setApplyingPreset] = useState(false)
+  const [wifiMode, setWifiMode] = useState('')
+  const [wifiSsid, setWifiSsid] = useState('')
 
   // Track humidity values during drag to avoid stale state issues
   const humidityDragValues = useRef<{ target: number; hysteresis: number }>({ target: 70, hysteresis: 2 })
@@ -49,32 +63,75 @@ export default function Dashboard() {
     if (isDemo) {
       setDemoMode(true)
       setEntities(DEMO_ENTITIES)
+      setReachable(true)
+      setLastError('')
       setLoading(false)
       return
     }
 
     const fetchData = async () => {
+      let ok = false
       try {
         const numbers = await api.getAllNumbers()
-        setEntities((prev) => ({ ...prev, ...numbers }))
+        if (Object.keys(numbers).length) {
+          setEntities((prev) => ({ ...prev, ...numbers }))
+          ok = true
+        }
       } catch (e) {
-        // Ignore errors during initial fetch - EventSource will populate data
+        setLastError('Could not read the chamber settings')
+      }
+
+      try {
+        const grow = await api.getGrowCaption()
+        setEntities((prev) => ({
+          ...prev,
+          ...(grow.phase ? { 'select-grow_phase': { state: grow.phase, value: grow.phase } } : {}),
+          ...(grow.day != null ? { 'number-grow_day': { state: String(grow.day), value: grow.day } } : {}),
+          ...(grow.total != null ? { 'number-grow_days_total': { state: String(grow.total), value: grow.total } } : {}),
+        }))
+        if (grow.phase || grow.day != null) ok = true
+      } catch (e) {
+        // Caption is optional until Ship 5a firmware is flashed
+      }
+
+      try {
+        const wifi = await api.getWifiStatus()
+        if (wifi.mode) setWifiMode(String(wifi.mode))
+        if (wifi.ssid) setWifiSsid(String(wifi.ssid))
+        setEntities((prev) => ({
+          ...prev,
+          ...(wifi.mode ? { 'text_sensor-wifi_mode': { state: wifi.mode, value: wifi.mode } } : {}),
+          ...(wifi.ssid ? { 'text_sensor-wifi_ssid': { state: wifi.ssid, value: wifi.ssid } } : {}),
+          ...(wifi.ip ? { 'text_sensor-ip_address': { state: wifi.ip, value: wifi.ip } } : {}),
+        }))
+        if (wifi.mode || wifi.ssid) ok = true
+      } catch (e) {
+        // Wi-Fi text sensors still arrive over /events
       }
 
       try {
         const tz = await api.getSelect('timezone')
-        if (tz?.state) setTimezone(tz.state)
+        if (tz?.state) {
+          setTimezone(tz.state)
+          ok = true
+        }
       } catch (e) {
         // Ignore errors during initial fetch - EventSource will populate data
       }
 
       try {
         const flip = await api.getSwitch('flip_screen')
-        if (flip) setFlipScreen(flip.state === 'ON' || flip.value === true)
+        if (flip) {
+          setFlipScreen(flip.state === 'ON' || flip.value === true)
+          ok = true
+        }
       } catch (e) {
         // Ignore errors during initial fetch - EventSource will populate data
       }
 
+      setReachable(ok)
+      if (!ok) setLastError((prev) => prev || 'Cannot reach the chamber')
+      else setLastError('')
       setLoading(false)
     }
 
@@ -82,6 +139,8 @@ export default function Dashboard() {
 
     const handleEvent = (event: any) => {
       if (event.id) {
+        setReachable(true)
+        setLastError('')
         setEntities((prev) => ({
           ...prev,
           [event.id]: {
@@ -102,6 +161,12 @@ export default function Dashboard() {
         if (event.id === 'switch-flip_screen') {
           setFlipScreen(event.state === 'ON' || event.value === true)
         }
+        if (event.id === 'text_sensor-wifi_mode' && event.state) setWifiMode(event.state)
+        if (event.id === 'text_sensor-wifi_ssid' && event.state) setWifiSsid(event.state)
+        if (event.id === 'select-grow_phase' || event.id === 'number-grow_day' || event.id === 'number-grow_days_total') {
+          setReachable(true)
+          setLastError('')
+        }
       }
     }
 
@@ -114,7 +179,10 @@ export default function Dashboard() {
 
     const connectEvents = () => {
       if (document.visibilityState === 'visible' && !eventSource) {
-        eventSource = api.subscribeToEvents(handleEvent)
+        eventSource = api.subscribeToEvents(handleEvent, () => {
+          setReachable((prev) => (prev === true ? prev : false))
+          setLastError((prev) => prev || 'Lost the live connection')
+        })
       }
     }
 
@@ -137,6 +205,21 @@ export default function Dashboard() {
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer))
     }
   }, [])
+
+  const applyPreset = async (preset: GrowPreset) => {
+    if (applyingPreset) return
+    setApplyingPreset(true)
+    const writes = applyPresetWrites(preset)
+    const ok = demoMode ? true : await api.applyWrites(writes)
+    if (ok) {
+      setEntities((prev) => ({ ...prev, ...entityPatchFromWrites(writes) }))
+      setLastError('')
+      setReachable(true)
+    } else {
+      setLastError('The chamber did not accept the new grow. Try again.')
+    }
+    setApplyingPreset(false)
+  }
 
   const handleNumberChange = useCallback((id: string, value: number) => {
     setEntities((prev) => ({
@@ -243,14 +326,14 @@ export default function Dashboard() {
 
   const handleOtaUpload = async () => {
     if (!otaFile) {
-      setOtaMessage('Please select a firmware file')
+      setOtaMessage('Choose an update file first')
       setOtaStatus('error')
       return
     }
 
     setOtaStatus('uploading')
     setOtaProgress(0)
-    setOtaMessage('Uploading firmware...')
+    setOtaMessage('Sending the update. Keep this page open.')
 
     try {
       const formData = new FormData()
@@ -268,7 +351,7 @@ export default function Dashboard() {
       xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
           setOtaStatus('success')
-          setOtaMessage('Firmware uploaded successfully! Device will restart...')
+          setOtaMessage('Update installed. The chamber is restarting.')
           setOtaProgress(100)
           setTimeout(() => {
             setOtaStatus('idle')
@@ -278,20 +361,20 @@ export default function Dashboard() {
           }, 5000)
         } else {
           setOtaStatus('error')
-          setOtaMessage(`Upload failed: ${xhr.statusText}`)
+          setOtaMessage('The chamber did not accept this file. Check that it is an OpenShrooly update and try again.')
         }
       })
 
       xhr.addEventListener('error', () => {
         setOtaStatus('error')
-        setOtaMessage('Upload failed: Network error')
+        setOtaMessage('Lost the connection to the chamber. Try again.')
       })
 
       xhr.open('POST', '/update')
       xhr.send(formData)
     } catch (error) {
       setOtaStatus('error')
-      setOtaMessage(`Upload failed: ${error}`)
+      setOtaMessage('Something went wrong sending the update. Try again.')
     }
   }
 
@@ -566,11 +649,41 @@ export default function Dashboard() {
   // Helper to get alert values
   const getAlert = (id: string) => entities[`binary_sensor-alert__${id}`]?.value === true
 
+  const growPhase = String(entities['select-grow_phase']?.state || entities['select-grow_phase']?.value || '')
+  const growDayValue = parseFloat((getNumber('grow_day') || getSensor('grow_day') || '') as string)
+  const growTotalValue = parseFloat((getNumber('grow_days_total') || getSensor('stage_days') || '') as string)
+  const wifiModeValue = wifiMode || String(entities['text_sensor-wifi_mode']?.state || '')
+  const wifiSsidValue = wifiSsid || String(entities['text_sensor-wifi_ssid']?.state || '')
+  const surface = demoMode
+    ? 'ready'
+    : deviceSurfaceState({
+        wifiMode: wifiModeValue,
+        ssid: wifiSsidValue,
+        phase: growPhase,
+        totalDays: growTotalValue,
+        reachable,
+        lastError,
+      })
+
   if (loading) {
     return (
       <div className="loading-screen">
         <div className="spinner"></div>
         <div>Connecting to chamber…</div>
+      </div>
+    )
+  }
+
+  if (surface === 'unreachable') {
+    return (
+      <div className="dashboard">
+        <div className="loading-screen">
+          <ConnectionBanner
+            state="unreachable"
+            ssid={wifiSsidValue}
+            onRetry={() => window.location.reload()}
+          />
+        </div>
       </div>
     )
   }
@@ -591,9 +704,9 @@ export default function Dashboard() {
   const co2Raw = getSensor('co2') ?? getSensor('co2_ppm') ?? getSensor('carbon_dioxide')
   const co2 = co2Raw == null || co2Raw === '' ? null : parseFloat(co2Raw as string)
   const profileName = String(entities['text_sensor-current_profile']?.state || entities['text_sensor-current_profile']?.value || '')
-  const stageName = String(entities['text_sensor-current_stage']?.state || entities['text_sensor-current_stage']?.value || '')
-  const growDay = parseFloat((getSensor('grow_day') || '') as string)
-  const stageDays = parseFloat((getSensor('stage_days') || '') as string)
+  const stageName = growPhase || String(entities['text_sensor-current_stage']?.state || entities['text_sensor-current_stage']?.value || '')
+  const growDay = growDayValue
+  const stageDays = growTotalValue
 
   // Temperature control values
   const tempControlEnabled = entities['switch-temperature_control_enabled']?.state === 'ON' || entities['switch-temperature_control_enabled']?.value === true
@@ -632,40 +745,36 @@ export default function Dashboard() {
       <div className="header-bar">
         <h1>
           <svg
+            className="brand-mark"
             width="28"
             height="28"
-            viewBox="0 0 27.753101 27.941927"
-            style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}
+            viewBox="0 0 28 28"
+            aria-hidden="true"
+            style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '10px', color: 'var(--sl-spore)' }}
           >
-            <g transform="translate(-34.692395,-50.295771)">
-              <g transform="matrix(0.27075242,0,0,0.27075242,20.785884,18.671899)">
-                <path
-                  style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '5.84717', strokeLinecap: 'round' }}
-                  d="m 62.774608,173.92618 h 78.560862 l 8.90336,-8.72004 -14.27203,-26.09984 -33.49774,-18.94359 -32.774503,18.71907 -14.741382,26.7906 z"
-                />
-                <path
-                  style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '5.84719', strokeLinecap: 'round' }}
-                  d="m 89.451285,173.99131 -7.470248,31.26293 11.879354,11.82315 h 17.766519 l 11.28636,-12.42725 -7.37135,-30.71071 z"
-                />
-                <path
-                  style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '5.84719', strokeLinecap: 'butt' }}
-                  d="m 109.6765,124.069 -10.553806,27.49 m -40.080662,18.96541 40.085576,-18.98387 29.393522,22.89182 v 0"
-                />
-              </g>
-            </g>
+            <path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" strokeWidth="1.6" />
           </svg>
           <span>
-            <span style={{ fontWeight: 'bold' }}>Open</span>
-            <span style={{ fontWeight: '300' }}>Shrooly</span>
-            <span className="brand-sub">Shroom Labs chamber</span>
+            <span className="brand-name">Shroom Labs</span>
+            <span className="brand-sub">Works with Shrooly devices running OpenShrooly</span>
           </span>
         </h1>
         <div className="header-right">
           {demoMode && <span className="demo-chip">Demo</span>}
-          <span className="live-dot" aria-hidden="true" />
+          {surface === 'first-run-wifi' && <span className="demo-chip">Setup</span>}
+          <span className={`live-dot${surface === 'first-run-wifi' ? ' is-setup' : ''}`} aria-hidden="true" />
           <div className="header-time">{lastUpdate.toLocaleTimeString()}</div>
         </div>
       </div>
+
+      <ConnectionBanner
+        state={surface}
+        ssid={wifiSsidValue}
+        onRetry={() => window.location.reload()}
+      />
+
+      <FirstRun state={surface} applying={applyingPreset} onApply={applyPreset} error={lastError} />
 
       {alerts.length > 0 && (
         <div className="alerts-banner">
@@ -708,7 +817,7 @@ export default function Dashboard() {
             min={400}
             max={2000}
             color="var(--sl-co2)"
-            detail="if sensor present"
+            detail="air freshness"
           />
         ) : (
           <LiveGauge
@@ -729,7 +838,7 @@ export default function Dashboard() {
         stage={stageName || undefined}
         day={Number.isFinite(growDay) ? growDay : undefined}
         stageDays={Number.isFinite(stageDays) ? stageDays : undefined}
-        stages={demoMode || profileName ? DEMO_STAGES : []}
+        stages={demoMode || profileName || (stageName && stageName !== 'Idle') ? DEMO_STAGES : []}
       />
 
       <LightTimeline
@@ -809,8 +918,8 @@ export default function Dashboard() {
         <div className="card card-settings" onClick={() => setModal({ type: 'settings' })}>
           <div className="card-icon">⚙️</div>
           <div className="card-label">Settings</div>
-          <div className="card-value">v1.0.0</div>
-          <div className="card-detail">System & Network</div>
+          <div className="card-value">v{DEVICE_VERSION}</div>
+          <div className="card-detail">Chamber and Wi-Fi</div>
         </div>
       </div>
 
@@ -828,7 +937,7 @@ export default function Dashboard() {
           Powered by ESPHome
         </a>
         <span className="footer-separator">•</span>
-        <span className="footer-text">Works with Shroom Labs · No Warranty</span>
+        <span className="footer-text">Shroom Labs. Works with Shrooly devices running OpenShrooly. No warranty.</span>
       </div>
 
       {/* Modals */}
@@ -845,7 +954,7 @@ export default function Dashboard() {
               <div className="water-level-display">
                 <div className="water-level-value">{waterLevel.toFixed(0)}%</div>
                 {waterLevel < 20 && (
-                  <div className="water-warning">⚠️ Water level low - please refill soon</div>
+                  <div className="water-warning">⚠️ Water is low. Please refill soon.</div>
                 )}
               </div>
 
@@ -874,7 +983,7 @@ export default function Dashboard() {
               <div className="calibrate-info" style={isCalibrated ? { color: '#4ade80' } : undefined}>
                 {isCalibrated
                   ? '✓ Sensor is calibrated'
-                  : 'Calibration sets the dry-tank baseline for accurate water-level measurement.'}
+                  : 'Calibrating tells the chamber what an empty tank looks like, so the water level reads correctly.'}
               </div>
 
               {calibrationError && (
@@ -898,7 +1007,7 @@ export default function Dashboard() {
                 ⚠️ Please completely empty and dry the water reservoir before calibrating.
               </p>
               <p className="calibrate-instruction">
-                This will set the current sensor readings as the "dry" baseline for accurate water level measurement.
+                This saves the current reading as an empty tank, so the water level reads correctly.
               </p>
               <p className="calibrate-instruction">
                 The reading will update immediately after calibration.
@@ -1137,7 +1246,7 @@ export default function Dashboard() {
               {(entities['switch-temperature_control_enabled']?.state === 'ON' || entities['switch-temperature_control_enabled']?.value === true) && (
                 <>
                   <div className="temp-disclaimer" style={{ marginBottom: '20px' }}>
-                    ⚠️ <strong>Important:</strong> OpenShrooly can request heating, but external heating equipment must be controlled via Home Assistant. The "Heat Requested" binary sensor signals when heating is needed.
+                    ⚠️ <strong>Important:</strong> The chamber can ask for heat, but it cannot run a heater by itself. Pair a heater with your smart home system, such as Home Assistant, so it turns on when the chamber asks for heat.
                   </div>
 
                   <div className="control-group">
@@ -1273,7 +1382,7 @@ export default function Dashboard() {
                   Temperature Warnings
                 </h3>
                 <div className="temp-disclaimer" style={{ marginBottom: '15px' }}>
-                  ℹ️ <strong>Note:</strong> These thresholds only trigger warnings. Home Assistant integration is required to receive and act on temperature warning alerts.
+                  ℹ️ <strong>Note:</strong> These limits only show a warning here. To get alerts on your phone or act on them, connect the chamber to a smart home system such as Home Assistant.
                 </div>
                 <div className="control-group">
                   <label>Warning Minimum: {getNumber('temperature__warning_minimum')}°C</label>
@@ -1504,7 +1613,7 @@ export default function Dashboard() {
                 <div className="settings-info">
                   <div className="info-row">
                     <span className="info-label">Version:</span>
-                    <span className="info-value">1.0.0</span>
+                    <span className="info-value">{DEVICE_VERSION}</span>
                   </div>
                   <div className="info-row">
                     <span className="info-label">Voltage:</span>
@@ -1517,15 +1626,15 @@ export default function Dashboard() {
                 <h3>Network</h3>
                 <div className="settings-info">
                   <div className="info-row">
-                    <span className="info-label">Mode:</span>
-                    <span className="info-value">{entities['text_sensor-wifi_mode']?.state || 'Unknown'}</span>
+                    <span className="info-label">Connection:</span>
+                    <span className="info-value">{connectionLabel(entities['text_sensor-wifi_mode']?.state)}</span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">SSID:</span>
+                    <span className="info-label">Wi-Fi network:</span>
                     <span className="info-value">{entities['text_sensor-wifi_ssid']?.state || 'Unknown'}</span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">IP Address:</span>
+                    <span className="info-label">Chamber address:</span>
                     <span className="info-value">{entities['text_sensor-ip_address']?.state || 'Unknown'}</span>
                   </div>
                 </div>
@@ -1569,9 +1678,9 @@ export default function Dashboard() {
               </div>
 
               <div className="settings-section">
-                <h3>Firmware Update (OTA)</h3>
+                <h3>Software update</h3>
                 <div className="control-group">
-                  <label>Upload Firmware (.bin file)</label>
+                  <label>Choose the OpenShrooly update file (ends in .bin)</label>
                   <input
                     type="file"
                     accept=".bin"
@@ -1584,56 +1693,28 @@ export default function Dashboard() {
                       }
                     }}
                     disabled={otaStatus === 'uploading'}
-                    style={{
-                      padding: '8px',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      marginTop: '8px'
-                    }}
+                    className="ota-file"
                   />
                   {otaFile && (
-                    <div style={{ marginTop: '10px', fontSize: '14px', color: '#64748b' }}>
+                    <div className="ota-meta">
                       Selected: {otaFile.name} ({(otaFile.size / 1024 / 1024).toFixed(2)} MB)
                     </div>
                   )}
                   <button
                     onClick={handleOtaUpload}
                     disabled={!otaFile || otaStatus === 'uploading'}
-                    style={{
-                      marginTop: '12px',
-                      padding: '10px 20px',
-                      backgroundColor: otaStatus === 'uploading' ? '#94a3b8' : '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: otaStatus === 'uploading' ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
+                    className="charts-button ota-button"
                   >
-                    {otaStatus === 'uploading' ? 'Uploading...' : 'Upload Firmware'}
+                    {otaStatus === 'uploading' ? 'Sending…' : 'Install update'}
                   </button>
                   {otaStatus !== 'idle' && (
-                    <div style={{ marginTop: '12px' }}>
+                    <div>
                       {otaStatus === 'uploading' && (
-                        <div style={{ width: '100%', backgroundColor: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
-                          <div
-                            style={{
-                              width: `${otaProgress}%`,
-                              backgroundColor: '#3b82f6',
-                              height: '100%',
-                              transition: 'width 0.3s ease'
-                            }}
-                          />
+                        <div className="ota-track">
+                          <div className="ota-fill" style={{ width: `${otaProgress}%` }} />
                         </div>
                       )}
-                      <div
-                        style={{
-                          marginTop: '8px',
-                          fontSize: '14px',
-                          color: otaStatus === 'success' ? '#22c55e' : otaStatus === 'error' ? '#ef4444' : '#64748b'
-                        }}
-                      >
+                      <div className={`ota-message${otaStatus === 'success' ? ' is-success' : otaStatus === 'error' ? ' is-error' : ''}`}>
                         {otaMessage}
                       </div>
                     </div>

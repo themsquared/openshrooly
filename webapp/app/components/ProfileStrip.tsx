@@ -9,13 +9,13 @@ type ProfileStripProps = {
 }
 
 export default function ProfileStrip({ profile, stage, day, stageDays, stages = [] }: ProfileStripProps) {
-  if (!profile && !stage) {
+  if (!profile && (!stage || stage === 'Idle')) {
     return (
       <section className="profile-strip">
         <div>
-          <div className="card-label">Current profile</div>
-          <div className="profile-name">No recipe on device</div>
-          <p className="profile-empty">Apply a profile from the local hub. Stock firmware has no recipe object yet.</p>
+          <div className="card-label">Current grow</div>
+          <div className="profile-name">Idle</div>
+          <p className="profile-empty">No grow is running. Pick a starting point above, or set humidity, temperature, and lights yourself.</p>
         </div>
       </section>
     )
@@ -30,10 +30,10 @@ export default function ProfileStrip({ profile, stage, day, stageDays, stages = 
   return (
     <section className="profile-strip">
       <div>
-        <div className="card-label">Current profile</div>
-        <div className="profile-name">{profile || 'Untitled'}</div>
+        <div className="card-label">Current grow</div>
+        <div className="profile-name">{profile || stage || 'Untitled'}</div>
         <div className="profile-stage">
-          {stage || '—'}
+          {stage || 'Not set'}
           {day != null && stageDays ? ` · day ${day} of ${stageDays}` : ''}
         </div>
       </div>
