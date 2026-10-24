@@ -253,6 +253,9 @@ async def allowlisted_host(request: Request, call_next):
     return await call_next(request)
 
 
+HUB_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+
+
 def page(request: Request, name: str, **context):
     token = context.get("csrf") or request.cookies.get(auth.CSRF_COOKIE) or auth.new_csrf()
     context.update(
@@ -264,6 +267,7 @@ def page(request: Request, name: str, **context):
         }
     )
     response = templates.TemplateResponse(request, name, context)
+    response.headers["Content-Security-Policy"] = HUB_CSP
     if request.cookies.get(auth.CSRF_COOKIE) != token:
         response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
     return response

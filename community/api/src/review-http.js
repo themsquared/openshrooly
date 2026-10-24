@@ -27,6 +27,7 @@ import {
   submitForReview,
 } from "./review.js";
 import { decodeBase64Photo } from "./photos.js";
+import { readJsonLimited } from "./http-body.js";
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -36,11 +37,7 @@ function json(body, status = 200) {
 }
 
 async function readJson(request) {
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
+  return readJsonLimited(request);
 }
 
 function parseProfile(row, seeds) {

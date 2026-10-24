@@ -100,6 +100,8 @@ UPDATE profile_review SET live_document = (
     SELECT document FROM profiles WHERE profiles.id = profile_review.profile_id
 ), offmenu_flag = 1, updated_at = updated_at
 WHERE confirmed_culinary_at IS NULL
+  AND status = 'published'
+  AND published_live = 1
   AND profile_id IN (
     SELECT id FROM profiles
     WHERE published = 1 AND author_id IS NOT NULL AND json_valid(document)

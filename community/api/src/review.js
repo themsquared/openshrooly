@@ -356,9 +356,21 @@ export async function listPendingReportPhotos(db) {
   return out;
 }
 
+export const RECLASS_STATE_KEY = "legacy_reclassify_v2";
+export const RECLASS_BATCH_LIMIT = 10;
+
 function shouldReclassifyLive(profile) {
   const classified = classifyTaxon(profile);
-  return classified.force || classified.hold;
+  return classified.force || classified.hold || classified.proseFlag;
+}
+
+function classSignature(doc) {
+  return JSON.stringify({
+    pack: doc?.pack || "",
+    restricted: Boolean(doc?.restricted),
+    notice: Boolean(doc?.legal_notice),
+    psi: Array.isArray(doc?.tags) && doc.tags.includes("psilocybin"),
+  });
 }
 
 function parseLegacyDocument(row) {
@@ -377,8 +389,8 @@ function parseLegacyDocument(row) {
   }
 }
 
-export async function reclassifyUnconfirmedLegacyBatch(db, { limit = 25, afterId = "" } = {}) {
-  const done = await db.one("SELECT * FROM maintenance_state WHERE key=?", ["legacy_reclassify"]);
+export async function reclassifyUnconfirmedLegacyBatch(db, { limit = RECLASS_BATCH_LIMIT, afterId = "" } = {}) {
+  const done = await db.one("SELECT * FROM maintenance_state WHERE key=?", [RECLASS_STATE_KEY]);
   if (done?.value === "done") return { scanned: 0, rewritten: 0, lastId: afterId, done: true };
   const cursor = afterId || (done?.value && done.value !== "done" ? done.value : "");
   const rows = await db.all(
@@ -398,7 +410,8 @@ export async function reclassifyUnconfirmedLegacyBatch(db, { limit = 25, afterId
     if (!shouldReclassifyLive(doc) && existing) continue;
     const normalized = applyPackRules(doc);
     const nextDoc = JSON.stringify(normalized);
-    if (nextDoc !== row.document) {
+    const classChanged = classSignature(normalized) !== classSignature(doc);
+    if (classChanged && nextDoc !== row.document) {
       await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [nextDoc, nowIso(), row.id]);
       rewritten += 1;
     }
@@ -416,30 +429,32 @@ export async function reclassifyUnconfirmedLegacyBatch(db, { limit = 25, afterId
       });
       continue;
     }
-    let live = normalized;
+    let live = doc;
     if (existing.live_document) {
       try {
         live = JSON.parse(existing.live_document);
       } catch {
-        live = normalized;
+        live = doc;
       }
     }
-    if (shouldReclassifyLive(live)) live = applyPackRules(live);
-    const liveJson = JSON.stringify(live);
-    const flag = needsOffmenuFlag(live) ? 1 : 0;
+    const nextLive = shouldReclassifyLive(live) ? applyPackRules(live) : live;
+    const liveJson = JSON.stringify(nextLive);
+    const flag = needsOffmenuFlag(nextLive) ? 1 : 0;
+    const liveClassChanged = classSignature(nextLive) !== classSignature(live);
+    if (!liveClassChanged && Number(existing.offmenu_flag) === flag) continue;
     if (liveJson === existing.live_document && Number(existing.offmenu_flag) === flag) continue;
     await upsertReview(db, {
       ...existing,
       live_document: liveJson,
       offmenu_flag: flag,
-      ...confirmFields(existing, live),
+      ...confirmFields(existing, nextLive),
     });
   }
   const finished = rows.length < limit;
   const value = finished ? "done" : lastId;
   const ts = nowIso();
-  if (done) await db.run("UPDATE maintenance_state SET value=?, updated_at=? WHERE key=?", [value, ts, "legacy_reclassify"]);
-  else await db.run("INSERT INTO maintenance_state (key, value, updated_at) VALUES (?, ?, ?)", ["legacy_reclassify", value, ts]);
+  if (done) await db.run("UPDATE maintenance_state SET value=?, updated_at=? WHERE key=?", [value, ts, RECLASS_STATE_KEY]);
+  else await db.run("INSERT INTO maintenance_state (key, value, updated_at) VALUES (?, ?, ?)", [RECLASS_STATE_KEY, value, ts]);
   return { scanned, rewritten, lastId, done: finished };
 }
 

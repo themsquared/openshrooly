@@ -176,7 +176,7 @@ const CUBE_STRAINS = [
   "huautla",
   "melmac",
 ];
-const PROSE_PHRASES = [
+const PSYCHOACTIVE_PHRASES = [
   "psilocybin",
   "psilocin",
   "magic mushroom",
@@ -185,8 +185,8 @@ const PROSE_PHRASES = [
   "magic shrooms",
   "magic truffle",
   "magic truffles",
-  ...CUBE_STRAINS,
 ];
+const PROSE_PHRASES = [...PSYCHOACTIVE_PHRASES, ...CUBE_STRAINS];
 const PROSE_WORDS = new Set(["shroom", "shrooms", "mushies", "cubes", "ape", "pe", "pe6", "gt", "jmf", "b+"]);
 const LOOKALIKE_GENERA = new Set(["inocybe", "galerina"]);
 
@@ -339,9 +339,16 @@ function parseSpeciesParts(species) {
 }
 
 function identityFields(profile, extra = {}) {
-  return [profile?.id, profile?.name, profile?.species, profile?.strain, profile?.variety_group, extra.title].filter(
-    (value) => value != null && String(value).trim() !== ""
-  );
+  return [
+    profile?.id,
+    profile?.name,
+    profile?.species,
+    profile?.genus,
+    extra.genus,
+    extra.title,
+    profile?.strain,
+    profile?.variety_group,
+  ].filter((value) => value != null && String(value).trim() !== "");
 }
 
 function proseFields(profile, extra = {}) {
@@ -380,6 +387,39 @@ function identityHasPsychoactiveGenus(profile, extra = {}) {
     const parsed = parseSpeciesParts(raw);
     if (parsed.genus && isPsychoactiveGenus(parsed.genus)) return true;
     if (parsed.words.some((word) => isPsychoactiveGenus(word))) return true;
+  }
+  return false;
+}
+
+function identityHasLookalike(profile, extra = {}) {
+  for (const raw of identityFields(profile, extra)) {
+    const parsed = parseSpeciesParts(raw);
+    if (
+      parsed.words.some(
+        (word) =>
+          LOOKALIKE_GENERA.has(word) || nearMissToken(word, LOOKALIKE_GENERA, { fold: foldTaxonToken, maxDist: 1, minLen: 6 })
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const IDENTITY_PROSE_WORDS = new Set(["cubes", "shroom", "shrooms", "mushies"]);
+
+function identityHasPsychoactiveTerm(profile, extra = {}) {
+  if (identityHasPsychoactiveGenus(profile, extra)) return true;
+  if (identityHasLookalike(profile, extra)) return true;
+  for (const raw of identityFields(profile, extra)) {
+    if (isVettedCulinaryPair(parseSpeciesParts(raw))) continue;
+    let text = normalizeTaxonText(raw);
+    if (!text) continue;
+    text = text.replace(/\bvitamin b\+/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    const wordSet = new Set(text.split(" "));
+    if (PSYCHOACTIVE_PHRASES.some((name) => text.includes(name))) return true;
+    if ([...IDENTITY_PROSE_WORDS].some((word) => wordSet.has(word))) return true;
   }
   return false;
 }
@@ -464,13 +504,14 @@ export function classifyTaxon(profile, extra = {}) {
   const culinaryGenus = CULINARY_GENERA.has(parsed.genus);
   const speciesRestricted = fieldRestrictedKind(profile?.species);
   const unvettedRestricted = identityHasUnvettedRestricted(profile, extra);
+  const identityPsycho = identityHasPsychoactiveTerm(profile, extra);
   const vettedPair = Boolean(speciesRestricted) && culinaryGenus && isVettedCulinaryPair(parsed) && !unvettedRestricted;
   const identityForce = hasForceMatch(identity);
   const unknownGenus = Boolean(parsed.genus) && !culinaryGenus && !OFFMENU_EPITHETS.has(parsed.genus);
   const force = identityForce || (Boolean(speciesRestricted) && speciesRestricted !== "near" && unknownGenus && hasSpecies);
   const latinOk = taxonLatinOk(profile, extra);
   const realEpithet = Boolean(parsed.epithet) && !PLACEHOLDER_EPITHETS.has(parsed.epithet);
-  const nearGenus = Boolean(parsed.genus) && !culinaryGenus && isPsychoactiveGenus(parsed.genus);
+  const nearGenus = Boolean(parsed.genus) && isPsychoactiveGenus(parsed.genus);
   const culinary =
     !force &&
     culinaryGenus &&
@@ -478,21 +519,25 @@ export function classifyTaxon(profile, extra = {}) {
     latinOk &&
     !unvettedRestricted &&
     !nearGenus &&
+    !identityPsycho &&
     (!speciesRestricted || vettedPair);
-  const hold = !force && !culinary && hasSpecies;
+  const hold = !force && !culinary && (hasSpecies || identityPsycho);
   const identityStrainFlag = looksLikeCubeStrain(profile?.strain) || looksLikeCubeStrain(profile?.name);
-  const proseFlag = hasProseFlag(proseFields(profile, extra)) || (culinary && identityStrainFlag);
+  const proseFlag = hasProseFlag(proseFields(profile, extra)) || identityPsycho || identityStrainFlag;
   const reasons = [];
   if (identityForce || (force && !culinaryGenus)) reasons.push("High-confidence restricted taxon.");
   if (hold && (unvettedRestricted || (culinaryGenus && speciesRestricted))) {
     reasons.push("Culinary genus with a restricted epithet. Confirm only if this is a known edible pair.");
   }
   if (hold && !latinOk) reasons.push("Species or strain is not plain Latin letters.");
-  if (hold && hasSpecies && !culinaryGenus && !unvettedRestricted) {
+  if (hold && hasSpecies && !culinaryGenus && !unvettedRestricted && !identityPsycho) {
     reasons.push("Genus is not on the culinary allowlist.");
   }
-  if (hold && culinaryGenus && !realEpithet && !unvettedRestricted) reasons.push("Species uses a placeholder epithet such as sp.");
-  if (proseFlag) reasons.push("Summary, notes, or tags mention a restricted name.");
+  if (hold && culinaryGenus && !realEpithet && !unvettedRestricted && !identityPsycho) {
+    reasons.push("Species uses a placeholder epithet such as sp.");
+  }
+  if (identityPsycho && !force) reasons.push("Name, strain, title, or variety mentions a restricted taxon.");
+  if (proseFlag && !identityPsycho) reasons.push("Summary, notes, or tags mention a restricted name.");
   return { force, hold, culinary, proseFlag, reasons };
 }
 
@@ -503,7 +548,7 @@ export function canConfirmCulinary(profile, extra = {}) {
   const parsed = parseSpeciesParts(profile?.species);
   if (!CULINARY_GENERA.has(parsed.genus)) return false;
   if (isPsychoactiveGenus(parsed.genus)) return false;
-  if (identityHasPsychoactiveGenus(profile, extra)) return false;
+  if (identityHasPsychoactiveTerm(profile, extra)) return false;
   if (identityHasUnvettedRestricted(profile, extra)) return false;
   return classified.hold || classified.culinary;
 }

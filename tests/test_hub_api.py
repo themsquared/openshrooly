@@ -164,3 +164,57 @@ def test_species_photo_picks_specific_harvest_shots():
     assert species_photo("Hypsizygus tessulatus", "Brown beech", "Beech / Buna Shimeji").endswith("species-beech.jpg")
     assert species_photo("Agaricus bisporus", "Brown cremini", "Button / Cremini").endswith("species-cremini.jpg")
     assert species_photo("Unknownia fictionalis", "", "Mystery").endswith("species-generic.jpg")
+
+
+def test_script_payload_in_summary_stays_text_and_pages_send_csp(client):
+    import json
+
+    from openshrooly_lib.webutil import json_dumps
+
+    payload = "hi </script><script>window.__pwn=1</script>"
+    encoded = json_dumps({"summary": payload})
+    assert "</script>" not in encoded
+    assert "\\u003c/script\\u003e" in encoded
+    assert json.loads(encoded)["summary"] == payload
+
+    assert _login(client).status_code == 303
+    pearl = client.get("/api/profiles/pearl-oyster").json()
+    pearl["id"] = "xss-oyster"
+    pearl["name"] = "XSS oyster"
+    pearl["summary"] = payload
+    token = client.cookies.get("hub_csrf")
+    imported = client.post(
+        "/profiles/import",
+        data={"document": json.dumps(pearl), "csrf": token},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    assert imported.status_code == 303
+    listing = client.get("/profiles")
+    edit = client.get("/profiles/xss-oyster/edit")
+    for page in (listing, edit):
+        assert page.headers.get("content-security-policy", "").startswith("default-src 'self'")
+        assert "script-src 'self'" in page.headers.get("content-security-policy", "")
+        assert "</script><script>" not in page.text
+        assert "window.__pwn" in page.text
+        assert "\\u003c/script\\u003e" in page.text or "\\u003cscript\\u003e" in page.text
+
+
+def test_profile_edit_form_saves_with_csrf(client):
+    import json
+
+    assert _login(client).status_code == 303
+    edit = client.get("/profiles/pearl-oyster/edit")
+    assert edit.status_code == 200
+    assert 'name="csrf"' in edit.text
+    pearl = client.get("/api/profiles/pearl-oyster").json()
+    pearl["name"] = "Pearl saved"
+    token = client.cookies.get("hub_csrf")
+    saved = client.post(
+        "/profiles/import",
+        data={"document": json.dumps(pearl), "csrf": token},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303
+    assert client.get("/api/profiles/pearl-oyster").json()["name"] == "Pearl saved"

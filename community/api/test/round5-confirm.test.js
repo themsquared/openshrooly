@@ -12,7 +12,7 @@ import {
   PSILOCYBIN_LEGAL_NOTICE,
   serveProfileDocument,
 } from "../src/profile-schema.js";
-import { reclassifyUnconfirmedLegacyBatch } from "../src/review.js";
+import { RECLASS_STATE_KEY, reclassifyUnconfirmedLegacyBatch } from "../src/review.js";
 import { handleRequest } from "../src/handlers.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -65,6 +65,17 @@ const CONFIRM_REFUSE = [
   ["c-agcub", "Agaricus cubensis"],
 ];
 
+const IDENTITY_PSYCHO = [
+  { id: "r6-name-psp", species: "Agaricus bisporus", name: "Psilocybe sp." },
+  { id: "r6-strain-psi", species: "Agaricus bisporus", strain: "Psilocybe" },
+  { id: "r6-magic", species: "Pleurotus ostreatus", name: "Magic mushrooms" },
+  { id: "r6-cubes", species: "Agaricus bisporus", variety_group: "cubes" },
+  { id: "r6-title", species: "Agaricus bisporus", title: "Psilocybin tek" },
+  { id: "r6-ag-psi", species: "Agaricus psilocybe" },
+  { id: "r6-amanita", species: "Agaricus bisporus", strain: "Amanita" },
+  { id: "r6-galerina", species: "Pleurotus galerina" },
+];
+
 const IDENTITY_HOLD = [
   { id: "i-strain", species: "Agaricus bisporus", strain: "cubensis" },
   { id: "i-vg", species: "Agaricus bisporus", variety_group: "cubensis" },
@@ -109,6 +120,35 @@ test("M1 live5-confirm taxa cannot be confirmed culinary", async () => {
     assert.equal(listed.data.some((p) => p.id === id), false, `nopsi ${species}`);
     const shown = await call(hidden, "GET", `/api/profiles/${id}`);
     assert.equal(shown.status, 404, `nopsi show ${species}`);
+  }
+});
+
+test("R6 identity fields classify off-menu even when species is on the allowlist", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "r6-alice@example.com");
+  const mod = await makeModerator(ctx, "r6-mod@example.com");
+  for (const row of IDENTITY_PSYCHO) {
+    const extra = row.title ? { title: row.title } : {};
+    const doc = draftFrom(pearl, row.id);
+    doc.species = row.species;
+    if (row.strain) doc.strain = row.strain;
+    if (row.variety_group) doc.variety_group = row.variety_group;
+    if (row.name) doc.name = row.name;
+    doc.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+    doc.allowed_payment_providers = ["stripe"];
+    const classified = classifyTaxon(doc, extra);
+    assert.equal(classified.culinary, false, JSON.stringify(row));
+    assert.equal(classified.hold || classified.force, true, JSON.stringify(row));
+    assert.equal(canConfirmCulinary(doc, extra), false, JSON.stringify(row));
+    const normalized = applyPackRules(doc, extra);
+    assert.equal(normalized.pack, "psilocybin", JSON.stringify(row));
+    await queueProfile(ctx, { token: alice.token, doc, title: row.title || doc.name });
+    const approved = await call(ctx, "POST", `/api/moderation/${row.id}/approve`, { token: mod.token, body: {} });
+    assert.equal(approved.status, 200, JSON.stringify({ row, data: approved.data }));
+    const live = await call(ctx, "GET", `/api/profiles/${row.id}`);
+    assert.equal(live.data.profile.pack, "psilocybin", row.id);
+    const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+    assert.equal(culinary.data.some((p) => p.id === row.id), false, row.id);
   }
 });
 
@@ -247,9 +287,48 @@ test("M3 confirm writes the marker and owner edits keep culinary unless the taxo
   assert.equal(put2.data.profile.pack, "psilocybin");
 });
 
+test("R6 reclass cursor version reruns after a v1 done marker", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "r6-reclass@example.com");
+  const doc = draftFrom(pearl, "r6-magic-legacy");
+  doc.species = "Pleurotus ostreatus";
+  doc.name = "Magic mushrooms";
+  doc.pack = "culinary";
+  doc.restricted = false;
+  const stamped = "2024-01-01T00:00:00.000Z";
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ["r6-magic-legacy", JSON.stringify(doc), alice.user.id, 1, stamped, stamped]
+  );
+  await ctx.db.run("INSERT INTO maintenance_state (key, value, updated_at) VALUES (?, ?, ?)", [
+    "legacy_reclassify",
+    "done",
+    stamped,
+  ]);
+  const clean = draftFrom(pearl, "r6-clean-oyster");
+  clean.species = "Pleurotus ostreatus";
+  clean.name = "Pearl Oyster";
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ["r6-clean-oyster", JSON.stringify(clean), alice.user.id, 1, stamped, stamped]
+  );
+  const batch = await reclassifyUnconfirmedLegacyBatch(ctx.db, { limit: 10 });
+  assert.equal(batch.done, true);
+  const rewritten = JSON.parse((await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["r6-magic-legacy"])).document);
+  assert.equal(rewritten.pack, "psilocybin");
+  const cleanRow = await ctx.db.one("SELECT * FROM profiles WHERE id=?", ["r6-clean-oyster"]);
+  assert.equal(JSON.parse(cleanRow.document).pack, "culinary");
+  assert.equal(cleanRow.updated_at, stamped);
+  const state = await ctx.db.one("SELECT * FROM maintenance_state WHERE key=?", [RECLASS_STATE_KEY]);
+  assert.equal(state.value, "done");
+});
+
 test("M4 request path does not run legacy reclassification", async () => {
   const src = readFileSync(new URL("../src/handlers.js", import.meta.url), "utf8");
+  const worker = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
   assert.doesNotMatch(src, /backfillLegacyReviews|reclassifyUnconfirmedLegacyBatch/);
+  assert.match(worker, /legacy_reclass_failed/);
+  assert.doesNotMatch(worker, /limit:\s*25/);
   const ctx = testEnv();
   const alice = await register(ctx, "m4-alice@example.com");
   const doc = draftFrom(pearl, "lg-norev");
@@ -294,6 +373,6 @@ test("S4 malformed profile JSON is skipped instead of 500", async () => {
 });
 
 test("S5 confirm button is only in the can_confirm_culinary branch", () => {
-  const app = readFileSync(join(root, "community/web/public/js/app.js"), "utf8");
-  assert.match(app, /can_confirm_culinary \? `[\s\S]*Confirm culinary/);
+  const queue = readFileSync(join(root, "community/web/public/js/moderate-queue.js"), "utf8");
+  assert.match(queue, /can_confirm_culinary \? `[\s\S]*Confirm culinary/);
 });

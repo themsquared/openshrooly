@@ -5,6 +5,7 @@ import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { encodePhotoForUpload, resolveMediaUrl } from "./photo-upload.js";
+import { queueItemHtml } from "./moderate-queue.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -600,40 +601,24 @@ async function renderModerate() {
     const box = $("#queue");
     const items = [];
     for (const item of data.items || []) {
-      const p = item.profile;
-      const r = item.review || {};
-      const thumbs = [];
-      for (const photo of r.photos || []) {
-        const src = await ownerPhotoUrl(p.id, photo.id);
-        if (src) thumbs.push(`<img src="${src}" alt="Submitted photo">`);
+      try {
+        if (item?.kind === "report-photo") {
+          const html = queueItemHtml(item, { mediaSrc: mediaUrl(item.photo_key) });
+          if (html) items.push(html);
+          continue;
+        }
+        if (item?.kind && item.kind !== "profile") continue;
+        if (!item?.profile) continue;
+        const thumbs = [];
+        for (const photo of item.review?.photos || []) {
+          const src = await ownerPhotoUrl(item.profile.id, photo.id);
+          if (src) thumbs.push(`<img src="${src}" alt="Submitted photo">`);
+        }
+        const html = queueItemHtml(item, { thumbs });
+        if (html) items.push(html);
+      } catch {
+        continue;
       }
-      items.push(`<article class="card" style="padding:1.1rem">
-              <p><span class="chip">${escapeHtml(p.pack === "psilocybin" ? "Off-menu" : "Culinary")}</span>${r.offmenu_flag ? `<span class="chip">Off-menu flag</span>` : ""}${r.blocklist_hit ? `<span class="chip">Text flag</span>` : ""}</p>
-              ${
-                (r.offmenu_reasons || []).length
-                  ? `<p class="notice">${(r.offmenu_reasons || []).map((reason) => escapeHtml(reason)).join(" ")}</p>`
-                  : ""
-              }
-              <h2>${escapeHtml(r.title || p.name)}</h2>
-              <p>${escapeHtml(r.description || p.summary || "")}</p>
-              <p class="muted">${escapeHtml(p.species || "")}</p>
-              ${
-                (item.affiliate_links || []).length
-                  ? `<p class="notice">Affiliate links: ${item.affiliate_links
-                      .map((link) => `${escapeHtml(link.label || link.id)} (${escapeHtml(link.url || "")})`)
-                      .join("; ")}</p>`
-                  : ""
-              }
-              ${thumbs.length ? `<div class="pb-photos">${thumbs.join("")}</div>` : ""}
-              <label>Reason <input id="reason-${escapeHtml(p.id)}" placeholder="Required to reject or ask for changes"></label>
-              <p class="pb-actions">
-                <button type="button" data-mod="approve" data-id="${escapeHtml(p.id)}">Approve</button>
-                ${r.can_confirm_culinary ? `<button type="button" class="secondary" data-mod="confirm-culinary" data-id="${escapeHtml(p.id)}">Confirm culinary</button>` : ""}
-                <button type="button" class="secondary" data-mod="request-changes" data-id="${escapeHtml(p.id)}">Ask for changes</button>
-                <button type="button" class="secondary" data-mod="reject" data-id="${escapeHtml(p.id)}">Reject</button>
-                <button type="button" class="secondary" data-mod="takedown" data-id="${escapeHtml(p.id)}">Take down</button>
-              </p>
-            </article>`);
     }
     box.innerHTML = items.length ? items.join("") : `<p class="muted">Nothing waiting.</p>`;
     box.addEventListener("click", async (ev) => {
@@ -641,9 +626,14 @@ async function renderModerate() {
       if (!btn) return;
       const id = btn.dataset.id;
       const action = btn.dataset.mod;
-      const reason = document.getElementById(`reason-${id}`)?.value || "";
+      const reasonBox = document.getElementById(`reason-${id}`) || document.getElementById(`reason-report-photo-${id}`);
+      const reason = reasonBox?.value || "";
       try {
-        if (action === "approve") await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: {} });
+        if (action === "report-photo-approve") {
+          await api(`/api/moderation/report-photos/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: {} });
+        } else if (action === "report-photo-reject") {
+          await api(`/api/moderation/report-photos/${encodeURIComponent(id)}/reject`, { method: "POST", jsonBody: { reason } });
+        } else if (action === "approve") await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: {} });
         else if (action === "confirm-culinary") {
           await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: { pack: "culinary" } });
         } else await api(`/api/moderation/${encodeURIComponent(id)}/${action}`, { method: "POST", jsonBody: { reason } });

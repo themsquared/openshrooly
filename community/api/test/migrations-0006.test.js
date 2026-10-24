@@ -128,6 +128,36 @@ test("0006 applies on a DB that already has #42 0004 and 0005", async () => {
   });
 });
 
+test("0006 rerun does not copy a pending draft into live_document", async () => {
+  await withDb(async (d1) => {
+    await apply(d1, SCHEMA);
+    await d1.prepare("INSERT INTO users (id, username, password_hash, created_at) VALUES (1, 'grower', 'x', '2024-01-01')").run();
+    const live = culinaryDoc("Pleurotus ostreatus");
+    const liveObj = JSON.parse(live);
+    liveObj.id = "pending-oyster";
+    await d1
+      .prepare("INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, 1, 1, '2024-01-01', '2024-01-01')")
+      .bind("pending-oyster", JSON.stringify(liveObj))
+      .run();
+    await apply(d1, MIG_0006);
+    const draft = { ...liveObj, name: "Draft sneak", species: "Psilocybe cubensis", pack: "psilocybin", restricted: true };
+    await d1
+      .prepare(
+        "INSERT INTO profile_review (profile_id, status, reason, title, description, live_document, blocklist_hit, offmenu_flag, published_live, created_at, updated_at) VALUES ('pending-oyster', 'pending', '', 'Draft', 'edit', ?, 0, 0, 1, '2024-01-01', '2024-01-01') ON CONFLICT(profile_id) DO UPDATE SET status='pending', live_document=excluded.live_document, published_live=1"
+      )
+      .bind(JSON.stringify(liveObj))
+      .run();
+    await d1.prepare("UPDATE profiles SET document=? WHERE id='pending-oyster'").bind(JSON.stringify(draft)).run();
+    await apply(d1, MIG_0006);
+    const review = await d1.prepare("SELECT * FROM profile_review WHERE profile_id='pending-oyster'").first();
+    assert.equal(review.status, "pending");
+    const storedLive = JSON.parse(review.live_document);
+    assert.equal(storedLive.species, "Pleurotus ostreatus");
+    assert.equal(storedLive.pack, "culinary");
+    assert.notEqual(storedLive.name, "Draft sneak");
+  });
+});
+
 test("0006 and schema.sql apply on a fresh DB", async () => {
   await withDb(async (d1) => {
     await apply(d1, SCHEMA);
