@@ -18,6 +18,7 @@ export function testEnv(extra = {}) {
     DEV_STUBS: "1",
     HIBP_DISABLED: "1",
     SITE_ORIGIN: "http://127.0.0.1:8888",
+    API_ORIGIN: "https://api.shroomlabs.io",
     OIDC_STUB: "1",
     TURNSTILE_STUB: "1",
     GROW_COACH_STUB: "1",
@@ -39,6 +40,15 @@ export async function call(ctx, method, path, { token, body, headers: extra = {}
   const res = await handleRequest(request, ctx);
   const text = await res.text();
   return { status: res.status, data: text ? JSON.parse(text) : null, headers: res.headers };
+}
+
+export async function callRaw(ctx, method, path, { token, headers: extra = {}, host } = {}) {
+  const headers = { ...extra };
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (host) headers.host = host;
+  const request = new Request(`${host ? `https://${host}` : "http://test"}${path}`, { method, headers });
+  const res = await handleRequest(request, ctx);
+  return { status: res.status, bytes: new Uint8Array(await res.arrayBuffer()), headers: res.headers };
 }
 
 export const RANDOM_HANDLE = /^grower_[0-9a-f]{10}$/;

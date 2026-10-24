@@ -4,17 +4,16 @@ import { renderProfileCards } from "./profile-cards.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
+import { encodePhotoForUpload, resolveMediaUrl } from "./photo-upload.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
 }
 
 function mediaUrl(key, fallback) {
-  if (fallback) return fallback;
+  if (fallback) return resolveMediaUrl(fallback, apiBase());
   if (!key) return "";
-  const base = String(cfg().mediaBase || "").replace(/\/$/, "");
-  if (base) return `${base}/${key}`;
-  return `${apiBase()}/api/media/${encodeURIComponent(key)}`;
+  return resolveMediaUrl(`/api/media/${encodeURIComponent(key)}`, apiBase());
 }
 
 function $(sel) {
@@ -204,7 +203,8 @@ async function renderProfile() {
       .map((r) => {
         const href = mediaUrl(r.photo_key, r.photo_url);
         const photo = href ? ` <a href="${href}">photo</a>` : "";
-        return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}</li>`;
+        const review = r.photo_status === "pending" && href ? " <span class='muted'>Awaiting review</span>" : "";
+        return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}${review}</li>`;
       })
       .join("") || "<li class='muted'>No community reports yet.</li>";
 
@@ -227,11 +227,7 @@ async function renderProfile() {
       flushes: fd.get("flushes"),
     };
     const file = fd.get("photo");
-    if (file && file.size) {
-      payload.photo_base64 = await fileToBase64(file);
-      payload.photo_type = file.type;
-      payload.photo_ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    }
+    if (file && file.size) Object.assign(payload, await encodePhotoForUpload(file));
     await api(`/api/profiles/${id}/reports`, { method: "POST", jsonBody: payload });
     location.reload();
   });
@@ -412,18 +408,6 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      resolve(result.split(",")[1] || "");
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 bindMobileNav();
@@ -612,9 +596,7 @@ async function renderCoach() {
       const data = await api("/api/coach/photo", {
         method: "POST",
         jsonBody: {
-          photo_base64: await fileToBase64(file),
-          photo_type: file.type,
-          photo_ext: (file.name.split(".").pop() || "jpg").toLowerCase(),
+          ...(await encodePhotoForUpload(file)),
           hint: $("#photo-hint").value,
         },
       });
