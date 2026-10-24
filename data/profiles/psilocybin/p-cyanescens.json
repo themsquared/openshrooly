@@ -20,7 +20,7 @@
   "source_notes": [
     {
       "title": "Field / grower notes",
-      "detail": "P. cyanescens fruits in cool, wet weather, often 10\u201318 \u00b0C, on lignin-rich mulch. Indoor success is inconsistent."
+      "detail": "P. cyanescens fruits in cool, wet weather, often 10-18 °C, on lignin-rich mulch. Indoor success is inconsistent."
     }
   ],
   "stages": [
@@ -29,9 +29,9 @@
       "name": "Colonization",
       "duration_days": 28,
       "humidity_percent": 88,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 20,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 14,
       "temperature_warning_max_c": 24,
@@ -56,9 +56,9 @@
       "name": "Pinning",
       "duration_days": 10,
       "humidity_percent": 94,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 12,
       "temperature_warning_max_c": 20,
@@ -83,9 +83,9 @@
       "name": "Fruiting",
       "duration_days": 14,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 12,
       "temperature_warning_max_c": 19,

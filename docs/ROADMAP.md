@@ -124,7 +124,7 @@ Cold shock (shiitake) **cannot** be done inside the chamber; the profile documen
 | Affiliate links | Working (example URLs) | Click tracking + FTC-style disclosure |
 | Psilocybin pack | **Free, no affiliates, no card checkout** | Enforced in validators. **Never marketed with Grow Coach** |
 
-Payments are **provider-agnostic**: an item lists `allowed_payment_providers`. The router picks the first configured provider. **Stripe is stubbed** (no live keys). Completing `/api/pay/{id}/complete` grants an entitlement locally. `/api/payments/webhook` is the inbound hook shape for a future live provider.
+Payments are **provider-agnostic**: an item lists `allowed_payment_providers`. The router picks the first configured provider. Checkout is stubbed. Entitlements are granted only by a signed `POST /api/payments/webhook` (`Stripe-Signature: t=,v1=` HMAC-SHA256). There is no client complete route.
 
 ### Future: BTCPay / Lightning (not implemented)
 

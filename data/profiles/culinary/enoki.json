@@ -14,16 +14,16 @@
   "restricted": false,
   "summary": "Needs cold fruiting and low FAE for supermarket-long stems.",
   "notes": "",
-  "chamber_notes": "A Shrooly cannot reach true 4\u201310 \u00b0C enoki rooms. This profile uses the coolest firmware target (15 \u00b0C) and very low FAE as a chamber approximation.",
+  "chamber_notes": "A Shrooly cannot reach true 4-10 °C enoki rooms. This profile uses the coolest firmware target (15 °C) and very low FAE as a chamber approximation.",
   "legal_notice": null,
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Commercial enoki: ~10\u201316 \u00b0C, high CO2, low light, 90\u201395% RH."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Commercial enoki: ~10-16 °C, high CO2, low light, 90-95% RH."
     },
     {
       "title": "Vendor cards",
-      "detail": "Home growers who lack a cold room get shorter, darker, more petaled fruits \u2014 still edible."
+      "detail": "Home growers who lack a cold room get shorter, darker, more petaled fruits  -  still edible."
     }
   ],
   "stages": [
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 18,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -59,9 +59,9 @@
       "name": "Pinning",
       "duration_days": 7,
       "humidity_percent": 95,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 13,
       "temperature_warning_max_c": 20,
@@ -86,9 +86,9 @@
       "name": "Fruiting",
       "duration_days": 18,
       "humidity_percent": 93,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 13,
       "temperature_warning_max_c": 19,

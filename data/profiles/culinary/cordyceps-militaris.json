@@ -19,11 +19,11 @@
   "source_notes": [
     {
       "title": "Published cultivation",
-      "detail": "Peer-reviewed and grower protocols commonly use 18\u201322 \u00b0C dark spawn, then 16\u201320 \u00b0C and 12/12 light for stroma."
+      "detail": "Peer-reviewed and grower protocols commonly use 18-22 °C dark spawn, then 16-20 °C and 12/12 light for stroma."
     },
     {
       "title": "Practice",
-      "detail": "RH 80\u201390% is enough; pooling water on rice drowns primordia."
+      "detail": "RH 80-90% is enough; pooling water on rice drowns primordia."
     }
   ],
   "stages": [
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 12,
       "humidity_percent": 82,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 20,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 15,
       "temperature_warning_max_c": 25,
@@ -59,9 +59,9 @@
       "name": "Orange initials",
       "duration_days": 10,
       "humidity_percent": 86,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 18,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 13,
       "temperature_warning_max_c": 23,
@@ -86,9 +86,9 @@
       "name": "Stroma",
       "duration_days": 35,
       "humidity_percent": 84,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 18,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 13,
       "temperature_warning_max_c": 23,

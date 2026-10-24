@@ -19,7 +19,7 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. citrinopileatus fruits in a wide warm band, often 18\u201330 \u00b0C."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. citrinopileatus fruits in a wide warm band, often 18-30 °C."
     },
     {
       "title": "Vendor cards",
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 12,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 25,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 20,
       "temperature_warning_max_c": 30,
@@ -59,9 +59,9 @@
       "name": "Pinning",
       "duration_days": 4,
       "humidity_percent": 93,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -86,9 +86,9 @@
       "name": "Fruiting",
       "duration_days": 8,
       "humidity_percent": 87,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 21,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 16,
       "temperature_warning_max_c": 26,

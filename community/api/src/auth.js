@@ -1,6 +1,19 @@
 /** Passwordless-first auth for Cloudflare Workers + D1. */
 
-import { hashPassword, laterIso, nowIso, randomBase64Url, randomToken, sha256Hex, verifyPassword } from "./crypto.js";
+import {
+  decryptSecret,
+  encryptSecret,
+  fromBase64Url,
+  hashPassword,
+  laterIso,
+  nowIso,
+  randomBase32,
+  randomBase64Url,
+  randomToken,
+  sha256Hex,
+  verifyPassword,
+  verifyTotp,
+} from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
@@ -244,9 +257,13 @@ export async function handleAuth(method, path, url, request, env) {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
     const body = await request.json().catch(() => ({}));
-    const row = await db.one("SELECT * FROM webauthn_challenges WHERE challenge=? AND user_id=?", [body.challenge, user.id]);
-    if (!row || row.expires_at < nowIso()) return json({ error: "challenge expired" }, 400);
+    const parsed = parseClientData(body.clientDataJSON);
+    if (!parsed || parsed.json.type !== "webauthn.create") return json({ error: "invalid authenticator data" }, 400);
+    const challengeValue = String(parsed.json.challenge || body.challenge || "");
+    const row = await consumeChallenge(db, challengeValue, "register", user.id);
+    if (!row) return json({ error: "challenge expired or already used" }, 400);
     if (!body.credentialId || !body.publicKey) throw new ValidationError("credentialId and publicKey required");
+    if (!jwkIsEs256(body.publicKey)) throw new ValidationError("ES256 public key required");
     await db.run(
       "INSERT INTO webauthn_credentials (user_id, credential_id, public_key, sign_count, created_at) VALUES (?, ?, ?, ?, ?)",
       [user.id, body.credentialId, typeof body.publicKey === "string" ? body.publicKey : JSON.stringify(body.publicKey), 0, nowIso()]
@@ -273,10 +290,15 @@ export async function handleAuth(method, path, url, request, env) {
 
   if (method === "POST" && path === "/api/auth/webauthn/login/finish") {
     const body = await request.json().catch(() => ({}));
-    const challenge = await db.one("SELECT * FROM webauthn_challenges WHERE challenge=?", [body.challenge]);
-    if (!challenge || challenge.expires_at < nowIso()) return json({ error: "challenge expired" }, 401);
+    const parsed = parseClientData(body.clientDataJSON);
+    if (!parsed || parsed.json.type !== "webauthn.get") return json({ error: "invalid authenticator data" }, 401);
+    const challengeValue = String(parsed.json.challenge || body.challenge || "");
+    const challenge = await consumeChallenge(db, challengeValue, "login");
+    if (!challenge) return json({ error: "challenge expired or already used" }, 401);
     const cred = await db.one("SELECT * FROM webauthn_credentials WHERE credential_id=?", [body.credentialId]);
     if (!cred) return json({ error: "unknown passkey" }, 401);
+    const valid = await verifyAssertion(cred.public_key, body.authenticatorData, parsed.bytes, body.signature);
+    if (!valid) return json({ error: "passkey verification failed" }, 401);
     const user = await db.one("SELECT * FROM users WHERE id=?", [cred.user_id]);
     const issued = await issueSession(db, user, request, env);
     await audit(db, user.id, "passkey_login", "", request);
@@ -286,8 +308,10 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/totp/begin") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
-    const secret = randomBase64Url(20);
-    await db.run("UPDATE users SET totp_secret_enc=? WHERE id=?", [secret, user.id]);
+    const secret = randomBase32(20);
+    const enc = await encryptSecret(secret, env);
+    if (!enc) return json({ error: "TOTP encryption key is not configured." }, 503);
+    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=? WHERE id=?", [enc, 0, user.id]);
     return json({ secret, otpauth: `otpauth://totp/ShroomLabs:${user.email || user.username}?secret=${secret}&issuer=ShroomLabs` });
   }
 
@@ -295,8 +319,10 @@ export async function handleAuth(method, path, url, request, env) {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
     const body = await request.json().catch(() => ({}));
-    if (String(body.code || "").length !== 6) throw new ValidationError("6-digit TOTP code required");
-    await db.run("UPDATE users SET totp_enabled=1 WHERE id=?", [user.id]);
+    const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
+    const secret = await decryptSecret(fresh?.totp_secret_enc, env);
+    if (!secret || !(await verifyTotp(secret, body.code))) return json({ error: "invalid TOTP code" }, 401);
+    await db.run("UPDATE users SET totp_enabled=? WHERE id=?", [1, user.id]);
     await audit(db, user.id, "totp_enable", "", request);
     return json({ ok: true });
   }
@@ -342,7 +368,7 @@ export async function handleAuth(method, path, url, request, env) {
 async function startOidc(env, request, provider) {
   const cfg = providerConfig(env, provider);
   if (!cfg.clientId && String(env.OIDC_STUB || "") !== "1") {
-    return json({ error: `${provider} OAuth is not configured. See docs/AUTH.md.`, redirect_uris: cfg.redirectUris }, 503);
+    return json({ error: `${provider} OAuth is not configured.`, redirect_uris: cfg.redirectUris }, 503);
   }
   if (!originAllowed(env, request) && request.headers.get("origin")) {
     return json({ error: "origin not allowed" }, 403);
@@ -458,3 +484,56 @@ async function sha256b64(value) {
 }
 
 const base64urlSha256 = true;
+
+async function consumeChallenge(db, challenge, purpose, userId) {
+  const value = String(challenge || "");
+  if (!value) return null;
+  const row = await db.one("SELECT * FROM webauthn_challenges WHERE challenge=?", [value]);
+  if (!row || row.used_at || row.expires_at < nowIso()) return null;
+  if (purpose && row.purpose !== purpose) return null;
+  if (userId != null && row.user_id != null && Number(row.user_id) !== Number(userId)) return null;
+  await db.run("UPDATE webauthn_challenges SET used_at=? WHERE challenge=?", [nowIso(), value]);
+  return row;
+}
+
+function parseClientData(encoded) {
+  try {
+    const bytes = fromBase64Url(encoded);
+    const json = JSON.parse(new TextDecoder().decode(bytes));
+    if (!json || typeof json !== "object") return null;
+    return { bytes, json };
+  } catch {
+    return null;
+  }
+}
+
+function jwkIsEs256(value) {
+  const jwk = typeof value === "string" ? safeJson(value) : value;
+  return Boolean(jwk && jwk.kty === "EC" && (jwk.crv === "P-256" || jwk.crv === "P256") && jwk.x && jwk.y);
+}
+
+function safeJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+async function verifyAssertion(publicKey, authenticatorData, clientDataBytes, signature) {
+  try {
+    const jwk = typeof publicKey === "string" ? JSON.parse(publicKey) : publicKey;
+    if (!jwkIsEs256(jwk) || !authenticatorData || !signature) return false;
+    const authData = fromBase64Url(authenticatorData);
+    const clientHash = new Uint8Array(await crypto.subtle.digest("SHA-256", clientDataBytes));
+    const signed = new Uint8Array(authData.length + clientHash.length);
+    signed.set(authData, 0);
+    signed.set(clientHash, authData.length);
+    const key = await crypto.subtle.importKey("jwk", { ...jwk, ext: true }, { name: "ECDSA", namedCurve: "P-256" }, false, [
+      "verify",
+    ]);
+    return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, fromBase64Url(signature), signed);
+  } catch {
+    return false;
+  }
+}

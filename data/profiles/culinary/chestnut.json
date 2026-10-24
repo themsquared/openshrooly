@@ -18,7 +18,7 @@
   "source_notes": [
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Chestnut / Pholiota adiposa cards typically 13\u201318 \u00b0C and 90\u201395% RH."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Chestnut / Pholiota adiposa cards typically 13-18 °C and 90-95% RH."
     },
     {
       "title": "Stamets",
@@ -31,9 +31,9 @@
       "name": "Colonization",
       "duration_days": 18,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 23,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 18,
       "temperature_warning_max_c": 28,
@@ -58,9 +58,9 @@
       "name": "Pinning",
       "duration_days": 6,
       "humidity_percent": 95,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,
@@ -85,9 +85,9 @@
       "name": "Fruiting",
       "duration_days": 10,
       "humidity_percent": 92,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 20,

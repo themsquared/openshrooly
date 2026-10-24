@@ -129,7 +129,8 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
     challenge TEXT NOT NULL UNIQUE,
     user_id INTEGER,
     purpose TEXT NOT NULL,
-    expires_at TEXT NOT NULL
+    expires_at TEXT NOT NULL,
+    used_at TEXT
 );
 CREATE TABLE IF NOT EXISTS oauth_states (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

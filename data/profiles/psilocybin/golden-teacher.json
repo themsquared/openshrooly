@@ -19,7 +19,7 @@
   "source_notes": [
     {
       "title": "Chamber consensus",
-      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. P. cubensis colonizes ~24\u201327 \u00b0C; pins and fruits ~21\u201324 \u00b0C at high RH with 12/12 light."
+      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. P. cubensis colonizes ~24-27 °C; pins and fruits ~21-24 °C at high RH with 12/12 light."
     },
     {
       "title": "Practice",
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 16,
       "humidity_percent": 92,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 25,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 20,
       "temperature_warning_max_c": 30,
@@ -59,9 +59,9 @@
       "name": "Pinning",
       "duration_days": 6,
       "humidity_percent": 95,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -86,9 +86,9 @@
       "name": "Fruiting",
       "duration_days": 10,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,

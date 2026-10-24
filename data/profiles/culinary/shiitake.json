@@ -19,11 +19,11 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). L. edodes: long spawn run, bark-like browning, then 5\u201310 \u00b0C shock and 13\u201318 \u00b0C fruiting."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). L. edodes: long spawn run, bark-like browning, then 5-10 °C shock and 13-18 °C fruiting."
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Block shiitake cards commonly list 80\u201390% RH and high FAE after shock."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Block shiitake cards commonly list 80-90% RH and high FAE after shock."
     }
   ],
   "stages": [
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 42,
       "humidity_percent": 88,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 24,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 19,
       "temperature_warning_max_c": 29,
@@ -52,16 +52,16 @@
         "run_duration_s": 15,
         "speed_percent": 20
       },
-      "notes": "Wait for full white, then browning \u2014 do not fruit early."
+      "notes": "Wait for full white, then browning  -  do not fruit early."
     },
     {
       "id": "browning",
       "name": "Browning / skin",
       "duration_days": 21,
       "humidity_percent": 80,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 21,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 16,
       "temperature_warning_max_c": 26,
@@ -86,9 +86,9 @@
       "name": "Cold shock (off-device)",
       "duration_days": 1,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 13,
       "temperature_warning_max_c": 20,
@@ -106,16 +106,16 @@
         "run_duration_s": 15,
         "speed_percent": 20
       },
-      "notes": "Firmware cannot reach fridge temps. Shock 12\u201324 h at 5\u201310 \u00b0C, then apply fruiting."
+      "notes": "Firmware cannot reach fridge temps. Shock 12-24 h at 5-10 °C, then apply fruiting."
     },
     {
       "id": "fruiting",
       "name": "Fruiting",
       "duration_days": 10,
       "humidity_percent": 85,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 12,
       "temperature_warning_max_c": 21,

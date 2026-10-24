@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { NAV_ITEMS } from "../../web/public/js/chrome.js";
+import { NAV_ITEMS, POSITIONING } from "../../web/public/js/chrome.js";
 import { isPsi, loadProfiles, renderLlms, renderProfilePage, renderSitemap, writeSeoFiles } from "../../web/scripts/generate-seo.js";
 
 const PUBLIC = join(import.meta.dirname, "../../web/public");
@@ -36,7 +36,65 @@ test("every public page has shared nav, title, and description", () => {
       last = at;
     }
     assert.doesNotMatch(header, /Restricted|psilocybin|Off-menu/i);
+    assert.match(header, /Sign in/, `${file} needs a static Sign in link`);
+    assert.match(header, new RegExp(POSITIONING.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+});
+
+test("generated profile pages share the homepage header lockup and nav", () => {
+  writeSeoFiles(PUBLIC);
+  const home = readFileSync(join(PUBLIC, "index.html"), "utf8");
+  const profile = readFileSync(join(PUBLIC, "profiles", "golden-teacher.html"), "utf8");
+  for (const [name, html] of [
+    ["index.html", home],
+    ["profiles/golden-teacher.html", profile],
+  ]) {
+    const header = html.slice(html.indexOf('data-chrome="header"'), html.indexOf("</header>"));
+    for (const label of NAV_ITEMS.map((item) => item.label)) {
+      assert.match(header, new RegExp(label), `${name} missing ${label}`);
+    }
+    assert.match(header, /Sign in/);
+    assert.match(header, /Works with Shrooly devices running OpenShrooly/);
+    assert.doesNotMatch(header, />Catalog</);
+    assert.doesNotMatch(html, /Works with OpenShrooly<\/small>/);
+  }
+});
+
+test("public visitor files do not use en or em dashes", () => {
+  writeSeoFiles(PUBLIC);
+  const hits = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+        continue;
+      }
+      if (!/\.(html|js|css|txt|xml|svg|json)$/i.test(entry.name)) continue;
+      const text = readFileSync(path, "utf8");
+      if (/[\u2013\u2014]/.test(text)) hits.push(path.slice(PUBLIC.length + 1));
+    }
+  };
+  walk(PUBLIC);
+  assert.deepEqual(hits, [], `U+2013 or U+2014 in ${hits.join(", ")}`);
+});
+
+test("public visitor copy does not mention Mike or missing keys", () => {
+  const hits = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+        continue;
+      }
+      if (!/\.(html|js)$/i.test(entry.name)) continue;
+      const text = readFileSync(path, "utf8");
+      if (/\bMike\b|missing keys|AUTH\.md/i.test(text)) hits.push(path.slice(PUBLIC.length + 1));
+    }
+  };
+  walk(PUBLIC);
+  assert.deepEqual(hits, [], `internal copy leaked in ${hits.join(", ")}`);
 });
 
 test("all profiles are indexed, including Off-menu", () => {

@@ -18,7 +18,7 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). H. ulmarius fruits cooler than tropical oysters, often 10\u201318 \u00b0C."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). H. ulmarius fruits cooler than tropical oysters, often 10-18 °C."
     },
     {
       "title": "Vendor cards",
@@ -31,9 +31,9 @@
       "name": "Colonization",
       "duration_days": 16,
       "humidity_percent": 88,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -58,9 +58,9 @@
       "name": "Pinning",
       "duration_days": 5,
       "humidity_percent": 92,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,
@@ -85,9 +85,9 @@
       "name": "Fruiting",
       "duration_days": 10,
       "humidity_percent": 86,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,

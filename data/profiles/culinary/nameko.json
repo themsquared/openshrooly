@@ -19,7 +19,7 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Nameko fruits cool and wet, often 10\u201318 \u00b0C at 90\u201395% RH."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Nameko fruits cool and wet, often 10-18 °C at 90-95% RH."
     },
     {
       "title": "Vendor cards",
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 20,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -59,9 +59,9 @@
       "name": "Pinning",
       "duration_days": 7,
       "humidity_percent": 95,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 10,
       "temperature_warning_max_c": 20,
@@ -86,9 +86,9 @@
       "name": "Fruiting",
       "duration_days": 12,
       "humidity_percent": 93,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 14,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 19,

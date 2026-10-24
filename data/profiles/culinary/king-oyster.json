@@ -19,11 +19,11 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. eryngii prefers cooler fruiting (often 12\u201318 \u00b0C) and modest air."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. eryngii prefers cooler fruiting (often 12-18 °C) and modest air."
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). King oyster cards commonly list 80\u201385% RH to thicken stems."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). King oyster cards commonly list 80-85% RH to thicken stems."
     }
   ],
   "stages": [
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 18,
       "humidity_percent": 88,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -59,9 +59,9 @@
       "name": "Pinning",
       "duration_days": 6,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,
@@ -86,9 +86,9 @@
       "name": "Fruiting",
       "duration_days": 14,
       "humidity_percent": 82,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,

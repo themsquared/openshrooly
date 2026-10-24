@@ -13,7 +13,7 @@ import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
 import { activateCoachSub, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
-import { originAllowed, securityHeaders } from "./security.js";
+import { originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { seedIfEmpty } from "./db.js";
 import seeds from "./seeds.json" with { type: "json" };
 
@@ -346,7 +346,7 @@ async function route(method, path, url, request, env) {
         "stripe",
         "requires_payment",
         profile.pricing.amount_cents,
-        JSON.stringify({ note: "Stripe stub. No live keys." }),
+        JSON.stringify({ note: "Payment stub session." }),
         nowIso(),
       ]
     );
@@ -358,35 +358,17 @@ async function route(method, path, url, request, env) {
     });
   }
 
-  const completeMatch = path.match(/^\/api\/pay\/([^/]+)\/complete$/);
-  if (completeMatch && method === "POST") {
-    const user = await userFromAuth(request, db);
-    if (!user) return json({ error: "sign in required" }, 401);
-    const checkout = await db.one("SELECT * FROM checkouts WHERE id=?", [completeMatch[1]]);
-    if (!checkout || checkout.user_id !== user.id) return json({ error: "not found" }, 404);
-    await db.run("UPDATE checkouts SET status=? WHERE id=?", ["paid", checkout.id]);
-    const details = (() => {
-      try {
-        return JSON.parse(checkout.details || "{}");
-      } catch {
-        return {};
-      }
-    })();
-    if (checkout.item_id === COACH_ITEM || details.item_type === "subscription") {
-      const periodEnd = await activateCoachSub(db, user.id);
-      return json({ ok: true, item_id: checkout.item_id, item_type: "subscription", period_end: periodEnd });
-    }
-    await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
-      user.id,
-      checkout.item_id,
-      "profile",
-      nowIso(),
-    ]);
-    return json({ ok: true, item_id: checkout.item_id });
-  }
-
   if (method === "POST" && path === "/api/payments/webhook") {
-    const body = await readJson(request);
+    const raw = await request.text();
+    const signature = request.headers.get("stripe-signature") || request.headers.get("x-webhook-signature") || "";
+    const verified = await verifyPaymentWebhook(env, raw, signature);
+    if (!verified.ok) return json({ error: "invalid webhook signature" }, 401);
+    let body = {};
+    try {
+      body = JSON.parse(raw || "{}");
+    } catch {
+      throw new ValidationError("webhook body must be JSON");
+    }
     const provider = body.provider || request.headers.get("x-payment-provider") || "stripe";
     if (!body.session_id || !body.item_id || !body.user_id) {
       throw new ValidationError("webhook needs session_id, item_id, user_id");
@@ -394,6 +376,8 @@ async function route(method, path, url, request, env) {
     if (body.pack === "psilocybin") {
       throw new ValidationError("psilocybin pack cannot receive payment webhooks");
     }
+    const checkout = await db.one("SELECT * FROM checkouts WHERE id=?", [body.session_id]);
+    if (checkout) await db.run("UPDATE checkouts SET status=? WHERE id=?", ["paid", checkout.id]);
     if (body.item_id === COACH_ITEM || body.item_type === "subscription") {
       const periodEnd = await activateCoachSub(db, Number(body.user_id));
       return json({ ok: true, provider, item_id: body.item_id, item_type: "subscription", period_end: periodEnd });
@@ -405,6 +389,17 @@ async function route(method, path, url, request, env) {
       nowIso(),
     ]);
     return json({ ok: true, provider });
+  }
+
+  if (method === "GET" && path === "/api/guides") {
+    const rows = await db.all("SELECT * FROM guides");
+    return json(
+      rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        pricing: typeof row.pricing === "string" ? JSON.parse(row.pricing) : row.pricing,
+      }))
+    );
   }
 
   const goMatch = path.match(/^\/api\/go\/([^/]+)\/([^/]+)$/);

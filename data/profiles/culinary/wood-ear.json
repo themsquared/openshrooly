@@ -19,7 +19,7 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Auricularia spp. fruit warm (often 20\u201330 \u00b0C) at 85\u201395% RH."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Auricularia spp. fruit warm (often 20-30 °C) at 85-95% RH."
     },
     {
       "title": "Vendor cards",
@@ -32,9 +32,9 @@
       "name": "Colonization",
       "duration_days": 18,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 26,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 18,
       "temperature_warning_max_c": 33,
@@ -59,9 +59,9 @@
       "name": "Pinning",
       "duration_days": 6,
       "humidity_percent": 94,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 24,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 18,
       "temperature_warning_max_c": 32,
@@ -86,9 +86,9 @@
       "name": "Fruiting",
       "duration_days": 14,
       "humidity_percent": 92,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 24,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 18,
       "temperature_warning_max_c": 32,

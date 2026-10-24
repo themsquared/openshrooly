@@ -140,6 +140,14 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.password_hash = params[0];
     return {};
   }
+  if (q.startsWith("UPDATE users SET totp_secret_enc=?, totp_enabled=")) {
+    const row = tables.users.find((u) => u.id === Number(params[2]));
+    if (row) {
+      row.totp_secret_enc = params[0];
+      row.totp_enabled = params[1];
+    }
+    return {};
+  }
   if (q.startsWith("UPDATE users SET totp_secret_enc=")) {
     const row = tables.users.find((u) => u.id === Number(params[1]));
     if (row) row.totp_secret_enc = params[0];
@@ -221,7 +229,13 @@ function dispatch(mode, tables, ids, sql, params) {
       user_id: params[1],
       purpose: params[2],
       expires_at: params[3],
+      used_at: null,
     });
+    return {};
+  }
+  if (q.startsWith("UPDATE webauthn_challenges SET used_at=")) {
+    const row = tables.webauthn_challenges.find((s) => s.challenge === params[1] && !s.used_at);
+    if (row) row.used_at = params[0];
     return {};
   }
   if (q.startsWith("SELECT * FROM webauthn_challenges WHERE challenge=? AND user_id=")) {

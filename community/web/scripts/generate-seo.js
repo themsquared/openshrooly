@@ -10,6 +10,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
 const PUBLIC = join(ROOT, "public");
 
+export function deDash(value) {
+  return String(value ?? "").replaceAll("\u2014", " - ").replaceAll("\u2013", "-");
+}
+
 export function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -340,7 +344,7 @@ export function stampChrome(html, activeId) {
   const next = html
     .replace(/<!--CHROME_HEADER-->[\s\S]*?<!--\/CHROME_HEADER-->/, `<!--CHROME_HEADER-->\n  ${renderHeader(activeId)}\n  <!--/CHROME_HEADER-->`)
     .replace(/<!--CHROME_FOOTER-->[\s\S]*?<!--\/CHROME_FOOTER-->/, `<!--CHROME_FOOTER-->\n  ${renderFooter()}\n  <!--/CHROME_FOOTER-->`);
-  return next;
+  return deDash(next);
 }
 
 const PAGE_ACTIVE = {
@@ -362,20 +366,21 @@ export function writeSeoFiles(dir = PUBLIC) {
   const profiles = loadProfiles();
   mkdirSync(join(dir, "profiles"), { recursive: true });
   mkdirSync(join(dir, "og"), { recursive: true });
-  writeFileSync(join(dir, "sitemap.xml"), renderSitemap(profiles));
-  writeFileSync(join(dir, "llms.txt"), renderLlms(profiles));
-  writeFileSync(join(dir, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`);
-  writeFileSync(join(dir, "faq.html"), renderFaqPage(profiles));
-  writeFileSync(join(dir, "og", "default.svg"), renderOgSvg());
+  const writeText = (path, content) => writeFileSync(path, deDash(String(content)));
+  writeText(join(dir, "sitemap.xml"), renderSitemap(profiles));
+  writeText(join(dir, "llms.txt"), renderLlms(profiles));
+  writeText(join(dir, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`);
+  writeText(join(dir, "faq.html"), renderFaqPage(profiles));
+  writeText(join(dir, "og", "default.svg"), renderOgSvg());
   for (const profile of profiles) {
-    writeFileSync(join(dir, "profiles", `${profile.id}.html`), renderProfilePage(profile));
-    writeFileSync(join(dir, "og", `${profile.id}.svg`), renderOgSvg(profile));
+    writeText(join(dir, "profiles", `${profile.id}.html`), renderProfilePage(profile));
+    writeText(join(dir, "og", `${profile.id}.svg`), renderOgSvg(profile));
   }
   for (const [file, activeId] of Object.entries(PAGE_ACTIVE)) {
     const path = join(dir, file);
     try {
       const html = readFileSync(path, "utf8");
-      if (html.includes("CHROME_HEADER")) writeFileSync(path, stampChrome(html, activeId));
+      if (html.includes("CHROME_HEADER")) writeText(path, stampChrome(html, activeId));
     } catch {
       /* optional page */
     }

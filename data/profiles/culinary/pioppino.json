@@ -18,11 +18,11 @@
   "source_notes": [
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Pioppino / Agrocybe aegerita cards: colonize warm, fruit 13\u201321 \u00b0C, 85\u201395% RH."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Pioppino / Agrocybe aegerita cards: colonize warm, fruit 13-21 °C, 85-95% RH."
     },
     {
       "title": "Stock firmware",
-      "detail": "Original Shrooly tree includes a pioppino recipe \u2014 treated here as a cool-cluster woodlover."
+      "detail": "Original Shrooly tree includes a pioppino recipe  -  treated here as a cool-cluster woodlover."
     }
   ],
   "stages": [
@@ -31,9 +31,9 @@
       "name": "Colonization",
       "duration_days": 16,
       "humidity_percent": 88,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 25,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 20,
       "temperature_warning_max_c": 30,
@@ -58,9 +58,9 @@
       "name": "Pinning",
       "duration_days": 5,
       "humidity_percent": 92,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 17,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 12,
       "temperature_warning_max_c": 22,
@@ -85,9 +85,9 @@
       "name": "Fruiting",
       "duration_days": 10,
       "humidity_percent": 86,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,

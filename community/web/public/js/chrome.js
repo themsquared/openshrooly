@@ -33,7 +33,7 @@ export function renderHeader(activeId = "") {
   <header class="site-header" data-chrome="header">
     <a class="brand" href="/">${brandSvg()}<span>Shroom Labs<small>${POSITIONING}</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site">${navLinks(activeId)}<span id="session-nav"></span></nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site">${navLinks(activeId)}<span id="session-nav"><a href="/login.html">Sign in</a></span></nav>
   </header>`;
 }
 

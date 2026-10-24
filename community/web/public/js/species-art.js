@@ -1,4 +1,4 @@
-/** Original harvest photos generated for Shroom Labs — not taken from shrooly.com. */
+/** Original harvest photos generated for Shroom Labs, not taken from shrooly.com. */
 
 const PHOTOS = [
   { keys: ["pink", "oyster"], src: "/img/species/species-pink-oyster.jpg" },

@@ -18,7 +18,7 @@
   "source_notes": [
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Buna shimeji / brown beech cards commonly 13\u201318 \u00b0C and 90\u201395% RH."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Buna shimeji / brown beech cards commonly 13-18 °C and 90-95% RH."
     },
     {
       "title": "Commercial",
@@ -31,9 +31,9 @@
       "name": "Colonization",
       "duration_days": 21,
       "humidity_percent": 88,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -58,9 +58,9 @@
       "name": "Pinning",
       "duration_days": 7,
       "humidity_percent": 94,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,
@@ -85,9 +85,9 @@
       "name": "Fruiting",
       "duration_days": 12,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 12,
       "temperature_warning_max_c": 20,

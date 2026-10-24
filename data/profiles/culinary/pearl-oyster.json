@@ -19,11 +19,11 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. ostreatus spawn run ~24 \u00b0C; fruiting often 10\u201321 \u00b0C at 85\u201390% RH."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. ostreatus spawn run ~24 °C; fruiting often 10-21 °C at 85-90% RH."
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Pearl/grey oysters typically 12\u201312 light and strong FAE."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Pearl/grey oysters typically 12-12 light and strong FAE."
     },
     {
       "title": "Stock firmware",
@@ -36,9 +36,9 @@
       "name": "Colonization",
       "duration_days": 14,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 24,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 19,
       "temperature_warning_max_c": 29,
@@ -63,9 +63,9 @@
       "name": "Pinning",
       "duration_days": 5,
       "humidity_percent": 93,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 18,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 13,
       "temperature_warning_max_c": 23,
@@ -90,9 +90,9 @@
       "name": "Fruiting",
       "duration_days": 10,
       "humidity_percent": 88,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 16,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 11,
       "temperature_warning_max_c": 21,

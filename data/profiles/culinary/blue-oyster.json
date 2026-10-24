@@ -13,18 +13,18 @@
     "cool"
   ],
   "restricted": false,
-  "summary": "Cool-preferring oyster. Deep color holds better below 18 \u00b0C.",
+  "summary": "Cool-preferring oyster. Deep color holds better below 18 °C.",
   "notes": "",
   "chamber_notes": "If the chamber runs warm, blues fade toward grey and stems elongate.",
   "legal_notice": null,
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Blue/columbinus types fruit best in the mid-teens \u00b0C with aggressive FAE."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Blue/columbinus types fruit best in the mid-teens °C with aggressive FAE."
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Blue oyster cards usually list 12\u201318 \u00b0C fruiting and high air exchange."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Blue oyster cards usually list 12-18 °C fruiting and high air exchange."
     }
   ],
   "stages": [
@@ -33,9 +33,9 @@
       "name": "Colonization",
       "duration_days": 12,
       "humidity_percent": 90,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 22,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 17,
       "temperature_warning_max_c": 27,
@@ -60,9 +60,9 @@
       "name": "Pinning",
       "duration_days": 4,
       "humidity_percent": 94,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 15,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 10,
       "temperature_warning_max_c": 20,
@@ -87,9 +87,9 @@
       "name": "Fruiting",
       "duration_days": 9,
       "humidity_percent": 87,
-      "humidity_hysteresis": 2.0,
+      "humidity_hysteresis": 2,
       "temperature_c": 14,
-      "temperature_hysteresis": 1.0,
+      "temperature_hysteresis": 1,
       "temperature_control_enabled": true,
       "temperature_warning_min_c": 10,
       "temperature_warning_max_c": 20,

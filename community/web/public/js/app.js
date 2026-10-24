@@ -108,9 +108,10 @@ async function renderProfile() {
     $("#locked").classList.remove("hidden");
     $("#price").textContent = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
     $("#buy")?.addEventListener("click", async () => {
-      const session = await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
-      await api(`/api/pay/${session.id}/complete`, { method: "POST", jsonBody: {} });
-      location.reload();
+      await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
+      const notice = $("#locked")?.querySelector("p");
+      if (notice) notice.textContent = "Checkout started. This recipe unlocks after the payment provider confirms.";
+      $("#buy")?.remove();
     });
     return;
   }
@@ -392,9 +393,8 @@ async function renderCoach() {
     $("#subscribe-panel").classList.remove("hidden");
     $("#subscribe").addEventListener("click", async () => {
       try {
-        const session = await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
-        await api(`/api/pay/${session.id}/complete`, { method: "POST", jsonBody: {} });
-        location.reload();
+        await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
+        showCoachError(new Error("Checkout started. Grow Coach unlocks after the payment provider confirms."));
       } catch (err) {
         showCoachError(err);
       }
