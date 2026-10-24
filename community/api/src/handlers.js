@@ -10,6 +10,7 @@ import {
 } from "./profile.js";
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
+import { handleDevices } from "./devices.js";
 import { originAllowed, securityHeaders } from "./security.js";
 import { seedIfEmpty } from "./db.js";
 import seeds from "./seeds.json" with { type: "json" };
@@ -147,6 +148,8 @@ async function route(method, path, url, request, env) {
   }
   const authResponse = await handleAuth(method, path, url, request, env);
   if (authResponse) return authResponse;
+  const deviceResponse = await handleDevices(method, path, url, request, env);
+  if (deviceResponse) return deviceResponse;
 
   if (method === "GET" && path === "/health") {
     return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver });

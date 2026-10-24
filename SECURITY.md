@@ -12,15 +12,16 @@ Shroom Labs and OpenShrooly treat **security and UX as non-negotiable**. If a ch
 | Paid culinary items | Charge without entitlement | Checkout stub + entitlement row; psilocybin pack cannot take payments |
 | Grow photos | Public object leak | R2 keys, no secrets in git, least-privilege Worker bindings |
 | Psilocybin pack | Commerce / affiliate ToS | Validators hard-block paid + affiliates |
+| Device identity | Stolen chamber / cloned cert / malicious cloud apply | On-device P-256 key; short-lived client certs; revoke + re-claim; local setpoints win |
 
 Trust boundaries:
 
-1. **Device** — ESP32-S3 on the LAN. Stock ESPHome REST. No community credentials stored on device.
+1. **Device** — ESP32-S3 on the LAN. Stock ESPHome REST. Cloud is opt-in: private key in encrypted NVS, outbound mTLS only. No community passwords on the chamber.
 2. **Hub** — one process, SQLite. Talks to devices over HTTP on the LAN. Optional Bearer to `api.shroomlabs.io`.
 3. **API** — Cloudflare Worker + D1. Cookie sessions for browsers; rotating refresh pairs for the Expo app; hub tokens are opaque hashes.
 4. **Frontend** — static Netlify. CSP, no inline scripts, self-hosted fonts.
 
-Out of scope this pass: mTLS to the chamber, on-device signed recipe objects, live Stripe keys.
+Out of scope this pass: on-device signed recipe objects, live Stripe keys, compiling the cloud component into the default 1.0.x binary.
 
 ## Auth summary
 

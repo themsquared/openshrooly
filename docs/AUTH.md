@@ -90,7 +90,10 @@ Existing D1:
 
 ```
 npx wrangler d1 execute shroomlabs --remote --file=schema-auth.sql
+npx wrangler d1 execute shroomlabs --remote --file=schema-devices.sql
 ```
+
+Device mTLS secrets (optional until chambers are linked): `CF_API_TOKEN`, `CF_ZONE_ID`. See [`docs/DEVICES.md`](DEVICES.md).
 
 `ALTER TABLE` lines fail safely if a column already exists — run the `CREATE TABLE` section if needed.
 

@@ -18,6 +18,10 @@
   </div>
 </details>
 <form method="post" action="/devices/{{ device.id }}/refresh"><button class="secondary" type="submit">Refresh now</button></form>
+<section class="card">
+  <h2>Shroom Labs cloud (opt-in)</h2>
+  <p class="muted">The chamber stays fully usable on this LAN. Cloud control is optional: enable the <code>shroom_labs_cloud</code> ESPHome component, claim the 6-character code at <a href="https://shroomlabs.io/claim.html">shroomlabs.io/claim</a>, then the device opens an outbound mTLS link. Local setpoints still win if the cloud is unreachable.</p>
+</section>
 <h2>Apply a profile</h2>
 <form class="card" method="post" action="/devices/{{ device.id }}/apply">
   <label>Profile

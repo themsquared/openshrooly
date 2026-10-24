@@ -22,6 +22,10 @@ export function createMemoryDb() {
     oauth_states: [],
     security_events: [],
     rate_limits: [],
+    cloud_devices: [],
+    device_certs: [],
+    device_commands: [],
+    device_telemetry: [],
   };
   let ids = {
     users: 1,
@@ -36,6 +40,9 @@ export function createMemoryDb() {
     webauthn_challenges: 1,
     oauth_states: 1,
     security_events: 1,
+    device_certs: 1,
+    device_commands: 1,
+    device_telemetry: 1,
   };
 
   return {
@@ -461,6 +468,153 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("SELECT * FROM guides")) {
     return tables.guides;
+  }
+  if (q.startsWith("INSERT INTO cloud_devices")) {
+    tables.cloud_devices.push({
+      id: params[0],
+      hardware_id: params[1],
+      public_jwk: params[2],
+      name: params[3],
+      status: params[4],
+      owner_id: params[5],
+      enroll_hash: params[6],
+      claim_code_hash: params[7],
+      claim_expires_at: params[8],
+      cloud_enabled: params[9],
+      last_seen_at: params[10],
+      created_at: params[11],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM cloud_devices WHERE id=")) {
+    return tables.cloud_devices.filter((d) => d.id === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM cloud_devices WHERE hardware_id=")) {
+    return tables.cloud_devices.filter((d) => d.hardware_id === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM cloud_devices WHERE claim_code_hash=")) {
+    return tables.cloud_devices.filter((d) => d.claim_code_hash === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM cloud_devices WHERE owner_id=")) {
+    return tables.cloud_devices.filter((d) => Number(d.owner_id) === Number(params[0]));
+  }
+  if (q.startsWith("UPDATE cloud_devices SET public_jwk=")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[7]);
+    if (row) {
+      row.public_jwk = params[0];
+      row.name = params[1];
+      row.status = params[2];
+      row.owner_id = params[3];
+      row.enroll_hash = params[4];
+      row.claim_code_hash = params[5];
+      row.claim_expires_at = params[6];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE cloud_devices SET owner_id=?, status=?, claim_code_hash=?")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[3]);
+    if (row) {
+      row.owner_id = params[0];
+      row.status = params[1];
+      row.claim_code_hash = params[2];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE cloud_devices SET status=?, cloud_enabled=?, claim_code_hash=?, enroll_hash=?")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[4]);
+    if (row) {
+      row.status = params[0];
+      row.cloud_enabled = params[1];
+      row.claim_code_hash = params[2];
+      row.enroll_hash = params[3];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE cloud_devices SET status=?, owner_id=?, cloud_enabled=?, public_jwk=?")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[7]);
+    if (row) {
+      row.status = params[0];
+      row.owner_id = params[1];
+      row.cloud_enabled = params[2];
+      row.public_jwk = params[3];
+      row.enroll_hash = params[4];
+      row.claim_code_hash = params[5];
+      row.claim_expires_at = params[6];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE cloud_devices SET status=?, cloud_enabled=? WHERE id=")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[2]);
+    if (row) {
+      row.status = params[0];
+      row.cloud_enabled = params[1];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE cloud_devices SET last_seen_at=")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[1]);
+    if (row) row.last_seen_at = params[0];
+    return {};
+  }
+  if (q.startsWith("INSERT INTO device_certs")) {
+    const row = {
+      id: ids.device_certs++,
+      device_id: params[0],
+      serial: params[1],
+      fingerprint: params[2],
+      pem: params[3],
+      issuer: params[4],
+      status: params[5],
+      cf_id: params[6],
+      not_before: params[7],
+      not_after: params[8],
+      created_at: params[9],
+    };
+    tables.device_certs.push(row);
+    return { lastRowId: row.id };
+  }
+  if (q.startsWith("SELECT * FROM device_certs WHERE serial=")) {
+    return tables.device_certs.filter((c) => c.serial === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM device_certs WHERE fingerprint=")) {
+    return tables.device_certs.filter((c) => c.fingerprint === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM device_certs WHERE device_id=")) {
+    return tables.device_certs.filter((c) => c.device_id === params[0]);
+  }
+  if (q.startsWith("UPDATE device_certs SET status=? WHERE id=")) {
+    const row = tables.device_certs.find((c) => c.id === params[1]);
+    if (row) row.status = params[0];
+    return {};
+  }
+  if (q.startsWith("INSERT INTO device_commands")) {
+    const row = {
+      id: ids.device_commands++,
+      device_id: params[0],
+      kind: params[1],
+      payload: params[2],
+      issued_at: params[3],
+      consumed_at: params[4],
+    };
+    tables.device_commands.push(row);
+    return { lastRowId: row.id };
+  }
+  if (q.startsWith("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL")) {
+    return tables.device_commands.filter((c) => c.device_id === params[0] && !c.consumed_at);
+  }
+  if (q.startsWith("UPDATE device_commands SET consumed_at=")) {
+    const row = tables.device_commands.find((c) => c.id === params[1]);
+    if (row) row.consumed_at = params[0];
+    return {};
+  }
+  if (q.startsWith("INSERT INTO device_telemetry")) {
+    tables.device_telemetry.push({
+      id: ids.device_telemetry++,
+      device_id: params[0],
+      document: params[1],
+      created_at: params[2],
+    });
+    return {};
   }
   if (mode === "run") return {};
   return [];

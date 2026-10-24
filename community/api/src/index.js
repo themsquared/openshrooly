@@ -36,6 +36,12 @@ async function envContext(env) {
       RESEND_API_KEY: env.RESEND_API_KEY,
       EMAIL_FROM: env.EMAIL_FROM,
       WEBAUTHN_RP_ID: env.WEBAUTHN_RP_ID || "shroomlabs.io",
+      CF_API_TOKEN: env.CF_API_TOKEN,
+      CF_ZONE_ID: env.CF_ZONE_ID,
+      DEVICE_ISSUER: env.DEVICE_ISSUER,
+      DEVICE_CA_KEY: env.DEVICE_CA_KEY,
+      DEVICE_CA_CERT: env.DEVICE_CA_CERT,
+      DEVICE_CA_CN: env.DEVICE_CA_CN,
     };
   }
   return env._ctx;

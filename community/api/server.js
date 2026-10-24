@@ -26,6 +26,11 @@ const env = {
   APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
   TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
+  CF_API_TOKEN: process.env.CF_API_TOKEN,
+  CF_ZONE_ID: process.env.CF_ZONE_ID,
+  DEVICE_ISSUER: process.env.DEVICE_ISSUER || "worker",
+  DEVICE_CA_KEY: process.env.DEVICE_CA_KEY,
+  DEVICE_CA_CERT: process.env.DEVICE_CA_CERT,
 };
 
 const server = createServer(async (req, res) => {

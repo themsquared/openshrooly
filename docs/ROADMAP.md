@@ -80,7 +80,7 @@ Offline-first: the hub is the grower's working copy.
 4. Merge is last-writer-wins by profile `id` (`openshrooly_lib.sync.merge_profiles`).
 5. Paid JSON is not exported until the hub token's user has an entitlement.
 
-No live device telemetry is uploaded in this pass.
+No live device telemetry is uploaded unless a grower **opts in** to the cloud link (Phase 0c). Default firmware still uploads nothing.
 
 ## Firmware: keep changes minimal
 
@@ -199,6 +199,30 @@ This is not a forecast. The firmware stays free and MIT-licensed regardless.
 
 ## Phased plan
 
+### Phase 0c — device identity + opt-in SaaS control (this follow-up)
+
+Devices configurable from Shroom Labs, with mTLS, without opening a port on the chamber.
+
+**Pick (verified):** Cloudflare-**managed** client certs on the **free** plan. The create API accepts a **CSR**, so the P-256 key is born on the ESP32-S3 and never uploaded. API Shield (Enterprise add-on) is **not** required for mTLS. A Worker CA is used for tests and local Node; it cannot do edge mTLS unless we pay for BYOCA.
+
+| | Free CF managed CA | Worker CA + BYOCA | Worker CA only |
+| --- | --- | --- | --- |
+| Edge mTLS | Yes | Yes | No |
+| Key stays on device | Yes (CSR) | Yes | Yes |
+| Active cert quota | **100 / zone** (revoke frees a slot) | Unlimited (CF stores the CA only) | n/a |
+| Monthly cost | $0 | Enterprise | $0 |
+| When to use | First ~50 chambers, 7-day certs, rotate+revoke | High churn / thousands of devices | Tests |
+
+Threat model, ESP32-S3 heap/flash (~22–42 KB heap TLS, ~155 KB flash if mbedTLS is newly linked), and Mike’s `CF_API_TOKEN` / `link.shroomlabs.io` checklist: [`docs/DEVICES.md`](DEVICES.md).
+
+- [x] Enroll + 6-char / QR claim, verified email
+- [x] CSR issuance (Worker CA locally; Cloudflare-managed when secrets exist)
+- [x] Silent rotation, revoke, re-claim
+- [x] Command queue + telemetry; **local settings win** if cloud is off, overridden, or older
+- [x] Tests for issue / rotate / revoke / reclaim / local-wins
+- [x] Opt-in ESPHome component (`esphome/external_components/shroom_labs_cloud`) — **not** in default YAML
+- [ ] Production: enable mTLS on `link.shroomlabs.io`, put `CF_API_TOKEN` + `CF_ZONE_ID` in Wrangler
+
 ### Phase 0b — UI system + passwordless auth (this follow-up)
 
 - [x] Shared tokens (`design/`) — dark mycelial / bioluminescent
@@ -255,7 +279,7 @@ See the pull request body for a checklist. Short version:
 
 **Works:** schema, seeds, hub against stock firmware REST, local community API, static web against that API, auth, ratings/forks/reports, hub sync protocol, affiliate policy, Stripe-shaped stub checkout, R2-shaped photo store (memory locally).
 
-**Stubbed:** live Stripe/BTCPay, creator payouts, real affiliate merchants, production D1/R2 IDs in `wrangler.toml`, email, moderation, firmware recipe objects.
+**Stubbed:** live Stripe/BTCPay, creator payouts, real affiliate merchants, production D1/R2 IDs in `wrangler.toml`, email, moderation, firmware recipe objects, live Cloudflare client-cert API (Worker CA used until Mike adds `CF_API_TOKEN`).
 
 ## Credits
 

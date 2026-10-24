@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claim a device · Shroom Labs</title>
+  <meta name="description" content="Bind an OpenShrooly chamber to your Shroom Labs account with the short code from the device.">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="claim">
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Shroom Labs<small>works with OpenShrooly</small></span>
+    </a>
+    <nav>
+      <a href="/">Catalog</a>
+      <a href="/account.html">Account</a>
+      <span id="session-nav"></span>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="auth-panel card">
+      <p class="eyebrow">Cloud is opt-in</p>
+      <h1>Claim a chamber</h1>
+      <p class="muted">The device shows a 6-character code (or a QR that opens this page). Claiming binds it to your verified account and lets Shroom Labs issue a short-lived client certificate. The private key never leaves the ESP32.</p>
+      <p id="error" class="notice hidden" role="alert"></p>
+      <form id="claim-form">
+        <label>Device code
+          <input id="code" name="code" maxlength="8" autocomplete="one-time-code" spellcheck="false" placeholder="e.g. 7K3M9P" required>
+        </label>
+        <button type="submit">Claim device</button>
+      </form>
+      <p class="muted">Lost or sold a chamber? Revoke it on your <a href="/account.html">account</a>, then start a re-claim on the device.</p>
+    </section>
+  </main>
+  <footer class="site-footer">Local controls still win if the cloud is unreachable. Firmware stays usable offline.</footer>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -203,7 +203,8 @@ async function renderAuth(mode) {
       $("#error").textContent = data.message || "Check your email for a sign-in link.";
       $("#error").classList.remove("hidden");
       if (data.debug_token) {
-        location.href = `/auth/callback.html?token=${encodeURIComponent(data.debug_token)}`;
+        const next = params().get("next") || "";
+        location.href = `/auth/callback.html?token=${encodeURIComponent(data.debug_token)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
       }
     } catch (err) {
       $("#error").textContent = err.message;
@@ -219,7 +220,7 @@ async function renderCallback() {
     if (token) {
       const data = await api("/api/auth/magic/complete", { method: "POST", jsonBody: { token } });
       if (data.access_token) setToken(data.access_token);
-      location.href = "/account.html";
+      location.href = params().get("next") || "/account.html";
       return;
     }
     if (code) {
@@ -258,6 +259,24 @@ async function renderAccount() {
     setToken("");
     location.href = "/";
   });
+  const devices = await api("/api/devices").catch(() => ({ devices: [] }));
+  $("#devices").innerHTML =
+    (devices.devices || [])
+      .map(
+        (d) => `<li>
+          <strong>${escapeHtml(d.name)}</strong> · ${escapeHtml(d.status)}
+          <span class="muted">${escapeHtml(d.id)}</span>
+          ${d.status !== "revoked" ? `<button type="button" class="secondary revoke" data-id="${escapeHtml(d.id)}">Revoke</button>` : ""}
+        </li>`
+      )
+      .join("") || "<li class='muted'>No chambers linked yet.</li>";
+  for (const btn of document.querySelectorAll(".revoke")) {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Revoke this device? Its cloud certificate stops working immediately. Local growing still works.")) return;
+      await api(`/api/devices/${encodeURIComponent(btn.dataset.id)}/revoke`, { method: "POST", jsonBody: {} });
+      location.reload();
+    });
+  }
   $("#mint").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
@@ -309,3 +328,23 @@ if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
 if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
 if (page === "publish") renderPublish();
+if (page === "claim") renderClaim();
+
+async function renderClaim() {
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  const preset = params().get("code") || "";
+  if (preset) $("#code").value = preset;
+  $("#claim-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code: $("#code").value } });
+      location.href = `/account.html#device-${encodeURIComponent(data.device.id)}`;
+    } catch (err) {
+      $("#error").textContent = err.message;
+      $("#error").classList.remove("hidden");
+    }
+  });
+}

@@ -10,6 +10,8 @@ Public catalog at **[shroomlabs.io](https://shroomlabs.io)**. Works with Shrooly
 
 The data layer is portable: standard SQL (`api/schema.sql`) and plain `fetch` handlers (`api/src/handlers.js`). Moving the API to a VPS later means pointing `server.js` at SQLite or Postgres with the same routes.
 
+Opt-in device cloud: claim at `/claim.html`, mTLS on `link.shroomlabs.io`. See [`docs/DEVICES.md`](../docs/DEVICES.md). Default firmware does not open a cloud socket.
+
 Psilocybin profiles are tagged, free-only, and never carry affiliate links or payment providers.
 
 ## Local development

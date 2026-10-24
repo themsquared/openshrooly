@@ -30,3 +30,5 @@ CDN_BASE_URL = "https://cdn.shroomlabs.io"
 # Secrets (do not put live payment keys here):
 #   npx wrangler secret put COMMUNITY_SECRET
 #   npx wrangler secret put STRIPE_WEBHOOK_SECRET   # unused stub
+#   npx wrangler secret put CF_API_TOKEN            # client certs, SSL Edit
+# Optional: CF_ZONE_ID in [vars] once DNS is on Cloudflare. See docs/DEVICES.md.

@@ -37,6 +37,13 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 | On-device | Lightweight cousin: gauges, light timeline, profile strip, system fonts |
 | Expo app | Same tokens; scaffold only |
 
+## Cloud claim
+
+- The chamber shows a **large 6-character code** (and a QR that is just `https://shroomlabs.io/claim.html?code=…`). No password typed on the device.
+- `/claim.html` is a single field, one button, an error that names the next step (expired → refresh on device; revoked → re-claim).
+- Account lists chambers and a **Revoke** action that explains local growing still works.
+- Copy: cloud is optional; local controls win if we are down.
+
 ## Copy
 
 Plain language. “Works with Shrooly devices running OpenShrooly.” Never brand the product as Shrooly. Restricted-pack legality notice is always visible on that pack.
