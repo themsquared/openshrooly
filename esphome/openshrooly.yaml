@@ -249,3 +249,4 @@ script: !include_dir_merge_list scripts/
 # '<<' merge, so its buttons and switch are added to the existing lists.
 packages:
   updates: !include components/updates.yaml
+  daily_range: !include components/daily_range.yaml

@@ -9,6 +9,9 @@ import {
 } from '../lib/setup-state'
 import { DEVICE_VERSION, connectionLabel } from '../lib/setup-state'
 import type { GrowPreset } from '../lib/setup-state'
+import { addSample, rangeText, scheduleText, trendText } from '../lib/card-text'
+import type { Sample } from '../lib/card-text'
+import Icon from './components/Icon'
 import LiveGauge from './components/LiveGauge'
 import LightTimeline from './components/LightTimeline'
 import ProfileStrip from './components/ProfileStrip'
@@ -25,6 +28,8 @@ export default function Dashboard() {
   const [entities, setEntities] = useState<EntityState>({})
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [tempSamples, setTempSamples] = useState<Sample[]>([])
+  const [humiditySamples, setHumiditySamples] = useState<Sample[]>([])
   const [modal, setModal] = useState<ModalState>({ type: null })
   const [timezone, setTimezone] = useState<string>('')
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
@@ -437,6 +442,13 @@ export default function Dashboard() {
   const getSensor = (id: string) => entities[`sensor-${id}`]?.value
   const getNumber = (id: string) => entities[`number-${id}`]?.value
 
+  // Keep the last few minutes of readings so the cards can say rising or falling.
+  useEffect(() => {
+    const t = Date.now()
+    setTempSamples((s) => addSample(s, t, parseFloat(getSensor('temperature') as string)))
+    setHumiditySamples((s) => addSample(s, t, parseFloat(getSensor('humidity') as string)))
+  }, [entities])
+
   // Sync lighting state from entities
   useEffect(() => {
     const sunrise = parseFloat((getNumber('lights__sunrise_hour') || 8) as string)
@@ -448,13 +460,6 @@ export default function Dashboard() {
     setLightSunset((sunrise + duration) % 24)
     setLuxValue(lux)
   }, [entities])
-
-  // Time formatting helpers
-  const formatTime = (hour: number) => {
-    const h = Math.floor(hour)
-    const m = Math.round((hour - h) * 60)
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-  }
 
   const timeOptions = Array.from({ length: 48 }, (_, i) => i * 0.5)
 
@@ -726,6 +731,16 @@ export default function Dashboard() {
 
   const temp = parseFloat((getSensor('temperature') || getSensor('current_temperature') || 0) as string) || 0
   const humidity = parseFloat((getSensor('humidity') || getSensor('current_humidity') || 0) as string) || 0
+  const tempRange = rangeText(
+    parseFloat(getSensor('temperature_low_today') as string),
+    parseFloat(getSensor('temperature_high_today') as string),
+    '°',
+  )
+  const humidityRange = rangeText(
+    parseFloat(getSensor('humidity_low_today') as string),
+    parseFloat(getSensor('humidity_high_today') as string),
+    '%',
+  )
   const waterLevel = parseFloat((getSensor('water_level_percent') || getSensor('water_level') || 0) as string) || 0
   const targetHumidity = parseFloat((getNumber('target_humidity') || 0) as string) || 0
   const co2Raw = getSensor('co2') ?? getSensor('co2_ppm') ?? getSensor('carbon_dioxide')
@@ -880,35 +895,23 @@ export default function Dashboard() {
         {/* Row 1 */}
         <div className="card card-temp" onClick={() => setModal({ type: 'temperature' })}>
           {heatRequested && <div className="status-rectangle heating-badge">HEATING</div>}
-          <div className="card-icon">🌡️</div>
+          <div className="card-icon"><Icon name="thermometer" /></div>
           <div className="card-label">Temperature</div>
-          <div className="card-value">
-            {temp.toFixed(1)}
-            <span className="card-unit">°C</span>
-          </div>
-          {tempControlEnabled && (
-            <div className="card-range">
-              {tempMin.toFixed(1)}° - {tempMax.toFixed(1)}°
-            </div>
-          )}
+          <div className="card-value card-value-text">{trendText(tempSamples, 0.3)}</div>
+          <div className="card-range">{tempRange ?? 'Range for today shows up soon'}</div>
         </div>
 
         <div className="card card-humidity" onClick={() => setModal({ type: 'humidity' })}>
           {humidifierOn && <div className="status-rectangle humidifying-badge">HUMIDIFYING</div>}
-          <div className="card-icon">💧</div>
+          <div className="card-icon"><Icon name="droplet" /></div>
           <div className="card-label">Humidity</div>
-          <div className="card-value">
-            {humidity.toFixed(1)}
-            <span className="card-unit">%</span>
-          </div>
-          <div className="card-target">
-            Target: {targetHumidity}%
-          </div>
+          <div className="card-value card-value-text">{trendText(humiditySamples, 1)}</div>
+          <div className="card-target">{humidityRange ?? 'Range for today shows up soon'}</div>
         </div>
 
         <div className="card card-air" onClick={() => setModal({ type: 'air' })}>
           {airExchangeOn && <div className="status-rectangle running-badge">RUNNING</div>}
-          <div className="card-icon">🌀</div>
+          <div className="card-icon"><Icon name="air" /></div>
           <div className="card-label">Air Exchange</div>
           <div className="card-value">
             {getNumber('air_exchange__period__min_')}
@@ -921,20 +924,20 @@ export default function Dashboard() {
 
         {/* Row 2 */}
         <div className="card card-light" onClick={() => setModal({ type: 'light' })}>
-          <div className="card-icon">{lightsOn ? '💡' : '🌙'}</div>
+          <div className="card-icon"><Icon name={lightsOn ? 'sun' : 'moon'} /></div>
           <div className="card-label">Lighting</div>
           <div className="card-value">
             {lightsOn ? getNumber('white_led_intensity') : 'OFF'}
             {lightsOn && <span className="card-unit">lux</span>}
           </div>
           <div className="card-schedule">
-            {formatTime(lightSunrise)} - {formatTime(lightSunset)}
+            {scheduleText(lightSunrise, lightSunset)}
           </div>
         </div>
 
         <div className="card card-water" onClick={() => setModal({ type: 'water' })}>
           {!isWaterCalibrated && <div className="status-rectangle humidifying-badge">NOT CALIBRATED</div>}
-          <div className="card-icon">🚰</div>
+          <div className="card-icon"><Icon name="water" /></div>
           <div className="card-label">Water Level</div>
           <div className="card-value">
             {waterLevel.toFixed(0)}
@@ -943,7 +946,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card card-settings" onClick={() => setModal({ type: 'settings' })}>
-          <div className="card-icon">⚙️</div>
+          <div className="card-icon"><Icon name="gear" /></div>
           <div className="card-label">Settings</div>
           <div className="card-value">v{installedVersion}</div>
           <div className="card-detail">Chamber and Wi-Fi</div>
@@ -976,7 +979,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🚰 Water Level</h2>
+            <h2><Icon name="water" size={22} className="heading-icon" />Water Level</h2>
             <div className="modal-content">
               <div className="water-level-display">
                 <div className="water-level-value">{waterLevel.toFixed(0)}%</div>
@@ -1028,7 +1031,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal calibrate-modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🚰 Water Calibration</h2>
+            <h2><Icon name="water" size={22} className="heading-icon" />Water Calibration</h2>
             <div className="modal-content">
               <p className="calibrate-warning">
                 ⚠️ Please completely empty and dry the water reservoir before calibrating.
@@ -1086,7 +1089,7 @@ export default function Dashboard() {
           <div className="modal-overlay" onClick={() => setModal({ type: null })}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
               <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-              <h2>💧 Humidity Control</h2>
+              <h2><Icon name="droplet" size={22} className="heading-icon" />Humidity Control</h2>
               <div className="modal-content">
                 <div className="control-group">
                   <label>Target: {target.toFixed(1)}% ± {hysteresis.toFixed(2)}% • Turns ON below {lowerBound.toFixed(1)}%, OFF {upperBound >= 100 ? 'at' : 'above'} {upperBound.toFixed(1)}%</label>
@@ -1255,7 +1258,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🌡️ Temperature Control</h2>
+            <h2><Icon name="thermometer" size={22} className="heading-icon" />Temperature Control</h2>
             <div className="modal-content">
               <div className="control-group" style={{ marginBottom: '20px' }}>
                 <label className="checkbox-label">
@@ -1448,7 +1451,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>🌀 Air Exchange</h2>
+            <h2><Icon name="air" size={22} className="heading-icon" />Air Exchange</h2>
             <div className="modal-content">
               <div className="control-group">
                 <label>Period: {getNumber('air_exchange__period__min_')} minutes</label>
@@ -1508,7 +1511,7 @@ export default function Dashboard() {
             <h2>💡 Lighting Schedule</h2>
             <div className="modal-content">
               <div className="control-group">
-                <label>Light Schedule: {formatTime(lightSunrise)} - {formatTime(lightSunset)} ({lightDuration.toFixed(1)}h)</label>
+                <label>Light Schedule: {scheduleText(lightSunrise, lightSunset)} ({lightDuration.toFixed(1)}h)</label>
                 <div className="dual-slider-container">
                   {/* Sunrise handle with sun icon - above track */}
                   <div
@@ -1539,7 +1542,7 @@ export default function Dashboard() {
                       setDraggingHandle('sunset')
                     }}
                   >
-                    <div className="slider-icon">🌙</div>
+                    <div className="slider-icon"><Icon name="moon" size={16} /></div>
                   </div>
 
                   <div className="dual-slider-track">
@@ -1633,7 +1636,7 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setModal({ type: null })}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-x" onClick={() => setModal({ type: null })}>×</button>
-            <h2>⚙️ Settings</h2>
+            <h2><Icon name="gear" size={22} className="heading-icon" />Settings</h2>
             <div className="modal-content">
               <div className="settings-section">
                 <h3>System Information</h3>
