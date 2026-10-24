@@ -2,15 +2,18 @@
 {% block title %}Devices · Hub{% endblock %}
 {% block content %}
 <h1>Devices</h1>
+{% if error %}<p class="notice">{{ error }}</p>{% endif %}
 <div class="cards">
   <form class="card" method="post" action="/devices/add">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
     <h2>Add by IP / hostname</h2>
-    <label>Name <input name="name" required placeholder="Kitchen Shrooly"></label>
+    <label>Name <input name="name" required placeholder="Kitchen chamber"></label>
     <label>Host <input name="host" required placeholder="openshrooly.local or 192.168.1.50"></label>
     <label>Port <input name="port" type="number" value="80"></label>
     <button type="submit">Add device</button>
   </form>
   <form class="card" method="post" action="/devices/discover">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
     <h2>mDNS scan</h2>
     <p class="muted">Looks for <code>_esphomelib._tcp</code> on the LAN. Needs the optional <code>zeroconf</code> package and multicast.</p>
     <button type="submit" class="secondary">Scan now</button>
@@ -22,6 +25,7 @@
   {% for item in discovered %}
   <li>{{ item.name }} — {{ item.addresses|join(", ") }}:{{ item.port }}
     <form method="post" action="/devices/add" class="row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="name" value="{{ item.name }}">
       <input type="hidden" name="host" value="{{ item.addresses[0] }}">
       <input type="hidden" name="port" value="{{ item.port }}">
@@ -41,6 +45,7 @@
     <td>{{ device.current_profile_id or "—" }}</td>
     <td>
       <form method="post" action="/devices/{{ device.id }}/delete">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="secondary" type="submit">Remove</button>
       </form>
     </td>

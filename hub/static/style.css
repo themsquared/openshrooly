@@ -77,6 +77,18 @@ header {
 nav { display: flex; gap: 1rem; flex-wrap: wrap; }
 header a, header button.link { color: var(--sl-ink-dim); text-decoration: none; background: none; border: 0; font: inherit; cursor: pointer; }
 header nav a:hover { color: var(--sl-spore); }
+.nav-auth { display: inline; margin: 0; }
+.nav-auth .link, header nav button.link {
+  color: var(--sl-ink-dim);
+  background: none;
+  border: 0;
+  padding: 0;
+  width: auto;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+.nav-auth .link:hover { color: var(--sl-spore); }
 main { padding: 1.4rem 1.5rem 3rem; max-width: var(--sl-max); }
 h1 { font-family: "Fraunces", var(--sl-font); font-size: 2rem; letter-spacing: -0.04em; margin: 0 0 0.4rem; }
 h2 { font-size: 1.25rem; margin: 1.6rem 0 0.8rem; }
@@ -195,3 +207,21 @@ pre { white-space: pre-wrap; background: #06100c; color: var(--sl-ink); padding:
 .gauge-tile strong { display: block; font-size: 1.8rem; letter-spacing: -0.04em; }
 footer { color: var(--sl-muted); }
 .hero p { max-width: 42rem; color: var(--sl-ink-dim); }
+.pairing-card { max-width: 28rem; }
+.pairing-qr {
+  background: #fff;
+  color: #111;
+  padding: 12px;
+  border-radius: 12px;
+  width: min(100%, 220px);
+  margin: 0.8rem 0;
+}
+.pairing-qr svg { display: block; width: 100%; height: auto; }
+.pairing-code {
+  font-family: "Fraunces", var(--sl-font);
+  font-size: 1.8rem;
+  letter-spacing: 0.08em;
+  margin: 0.4rem 0 0.8rem;
+}
+.plain-list { max-width: 42rem; padding-left: 1.2rem; }
+.plain-list li { margin: 0.35rem 0; }

@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ device.name }} · Hub{% endblock %}
 {% block content %}
-<p class="{% if status.online %}ok live{% else %}bad{% endif %}">{% if status.online %}Reachable{% else %}Not reachable on this poll{% endif %}</p>
+{% if apply_error %}<p class="notice">{{ apply_error }}</p>{% endif %}
+<p class="{% if status.online %}ok live{% else %}bad{% endif %}">{% if status.online %}Reachable{% elif status.blocked %}Blocked{% if status.reason %}: {{ status.reason }}{% endif %}{% else %}Offline{% if status.reason %}: {{ status.reason }}{% endif %}{% endif %}</p>
 <h1>{{ device.name }}</h1>
 <p class="muted">{{ device.host }}:{{ device.port }} · last seen {{ device.last_seen or "never" }}</p>
 <div class="gauge-row">
@@ -17,13 +18,14 @@
     {% endfor %}
   </div>
 </details>
-<form method="post" action="/devices/{{ device.id }}/refresh"><button class="secondary" type="submit">Refresh now</button></form>
+<form method="post" action="/devices/{{ device.id }}/refresh"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary" type="submit">Refresh now</button></form>
 <section class="card">
   <h2>Shroom Labs cloud (opt-in)</h2>
   <p class="muted">The chamber stays fully usable on this LAN. Cloud control is optional: enable the <code>shroom_labs_cloud</code> ESPHome component, claim the 6-character code at <a href="https://shroomlabs.io/claim.html">shroomlabs.io/claim</a>, then the device opens an outbound mTLS link. Local setpoints still win if the cloud is unreachable.</p>
 </section>
 <h2>Apply a profile</h2>
 <form class="card" method="post" action="/devices/{{ device.id }}/apply">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
   <label>Profile
     <select name="profile_id" required>
       {% for profile in profiles %}
