@@ -59,6 +59,15 @@ export default function CloudSettings({ demo, open }: { demo: boolean; open: boo
   }, [open, load])
 
   useEffect(() => {
+    if (!open || demo || status?.state !== 'disconnecting')
+      return
+    const id = window.setInterval(() => {
+      void load()
+    }, 500)
+    return () => window.clearInterval(id)
+  }, [open, demo, status?.state, load])
+
+  useEffect(() => {
     if (!status?.qr || !status.qr_size || !canvasRef.current)
       return
     drawQrModules(canvasRef.current, status.qr, status.qr_size)

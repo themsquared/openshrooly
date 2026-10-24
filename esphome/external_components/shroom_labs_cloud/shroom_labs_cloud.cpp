@@ -14,6 +14,7 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/ecdsa.h>
 #include <mbedtls/entropy.h>
+#include "cloud_sha256.h"
 #include <mbedtls/sha256.h>
 #include <nvs.h>
 #include <nvs_flash.h>
@@ -186,7 +187,7 @@ bool EspCrypto::ensure_key(uint8_t priv[32], uint8_t x[32], uint8_t y[32]) {
 
 bool EspCrypto::sign(const uint8_t priv[32], const uint8_t *data, size_t len, uint8_t sig[64]) {
   uint8_t hash[32];
-  if (mbedtls_sha256(data, len, hash, 0) != 0)
+  if (shl_mbedtls_sha256(data, len, hash) != 0)
     return false;
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr;
@@ -239,7 +240,7 @@ bool EspCrypto::make_csr(const uint8_t priv[32], const uint8_t x[32], const uint
 }
 
 bool EspCrypto::sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
-  return mbedtls_sha256(data, len, out, 0) == 0;
+  return shl_mbedtls_sha256(data, len, out) == 0;
 }
 
 std::string EspCrypto::hardware_id() {

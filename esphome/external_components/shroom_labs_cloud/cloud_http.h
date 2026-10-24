@@ -18,7 +18,8 @@ static constexpr uint8_t MAX_ROTATE_PER_HOUR = 8;
 static constexpr uint32_t ROTATE_HOUR_MS = 3600000;
 static constexpr uint32_t CLAIM_POLL_MS = 5000;
 static constexpr uint32_t CLAIM_POLL_JITTER_MS = 1500;
-static constexpr int64_t RELINK_CONFIRM_MS = 3600LL * 1000;
+static constexpr uint32_t RELINK_CONFIRM_MS = 3600u * 1000u;
+static constexpr uint32_t RELINK_WINDOW_MS = 24u * 3600u * 1000u;
 static constexpr uint32_t MAGIC = 0x53484c34;  // SHL4
 static constexpr int64_t CERT_GRACE_MS = 30LL * 24 * 3600 * 1000;
 

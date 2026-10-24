@@ -942,6 +942,22 @@ test("b4: attacker cannot complete CSR after a failed takeover", async () => {
   assert.equal(listed.data.devices[0].status, "active");
 });
 
+test("claimed owner plus proof is relink_in_progress not revoked", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-relink-win@example.com");
+  const d = await enrollClaim(ctx, token, "aabbccddeeffbb06");
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+  });
+  assert.equal(inbox.status, 401, JSON.stringify(inbox.data));
+  assert.equal(inbox.data.code, "relink_in_progress");
+  assert.notEqual(inbox.data.code, "revoked");
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(row.status, "claimed");
+  assert.ok(Number(row.owner_id) > 0);
+});
+
 test("revoked re-enroll issues a new device id and drops old telemetry", async () => {
   const ctx = env();
   const { token } = await register(ctx, "owner-b5@example.com");

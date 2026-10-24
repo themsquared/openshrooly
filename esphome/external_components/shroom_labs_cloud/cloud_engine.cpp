@@ -153,6 +153,7 @@ void CloudEngine::wipe_() {
   issued_ms_ = 0;
   cloud_enabled_ = false;
   state_ = CloudState::Off;
+  reset_relink_();
   if (store_)
     store_->erase_all();
 }
@@ -217,11 +218,16 @@ void CloudEngine::finish() {
 
 void CloudEngine::drain_queued_() {
   if (pending_wipe_) {
+    CloudJob after = queued_;
     queued_ = CloudJob::NONE;
-    if (!try_begin(CloudJob::REVOKE))
+    if (!try_begin(CloudJob::REVOKE)) {
+      queued_ = after;
       return;
+    }
     handle_revoke_();
     finish();
+    if (after != CloudJob::NONE && after != CloudJob::REVOKE)
+      queue_(after);
     return;
   }
   CloudJob next = queued_;
@@ -231,6 +237,13 @@ void CloudEngine::drain_queued_() {
 }
 
 bool CloudEngine::queue_(CloudJob job) {
+  if (job == CloudJob::ENROLL) {
+    std::lock_guard<std::mutex> g(lock_);
+    if (state_ == CloudState::Off) {
+      cloud_enabled_ = true;
+      apply_(CloudEvent::Enable);
+    }
+  }
   if (start_job_ != nullptr) {
     if (start_job_(start_ctx_, job))
       return true;
@@ -296,6 +309,11 @@ void CloudEngine::connect() {
     backoff_ms_ = BACKOFF_MIN_MS;
     show_claim_ = true;
     revoke_failed_ = false;
+    if (pending_wipe_ || job_ == CloudJob::REVOKE) {
+      queued_ = CloudJob::ENROLL;
+      save_identity_();
+      return;
+    }
     if (state_ == CloudState::Linked) {
       save_identity_();
       return;
@@ -311,12 +329,18 @@ void CloudEngine::disconnect() {
   {
     std::lock_guard<std::mutex> g(lock_);
     pending_wipe_ = true;
-    queued_ = CloudJob::NONE;
+    if (queued_ != CloudJob::ENROLL)
+      queued_ = CloudJob::NONE;
   }
-  if (!try_begin(CloudJob::REVOKE))
+  if (sync_jobs_ && start_job_ == nullptr) {
+    if (!try_begin(CloudJob::REVOKE))
+      return;
+    handle_revoke_();
+    finish();
+    drain_queued_();
     return;
-  handle_revoke_();
-  finish();
+  }
+  queue_(CloudJob::REVOKE);
 }
 
 void CloudEngine::refresh() {
@@ -405,6 +429,8 @@ uint32_t CloudEngine::claim_seconds_left() const {
 }
 
 std::string CloudEngine::display_title() const {
+  if (pending_wipe_)
+    return "Disconnecting...";
   switch (state()) {
     case CloudState::Linked:
       return "Linked";
@@ -436,6 +462,8 @@ std::string CloudEngine::display_code() const {
 
 std::string CloudEngine::display_hint() const {
   std::lock_guard<std::mutex> g(lock_);
+  if (pending_wipe_)
+    return "Disconnecting...";
   if (revoke_failed_ && state_ == CloudState::Off)
     return "Also remove it on shroomlabs.io if it still appears.";
   return state_message(state_);
@@ -466,9 +494,9 @@ std::string CloudEngine::status_json() const {
   out += "\"enabled\":";
   out += cloud_enabled_ ? "true" : "false";
   out += ",\"state\":\"";
-  out += state_name(state_);
+  out += pending_wipe_ ? "disconnecting" : state_name(state_);
   out += "\",\"linked\":";
-  out += (state_ == CloudState::Linked && has_cert_) ? "true" : "false";
+  out += (!pending_wipe_ && state_ == CloudState::Linked && has_cert_) ? "true" : "false";
   out += ",\"claim_code\":\"";
   out += live ? format_claim_code(claim_code_.c_str()) : "";
   out += "\",\"claim_url\":\"";
@@ -478,7 +506,9 @@ std::string CloudEngine::status_json() const {
   out += "\",\"expires_in_s\":";
   out += std::to_string(left);
   out += ",\"message\":\"";
-  if (revoke_failed_ && state_ == CloudState::Off)
+  if (pending_wipe_)
+    out += "Disconnecting...";
+  else if (revoke_failed_ && state_ == CloudState::Off)
     out += "Also remove it on shroomlabs.io if it still appears.";
   else
     out += state_message(state_);
@@ -547,8 +577,11 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   req.headers.emplace_back("Content-Type", "application/json");
   if (pop) {
     std::string nonce;
-    if (!fetch_nonce_(&nonce))
+    const int nonce_status = fetch_nonce_(&nonce);
+    if (nonce_status != 200) {
+      fail.status = nonce_status;
       return fail;
+    }
     char body_hex[65];
     uint8_t digest[32];
     if (crypto_ == nullptr || !crypto_->sha256(reinterpret_cast<const uint8_t *>(body.data()), body.size(), digest))
@@ -574,20 +607,24 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   return r;
 }
 
-bool CloudEngine::fetch_nonce_(std::string *nonce) {
+int CloudEngine::fetch_nonce_(std::string *nonce) {
   std::string id;
   {
     std::lock_guard<std::mutex> g(lock_);
     id = device_id_;
   }
   if (id.empty())
-    return false;
+    return 0;
   std::string path = "/api/devices/" + id + "/nonce";
   request_count_++;
   HttpResponse r = transport_->execute({"POST", https_url(api_host_.c_str(), path.c_str()), "", {}});
-  if (!response_usable(r) || r.status != 200)
-    return false;
-  return json_get_string(r.body.c_str(), "nonce", nonce) && !nonce->empty();
+  if (!response_usable(r))
+    return r.status > 0 ? r.status : 0;
+  if (r.status != 200)
+    return r.status;
+  if (!json_get_string(r.body.c_str(), "nonce", nonce) || nonce->empty())
+    return 0;
+  return 200;
 }
 
 bool CloudEngine::store_enroll_(const std::string &body) {
@@ -633,6 +670,7 @@ bool CloudEngine::store_cert_(const std::string &body) {
     issued_ms_ = exp > (7LL * 24 * 3600 * 1000) ? exp - (7LL * 24 * 3600 * 1000) : 0;
   }
   save_cert_(pem);
+  reset_relink_();
   return true;
 }
 
@@ -649,8 +687,17 @@ bool CloudEngine::handle_enroll_() {
   }
   std::string jwk = jwk_json(snap.pub_x, snap.pub_y);
   std::string body = enroll_body_json(crypto_->hardware_id().c_str(), jwk.c_str(), "Chamber");
-  const bool pop = snap.has_key && !snap.device_id.empty();
+  bool pop = snap.has_key && !snap.device_id.empty();
   HttpResponse r = http_("POST", "/api/devices/enroll", body, pop, false);
+  if (pop && !r.ok && r.status == 404) {
+    {
+      std::lock_guard<std::mutex> g(lock_);
+      device_id_.clear();
+      save_identity_();
+    }
+    pop = false;
+    r = http_("POST", "/api/devices/enroll", body, false, false);
+  }
   std::lock_guard<std::mutex> g(lock_);
   if (discard_job_())
     return false;
@@ -869,6 +916,8 @@ bool CloudEngine::handle_probe_() {
     bump_backoff_(r.retry_after_s);
     return false;
   }
+  if (o == HttpOutcome::Success)
+    reset_relink_();
   return o == HttpOutcome::Success;
 }
 
@@ -891,14 +940,22 @@ bool CloudEngine::handle_revoke_() {
   return ok;
 }
 
+void CloudEngine::reset_relink_() { relink_seen_ms_ = 0; }
+
 bool CloudEngine::confirm_relink_() {
-  const int64_t wall = wall_();
-  const int64_t now = wall > 0 ? wall : static_cast<int64_t>(now_());
+  const uint32_t now = now_() == 0 ? 1 : now_();
   if (relink_seen_ms_ == 0) {
-    relink_seen_ms_ = now == 0 ? 1 : now;
+    relink_seen_ms_ = now;
     return false;
   }
-  return now - relink_seen_ms_ >= RELINK_CONFIRM_MS;
+  const int32_t dt = static_cast<int32_t>(now - relink_seen_ms_);
+  if (dt < static_cast<int32_t>(RELINK_CONFIRM_MS))
+    return false;
+  if (dt > static_cast<int32_t>(RELINK_WINDOW_MS)) {
+    relink_seen_ms_ = now;
+    return false;
+  }
+  return true;
 }
 
 void CloudEngine::maybe_fill_issued_() {
@@ -919,6 +976,10 @@ void CloudEngine::maybe_fill_issued_() {
 void CloudEngine::loop() {
   if (busy_)
     return;
+  if (pending_wipe_) {
+    queue_(CloudJob::REVOKE);
+    return;
+  }
   const uint32_t now = now_();
   CloudState st;
   bool enabled = false;

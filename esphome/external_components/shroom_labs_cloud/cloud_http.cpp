@@ -71,6 +71,8 @@ static HttpOutcome auth_from_body(int status, const char *body, HttpOutcome fall
     return HttpOutcome::CertExpired;
   if (code == "relink_required")
     return HttpOutcome::RelinkRequired;
+  if (code == "relink_in_progress")
+    return HttpOutcome::ProofInvalid;
   if (code == "proof_invalid")
     return HttpOutcome::ProofInvalid;
   return fallback;

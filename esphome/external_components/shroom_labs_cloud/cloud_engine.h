@@ -65,6 +65,7 @@ class CloudEngine {
   bool probe_now();
   bool revoke_now();
   bool revoke_failed() const { return revoke_failed_; }
+  bool pending_wipe() const { return pending_wipe_; }
 
  protected:
   struct JobSnap {
@@ -90,6 +91,7 @@ class CloudEngine {
   void wipe_();
   void relink_();
   bool confirm_relink_();
+  void reset_relink_();
   void zero_key_();
   bool discard_job_() const { return pending_wipe_; }
   void drain_queued_();
@@ -97,7 +99,7 @@ class CloudEngine {
   bool sign_(const uint8_t *data, size_t len, uint8_t sig[64]);
   bool make_csr_(std::string *pem);
   HttpResponse http_(const char *method, const char *path, const std::string &body, bool pop, bool with_serial);
-  bool fetch_nonce_(std::string *nonce);
+  int fetch_nonce_(std::string *nonce);
   bool handle_enroll_();
   bool handle_csr_();
   bool handle_rotate_();
@@ -154,7 +156,7 @@ class CloudEngine {
   std::atomic<bool> revoke_failed_{false};
   CloudJob job_{CloudJob::NONE};
   CloudJob queued_{CloudJob::NONE};
-  int64_t relink_seen_ms_{0};
+  uint32_t relink_seen_ms_{0};
   mutable std::mutex lock_;
 };
 

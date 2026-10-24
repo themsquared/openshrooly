@@ -2,9 +2,11 @@
 #include "cloud_format.h"
 #include "cloud_http.h"
 #include "cloud_qr.h"
+#include "cloud_sha256.h"
 
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <mbedtls/sha256.h>
 #include <openssl/sha.h>
 #include <string>
@@ -387,6 +389,8 @@ int main() {
     }
   };
   struct HostCrypto : CloudCrypto {
+    int sign_calls = 0;
+    int sha_calls = 0;
     bool ensure_key(uint8_t priv[32], uint8_t x[32], uint8_t y[32]) override {
       for (int i = 0; i < 32; i++) {
         priv[i] = static_cast<uint8_t>(i + 1);
@@ -396,6 +400,7 @@ int main() {
       return true;
     }
     bool sign(const uint8_t *, const uint8_t *, size_t, uint8_t sig[64]) override {
+      sign_calls++;
       for (int i = 0; i < 64; i++)
         sig[i] = static_cast<uint8_t>(i);
       return true;
@@ -404,6 +409,7 @@ int main() {
       return build_p256_csr_pem(x, y, cn, dummy_sign, nullptr, pem);
     }
     bool sha256(const uint8_t *data, size_t len, uint8_t out[32]) override {
+      sha_calls++;
       SHA256(data, len, out);
       return true;
     }
@@ -422,9 +428,13 @@ int main() {
     bool status_claimed = true;
     int nonce_limit = 60;
     int nonce_count = 0;
+    int nonce_status = 200;
     int enroll_with_proof = 0;
+    std::function<void(const HttpRequest &)> hook;
     HttpResponse execute(const HttpRequest &req) override {
       urls.push_back(req.url);
+      if (hook)
+        hook(req);
       if (req.url.find("/enroll") != std::string::npos) {
         for (const auto &h : req.headers) {
           if (h.first == "x-device-proof" && !h.second.empty())
@@ -441,6 +451,14 @@ int main() {
       }
       if (auto_nonce && req.url.find("/nonce") != std::string::npos) {
         nonce_count++;
+        if (nonce_status != 200) {
+          HttpResponse missing;
+          missing.ok = true;
+          missing.status = nonce_status;
+          missing.complete = true;
+          missing.body = "{\"error\":\"not found\"}";
+          return missing;
+        }
         if (nonce_count > nonce_limit) {
           HttpResponse limited;
           limited.ok = true;
@@ -741,6 +759,7 @@ int main() {
                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
                 {"/enroll", ok_body(200, enroll_ok)}};
   CloudEngine eng18(&tr18, &clk, &store18, &crypto);
+  clk.now = 200000;
   clk.wall = 2000000000000;
   eng18.connect();
   eng18.csr_now();
@@ -748,7 +767,7 @@ int main() {
   eng18.rotate_now();
   expect(eng18.state() == CloudState::Linked, "first relink_required keeps Linked");
   expect(eng18.has_key(), "first relink_required keeps key");
-  clk.wall = 2000000000000 + RELINK_CONFIRM_MS;
+  clk.now = 200000 + RELINK_CONFIRM_MS;
   eng18.rotate_now();
   expect(eng18.state() == CloudState::Relink, "second relink_required is Relink");
   expect(eng18.has_key(), "relink keeps key");
@@ -767,6 +786,92 @@ int main() {
   eng18.connect();
   expect(eng18.state() == CloudState::PendingClaim, "relink connect enrolls");
   expect(tr18.enroll_with_proof > proofs_before, "relink enroll proves key");
+
+  HostStore store18c;
+  ScriptTransport tr18c;
+  tr18c.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/rotate", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")}};
+  CloudEngine eng18c(&tr18c, &clk, &store18c, &crypto);
+  clk.now = 300000;
+  eng18c.connect();
+  eng18c.csr_now();
+  eng18c.rotate_now();
+  clk.now = 300000 + RELINK_CONFIRM_MS / 2;
+  eng18c.rotate_now();
+  expect(eng18c.state() == CloudState::Linked, "relink counter resets on success");
+  clk.now = 300000 + RELINK_CONFIRM_MS;
+  eng18c.rotate_now();
+  expect(eng18c.state() == CloudState::Linked, "one sighting after success stays Linked");
+
+  HostStore store18d;
+  ScriptTransport tr18d;
+  tr18d.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")}};
+  CloudEngine eng18d(&tr18d, &clk, &store18d, &crypto);
+  clk.now = 400000;
+  eng18d.connect();
+  eng18d.csr_now();
+  eng18d.rotate_now();
+  clk.now = 400000 + RELINK_WINDOW_MS + 1000;
+  eng18d.rotate_now();
+  expect(eng18d.state() == CloudState::Linked, "sighting after 24h restarts window");
+  clk.now = 400000 + RELINK_WINDOW_MS + 1000 + RELINK_CONFIRM_MS;
+  eng18d.rotate_now();
+  expect(eng18d.state() == CloudState::Relink, "two sightings within 24h relink");
+
+  HostStore store18e;
+  ScriptTransport tr18e;
+  tr18e.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")}};
+  CloudEngine eng18e(&tr18e, &clk, &store18e, &crypto);
+  clk.now = 500000;
+  clk.wall = 0;
+  eng18e.connect();
+  eng18e.csr_now();
+  eng18e.rotate_now();
+  clk.wall = 2000000000000;
+  clk.now = 500000 + 120000;
+  eng18e.rotate_now();
+  expect(eng18e.state() == CloudState::Linked, "wall jump does not confirm relink");
+
+  HostStore store18f;
+  ScriptTransport tr18f;
+  tr18f.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng18f(&tr18f, &clk, &store18f, &crypto);
+  clk.now = 600000;
+  clk.wall = 2000000000000;
+  eng18f.connect();
+  eng18f.csr_now();
+  eng18f.rotate_now();
+  clk.now = 600000 + RELINK_CONFIRM_MS;
+  eng18f.rotate_now();
+  expect(eng18f.state() == CloudState::Relink, "gone start Relink");
+  tr18f.nonce_status = 404;
+  int proofs_gone = tr18f.enroll_with_proof;
+  size_t enrolls_before = 0;
+  for (const auto &u : tr18f.urls)
+    if (u.find("/enroll") != std::string::npos)
+      enrolls_before++;
+  eng18f.connect();
+  expect(eng18f.state() == CloudState::PendingClaim, "gone row enrolls fresh");
+  expect(tr18f.enroll_with_proof == proofs_gone, "gone row enrolls without proof");
+  size_t enrolls_after = 0;
+  for (const auto &u : tr18f.urls)
+    if (u.find("/enroll") != std::string::npos)
+      enrolls_after++;
+  expect(enrolls_after > enrolls_before, "gone row posted enroll");
 
   HostStore store19;
   ScriptTransport tr19;
@@ -833,6 +938,129 @@ int main() {
   expect(!eng19c.has_cert(), "rotate discard drops cert write-back");
   eng19c.finish();
   eng19c.drain_queued();
+
+  HostStore store19d;
+  ScriptTransport tr19d;
+  tr19d.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(200, cert_ok)},
+                 {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine eng19d(&tr19d, &clk, &store19d, &crypto);
+  eng19d.connect();
+  eng19d.csr_now();
+  expect(eng19d.try_begin(CloudJob::ROTATE), "midhttp begin");
+  tr19d.hook = [&](const HttpRequest &req) {
+    if (req.url.find("/rotate") != std::string::npos)
+      eng19d.disconnect();
+  };
+  eng19d.run_job(CloudJob::ROTATE);
+  expect(eng19d.state() == CloudState::Off, "midhttp rotate wipes");
+  expect(!eng19d.has_key(), "midhttp rotate zeros key");
+  expect(!eng19d.has_cert(), "midhttp rotate discards cert");
+  eng19d.finish();
+  eng19d.drain_queued();
+  tr19d.hook = nullptr;
+
+  HostStore store19e;
+  ScriptTransport tr19e;
+  auto start_false = [](void *, CloudJob) { return false; };
+  tr19e.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/inbox", ok_body(200, "{\"commands\":[]}")},
+                 {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine eng19e(&tr19e, &clk, &store19e, &crypto);
+  eng19e.connect();
+  eng19e.csr_now();
+  eng19e.set_sync_jobs(false);
+  eng19e.set_start_job(+start_false, nullptr);
+  expect(eng19e.try_begin(CloudJob::PROBE), "finish-drain begin");
+  eng19e.run_job(CloudJob::PROBE);
+  eng19e.finish();
+  expect(eng19e.has_key(), "finish-drain still linked");
+  eng19e.disconnect();
+  expect(eng19e.has_key(), "finish-drain disconnect waits");
+  expect(eng19e.display_title() == std::string("Disconnecting..."), "finish-drain title");
+  expect(std::strstr(eng19e.status_json().c_str(), "disconnecting") != nullptr, "finish-drain json");
+  eng19e.drain_queued();
+  expect(eng19e.state() == CloudState::Off, "finish-drain wipes");
+  expect(!eng19e.has_key(), "finish-drain zeros key");
+
+  HostStore store19f;
+  ScriptTransport tr19f;
+  tr19f.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine eng19f(&tr19f, &clk, &store19f, &crypto);
+  eng19f.connect();
+  eng19f.csr_now();
+  expect(eng19f.try_begin(CloudJob::REVOKE), "disc-during-revoke begin");
+  tr19f.hook = [&](const HttpRequest &req) {
+    if (req.url.find("/self-revoke") != std::string::npos)
+      eng19f.disconnect();
+  };
+  eng19f.run_job(CloudJob::REVOKE);
+  expect(eng19f.state() == CloudState::Off, "disc-during-revoke wipes");
+  expect(!eng19f.has_key(), "disc-during-revoke zeros key");
+  eng19f.finish();
+  eng19f.drain_queued();
+  expect(!eng19f.busy(), "disc-during-revoke busy after drain");
+  expect(eng19f.state() == CloudState::Off, "disc-during-revoke stays Off");
+  tr19f.hook = nullptr;
+
+  HostStore store19g;
+  ScriptTransport tr19g;
+  tr19g.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/self-revoke", ok_body(200, "{\"ok\":true}")},
+                 {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng19g(&tr19g, &clk, &store19g, &crypto);
+  eng19g.connect();
+  eng19g.csr_now();
+  expect(eng19g.try_begin(CloudJob::CSR), "disc-then-connect begin");
+  eng19g.disconnect();
+  eng19g.connect();
+  expect(eng19g.has_key(), "disc-then-connect keeps key until wipe");
+  eng19g.run_job(CloudJob::CSR);
+  expect(eng19g.state() == CloudState::Off, "disc-then-connect wipes first");
+  expect(!eng19g.has_key(), "disc-then-connect zeros key");
+  eng19g.finish();
+  eng19g.drain_queued();
+  expect(eng19g.state() == CloudState::PendingClaim, "disc-then-connect enrolls");
+  expect(eng19g.cloud_enabled(), "disc-then-connect stays on");
+
+  HostStore store19h;
+  ScriptTransport tr19h;
+  HostCrypto crypto19h;
+  CloudJob handed = CloudJob::NONE;
+  auto start_record = [](void *ctx, CloudJob job) {
+    *static_cast<CloudJob *>(ctx) = job;
+    return true;
+  };
+  tr19h.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine eng19h(&tr19h, &clk, &store19h, &crypto19h);
+  eng19h.connect();
+  eng19h.csr_now();
+  eng19h.set_sync_jobs(false);
+  eng19h.set_start_job(+start_record, &handed);
+  size_t urls_idle = tr19h.urls.size();
+  int signs_before = crypto19h.sign_calls;
+  int shas_before = crypto19h.sha_calls;
+  handed = CloudJob::NONE;
+  eng19h.disconnect();
+  expect(tr19h.urls.size() == urls_idle, "disconnect no TLS on caller");
+  expect(crypto19h.sign_calls == signs_before, "disconnect no sign on caller");
+  expect(crypto19h.sha_calls == shas_before, "disconnect no sha on caller");
+  expect(handed == CloudJob::REVOKE, "disconnect hands REVOKE to cloud task");
+  expect(eng19h.has_key(), "disconnect waits for cloud task");
+  expect(eng19h.display_title() == std::string("Disconnecting..."), "disconnecting title");
+  expect(eng19h.try_begin(CloudJob::REVOKE), "cloud task begin");
+  eng19h.run_job(CloudJob::REVOKE);
+  eng19h.finish();
+  eng19h.drain_queued();
+  expect(eng19h.state() == CloudState::Off, "cloud task wipes");
+  expect(!eng19h.has_key(), "cloud task zeros key");
 
   HostStore store20;
   ScriptTransport tr20;
@@ -905,10 +1133,10 @@ int main() {
   const char *abc_sha = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
   uint8_t digest[32];
   char hex[65];
-  expect(mbedtls_sha256_ret(nullptr, 0, digest, 0) == 0, "sha empty call");
+  expect(shl_mbedtls_sha256(nullptr, 0, digest) == 0, "sha empty call");
   hex_encode_to(digest, 32, hex);
   expect(std::strcmp(hex, empty_sha) == 0, "sha empty FIPS");
-  expect(mbedtls_sha256_ret(reinterpret_cast<const uint8_t *>("abc"), 3, digest, 0) == 0, "sha abc call");
+  expect(shl_mbedtls_sha256(reinterpret_cast<const uint8_t *>("abc"), 3, digest) == 0, "sha abc call");
   hex_encode_to(digest, 32, hex);
   expect(std::strcmp(hex, abc_sha) == 0, "sha abc FIPS");
   int sha_bad = 0;
@@ -919,7 +1147,7 @@ int main() {
     uint8_t got[32];
     uint8_t exp[32];
     const uint8_t *p = n ? buf.data() : nullptr;
-    if (mbedtls_sha256_ret(p, static_cast<size_t>(n), got, 0) != 0) {
+    if (shl_mbedtls_sha256(p, static_cast<size_t>(n), got) != 0) {
       sha_bad++;
       continue;
     }

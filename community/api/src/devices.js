@@ -340,6 +340,9 @@ export async function diagnoseDeviceAuth(request, db, deviceId, bodyBytes) {
   const proofOk = await verifyRequestProof(request, db, device, bodyBytes);
   if (!proofOk) return { ok: false, code: "proof_invalid", status: 401, device };
 
+  if (device.status === "claimed" && device.owner_id) {
+    return { ok: false, code: "relink_in_progress", status: 401, device, proofOk: true };
+  }
   if (device.status !== "active") return { ok: false, code: "revoked", status: 403, device, proofOk: true };
 
   const serial = presentedSerial(request);
@@ -372,6 +375,9 @@ function throwDeviceAuth(auth) {
   if (auth.code === "proof_invalid") throw new ValidationError("device proof required", 401, "proof_invalid");
   if (auth.code === "cert_expired") throw new ValidationError("device certificate expired", 401, "cert_expired");
   if (auth.code === "relink_required") throw new ValidationError("certificate grace ended. Link the chamber again", 401, "relink_required");
+  if (auth.code === "relink_in_progress") {
+    throw new ValidationError("this chamber is being linked", 401, "relink_in_progress");
+  }
   if (auth.code === "not_found") throw new ValidationError("device not found", 404);
   throw new ValidationError("device certificate required", 401, auth.code || "cert_required");
 }
