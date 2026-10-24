@@ -17,9 +17,7 @@
       <span>Shroom Labs<small>works with OpenShrooly</small></span>
     </a>
     <nav>
-      <a href="/?pack=culinary">Culinary</a>
-      <a href="/?pack=psilocybin">Restricted pack</a>
-      <a href="/publish.html">Publish</a>
+      <a href="/">Catalog</a>
       <a href="/claim.html">Claim device</a>
       <a id="nav-coach" href="/coach.html">Grow Coach</a>
       <span id="session-nav"></span>
@@ -30,9 +28,13 @@
       <canvas id="mycelium" aria-hidden="true"></canvas>
       <div class="hero-copy">
         <p class="eyebrow" id="pack-label">Culinary library</p>
-        <h1>Recipes for the chamber at home.</h1>
-        <p class="lede">Humidity, light, and air — written as stages you can watch through the glass. Apply from a hub on your LAN. The device stays yours, offline-first.</p>
-        <form class="search-bar" method="get" role="search">
+        <h1>Grow the flush you planned.</h1>
+        <p class="lede">Stage-perfect humidity, light, and air — written as living setpoints you watch through the glass. Offline-first. The chamber stays yours.</p>
+        <div class="hero-actions">
+          <a class="button hero-cta" href="#library">Open the library</a>
+          <a class="button ghost" href="/claim.html">Claim a chamber</a>
+        </div>
+        <form class="search-bar" method="get" role="search" action="#library">
           <input type="hidden" name="pack" id="pack" value="culinary">
           <label>Search the library
             <input name="q" id="q" placeholder="lion’s mane, oyster, shiitake" autocomplete="off">
@@ -41,8 +43,17 @@
         </form>
       </div>
     </section>
-    <p id="legal" class="legal hidden">Legality of cultivating Psilocybe species varies by jurisdiction. These cards are free environmental setpoints only. They are never sold and never carry affiliate links.</p>
-    <div id="cards" class="cards"></div>
+    <section id="library" class="library" aria-label="Profile library">
+      <div class="library-toolbar">
+        <div class="pack-toggle" role="group" aria-label="Library pack filter">
+          <a id="pack-culinary" href="/?pack=culinary#library">Culinary</a>
+          <a id="pack-restricted" href="/?pack=psilocybin#library">Restricted</a>
+        </div>
+        <p class="pack-hint">Restricted species stay off the main nav. Open them here only if your jurisdiction allows cultivation.</p>
+      </div>
+      <p id="legal" class="legal hidden">Legality of cultivating Psilocybe species varies by jurisdiction. These cards are free environmental setpoints only. They are never sold and never carry affiliate links.</p>
+      <div id="cards" class="cards"></div>
+    </section>
     <section class="how" aria-label="How it works">
       <h2 class="display" style="font-size:1.8rem">How a profile reaches the chamber</h2>
       <div class="cards">

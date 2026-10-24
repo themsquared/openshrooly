@@ -57,15 +57,19 @@ async function renderHome() {
   $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
   $("#q").value = q;
   $("#pack").value = pack;
+  $("#pack-culinary")?.classList.toggle("is-on", pack !== "psilocybin");
+  $("#pack-restricted")?.classList.toggle("is-on", pack === "psilocybin");
+  $("#pack-culinary")?.setAttribute("aria-pressed", pack !== "psilocybin" ? "true" : "false");
+  $("#pack-restricted")?.setAttribute("aria-pressed", pack === "psilocybin" ? "true" : "false");
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
   $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
   $("#nav-coach")?.classList.toggle("hidden", pack === "psilocybin");
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
-  $("#cards").innerHTML =
-    profiles
-      .map(
-        (p) => `
+  $("#cards").innerHTML = profiles.length
+    ? profiles
+        .map(
+          (p) => `
     <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
       <div class="profile-art">${speciesArt(p.species, p.strain, p.name)}</div>
       <div class="profile-body">
@@ -80,8 +84,14 @@ async function renderHome() {
         ${stageDots(p.stage_list || [])}
       </div>
     </a>`
-      )
-      .join("") || "<p>No profiles match.</p>";
+        )
+        .join("")
+    : `<div class="empty-library">
+        <svg class="empty-mark" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg>
+        <h2>Nothing in this flush</h2>
+        <p>No profiles match that search. Try oyster, lion’s mane, or clear the query.</p>
+        <a class="button ghost" href="/?pack=${encodeURIComponent(pack)}#library">Clear search</a>
+      </div>`;
 }
 
 async function renderProfile() {
@@ -113,7 +123,7 @@ async function renderProfile() {
       return;
     }
     $("#buy")?.addEventListener("click", async () => {
-      const session = await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
+      await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
       const notice = $("#locked")?.querySelector("p");
       if (notice) notice.textContent = "Checkout started. This recipe unlocks after the payment provider confirms.";
       $("#buy")?.remove();
@@ -430,7 +440,7 @@ async function renderCoach() {
     $("#subscribe-panel").classList.remove("hidden");
     $("#subscribe").addEventListener("click", async () => {
       try {
-        const session = await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
+        await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
         showCoachError(new Error("Checkout started. Grow Coach unlocks after the payment provider confirms."));
       } catch (err) {
         showCoachError(err);
