@@ -46,14 +46,28 @@ function trimInt(value) {
   return trimmed;
 }
 
-export function allowedOrigins(env) {
+export const PROD_WEBAUTHN_ORIGINS = ["https://shroomlabs.io", "https://www.shroomlabs.io"];
+
+export function isProdWebAuthn(env, request) {
+  if (env?.db?.driver === "d1") return true;
+  if (!request) return false;
+  try {
+    const host = new URL(request.url).hostname.toLowerCase();
+    return host === "shroomlabs.io" || host === "www.shroomlabs.io" || host === "api.shroomlabs.io";
+  } catch {
+    return false;
+  }
+}
+
+export function allowedOrigins(env, request) {
+  if (isProdWebAuthn(env, request)) return [...PROD_WEBAUTHN_ORIGINS];
   const listed = String(env?.CORS_ORIGIN || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   const site = String(env?.SITE_ORIGIN || "").trim();
   if (site && !listed.includes(site)) listed.push(site);
-  for (const extra of ["https://shroomlabs.io", "https://www.shroomlabs.io"]) {
+  for (const extra of PROD_WEBAUTHN_ORIGINS) {
     if (!listed.includes(extra)) listed.push(extra);
   }
   return listed;

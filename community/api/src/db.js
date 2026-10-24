@@ -118,6 +118,7 @@ function dispatch(mode, tables, ids, sql, params) {
             role: params[5],
             totp_secret_enc: null,
             totp_enabled: 0,
+            totp_last_step: null,
             created_at: params[6],
           }
         : {
@@ -130,6 +131,7 @@ function dispatch(mode, tables, ids, sql, params) {
             role: "user",
             totp_secret_enc: null,
             totp_enabled: 0,
+            totp_last_step: null,
             created_at: params[2],
           };
     if (tables.users.some((u) => u.username === row.username)) throw new Error("UNIQUE");
@@ -155,6 +157,15 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.password_hash = params[0];
     return {};
   }
+  if (q.startsWith("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=")) {
+    const row = tables.users.find((u) => u.id === Number(params[3]));
+    if (row) {
+      row.totp_secret_enc = params[0];
+      row.totp_enabled = params[1];
+      row.totp_last_step = params[2];
+    }
+    return {};
+  }
   if (q.startsWith("UPDATE users SET totp_secret_enc=?, totp_enabled=")) {
     const row = tables.users.find((u) => u.id === Number(params[2]));
     if (row) {
@@ -168,9 +179,22 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.totp_secret_enc = params[0];
     return {};
   }
+  if (q.startsWith("UPDATE users SET totp_enabled=?, totp_last_step=")) {
+    const row = tables.users.find((u) => u.id === Number(params[2]));
+    if (row) {
+      row.totp_enabled = params[0];
+      row.totp_last_step = params[1];
+    }
+    return {};
+  }
   if (q.startsWith("UPDATE users SET totp_enabled=")) {
     const row = tables.users.find((u) => u.id === Number(params[1]));
     if (row) row.totp_enabled = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE users SET totp_last_step=")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    if (row) row.totp_last_step = params[0];
     return {};
   }
   if (q.includes("FROM users JOIN sessions")) {

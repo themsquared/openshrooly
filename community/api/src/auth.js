@@ -11,7 +11,8 @@ import {
   randomToken,
   sha256Hex,
   verifyPassword,
-  verifyTotp,
+  matchTotp,
+  clockMs,
 } from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } from "./providers.js";
@@ -279,7 +280,7 @@ export async function handleAuth(method, path, url, request, env) {
     const challengeValue = String(parsed?.json?.challenge || body.challenge || "");
     const row = await consumeChallenge(db, challengeValue, "register", user.id);
     if (!row) return json({ error: "challenge expired or already used" }, 400);
-    if (!clientDataOk(parsed, "webauthn.create", challengeValue, allowedOrigins(env))) {
+    if (!clientDataOk(parsed, "webauthn.create", challengeValue, allowedOrigins(env, request))) {
       return json({ error: "invalid authenticator data" }, 400);
     }
     const attestation = parseAttestationObject(body.attestationObject);
@@ -325,7 +326,7 @@ export async function handleAuth(method, path, url, request, env) {
     const challengeValue = String(parsed?.json?.challenge || body.challenge || "");
     const challenge = await consumeChallenge(db, challengeValue, "login");
     if (!challenge) return json({ error: "challenge expired or already used" }, 401);
-    if (!clientDataOk(parsed, "webauthn.get", challengeValue, allowedOrigins(env))) {
+    if (!clientDataOk(parsed, "webauthn.get", challengeValue, allowedOrigins(env, request))) {
       return json({ error: "invalid authenticator data" }, 401);
     }
     const auth = parseAuthenticatorData(body.authenticatorData);
@@ -344,18 +345,19 @@ export async function handleAuth(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/auth/totp/begin") {
-    const { user, session } = await userFromRequest(request, db);
+    const { user } = await userFromRequest(request, db);
     requireVerified(user);
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
     if (Number(fresh.totp_enabled)) {
-      const allowed = (await verifyUserTotp(fresh, env, body.code)) || isFreshReauth(session);
-      if (!allowed) return json({ error: "current TOTP code required to re-enroll" }, 401);
+      if (!(await consumeUserTotp(db, fresh, env, body.code))) {
+        return json({ error: "current TOTP code required to re-enroll" }, 401);
+      }
     }
     const secret = randomBase32(20);
     const enc = await encryptSecret(secret, env);
     if (!enc) return json({ error: "TOTP encryption key is not configured." }, 503);
-    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=? WHERE id=?", [enc, 0, user.id]);
+    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=? WHERE id=?", [enc, 0, null, user.id]);
     return json({ secret, otpauth: `otpauth://totp/ShroomLabs:${user.email || user.username}?secret=${secret}&issuer=ShroomLabs` });
   }
 
@@ -367,8 +369,9 @@ export async function handleAuth(method, path, url, request, env) {
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
     const secret = await decryptSecret(fresh?.totp_secret_enc, env);
-    if (!secret || !(await verifyTotp(secret, body.code))) return json({ error: "invalid TOTP code" }, 401);
-    await db.run("UPDATE users SET totp_enabled=? WHERE id=?", [1, user.id]);
+    const matched = secret ? await matchTotp(secret, body.code, clockMs(env)) : { ok: false };
+    if (!matched.ok) return json({ error: "invalid TOTP code" }, 401);
+    await db.run("UPDATE users SET totp_enabled=?, totp_last_step=? WHERE id=?", [1, matched.step, user.id]);
     await audit(db, user.id, "totp_enable", "", request);
     return json({ ok: true });
   }
@@ -378,10 +381,10 @@ export async function handleAuth(method, path, url, request, env) {
     requireVerified(user);
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
-    if (!Number(fresh.totp_enabled) || !(await verifyUserTotp(fresh, env, body.code))) {
+    if (!Number(fresh.totp_enabled) || !(await consumeUserTotp(db, fresh, env, body.code))) {
       return json({ error: "current TOTP code required to disable" }, 401);
     }
-    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=? WHERE id=?", [null, 0, user.id]);
+    await db.run("UPDATE users SET totp_secret_enc=?, totp_enabled=?, totp_last_step=? WHERE id=?", [null, 0, null, user.id]);
     await audit(db, user.id, "totp_disable", "", request);
     return json({ ok: true });
   }
@@ -395,7 +398,7 @@ export async function handleAuth(method, path, url, request, env) {
     if (!pending || pending.expires_at < nowIso()) return json({ error: "totp required" }, 401);
     await db.run("DELETE FROM totp_pending WHERE token_hash=?", [hash]);
     const user = await db.one("SELECT * FROM users WHERE id=?", [pending.user_id]);
-    if (!(await verifyUserTotp(user, env, body.code || body.totp))) return json({ error: "invalid TOTP code" }, 401);
+    if (!(await consumeUserTotp(db, user, env, body.code || body.totp))) return json({ error: "invalid TOTP code" }, 401);
     const issued = await issueSession(db, user, request, env);
     await audit(db, user.id, "totp_sign_in", "", request);
     return json({ user: publicUser(user), ...issued }, 200, issued.headers);
@@ -564,7 +567,7 @@ const base64urlSha256 = true;
 async function completeSignIn(db, user, request, env, body = {}) {
   if (Number(user.totp_enabled)) {
     const code = body.totp || body.code;
-    if (!(await verifyUserTotp(user, env, code))) {
+    if (!(await consumeUserTotp(db, user, env, code))) {
       const token = randomToken() + randomToken();
       await db.run("INSERT INTO totp_pending (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)", [
         await sha256Hex(token),
@@ -579,16 +582,16 @@ async function completeSignIn(db, user, request, env, body = {}) {
   return json({ user: publicUser(user), ...issued }, 200, issued.headers);
 }
 
-async function verifyUserTotp(user, env, code) {
+async function consumeUserTotp(db, user, env, code) {
   const secret = await decryptSecret(user?.totp_secret_enc, env);
   if (!secret) return false;
-  return verifyTotp(secret, code);
-}
-
-function isFreshReauth(session) {
-  if (!session?.created_at) return false;
-  const created = Date.parse(session.created_at);
-  return Number.isFinite(created) && Date.now() - created < 2 * 60 * 1000;
+  const matched = await matchTotp(secret, code, clockMs(env));
+  if (!matched.ok) return false;
+  const last = Number(user.totp_last_step || 0);
+  if (last && matched.step <= last) return false;
+  await db.run("UPDATE users SET totp_last_step=? WHERE id=?", [matched.step, user.id]);
+  user.totp_last_step = matched.step;
+  return true;
 }
 
 async function cleanupChallenges(db) {

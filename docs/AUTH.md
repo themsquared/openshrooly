@@ -92,6 +92,7 @@ Existing D1:
 npx wrangler d1 execute shroomlabs --remote --file=schema-auth.sql
 npx wrangler d1 execute shroomlabs --remote --file=schema-devices.sql
 npx wrangler d1 execute shroomlabs --remote --file=schema-coach.sql
+npx wrangler d1 execute shroomlabs --remote --command "ALTER TABLE users ADD COLUMN totp_last_step INTEGER;"
 cd community/api && npm run db:seed:remote
 ```
 

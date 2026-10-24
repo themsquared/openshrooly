@@ -4,8 +4,6 @@ export const PROD_HOSTS = new Set(["shroomlabs.io", "www.shroomlabs.io", "api.sh
 
 export function requestHost(request) {
   if (!request) return "";
-  const forwarded = request.headers?.get?.("x-forwarded-host") || request.headers?.get?.("host") || "";
-  if (forwarded) return String(forwarded).split(",")[0].split(":")[0].trim().toLowerCase();
   try {
     return new URL(request.url).hostname.toLowerCase();
   } catch {
@@ -20,6 +18,7 @@ export function isProdHost(request) {
 /** Completing stubs (fake email, OIDC, checkout, canned coach) only. */
 export function devStubsEnabled(env = {}, request) {
   if (String(env.DEV_STUBS || "") !== "1") return false;
+  if (env.db?.driver === "d1") return false;
   if (request && isProdHost(request)) return false;
   return true;
 }
@@ -37,9 +36,9 @@ export function appleConfigured(env = {}) {
 }
 
 export function paymentsConfigured(env = {}) {
-  return Boolean(
-    String(env.PAYMENTS_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET || env.STRIPE_SECRET_KEY || "").trim()
-  );
+  const secret = String(env.STRIPE_SECRET_KEY || "").trim();
+  const webhook = String(env.PAYMENTS_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET || "").trim();
+  return Boolean(secret && webhook);
 }
 
 export function photosConfigured(env = {}) {

@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { withCors } from "../src/handlers.js";
 import { base64url, fromBase64Url, totpAt, verifyTotp } from "../src/crypto.js";
 import {
+  allowedOrigins,
   buildAuthData,
   encodeAttestationNone,
   rawEcdsaToDer,
@@ -247,9 +248,12 @@ async function enableTotp(ctx, token, user) {
 
 test("TOTP is required on every sign-in path and begin needs the current code", async () => {
   const ctx = testEnv();
+  const t0 = Date.now();
+  ctx.NOW_MS = t0;
   const { token, user } = await register(ctx, "mfa@example.com");
   const secret = await enableTotp(ctx, token, user);
-  const code = await totpAt(secret, Math.floor(Date.now() / 30_000));
+  ctx.NOW_MS = t0 + 30_000;
+  const code = await totpAt(secret, Math.floor(ctx.NOW_MS / 30_000));
 
   const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "mfa@example.com", turnstile: "ok" } });
   const without = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
@@ -275,8 +279,68 @@ test("TOTP is required on every sign-in path and begin needs the current code", 
 
   const blocked = await call(ctx, "POST", "/api/auth/totp/begin", { token, body: {} });
   assert.equal(blocked.status, 401);
-  const reenroll = await call(ctx, "POST", "/api/auth/totp/begin", { token, body: { code } });
+  ctx.NOW_MS = t0 + 60_000;
+  const later = await totpAt(secret, Math.floor(ctx.NOW_MS / 30_000));
+  const reenroll = await call(ctx, "POST", "/api/auth/totp/begin", { token, body: { code: later } });
   assert.equal(reenroll.status, 200, JSON.stringify(reenroll.data));
+});
+
+test("stolen refresh token cannot disable TOTP", async () => {
+  const ctx = testEnv();
+  const t0 = Date.now();
+  ctx.NOW_MS = t0;
+  const registered = await register(ctx, "stolen@example.com");
+  const secret = await enableTotp(ctx, registered.token, registered.user);
+  const refreshed = await call(ctx, "POST", "/api/auth/refresh", { body: { refresh_token: registered.refresh_token } });
+  assert.equal(refreshed.status, 200);
+  assert.ok(refreshed.data.access_token);
+  const cookie = String(refreshed.headers.get("set-cookie") || "").split(";")[0];
+  assert.match(cookie, /__Host-sl_session=/);
+
+  const viaCookie = await call(ctx, "POST", "/api/auth/totp/begin", { headers: { cookie }, body: {} });
+  assert.equal(viaCookie.status, 401);
+  const viaBearer = await call(ctx, "POST", "/api/auth/totp/begin", { token: refreshed.data.access_token, body: {} });
+  assert.equal(viaBearer.status, 401);
+  const disable = await call(ctx, "POST", "/api/auth/totp/disable", { headers: { cookie }, body: {} });
+  assert.equal(disable.status, 401);
+  const still = await ctx.db.one("SELECT * FROM users WHERE id=?", [registered.user.id]);
+  assert.equal(Number(still.totp_enabled), 1);
+  assert.ok(still.totp_secret_enc);
+
+  ctx.NOW_MS = t0 + 30_000;
+  const code = await totpAt(secret, Math.floor(ctx.NOW_MS / 30_000));
+  const allowed = await call(ctx, "POST", "/api/auth/totp/begin", { headers: { cookie }, body: { code } });
+  assert.equal(allowed.status, 200, JSON.stringify(allowed.data));
+});
+
+test("TOTP rejects a replayed code in the same time step", async () => {
+  const ctx = testEnv();
+  const t0 = Date.now();
+  ctx.NOW_MS = t0;
+  const { token, user } = await register(ctx, "replay@example.com");
+  const secret = await enableTotp(ctx, token, user);
+  const confirmCode = await totpAt(secret, Math.floor(t0 / 30_000));
+  const immediate = await call(ctx, "POST", "/api/auth/totp/disable", { token, body: { code: confirmCode } });
+  assert.equal(immediate.status, 401);
+
+  ctx.NOW_MS = t0 + 30_000;
+  const code = await totpAt(secret, Math.floor(ctx.NOW_MS / 30_000));
+  const start1 = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "replay@example.com", turnstile: "ok" } });
+  const pending1 = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start1.data.debug_token } });
+  assert.equal(pending1.data.totp_required, true);
+  const first = await call(ctx, "POST", "/api/auth/totp/verify", {
+    body: { totp_token: pending1.data.totp_token, code },
+  });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+
+  const start2 = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "replay@example.com", turnstile: "ok" } });
+  const pending2 = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start2.data.debug_token } });
+  const replay = await call(ctx, "POST", "/api/auth/totp/verify", {
+    body: { totp_token: pending2.data.totp_token, code },
+  });
+  assert.equal(replay.status, 401);
+  const still = await ctx.db.one("SELECT * FROM users WHERE id=?", [user.id]);
+  assert.equal(Number(still.totp_enabled), 1);
 });
 
 test("TOTP confirm is rate limited", async () => {
@@ -435,6 +499,36 @@ print("ok")
   const result = spawnSync("python3", ["-c", py], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /ok/);
+});
+
+test("prod WebAuthn origins exclude localhost even when CORS_ORIGIN lists it", async () => {
+  const ctx = testEnv();
+  const local = allowedOrigins(ctx, new Request("http://127.0.0.1:8787/health"));
+  assert.ok(local.includes("http://127.0.0.1:8888"));
+
+  ctx.db.driver = "d1";
+  const prodUrl = new Request("https://api.shroomlabs.io/api/auth/webauthn/login/begin");
+  const prod = allowedOrigins(ctx, prodUrl);
+  assert.deepEqual(prod, ["https://shroomlabs.io", "https://www.shroomlabs.io"]);
+  assert.ok(!prod.some((origin) => /localhost|127\.0\.0\.1/.test(origin)));
+
+  ctx.db.driver = "memory";
+  const { token } = await register(ctx, "wa-prod@example.com");
+  const { keys, publicKey } = await passkey();
+  await registerPasskey(ctx, token, keys, publicKey, credId("cred-prod"));
+  ctx.db.driver = "d1";
+  const localhost = await loginPasskey(ctx, keys, publicKey, {
+    credentialId: credId("cred-prod"),
+    signCount: 2,
+    origin: "http://127.0.0.1:8888",
+  });
+  assert.equal(localhost.status, 401);
+  const site = await loginPasskey(ctx, keys, publicKey, {
+    credentialId: credId("cred-prod"),
+    signCount: 2,
+    origin: "https://shroomlabs.io",
+  });
+  assert.equal(site.status, 200, JSON.stringify(site.data));
 });
 
 test("Google 503 does not list callback URIs", async () => {

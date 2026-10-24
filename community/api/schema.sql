@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'user',
     totp_secret_enc TEXT,
     totp_enabled INTEGER NOT NULL DEFAULT 0,
+    totp_last_step INTEGER,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS api_tokens (

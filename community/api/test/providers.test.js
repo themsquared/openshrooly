@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { capabilities, createPushProvider, devStubsEnabled, isProdHost } from "../src/providers.js";
+import { capabilities, createPushProvider, devStubsEnabled, isProdHost, requestHost } from "../src/providers.js";
 import { call, register, testEnv } from "./helpers.js";
 
 function prodLike() {
@@ -94,6 +94,47 @@ test("DEV_STUBS still completes local magic and OIDC flows", async () => {
   const oidc = await call(ctx, "GET", "/api/auth/oidc/google/start");
   assert.equal(oidc.status, 200);
   assert.ok(oidc.data.debug_code);
+});
+
+test("X-Forwarded-Host cannot enable DEV_STUBS on a prod URL or D1", async () => {
+  const env = { DEV_STUBS: "1" };
+  const spoof = new Request("https://api.shroomlabs.io/health", {
+    headers: { "x-forwarded-host": "localhost", host: "localhost" },
+  });
+  assert.equal(requestHost(spoof), "api.shroomlabs.io");
+  assert.equal(isProdHost(spoof), true);
+  assert.equal(devStubsEnabled(env, spoof), false);
+  assert.equal(capabilities(env, spoof).stubs, false);
+
+  const ctx = testEnv({ DEV_STUBS: "1" });
+  const magic = await call(ctx, "POST", "/api/auth/magic/start", {
+    host: "api.shroomlabs.io",
+    headers: { "x-forwarded-host": "localhost" },
+    body: { email: "spoof@example.com", turnstile: "ok" },
+  });
+  assert.ok(magic.status === 400 || magic.status === 503);
+  assert.equal(magic.data.debug_token, undefined);
+
+  const d1 = testEnv({ DEV_STUBS: "1" });
+  d1.db.driver = "d1";
+  const local = await call(d1, "POST", "/api/auth/magic/start", {
+    body: { email: "d1@example.com", turnstile: "ok" },
+  });
+  assert.ok(local.status === 400 || local.status === 503);
+  assert.equal(local.data.debug_token, undefined);
+  assert.equal(devStubsEnabled(d1, new Request("http://127.0.0.1:8787/health")), false);
+});
+
+test("payments stay Coming soon without STRIPE_SECRET_KEY", async () => {
+  const ctx = testEnv();
+  const { token } = await register(ctx, "pay@example.com");
+  ctx.DEV_STUBS = "";
+  ctx.STRIPE_SECRET_KEY = "";
+  const caps = await call(ctx, "GET", "/api/capabilities");
+  assert.equal(caps.data.payments, false);
+  const paid = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(paid.status, 503);
+  assert.equal(paid.data.coming_soon, true);
 });
 
 test("push provider stubs only when DEV_STUBS is on a non-prod host", async () => {
