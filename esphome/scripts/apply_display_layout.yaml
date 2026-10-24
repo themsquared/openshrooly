@@ -53,6 +53,7 @@
           layout_page(id(fairsettings).obj, 4);
           layout_page(id(gwatercalibration).obj, 4);
           layout_page(id(hsystemsettings).obj, 4);
+          layout_page(id(icloudclaim).obj, 4);
 
           id(display_layout_flipped) = flipped;
         }

@@ -226,14 +226,15 @@ static bool request_guard(AsyncWebServerRequest *req) {
   char buf[AsyncWebServerRequest::URL_BUF_SIZE];
   StringRef url_ref = req->url_to(buf);
   const char *url = url_ref.c_str();
-  const bool is_security_page = strcmp(url, "/security") == 0;
-  if (m == HTTP_GET && !is_security_page) {
+  const bool is_secret_get =
+      m == HTTP_GET && (strcmp(url, "/security") == 0 || strcmp(url, "/cloud") == 0);
+  if (m == HTTP_GET && !is_secret_get) {
     if (!get_changes_state(url))
       return true;  // the read-only dashboard stays open on the home network
     if (strcmp(url, "/wifisave") == 0 && from_setup_network(*req))
       return true;  // joining the password-protected setup network is the proof
   }
-  if (!is_security_page && !same_origin(req, m == HTTP_GET)) {
+  if (!is_secret_get && !same_origin(req, m == HTTP_GET)) {
     reply(req, 403, "This change must be made from the chamber's own page.", false);
     return false;
   }

@@ -1094,6 +1094,33 @@ input[type="range"]::-moz-range-thumb {
 
 .checkbox-label { display: flex; align-items: center; gap: 10px; }
 
+.cloud-claim { margin-top: 12px; }
+.cloud-code {
+  font-family: var(--sl-mono);
+  font-size: 36px;
+  letter-spacing: 0.18em;
+  font-weight: 800;
+  color: var(--sl-spore);
+  padding: 10px 0;
+}
+.cloud-qr {
+  display: block;
+  width: 168px;
+  height: 168px;
+  margin: 12px 0;
+  background: #f4fff6;
+  border-radius: 8px;
+}
+.cloud-linked {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(125, 255, 179, 0.12);
+  color: var(--sl-ok);
+  border: 1px solid rgba(125, 255, 179, 0.3);
+  font-weight: 700;
+}
+
 @media (max-width: 768px) {
   .header-bar { padding: 14px 16px; }
   .header-bar h1 { font-size: 18px; }

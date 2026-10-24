@@ -29,6 +29,13 @@ export const NONCE_MS = 2 * 60 * 1000;
 export const NONCE_OUTSTANDING_MAX = 8;
 export const MAX_DEVICE_BODY = 16 * 1024;
 export const PROOF_VERSION = "shroomlabs-device-pop-v1";
+export const CERT_GRACE_MS = 30 * 24 * 3600 * 1000;
+export const CSR_POLL_LIMIT = 240;
+export const CSR_POLL_WINDOW_S = 900;
+export const CLAIM_STATUS_LIMIT = 240;
+export const CLAIM_STATUS_WINDOW_S = 900;
+export const CLAIM_STATUS_IP_LIMIT = 720;
+export const CLAIM_STATUS_RETRY_S = 60;
 const te = new TextEncoder();
 
 /** Read a request body as text with a hard size cap (413 above it). */
@@ -60,6 +67,10 @@ function json(body, status = 200, headers = {}) {
     status,
     headers: { "content-type": "application/json; charset=utf-8", ...headers },
   });
+}
+
+function rateLimited(windowSec) {
+  return json({ error: "rate limited", code: "rate_limited" }, 429, { "retry-after": String(Math.max(1, windowSec)) });
 }
 
 function claimCode() {
@@ -291,26 +302,95 @@ async function enrollProofOk(body, device) {
   return false;
 }
 
+function presentedSerial(request) {
+  const tls = request.cf?.tlsClientAuth;
+  const edgeSerial = tls && tls.certVerified === "SUCCESS" && tls.certPresented === "1" ? String(tls.certSerial || "") : "";
+  return (edgeSerial || request.headers.get("x-device-cert-serial") || "").toLowerCase().replace(/:/g, "");
+}
+
+function withinCertGrace(notAfter) {
+  if (!notAfter) return false;
+  const end = Date.parse(notAfter);
+  if (!Number.isFinite(end)) return false;
+  return Date.now() - end <= CERT_GRACE_MS;
+}
+
+async function purgeDeviceHistory(db, deviceId) {
+  await db.run("DELETE FROM device_telemetry WHERE device_id=?", [deviceId]);
+  await db.run("DELETE FROM device_commands WHERE device_id=?", [deviceId]);
+  await db.run("DELETE FROM device_nonces WHERE device_id=?", [deviceId]);
+}
+
+async function retireDeviceRow(env, db, device) {
+  await revokeDeviceCerts(env, db, device.id, "revoked");
+  await purgeDeviceHistory(db, device.id);
+  await db.run("DELETE FROM device_certs WHERE device_id=?", [device.id]);
+  await db.run("DELETE FROM cloud_devices WHERE id=?", [device.id]);
+}
+
+/**
+ * Classify a device request. Distinguishes revoke from an expired or superseded cert and from a bad proof.
+ * Proof is checked against the key on file and the nonce is consumed at most once.
+ */
+export async function diagnoseDeviceAuth(request, db, deviceId, bodyBytes) {
+  const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [deviceId]);
+  if (!device) return { ok: false, code: "not_found", status: 404 };
+  if (device.status === "revoked") return { ok: false, code: "revoked", status: 403, device };
+
+  const proofOk = await verifyRequestProof(request, db, device, bodyBytes);
+  if (!proofOk) return { ok: false, code: "proof_invalid", status: 401, device };
+
+  if (device.status === "claimed" && device.owner_id) {
+    return { ok: false, code: "relink_in_progress", status: 401, device, proofOk: true };
+  }
+  if (device.status !== "active") return { ok: false, code: "revoked", status: 403, device, proofOk: true };
+
+  const serial = presentedSerial(request);
+  if (!serial || serial.length > 64) {
+    return { ok: false, code: "relink_required", status: 401, device, proofOk: true, grace: false };
+  }
+  const cert = await db.one("SELECT * FROM device_certs WHERE serial=?", [serial]);
+  if (!cert || cert.device_id !== device.id) {
+    return { ok: false, code: "relink_required", status: 401, device, proofOk: true, grace: false };
+  }
+  if (cert.status === "revoked") {
+    return { ok: false, code: "relink_required", status: 401, device, cert, proofOk: true, grace: false };
+  }
+  const fingerprint = (request.headers.get("x-device-cert-fingerprint") || "").toLowerCase().replace(/:/g, "");
+  if (fingerprint && cert.fingerprint && !timingSafeEqual(fingerprint, cert.fingerprint)) {
+    return { ok: false, code: "relink_required", status: 401, device, cert, proofOk: true, grace: false };
+  }
+  const expired = Boolean(cert.not_after && cert.not_after < nowIso());
+  if (cert.status === "active" && !expired) return { ok: true, device, cert, proofOk: true };
+
+  const renewable = cert.status === "active" || cert.status === "superseded";
+  if (renewable && withinCertGrace(cert.not_after)) {
+    return { ok: false, code: "cert_expired", status: 401, device, cert, proofOk: true, grace: true };
+  }
+  return { ok: false, code: "relink_required", status: 401, device, cert, proofOk: true, grace: false };
+}
+
+function throwDeviceAuth(auth) {
+  if (auth.code === "revoked") throw new ValidationError("device revoked", 403, "revoked");
+  if (auth.code === "proof_invalid") throw new ValidationError("device proof required", 401, "proof_invalid");
+  if (auth.code === "cert_expired") throw new ValidationError("device certificate expired", 401, "cert_expired");
+  if (auth.code === "relink_required") throw new ValidationError("certificate grace ended. Link the chamber again", 401, "relink_required");
+  if (auth.code === "relink_in_progress") {
+    throw new ValidationError("this chamber is being linked", 401, "relink_in_progress");
+  }
+  if (auth.code === "not_found") throw new ValidationError("device not found", 404);
+  throw new ValidationError("device certificate required", 401, auth.code || "cert_required");
+}
+
 /**
  * Authenticate a device request: an active, unexpired cert for this device (by serial) plus proof of
  * possession over a server nonce. Client-supplied cf-cert-* headers are never trusted; the edge serial is
  * used only when Cloudflare itself verified a client certificate on the TLS connection.
  */
 export async function requireDeviceCert(request, db, env = {}, deviceId, bodyBytes) {
-  const tls = request.cf?.tlsClientAuth;
-  const edgeSerial = tls && tls.certVerified === "SUCCESS" && tls.certPresented === "1" ? String(tls.certSerial || "") : "";
-  const serial = (edgeSerial || request.headers.get("x-device-cert-serial") || "").toLowerCase().replace(/:/g, "");
-  if (!serial || serial.length > 64) return null;
-  const cert = await db.one("SELECT * FROM device_certs WHERE serial=?", [serial]);
-  if (!cert || cert.status !== "active") return null;
-  if (deviceId && cert.device_id !== deviceId) return null;
-  if (cert.not_after && cert.not_after < nowIso()) return null;
-  const fingerprint = (request.headers.get("x-device-cert-fingerprint") || "").toLowerCase().replace(/:/g, "");
-  if (fingerprint && cert.fingerprint && !timingSafeEqual(fingerprint, cert.fingerprint)) return null;
-  const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [cert.device_id]);
-  if (!device || device.status !== "active") return null;
-  if (!(await verifyRequestProof(request, db, device, bodyBytes))) return null;
-  return { device, cert };
+  const auth = await diagnoseDeviceAuth(request, db, deviceId, bodyBytes);
+  if (auth.ok) return { device: auth.device, cert: auth.cert };
+  return null;
 }
 
 async function saveCert(db, deviceId, issued) {
@@ -386,28 +466,60 @@ export async function handleDevices(method, path, url, request, env) {
 
   if (method === "POST" && path === "/api/devices/enroll") {
     const limited = await rateLimit(db, `enroll:${rateLimitClient(request)}`, 20, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
-    const { data: body } = await readBody(request);
+    if (!limited.ok) return rateLimited(3600);
+    const { data: body, bytes } = await readBody(request);
     const hardwareId = String(body.hardware_id || "").slice(0, 64);
     if (hardwareId.length < 8) throw new ValidationError("hardware_id required");
     const publicJwk = await verifyPublicJwk(body.public_jwk);
-    const existing = await db.one("SELECT * FROM cloud_devices WHERE hardware_id=?", [hardwareId]);
-    if (existing && existing.status === "unclaimed" && existing.claim_expires_at > nowIso()) {
-      const onFile = deviceJwk(existing);
-      if (!onFile || onFile.x !== publicJwk.x || onFile.y !== publicJwk.y) {
-        throw new ValidationError("a claim is already in progress for this device; try again after it expires", 409);
-      }
-    }
+    let existing = await db.one("SELECT * FROM cloud_devices WHERE hardware_id=?", [hardwareId]);
     const code = claimCode();
     const codeHash = await sha256Hex(code);
     const enrollToken = randomToken();
     const enrollHash = await sha256Hex(enrollToken);
     const expires = laterIso(CLAIM_MS);
-    if (existing && existing.status !== "revoked" && existing.owner_id) {
-      throw new ValidationError("device already claimed. Revoke it or use reclaim", 409);
-    }
-    const id = existing?.id || `sldev_${randomToken().slice(0, 16)}`;
     const name = String(body.name || "OpenShrooly").slice(0, 80);
+
+    if (existing && existing.owner_id && existing.status !== "revoked") {
+      // Hardware id alone is never enough to re-key or free an owned chamber.
+      const proven = await verifyRequestProof(request, db, existing, bytes);
+      const onFile = deviceJwk(existing);
+      const sameKey = onFile && onFile.x === publicJwk.x && onFile.y === publicJwk.y;
+      if (!proven || !sameKey) {
+        throw new ValidationError("device already claimed. Revoke it or use reclaim", 409, "already_claimed");
+      }
+      await db.run(
+        "UPDATE cloud_devices SET enroll_hash=?, claim_code_hash=?, claim_expires_at=?, status=? WHERE id=?",
+        [enrollHash, codeHash, expires, "claimed", existing.id]
+      );
+      await audit(db, existing.owner_id, "device_relink_enroll", existing.id, request);
+      const claimUrl = `${site}/claim.html?code=${code}`;
+      return json({
+        device_id: existing.id,
+        claim_code: code,
+        claim_expires_at: expires,
+        claim_url: claimUrl,
+        enroll_token: enrollToken,
+        qr: claimUrl,
+      });
+    }
+
+    if (existing && existing.status === "unclaimed" && existing.claim_expires_at > nowIso()) {
+      const onFile = deviceJwk(existing);
+      if (!onFile || onFile.x !== publicJwk.x || onFile.y !== publicJwk.y) {
+        throw new ValidationError(
+          "a claim is already in progress for this device; try again after it expires",
+          409,
+          "claim_in_progress"
+        );
+      }
+    }
+
+    if (existing && existing.status === "revoked") {
+      await retireDeviceRow(env, db, existing);
+      existing = null;
+    }
+
+    const id = existing?.id || `sldev_${randomToken().slice(0, 16)}`;
     if (existing) {
       await db.run(
         "UPDATE cloud_devices SET public_jwk=?, name=?, status=?, owner_id=?, enroll_hash=?, claim_code_hash=?, claim_expires_at=? WHERE id=?",
@@ -435,7 +547,7 @@ export async function handleDevices(method, path, url, request, env) {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
     const limited = await rateLimit(db, `claim:${user.id}`, 30, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
+    if (!limited.ok) return rateLimited(3600);
     const body = await request.json().catch(() => ({}));
     const code = normalizeCode(body.code);
     if (code.length !== 6) throw new ValidationError("enter the 6-character code from the device");
@@ -443,6 +555,9 @@ export async function handleDevices(method, path, url, request, env) {
     if (!row) throw new ValidationError("code not found", 404);
     if (row.claim_expires_at < nowIso()) throw new ValidationError("code expired. Refresh it on the device", 410);
     if (row.status === "revoked") throw new ValidationError("device revoked. Start a re-claim on the chamber", 409);
+    if (row.owner_id && Number(row.owner_id) !== Number(user.id)) {
+      throw new ValidationError("device already claimed. Revoke it or use reclaim", 409, "already_claimed");
+    }
     await db.run("UPDATE cloud_devices SET owner_id=?, status=?, claim_code_hash=? WHERE id=?", [
       user.id,
       "claimed",
@@ -457,29 +572,53 @@ export async function handleDevices(method, path, url, request, env) {
   if (nonceMatch && method === "POST") {
     const deviceId = decodeURIComponent(nonceMatch[1]).slice(0, 64);
     const client = await rateLimit(db, `device-nonce-ip:${rateLimitClient(request)}`, 120, 600);
-    if (!client.ok) return json({ error: "rate limited" }, 429);
+    if (!client.ok) return rateLimited(600);
     const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [deviceId]);
     if (!device) throw new ValidationError("device not found", 404);
     const perDevice = await rateLimit(db, `device-nonce:${device.id}`, 60, 600);
-    if (!perDevice.ok) return json({ error: "rate limited" }, 429);
+    if (!perDevice.ok) return rateLimited(600);
     return json(await issueNonce(db, device.id));
+  }
+
+  const claimStatusMatch = path.match(/^\/api\/devices\/([^/]+)\/claim-status$/);
+  if (claimStatusMatch && method === "POST") {
+    const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [decodeURIComponent(claimStatusMatch[1])]);
+    const { data: body } = await readBody(request);
+    const tokenOk = device ? await enrollProofOk(body, device) : false;
+    if (!device || !tokenOk) {
+      const ipLimited = await rateLimit(db, `device-claim-status-ip:${rateLimitClient(request)}`, CLAIM_STATUS_IP_LIMIT, CLAIM_STATUS_WINDOW_S);
+      if (!ipLimited.ok) return rateLimited(CLAIM_STATUS_RETRY_S);
+      if (!device) throw new ValidationError("device not found", 404);
+      throw new ValidationError("enroll token required", 401, "proof_invalid");
+    }
+    if (device.status === "unclaimed" && device.claim_expires_at && device.claim_expires_at < nowIso()) {
+      throw new ValidationError("claim code expired. Refresh it on the device", 410, "claim_expired");
+    }
+    const limited = await rateLimit(db, `device-claim-status:${device.id}`, CLAIM_STATUS_LIMIT, CLAIM_STATUS_WINDOW_S);
+    if (!limited.ok) return rateLimited(CLAIM_STATUS_RETRY_S);
+    const claimed = device.status === "claimed" || device.status === "active";
+    return json({ claimed });
   }
 
   const csrMatch = path.match(/^\/api\/devices\/([^/]+)\/csr$/);
   if (csrMatch && method === "POST") {
     const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [decodeURIComponent(csrMatch[1])]);
     if (!device) throw new ValidationError("device not found", 404);
-    const limited = await rateLimit(db, `device-csr:${device.id}`, 10, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
     const { data: body, bytes } = await readBody(request);
-    if (!(await enrollProofOk(body, device))) throw new ValidationError("enroll token required", 401);
+    if (!(await enrollProofOk(body, device))) throw new ValidationError("enroll token required", 401, "proof_invalid");
+    if (!(await verifyRequestProof(request, db, device, bytes))) {
+      throw new ValidationError("device proof required", 401, "proof_invalid");
+    }
     if (device.status !== "claimed" && device.status !== "active") {
+      const poll = await rateLimit(db, `device-csr-poll:${device.id}`, CSR_POLL_LIMIT, CSR_POLL_WINDOW_S);
+      if (!poll.ok) return rateLimited(CSR_POLL_WINDOW_S);
       throw new ValidationError("claim this device in Shroom Labs before a certificate can be issued", 403);
     }
-    if (!(await verifyRequestProof(request, db, device, bytes))) throw new ValidationError("device proof required", 401);
+    const limited = await rateLimit(db, `device-csr:${device.id}`, 10, 3600);
+    if (!limited.ok) return rateLimited(3600);
     await checkCsr(device, body.csr);
     const issued = await replaceCert(env, db, device.id, body.csr, request);
-    await db.run("UPDATE cloud_devices SET status=?, cloud_enabled=? WHERE id=?", ["active", 1, device.id]);
+    await db.run("UPDATE cloud_devices SET status=?, cloud_enabled=?, enroll_hash=? WHERE id=?", ["active", 1, null, device.id]);
     await audit(db, device.owner_id, "device_cert_issue", `${device.id}:${issued.serial}`, request);
     return json({
       certificate: issued.pem,
@@ -495,11 +634,14 @@ export async function handleDevices(method, path, url, request, env) {
   const rotateMatch = path.match(/^\/api\/devices\/([^/]+)\/rotate$/);
   if (rotateMatch && method === "POST") {
     const deviceId = decodeURIComponent(rotateMatch[1]);
-    const limited = await rateLimit(db, `device-rotate:${deviceId.slice(0, 64)}`, 10, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
     const { data: body, bytes } = await readBody(request);
-    const bound = await requireDeviceCert(request, db, env, deviceId, bytes);
-    if (!bound) throw new ValidationError("current device certificate required", 401);
+    const auth = await diagnoseDeviceAuth(request, db, deviceId, bytes);
+    if (!auth.ok && !(auth.code === "cert_expired" && auth.grace && auth.proofOk && auth.device)) {
+      throwDeviceAuth(auth);
+    }
+    const limited = await rateLimit(db, `device-rotate:${auth.device.id}`, 10, 3600);
+    if (!limited.ok) return rateLimited(3600);
+    const bound = { device: auth.device, cert: auth.cert || {} };
     // Validate the new CSR before touching the current cert so a bad CSR cannot lock the device out.
     // A new key is allowed here: the old key signed the proof and the CSR proves the new key.
     const verified = await checkCsr(bound.device, body.csr, { allowNewKey: true });
@@ -517,6 +659,28 @@ export async function handleDevices(method, path, url, request, env) {
       issuer: issued.issuer,
       previous_serial: bound.cert.serial,
     });
+  }
+
+  const selfRevokeMatch = path.match(/^\/api\/devices\/([^/]+)\/self-revoke$/);
+  if (selfRevokeMatch && method === "POST") {
+    const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [decodeURIComponent(selfRevokeMatch[1])]);
+    if (!device) throw new ValidationError("device not found", 404);
+    const { bytes } = await readBody(request);
+    if (!(await verifyRequestProof(request, db, device, bytes))) {
+      throw new ValidationError("device proof required", 401, "proof_invalid");
+    }
+    const limited = await rateLimit(db, `device-self-revoke:${device.id}`, 10, 3600);
+    if (!limited.ok) return rateLimited(3600);
+    await revokeDeviceCerts(env, db, device.id, "revoked");
+    await db.run("UPDATE cloud_devices SET status=?, cloud_enabled=?, claim_code_hash=?, enroll_hash=? WHERE id=?", [
+      "revoked",
+      0,
+      null,
+      null,
+      device.id,
+    ]);
+    await audit(db, null, "device_self_revoke", device.id, request);
+    return json({ ok: true, device_id: device.id, status: "revoked" });
   }
 
   const revokeMatch = path.match(/^\/api\/devices\/([^/]+)\/revoke$/);
@@ -545,7 +709,7 @@ export async function handleDevices(method, path, url, request, env) {
     const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [decodeURIComponent(reclaimMatch[1])]);
     if (!device) throw new ValidationError("device not found", 404);
     const limited = await rateLimit(db, `device-reclaim:${device.id}`, 10, 3600);
-    if (!limited.ok) return json({ error: "rate limited" }, 429);
+    if (!limited.ok) return rateLimited(3600);
     const { data: body, bytes } = await readBody(request);
     if (device.status !== "revoked" && !(await enrollProofOk(body, device))) {
       throw new ValidationError("revoke from the account first, or present the enroll token", 403);
@@ -554,6 +718,7 @@ export async function handleDevices(method, path, url, request, env) {
     if (!(await verifyRequestProof(request, db, device, bytes))) throw new ValidationError("device proof required", 401);
     const nextJwk = body.public_jwk ? await verifyPublicJwk(body.public_jwk) : deviceJwk(device);
     await revokeDeviceCerts(env, db, device.id, "revoked");
+    if (device.owner_id) await purgeDeviceHistory(db, device.id);
     const code = claimCode();
     const enrollToken = randomToken();
     await db.run(
@@ -609,10 +774,9 @@ export async function handleDevices(method, path, url, request, env) {
 
   const inboxMatch = path.match(/^\/api\/devices\/([^/]+)\/inbox$/);
   if (inboxMatch && method === "GET") {
-    const bound = await requireDeviceCert(request, db, env, decodeURIComponent(inboxMatch[1]), new Uint8Array());
-    if (!bound) {
-      throw new ValidationError("device certificate required", 401);
-    }
+    const auth = await diagnoseDeviceAuth(request, db, decodeURIComponent(inboxMatch[1]), new Uint8Array());
+    if (!auth.ok) throwDeviceAuth(auth);
+    const bound = { device: auth.device, cert: auth.cert };
     await db.run("UPDATE cloud_devices SET last_seen_at=? WHERE id=?", [nowIso(), bound.device.id]);
     const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [bound.device.id]);
     return json({
@@ -635,8 +799,9 @@ export async function handleDevices(method, path, url, request, env) {
   const telMatch = path.match(/^\/api\/devices\/([^/]+)\/telemetry$/);
   if (telMatch && method === "POST") {
     const { data: body, bytes } = await readBody(request);
-    const bound = await requireDeviceCert(request, db, env, decodeURIComponent(telMatch[1]), bytes);
-    if (!bound) throw new ValidationError("device certificate required", 401);
+    const auth = await diagnoseDeviceAuth(request, db, decodeURIComponent(telMatch[1]), bytes);
+    if (!auth.ok) throwDeviceAuth(auth);
+    const bound = { device: auth.device, cert: auth.cert };
     await db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
       bound.device.id,
       JSON.stringify(body),

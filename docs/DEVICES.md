@@ -42,10 +42,10 @@ shroomlabs-device-pop-v1
 <nonce>
 <METHOD>
 <path>
-<base64url SHA-256 of the exact request body>
+<lowercase hex SHA-256 of the exact request body>
 ```
 
-3. It sends `x-device-nonce: <nonce>` and `x-device-proof: <base64url signature>` (raw 64-byte r||s or DER).
+3. It sends `x-device-nonce: <nonce>` and `x-device-proof: <base64 signature>` (raw 64-byte r||s or DER). The Worker also accepts URL-safe base64.
 4. The Worker verifies the signature with the device key on file, then consumes the nonce with one atomic `DELETE ... WHERE nonce_hash = ? AND device_id = ? AND expires_at > ?`. Replays, expired nonces, another device's nonce, and edits to the path or body are all refused.
 
 ### CSR rules
@@ -66,7 +66,7 @@ shroomlabs-device-pop-v1
 
 Rotate validates the new CSR first, so a bad CSR never kills the working cert. On the Worker CA path the new cert is issued and then the old serial is marked `superseded`. On the Cloudflare path the old Cloudflare id is deleted **before** the new cert is minted (zero overlap). The rotate call authenticates with the current serial plus PoP at the app layer, so the device can still prove possession after the Cloudflare slot is freed.
 
-Rate limits: nonce 120 per 10 minutes per client and 60 per 10 minutes per device; CSR, rotate, and reclaim 10 per hour per device.
+Rate limits: nonce 120 per 10 minutes per client and 60 per 10 minutes per device; claim-status (no nonce) 240 per 15 minutes per device and 720 per 15 minutes per IP; pending-claim CSR polls 240 per 15 minutes (`device-csr-poll`); CSR issue, rotate, reclaim, and self-revoke 10 per hour per device. 429 responses send `Retry-After`. Rotate and self-revoke count the hourly limit only after a valid device proof.
 
 ### Why not multi-zone?
 
@@ -76,7 +76,7 @@ Spreading 100-cert shards across `link-a.`, `link-b.`, extra CF zones, or extra 
 
 | Asset | Threat | Control |
 | --- | --- | --- |
-| Device private key | Extract from flash / swap firmware | Generated on-device (P-256); stored in encrypted NVS; never in CSR, logs, or the hub |
+| Device private key | Extract from flash / swap firmware | Generated on-device (P-256); stored in the `shlcloud` NVS namespace; never in CSR, logs, or the hub. Stock images do not enable flash encryption, so a USB dump can read the key (same as the Ship 9 admin password). |
 | Enrollment | Attacker claims a stranger’s chamber | 6-char code, 15-minute TTL, hashed at rest, rate-limited; verified email required to claim |
 | Cloud impersonation | Stolen hub token used as a device | Devices authenticate with a cert serial plus a proof signed by the device key, not the browser session |
 | Stolen serial / PEM | Replay headers without the key | Proof is always required, over a single-use 2-minute server nonce, bound to device, method, path, and body |
@@ -99,10 +99,14 @@ Trust boundaries:
 
 1. `POST /api/devices/enroll` `{ hardware_id, public_jwk }` → `claim_code`, `enroll_token`, `claim_url` (QR payload).
 2. Owner signs in (verified email) → `POST /api/devices/claim` `{ code }`.
-3. Device `GET /api/devices/ca` (optional pin), gets a nonce, then `POST /api/devices/:id/csr` `{ csr, enroll_token }` with PoP → 7-day client cert (`issuer` is `worker-ca` or `cloudflare-managed`).
+3. Device polls `POST /api/devices/:id/claim-status` `{ enroll_token }` (no nonce) every ~5 s. The reply is only `{ claimed }`. After `claimed: true` it gets a nonce and `POST /api/devices/:id/csr` `{ csr, enroll_token }` with PoP → 7-day client cert (`issuer` is `worker-ca` or `cloudflare-managed`). Optional `GET /api/devices/ca` pins the Worker CA.
 4. Device calls `GET /api/devices/:id/inbox` and `POST /api/devices/:id/telemetry` with `x-device-cert-serial` plus a fresh nonce and proof on every request.
-5. Silent rotate at ~3.5 days: new CSR + current serial + PoP → new cert, then the predecessor is superseded.
-6. `POST /api/devices/:id/revoke` (account) or `/reclaim` (device after revoke, PoP by the key on file).
+5. Silent rotate at ~3.5 days: new CSR + a serial of that device (the active serial, or a superseded serial still inside its 30-day `not_after` grace) plus PoP → new cert, then every other active serial is superseded. Otherwise `relink_required`. Watch `relink_required` volume: a bad serial table could ask every chamber to link again. The chamber confirms that code twice, an hour apart, and keeps its key.
+6. Account `POST /api/devices/:id/revoke` (session). Device Disconnect calls `POST /api/devices/:id/self-revoke` with the same nonce + key proof as other device routes. Both set status=revoked, revoke certs, and audit. The chamber then wipes its key. A later Connect enrolls a new key on a new device id (old telemetry is dropped). An unauthenticated enroll never resets an owned row: hardware id alone is not enough. Relink after grace proves the registered key and keeps the owner until that owner claims the new code or removes the chamber on the site.
+7. Auth errors are distinguishable JSON `code` values: `revoked` (403, wipe the key), `cert_expired` (401, keep the key and renew by proof for 30 days), `relink_required` (401, confirm twice an hour apart within 24 h then show Link again, keep the key), `relink_in_progress` (401, owner + claimed, keep the key), `proof_invalid` (401, back off and retry). Do not treat every 401 as a revoke. A nonce 404 whose body says device not found enrolls again without proof.
+8. Claim-status polls do not use a nonce and do not count against the CSR issue limit. The enroll token expires with the 15-minute claim window while unclaimed and is cleared after the first cert. A leftover CSR poll while unclaimed is still capped at 240 / 15 min (`device-csr-poll`). Claim-status IP limits apply only to 404/401, and `Retry-After` is capped at 60 s so several chambers behind one router can still pair.
+
+Public `deviceClaiming` (open pairing for anyone) is blocked until a follow-up binds rows to the device key instead of the hardware id (so a guessed MAC cannot squat a never-seen chamber) and stops an anonymous enroll of a revoked hardware id from deleting that chamber's history. Bench use and a limited claim flag can ship without that.
 
 Commands the SaaS may queue: `apply_profile`, `setpoints`, `schedule`, `firmware_notice`. The device decides whether to apply.
 
@@ -114,10 +118,27 @@ Telemetry and `last_seen_at` are the data source for a later **email alerts** sh
 | --- | --- | --- | --- |
 | mbedTLS client (already common if HTTPS is on) | ~155 KB if newly linked | ~42 KB default, **~22 KB** with `CONFIG_MBEDTLS_DYNAMIC_BUFFER` + free CA/config | Espressif https_request figures |
 | One WSS + TLS |: | ~24 KB idle, ~30 KB under traffic (measured WSS on S2/S3-class) | Keep **one** socket. App-layer proof is one ECDSA sign, not a second handshake |
-| P-256 key + cert in NVS | < 2 KB |: | Encrypted NVS / flash encryption |
-| This component vs default firmware | **0** unless `shroom_labs_cloud:` is in YAML | 0 | Default OpenShrooly YAML does not include it |
+| P-256 key + cert in NVS | < 2 KB |: | Ordinary NVS on stock images. Encrypted NVS only when flash encryption is on. USB can dump the key. |
+| This component vs default firmware | ~49 KB flash when compiled in | 16 KB task + ~22 KB QR canvas | Compiled into the default YAML, **off until Connect to Shroom Labs** |
 
-Do **not** enable the component on the default 1.0.x build. The web UI gzip budget is already ~161 KB.
+The component is in the default 1.0.x-sl build (`esphome/components/cloud.yaml`) and stays off until the local admin toggle. That costs flash even while unused. The web UI gzip budget is already ~161 KB.
+
+### Flash layout (proposal, not applied)
+
+The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 97.2% full (~50 KB free). OTA still fits. The next feature of this size will not.
+
+Do not flash a new table from this pairing ship. A later layout change needs its own design. Rewriting the table from the running app and writing both slots cannot survive a power cut: a bad table cannot be undone by OTA rollback, and a 6 MB ota_0 would overlap the running image and today's NVS at 0x3A0000.
+
+A safe later plan:
+
+1. Keep the 4 MB table until that dedicated ship.
+2. Stage the copy: write the new table and the new image to unused flash above 4 MB first, then flip a single boot field. If power dies mid-write, the old table and running slot are still intact.
+3. Keep USB Serial/JTAG recovery as the hard fallback (`docs/RECOVERY.md`): a full 16 MB `read_flash` / `write_flash` of a known-good image, including the old table.
+4. Do not move NVS without a migrator: today's NVS lives at 0x3A0000-0x400000. A table that only sets `flash_size: 16MB` would look like a factory reset.
+
+Until that ship, leave the 4 MB table. If an image does not fit, stop and cut scope rather than the OTA slots.
+
+Host tests (`scripts/test_shroom_labs_cloud.py`) compile `cloud_engine.cpp` with ASan/UBSan and drive the real `handle_*()`, `store_*()`, and `loop()` code against a fake HTTPS transport, clock, NVS, and crypto. `IdfTransport` (open / write / fetch_headers / read, plus `idf_headers_ok` and `is_complete_data_received`) is the ESP-IDF adapter. A live mock HTTPS run on the IDF `linux` target or QEMU is not in CI: this tree has no exported ESP-IDF environment and no `qemu-system-xtensa`, and ESPHome's linux target is not part of the firmware workflow. The adapter rules and 16 KB cap are covered on the host.
 
 ## Mike’s production checklist
 
@@ -142,6 +163,6 @@ Local / CI uses the Worker CA (`DEVICE_ISSUER=worker`). Never commit the CA key.
 
 ## UX
 
-- Device (next firmware): large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. Not in shipped firmware yet.
+- Device: large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. The component is in the default 1.0.x-sl build and stays off until that toggle.
 - Site: `/claim.html` explains pairing. The code form is shown for `?code=` (camera / typed) or when `deviceClaiming` is on. Account list + revoke.
-- Copy: cloud linking needs a firmware update that is not out yet; the chamber still works on your own network.
+- Copy: scan the QR code first. Typing the letters is the fallback. The chamber still works on your own network if cloud is off or down. If the cert is past the 30-day grace window the chamber shows Link again: "This chamber was offline too long. Press Connect to link it again."

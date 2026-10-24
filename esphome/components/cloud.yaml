@@ -1,0 +1,27 @@
+# Opt-in Shroom Labs cloud pairing. Off until someone turns it on
+# from the local web page (admin login). Growing does not use this path.
+shroom_labs_cloud:
+  id: shl_cloud
+  api_host: api.shroomlabs.io
+  site_origin: https://shroomlabs.io
+
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(shl_cloud)->take_show_claim();'
+          then:
+            - lambda: |-
+                id(current_ui_page) = 8;
+                id(page_just_changed) = true;
+            - lvgl.page.show: icloudclaim
+            - script.execute: update_cloud_screen
+            - component.update: my_display
+  - interval: 10s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(icloudclaim).is_showing();'
+          then:
+            - script.execute: update_cloud_screen

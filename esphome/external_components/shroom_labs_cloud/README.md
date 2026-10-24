@@ -1,25 +1,27 @@
 # shroom_labs_cloud (opt-in)
 
-Outbound Shroom Labs link. **Not compiled into the default OpenShrooly YAML.** Enable it only when a grower wants SaaS control.
+Outbound Shroom Labs pairing. Compiled into this firmware, **off until someone turns it on** from the local web page (admin login). Growing does not use this path. A cloud failure does not change local control.
 
 ## What it does
 
-1. Generates an ECDSA P-256 key in **encrypted NVS** (flash encryption / NVS encryption when the board has it). The private key never leaves the ESP32-S3.
-2. Shows a 6-character claim code (and the claim URL as a QR payload) on the local web UI.
-3. After the owner claims the code at shroomlabs.io, submits a CSR and stores the short-lived client cert.
-4. Opens **outbound-only** `wss://link.shroomlabs.io/api/devices/inbox` with mTLS. No inbound ports.
-5. Applies cloud commands only when `cloud_enabled` is on **and** the last local change is older than the command. Offline, the stock REST UI and hub keep working.
+1. Generates an ECDSA P-256 key in NVS. The private key never leaves the ESP32-S3, is never logged, and is never sent in a CSR or to the hub.
+2. `POST /api/devices/enroll` with `{ hardware_id, public_jwk, name }`.
+3. Shows the 6-character claim code and `https://shroomlabs.io/claim.html?code=...` as a QR on the e-paper screen and on the local web page (behind the admin login). The code lasts 15 minutes. Refresh asks for a new one.
+4. After the owner claims the code, `POST /api/devices/:id/csr` with the enroll token and proof of possession. Stores the 7-day client cert and schedules a silent rotate at 3.5 days.
+5. Local Disconnect calls `POST /api/devices/:id/self-revoke` with the device key proof, then wipes the `shlcloud` NVS namespace and zeroes the key. Account revoke is noticed on the next inbox probe as `403 {"code":"revoked"}`. The chamber wipes the cert and key and shows Unlinked. An expired cert (`cert_expired`) keeps the key and renews by proof for 30 days. A bad proof (`proof_invalid`) backs off and retries. Refresh then enrolls again once the row is revoked.
+
+Telemetry and applying remote commands are not in this ship. `cloud_ready()`, `note_local_change()`, and the inbox probe are the hooks.
+
+## TLS
+
+HTTPS to `api.shroomlabs.io` only. The built-in CA bundle is used. `setInsecure` is not used. Redirects are not followed.
+
+## Storage
+
+The key lives in the `shlcloud` NVS namespace. This build uses encrypted NVS when flash encryption is on. Stock OpenShrooly images do not enable flash encryption, so the key is in ordinary NVS. Treat a dumped flash image as enough to steal the key; signed OTA and physical access still matter.
 
 ## Enable
 
-```yaml
-external_components:
-  - source: components
+The component is in `esphome/components/cloud.yaml`. Cloud stays off until **Connect to Shroom Labs** is turned on.
 
-shroom_labs_cloud:
-  api_host: link.shroomlabs.io
-```
-
-Leave this block out of production firmware if you do not want the TLS client (~22–42 KB heap, ~155 KB flash for mbedTLS if it is not already linked).
-
-See `docs/DEVICES.md` for the threat model and Cloudflare-managed CA.
+See `docs/DEVICES.md`. If that file and the Worker disagree, the Worker wins.

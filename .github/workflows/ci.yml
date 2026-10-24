@@ -51,7 +51,7 @@ jobs:
       - name: Install RP2040 toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc-arm-none-eabi libnewlib-arm-none-eabi
+          sudo apt-get install --yes gcc-arm-none-eabi libnewlib-arm-none-eabi libmbedtls-dev
 
       - name: Build RP2040 coprocessor
         run: |
@@ -95,6 +95,7 @@ jobs:
         run: |
           (cd webapp && npm test)
           python3 scripts/test_signed_update.py
+          python3 scripts/test_shroom_labs_cloud.py
 
       - name: Verify embedded assets are current
         run: |

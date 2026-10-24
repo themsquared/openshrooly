@@ -59,7 +59,7 @@ async function call(ctx, method, path, { token, body, raw, device, headers: extr
   });
   const res = await handleRequest(request, ctx);
   const text = await res.text();
-  return { status: res.status, data: text ? JSON.parse(text) : null, text };
+  return { status: res.status, data: text ? JSON.parse(text) : null, text, headers: res.headers };
 }
 
 async function nonceFor(ctx, deviceId) {
@@ -223,7 +223,9 @@ test("claim, issue, rotate to a new key, and revoke", async () => {
   const revoked = await call(ctx, "POST", `/api/devices/${deviceId}/revoke`, { token, body: {} });
   assert.equal(revoked.status, 200);
   const dead = await deviceCall(ctx, "GET", inboxPath, { deviceId, key: newKeys.privateKey, cert: rotated.data });
-  assert.equal(dead.status, 401);
+  assert.equal(dead.status, 403);
+  assert.equal(dead.data.code, "revoked");
+  assert.equal(dead.data.status, "revoked");
 });
 
 test("a bad CSR on rotate leaves the current cert working", async () => {
@@ -245,8 +247,14 @@ test("only one active cert per device: a second CSR supersedes the first", async
   const ctx = env();
   const { token } = await register(ctx);
   const d = await enrollClaimIssue(ctx, token);
-  const second = await requestCert(ctx, d);
-  assert.equal(second.status, 200);
+  const csr2 = await buildCsr(d.pair.keys.privateKey, d.pair.keys.publicKey, d.deviceId);
+  const second = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { csr: csr2 },
+  });
+  assert.equal(second.status, 200, JSON.stringify(second.data));
   const rows = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
   assert.equal(rows.filter((r) => r.status === "active").length, 1);
   assert.equal(new Set(rows.map((r) => r.serial)).size, rows.length);
@@ -365,7 +373,8 @@ test("garbage, oversized, and non-P-256 CSRs are refused with 4xx", async () => 
   }
   // Nine refusals plus this one make ten CSR attempts, the hourly cap per device.
   assert.equal((await send(good)).status, 200);
-  assert.equal((await send(good)).status, 429);
+  // First cert clears the enroll token, so a later CSR cannot reuse it.
+  assert.equal((await send(good)).status, 401);
 });
 
 test("oversized CSR and oversized device bodies are refused with 413", async () => {
@@ -592,4 +601,382 @@ test("Worker CA pin endpoint is public and returns only the certificate", async 
   assert.equal(res.data.auth, "app-layer");
   assert.match(String(res.data.certificate || ""), /BEGIN CERTIFICATE/);
   assert.doesNotMatch(res.text, /PRIVATE/);
+});
+
+test("device self-revoke uses key proof, is rate limited, and audits", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeff7788");
+  const noProof = await call(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, { body: {} });
+  assert.equal(noProof.status, 401);
+  assert.equal(noProof.data.code, "proof_invalid");
+  const ok = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: {},
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(ok.data.status, "revoked");
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(row.status, "revoked");
+  const listed = await call(ctx, "GET", "/api/devices", { token });
+  assert.equal(listed.data.devices[0].status, "revoked");
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+  });
+  assert.equal(inbox.status, 403);
+  assert.equal(inbox.data.code, "revoked");
+  const audits = await ctx.db.all("SELECT * FROM security_events WHERE kind=?", ["device_self_revoke"]);
+  assert.ok(audits.some((a) => String(a.detail) === d.deviceId));
+  for (let i = 0; i < 9; i++) {
+    await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, {
+      deviceId: d.deviceId,
+      key: d.pair.keys.privateKey,
+      cert: d.issued.data,
+      body: {},
+    });
+  }
+  const limited = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: {},
+  });
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get("retry-after"), "3600");
+});
+
+test("401 codes distinguish revoke, expired cert, and bad proof", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeff8899");
+  const path = `/api/devices/${d.deviceId}/inbox`;
+  const badProof = await call(ctx, "GET", path, { device: d.issued.data });
+  assert.equal(badProof.status, 401);
+  assert.equal(badProof.data.code, "proof_invalid");
+
+  const certs = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
+  const yesterday = new Date(Date.now() - 86400000).toISOString();
+  for (const row of certs) row.not_after = yesterday;
+  const expired = await deviceCall(ctx, "GET", path, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+  });
+  assert.equal(expired.status, 401);
+  assert.equal(expired.data.code, "cert_expired");
+
+  const csr2 = await buildCsr(d.pair.keys.privateKey, d.pair.keys.publicKey, d.deviceId);
+  const renewed = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { csr: csr2 },
+  });
+  assert.equal(renewed.status, 200, JSON.stringify(renewed.data));
+  assert.ok(renewed.data.serial);
+  assert.notEqual(renewed.data.serial, d.issued.data.serial);
+});
+
+test("pending claim polls do not count against the CSR issue limit", async () => {
+  const ctx = env();
+  const pair = await devicePair();
+  const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9901", public_jwk: pair.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(enrolled.status, 200);
+  const deviceId = enrolled.data.device_id;
+  const csr = await buildCsr(pair.keys.privateKey, pair.keys.publicKey, deviceId);
+  const body = { csr, enroll_token: enrolled.data.enroll_token };
+  for (let i = 0; i < 12; i++) {
+    const poll = await deviceCall(ctx, "POST", `/api/devices/${deviceId}/csr`, { deviceId, key: pair.keys.privateKey, body });
+    assert.equal(poll.status, 403, `poll ${i} ${JSON.stringify(poll.data)}`);
+  }
+  const { token } = await register(ctx);
+  const claimed = await call(ctx, "POST", "/api/devices/claim", { token, body: { code: enrolled.data.claim_code } });
+  assert.equal(claimed.status, 200);
+  const issued = await deviceCall(ctx, "POST", `/api/devices/${deviceId}/csr`, { deviceId, key: pair.keys.privateKey, body });
+  assert.equal(issued.status, 200, JSON.stringify(issued.data));
+});
+
+test("enroll 409 codes distinguish already claimed from a claim in progress", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeff9902");
+  const other = await devicePair();
+  const claimed = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9902", public_jwk: other.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(claimed.status, 409);
+  assert.equal(claimed.data.code, "already_claimed");
+
+  const first = await devicePair();
+  const pending = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9903", public_jwk: first.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(pending.status, 200);
+  const busy = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9903", public_jwk: other.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(busy.status, 409);
+  assert.equal(busy.data.code, "claim_in_progress");
+  void d;
+});
+
+test("claim-status is nonce-free and reports only claimed", async () => {
+  const ctx = env();
+  const pair = await devicePair();
+  const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffaa01", public_jwk: pair.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(enrolled.status, 200);
+  const deviceId = enrolled.data.device_id;
+  const path = `/api/devices/${deviceId}/claim-status`;
+  const missing = await call(ctx, "POST", path, { body: {} });
+  assert.equal(missing.status, 401);
+  assert.equal(missing.data.code, "proof_invalid");
+  const bad = await call(ctx, "POST", path, { body: { enroll_token: "nope" } });
+  assert.equal(bad.status, 401);
+  const waiting = await call(ctx, "POST", path, { body: { enroll_token: enrolled.data.enroll_token } });
+  assert.equal(waiting.status, 200, JSON.stringify(waiting.data));
+  assert.equal(waiting.data.claimed, false);
+  assert.equal(Object.keys(waiting.data).join(), "claimed");
+  const before = (await ctx.db.all("SELECT nonce_hash FROM device_nonces WHERE device_id=? AND expires_at>?", [deviceId, 0])).length;
+  const { token } = await register(ctx);
+  assert.equal((await call(ctx, "POST", "/api/devices/claim", { token, body: { code: enrolled.data.claim_code } })).status, 200);
+  const claimed = await call(ctx, "POST", path, { body: { enroll_token: enrolled.data.enroll_token } });
+  assert.equal(claimed.status, 200);
+  assert.equal(claimed.data.claimed, true);
+  const after = (await ctx.db.all("SELECT nonce_hash FROM device_nonces WHERE device_id=? AND expires_at>?", [deviceId, 0])).length;
+  assert.equal(after, before);
+});
+
+test("two chambers on one IP can poll claim-status through the 15-minute window", async () => {
+  const ctx = env();
+  const a = await devicePair();
+  const b = await devicePair();
+  const ea = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffaa02", public_jwk: a.public_jwk, name: "A" },
+  });
+  const eb = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffaa03", public_jwk: b.public_jwk, name: "B" },
+  });
+  assert.equal(ea.status, 200);
+  assert.equal(eb.status, 200);
+  for (let i = 0; i < 12; i++) {
+    const sa = await call(ctx, "POST", `/api/devices/${ea.data.device_id}/claim-status`, {
+      body: { enroll_token: ea.data.enroll_token },
+    });
+    const sb = await call(ctx, "POST", `/api/devices/${eb.data.device_id}/claim-status`, {
+      body: { enroll_token: eb.data.enroll_token },
+    });
+    assert.equal(sa.status, 200, `a ${i}`);
+    assert.equal(sb.status, 200, `b ${i}`);
+    assert.equal(sa.data.claimed, false);
+    assert.equal(sb.data.claimed, false);
+  }
+});
+
+async function rotateAuthCase(ctx, d, cert, expected) {
+  const csr = await buildCsr(d.pair.keys.privateKey, d.pair.keys.publicKey, d.deviceId);
+  const res = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert,
+    body: { csr },
+  });
+  assert.equal(res.status, expected.status, JSON.stringify(res.data));
+  assert.equal(res.data.code, expected.code);
+  return res;
+}
+
+test("rotate refuses omitted, unknown, foreign, superseded-past-grace, revoked, and stale certs", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffaa04");
+  const other = await enrollClaimIssue(ctx, token, "aabbccddeeffaa05");
+
+  await rotateAuthCase(ctx, d, { serial: "" }, { status: 401, code: "relink_required" });
+  await rotateAuthCase(ctx, d, { serial: "deadbeef" }, { status: 401, code: "relink_required" });
+  await rotateAuthCase(ctx, d, other.issued.data, { status: 401, code: "relink_required" });
+  await rotateAuthCase(
+    ctx,
+    d,
+    { serial: d.issued.data.serial, fingerprint: "aa".repeat(32) },
+    { status: 401, code: "relink_required" }
+  );
+
+  const certs = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
+  for (const row of certs) row.status = "revoked";
+  await rotateAuthCase(ctx, d, d.issued.data, { status: 401, code: "relink_required" });
+
+  const stale = await enrollClaimIssue(ctx, token, "aabbccddeeffaa06");
+  const staleRows = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [stale.deviceId]);
+  const ninety = new Date(Date.now() - 90 * 86400000).toISOString();
+  for (const row of staleRows) row.not_after = ninety;
+  await rotateAuthCase(ctx, stale, stale.issued.data, { status: 401, code: "relink_required" });
+});
+
+test("superseded cert within 30-day grace can still rotate", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffaa07");
+  const rows = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
+  const yesterday = new Date(Date.now() - 86400000).toISOString();
+  for (const row of rows) {
+    row.status = "superseded";
+    row.not_after = yesterday;
+  }
+  const csr = await buildCsr(d.pair.keys.privateKey, d.pair.keys.publicKey, d.deviceId);
+  const renewed = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { csr },
+  });
+  assert.equal(renewed.status, 200, JSON.stringify(renewed.data));
+  assert.ok(renewed.data.serial);
+});
+
+test("anonymous rotate and self-revoke do not consume the device rate limit", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffaa08");
+  for (let i = 0; i < 10; i++) {
+    const anonRotate = await call(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+      body: { csr: "-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----" },
+    });
+    assert.equal(anonRotate.status, 401);
+    const anonRevoke = await call(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, { body: {} });
+    assert.equal(anonRevoke.status, 401);
+  }
+  const csr = await buildCsr(d.pair.keys.privateKey, d.pair.keys.publicKey, d.deviceId);
+  const rotated = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { csr },
+  });
+  assert.equal(rotated.status, 200, JSON.stringify(rotated.data));
+  const revoked = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: rotated.data,
+    body: {},
+  });
+  assert.equal(revoked.status, 200, JSON.stringify(revoked.data));
+});
+
+test("b2: anonymous enroll cannot take a chamber past cert grace", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b2@example.com");
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffbb02");
+  await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+    d.deviceId,
+    JSON.stringify({ temp: 20 }),
+    "2026-01-01T00:00:00Z",
+  ]);
+  const rows = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
+  for (const row of rows) row.not_after = new Date(Date.now() - 90 * 86400000).toISOString();
+  const attacker = await devicePair();
+  const hijack = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb02", public_jwk: attacker.public_jwk, name: "Stolen" },
+  });
+  assert.equal(hijack.status, 409, JSON.stringify(hijack.data));
+  assert.equal(hijack.data.code, "already_claimed");
+  const kept = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(Number(kept.owner_id) > 0, true);
+  assert.notEqual(kept.status, "unclaimed");
+  const listed = await call(ctx, "GET", "/api/devices", { token });
+  assert.equal(listed.data.devices[0].id, d.deviceId);
+
+  const proven = await deviceCall(ctx, "POST", "/api/devices/enroll", {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    body: { hardware_id: "aabbccddeeffbb02", public_jwk: d.pair.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(proven.status, 200, JSON.stringify(proven.data));
+  assert.equal(proven.data.device_id, d.deviceId);
+  const after = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(Number(after.owner_id), Number(kept.owner_id));
+  const tel = await ctx.db.all("SELECT * FROM device_telemetry WHERE device_id=?", [d.deviceId]);
+  assert.equal(tel.length, 1);
+});
+
+test("b3: anonymous enroll cannot take a claimed chamber before the first cert", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b3@example.com");
+  const d = await enrollClaim(ctx, token, "aabbccddeeffbb03");
+  const attacker = await devicePair();
+  const hijack = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb03", public_jwk: attacker.public_jwk, name: "Stolen" },
+  });
+  assert.equal(hijack.status, 409);
+  assert.equal(hijack.data.code, "already_claimed");
+  const issued = await requestCert(ctx, d);
+  assert.equal(issued.status, 200, JSON.stringify(issued.data));
+});
+
+test("b4: attacker cannot complete CSR after a failed takeover", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b4@example.com");
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffbb04");
+  const attacker = await devicePair();
+  const hijack = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb04", public_jwk: attacker.public_jwk, name: "Stolen" },
+  });
+  assert.equal(hijack.status, 409);
+  const csr = await buildCsr(attacker.keys.privateKey, attacker.keys.publicKey, d.deviceId);
+  const stolen = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/csr`, {
+    deviceId: d.deviceId,
+    key: attacker.keys.privateKey,
+    body: { csr, enroll_token: "nope" },
+  });
+  assert.notEqual(stolen.status, 200);
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(row.status, "active");
+  const listed = await call(ctx, "GET", "/api/devices", { token });
+  assert.equal(listed.data.devices[0].status, "active");
+});
+
+test("claimed owner plus proof is relink_in_progress not revoked", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-relink-win@example.com");
+  const d = await enrollClaim(ctx, token, "aabbccddeeffbb06");
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+  });
+  assert.equal(inbox.status, 401, JSON.stringify(inbox.data));
+  assert.equal(inbox.data.code, "relink_in_progress");
+  assert.notEqual(inbox.data.code, "revoked");
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(row.status, "claimed");
+  assert.ok(Number(row.owner_id) > 0);
+});
+
+test("revoked re-enroll issues a new device id and drops old telemetry", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b5@example.com");
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffbb05");
+  await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+    d.deviceId,
+    JSON.stringify({ temp: 21 }),
+    "2026-01-01T00:00:00Z",
+  ]);
+  const revoked = await call(ctx, "POST", `/api/devices/${d.deviceId}/revoke`, { token, body: {} });
+  assert.equal(revoked.status, 200);
+  const next = await devicePair();
+  const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb05", public_jwk: next.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(enrolled.status, 200, JSON.stringify(enrolled.data));
+  assert.notEqual(enrolled.data.device_id, d.deviceId);
+  const oldTel = await ctx.db.all("SELECT * FROM device_telemetry WHERE device_id=?", [d.deviceId]);
+  assert.equal(oldTel.length, 0);
+  const oldRow = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(oldRow, null);
 });

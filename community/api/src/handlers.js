@@ -198,7 +198,14 @@ export async function handleRequest(request, env) {
     }
     return await route(method, path, url, request, env);
   } catch (err) {
-    if (err instanceof ValidationError) return json({ error: err.message }, err.status || 400);
+    if (err instanceof ValidationError) {
+      const body = { error: err.message };
+      if (err.code) {
+        body.code = err.code;
+        if (err.code === "revoked") body.status = "revoked";
+      }
+      return json(body, err.status || 400);
+    }
     if (String(err?.message) === "UNIQUE") return json({ error: "username taken" }, 409);
     return internalError(err, method, path);
   }
