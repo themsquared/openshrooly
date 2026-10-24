@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [otaProgress, setOtaProgress] = useState<number>(0)
   const [otaStatus, setOtaStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
   const [otaMessage, setOtaMessage] = useState<string>('')
+  const [updateRequestError, setUpdateRequestError] = useState<string>('')
   const [demoMode, setDemoMode] = useState(false)
   const [reachable, setReachable] = useState<boolean | undefined>(undefined)
   const [lastError, setLastError] = useState('')
@@ -322,6 +323,32 @@ export default function Dashboard() {
   const handleFlipScreenChange = async (flipped: boolean) => {
     setFlipScreen(flipped)
     await api.setSwitch('flip_screen', flipped)
+  }
+
+  const updateState = entities['text_sensor-update_state']?.state || 'idle'
+  const updateBusy = ['checking', 'downloading', 'verifying', 'restarting'].includes(updateState)
+  const updateStatus = updateRequestError || entities['text_sensor-update_status']?.state || 'Not checked yet.'
+  const availableVersion = entities['text_sensor-available_version']?.state || ''
+  const installedVersion = entities['text_sensor-installed_version']?.state || DEVICE_VERSION
+  const allowOlder = entities['switch-allow_older_versions']?.state === 'ON'
+  const updateProgress = Number((updateStatus.match(/(\d{1,3})%/) || [])[1] || 0)
+
+  const handleCheckForUpdate = async () => {
+    setUpdateRequestError('')
+    const ok = await api.pressButton('check_for_update')
+    if (!ok) setUpdateRequestError('Could not reach your Shrooly. Try again.')
+  }
+
+  const handleInstallUpdate = async () => {
+    setUpdateRequestError('')
+    const ok = await api.pressButton('install_update')
+    if (!ok) setUpdateRequestError('Could not reach your Shrooly. Try again.')
+  }
+
+  const handleAllowOlderChange = async (allow: boolean) => {
+    setUpdateRequestError('')
+    const ok = await api.setSwitch('allow_older_versions', allow)
+    if (!ok) setUpdateRequestError('Could not change that setting. Try again.')
   }
 
   const handleOtaUpload = async () => {
@@ -918,7 +945,7 @@ export default function Dashboard() {
         <div className="card card-settings" onClick={() => setModal({ type: 'settings' })}>
           <div className="card-icon">⚙️</div>
           <div className="card-label">Settings</div>
-          <div className="card-value">v{DEVICE_VERSION}</div>
+          <div className="card-value">v{installedVersion}</div>
           <div className="card-detail">Chamber and Wi-Fi</div>
         </div>
       </div>
@@ -1613,7 +1640,7 @@ export default function Dashboard() {
                 <div className="settings-info">
                   <div className="info-row">
                     <span className="info-label">Version:</span>
-                    <span className="info-value">{DEVICE_VERSION}</span>
+                    <span className="info-value">{installedVersion}</span>
                   </div>
                   <div className="info-row">
                     <span className="info-label">Voltage:</span>
@@ -1679,47 +1706,107 @@ export default function Dashboard() {
 
               <div className="settings-section">
                 <h3>Software update</h3>
+                <div className="settings-info">
+                  <div className="info-row">
+                    <span className="info-label">Installed version:</span>
+                    <span className="info-value">{installedVersion}</span>
+                  </div>
+                </div>
                 <div className="control-group">
-                  <label>Choose the OpenShrooly update file (ends in .bin)</label>
-                  <input
-                    type="file"
-                    accept=".bin"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        setOtaFile(file)
-                        setOtaStatus('idle')
-                        setOtaMessage('')
-                      }
-                    }}
-                    disabled={otaStatus === 'uploading'}
-                    className="ota-file"
-                  />
-                  {otaFile && (
-                    <div className="ota-meta">
-                      Selected: {otaFile.name} ({(otaFile.size / 1024 / 1024).toFixed(2)} MB)
+                  <div className={`ota-message${updateState === 'failed' ? ' is-error' : updateState === 'current' || updateState === 'restarting' ? ' is-success' : ''}`} aria-live="polite">
+                    {updateStatus}
+                  </div>
+                  {updateState === 'downloading' && (
+                    <div className="ota-track">
+                      <div className="ota-fill" style={{ width: `${updateProgress}%` }} />
                     </div>
                   )}
                   <button
-                    onClick={handleOtaUpload}
-                    disabled={!otaFile || otaStatus === 'uploading'}
+                    onClick={handleCheckForUpdate}
+                    disabled={updateBusy || !reachable}
                     className="charts-button ota-button"
                   >
-                    {otaStatus === 'uploading' ? 'Sending…' : 'Install update'}
+                    {updateState === 'checking' ? 'Checking…' : 'Check for updates'}
                   </button>
-                  {otaStatus !== 'idle' && (
-                    <div>
-                      {otaStatus === 'uploading' && (
-                        <div className="ota-track">
-                          <div className="ota-fill" style={{ width: `${otaProgress}%` }} />
-                        </div>
-                      )}
-                      <div className={`ota-message${otaStatus === 'success' ? ' is-success' : otaStatus === 'error' ? ' is-error' : ''}`}>
-                        {otaMessage}
+                  {updateState === 'available' && availableVersion && (
+                    <>
+                      <button
+                        onClick={handleInstallUpdate}
+                        disabled={updateBusy}
+                        className="charts-button ota-button update-install"
+                      >
+                        Install version {availableVersion}
+                      </button>
+                      <div className="control-help">
+                        Your Shrooly checks the download is a genuine Shroom Labs release before using it, then restarts. Your grow settings are kept.
                       </div>
-                    </div>
+                    </>
                   )}
+                  <div className="control-help">
+                    Updates come only from shroomlabs.io and are checked only when you press the button.
+                  </div>
                 </div>
+                <details className="update-advanced">
+                  <summary>More update options</summary>
+                  <div className="control-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={allowOlder}
+                        onChange={(e) => handleAllowOlderChange(e.target.checked)}
+                        disabled={updateBusy}
+                      />
+                      <span style={{ marginLeft: '8px' }}>Allow going back to an older version</span>
+                    </label>
+                    <div className="control-help">
+                      Turns itself off when your Shrooly restarts.
+                    </div>
+                  </div>
+                  <div className="control-group">
+                    <label>Install from a file on this computer</label>
+                    <div className="control-help">
+                      For recovery only. Files installed this way are not checked for the Shroom Labs signature, so use only files you trust.
+                    </div>
+                    <input
+                      type="file"
+                      accept=".bin"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setOtaFile(file)
+                          setOtaStatus('idle')
+                          setOtaMessage('')
+                        }
+                      }}
+                      disabled={otaStatus === 'uploading'}
+                      className="ota-file"
+                    />
+                    {otaFile && (
+                      <div className="ota-meta">
+                        Selected: {otaFile.name} ({(otaFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </div>
+                    )}
+                    <button
+                      onClick={handleOtaUpload}
+                      disabled={!otaFile || otaStatus === 'uploading'}
+                      className="charts-button ota-button"
+                    >
+                      {otaStatus === 'uploading' ? 'Sending…' : 'Install this file'}
+                    </button>
+                    {otaStatus !== 'idle' && (
+                      <div>
+                        {otaStatus === 'uploading' && (
+                          <div className="ota-track">
+                            <div className="ota-fill" style={{ width: `${otaProgress}%` }} />
+                          </div>
+                        )}
+                        <div className={`ota-message${otaStatus === 'success' ? ' is-success' : otaStatus === 'error' ? ' is-error' : ''}`}>
+                          {otaMessage}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </details>
               </div>
             </div>
           </div>

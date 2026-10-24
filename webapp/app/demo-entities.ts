@@ -32,6 +32,10 @@ export const DEMO_ENTITIES: EntityState = {
   'text_sensor-wifi_mode': { value: 'STA', state: 'STA' },
   'text_sensor-wifi_ssid': { value: 'mycelium-lab', state: 'mycelium-lab' },
   'text_sensor-ip_address': { value: '192.168.1.42', state: '192.168.1.42' },
+  'text_sensor-update_state': { value: 'available', state: 'available' },
+  'text_sensor-update_status': { value: 'Version 1.0.4 is available.', state: 'Version 1.0.4 is available.' },
+  'text_sensor-available_version': { value: '1.0.4', state: '1.0.4' },
+  'switch-allow_older_versions': { value: false, state: 'OFF' },
 }
 
 export const DEMO_STAGES = [

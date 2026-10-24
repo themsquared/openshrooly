@@ -25,3 +25,6 @@ community/api/src/seeds.json
 
 # Netlify CLI local state
 .netlify/
+
+# Signed releases are published to Netlify, never committed
+community/web/public/firmware/

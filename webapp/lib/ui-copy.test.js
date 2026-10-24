@@ -94,3 +94,20 @@ test("no secrets in the exported files", { skip: !fs.existsSync(outDir) }, () =>
     for (const p of patterns) assert.equal(p.test(text), false, `${path.relative(root, file)} matches ${p}`);
   }
 });
+
+test("update checks only happen when someone presses the button", () => {
+  const page = fs.readFileSync(path.join(root, "app", "page.tsx"), "utf8");
+  const presses = [...page.matchAll(/pressButton\('(check_for_update|install_update)'\)/g)];
+  assert.equal(presses.length, 2, "expected one check press and one install press");
+  const handlers = page.match(/const handleCheckForUpdate[\s\S]*?\n  }\n\n  const handleInstallUpdate[\s\S]*?\n  }\n/);
+  assert.ok(handlers, "update handlers not found");
+  for (const m of presses) assert.ok(handlers[0].includes(m[0]), `${m[0]} called outside its button handler`);
+  assert.match(page, /onClick=\{handleCheckForUpdate\}/);
+  assert.match(page, /onClick=\{handleInstallUpdate\}/);
+
+  const yaml = fs.readFileSync(path.join(root, "..", "esphome", "components", "updates.yaml"), "utf8");
+  const calls = [...yaml.matchAll(/id\(software_update\)\.(check|install)\(\)/g)].map((m) => m[1]);
+  assert.deepEqual(calls.sort(), ["check", "install"], "the device must only check or install from its two buttons");
+  assert.doesNotMatch(yaml, /interval:|on_boot:/, "no automatic update checks");
+  assert.match(yaml, /restore_mode: ALWAYS_OFF/, "allowing older versions must not survive a restart");
+});

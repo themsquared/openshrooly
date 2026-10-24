@@ -1,5 +1,5 @@
 substitutions:
-  device_version: "1.0.2"
+  device_version: "1.0.3-sl.1"
 
 esphome:
   name: openshrooly
@@ -99,6 +99,11 @@ api:
 ota:
   platform: esphome
 
+# Listed deviations from grahamsz/openshrooly: recovery after a bad OTA,
+# and USB serial Wi-Fi provisioning for the browser installer.
+safe_mode:
+
+improv_serial:
 
 external_components:
   - source:
@@ -239,3 +244,8 @@ script: !include_dir_merge_list scripts/
 <<: !include components/buttons.yaml
 <<: !include components/lvgl_config.yaml
 <<: !include components/webserver.yaml
+
+# Signed software updates (see components/updates.yaml). A package, not a
+# '<<' merge, so its buttons and switch are added to the existing lists.
+packages:
+  updates: !include components/updates.yaml

@@ -328,6 +328,11 @@ input[type="number"]:focus,
 .ota-message { margin-top: 8px; font-size: 14px; color: var(--sl-muted); }
 .ota-message.is-success { color: var(--sl-ok); }
 .ota-message.is-error { color: var(--sl-bad); }
+.update-install { margin-left: 8px; }
+.update-advanced { margin-top: 16px; }
+.update-advanced summary { cursor: pointer; font-size: 14px; color: var(--sl-muted); }
+.update-advanced[open] summary { margin-bottom: 8px; }
+@media (max-width: 480px) { .update-install { margin-left: 0; display: block; } }
 
 @media (max-width: 600px) {
   .connection-banner { flex-direction: column; align-items: stretch; }

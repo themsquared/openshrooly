@@ -1,0 +1,69 @@
+# Signed software updates. Checks happen only when someone presses
+# "Check for Update". Release info and images come from shroomlabs.io over
+# HTTPS, and the image must match the Ed25519 signed size and SHA-256 before
+# the device switches to it. The public key below pairs with a private key
+# that is kept offline (never in this repo or on the website).
+signed_update:
+  id: software_update
+  manifest_url: "https://shroomlabs.io/firmware/stable/manifest.json"
+  download_prefix: "https://shroomlabs.io/firmware/stable/"
+  public_key: "d060c2d2edb7871bcd6e211e23df8378e470cecf4ffb8575490fbbabab4afcdb"
+  current_version: ${device_version}
+  status:
+    name: "Update Status"
+    icon: mdi:update
+    web_server:
+      sorting_group_id: grp_system
+      sorting_weight: 20
+  state:
+    name: "Update State"
+    internal: false
+    web_server:
+      sorting_group_id: grp_hidden
+      sorting_weight: 20
+  available_version:
+    name: "Available Version"
+    web_server:
+      sorting_group_id: grp_system
+      sorting_weight: 21
+  installed_version:
+    name: "Installed Version"
+    web_server:
+      sorting_group_id: grp_system
+      sorting_weight: 19
+
+button:
+  - platform: template
+    name: "Check for Update"
+    id: check_for_update
+    icon: mdi:cloud-search
+    web_server:
+      sorting_group_id: grp_system
+      sorting_weight: 22
+    on_press:
+      - lambda: id(software_update).check();
+
+  - platform: template
+    name: "Install Update"
+    id: install_update
+    icon: mdi:download
+    web_server:
+      sorting_group_id: grp_system
+      sorting_weight: 23
+    on_press:
+      - lambda: id(software_update).install();
+
+switch:
+  - platform: template
+    id: allow_older_versions
+    name: "Allow Older Versions"
+    icon: mdi:history
+    optimistic: true
+    restore_mode: ALWAYS_OFF  # never survives a restart
+    web_server:
+      sorting_group_id: grp_system
+      sorting_weight: 24
+    on_turn_on:
+      - lambda: id(software_update).set_allow_older(true);
+    on_turn_off:
+      - lambda: id(software_update).set_allow_older(false);
