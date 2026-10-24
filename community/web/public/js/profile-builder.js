@@ -545,13 +545,21 @@ export class ProfileBuilder extends HTMLElement {
     this.dispatchEvent(new CustomEvent("profilechange", { detail: this.getDocument() }));
   }
 
-  cloneFrom(id) {
+  async cloneFrom(id) {
     if (!id) {
       this.setProfile(blankProfile());
       return;
     }
-    const source = [...this.catalog, ...this.ownProfiles].find((p) => p.id === id);
+    let source = [...this.catalog, ...this.ownProfiles].find((p) => p.id === id);
     if (!source) return;
+    if (typeof this.resolveSource === "function" && !Array.isArray(source.stages)) {
+      try {
+        const resolved = await this.resolveSource(id);
+        source = resolved || source;
+      } catch {
+        /* keep the summary and fall back to a blank clone */
+      }
+    }
     const locked = !canCloneFull(source, { unlocked: Boolean(source.unlocked) });
     this.setProfile(cloneProfile(source, { id: `${slugify(source.name)}-copy`, name: `${source.name} copy` }), { locked });
   }

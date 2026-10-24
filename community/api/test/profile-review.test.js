@@ -75,6 +75,7 @@ test("private drafts never leak on public lists, search, or profile GET", async 
   const mine = await call(ctx, "GET", "/api/profiles/my-oyster-draft", { token });
   assert.equal(mine.status, 200);
   assert.equal(mine.data.review.status, "draft");
+  assert.ok(Array.isArray(mine.data.review.photos));
 });
 
 test("pending photos are not on the public media path", async () => {
@@ -96,6 +97,9 @@ test("pending photos are not on the public media path", async () => {
   const ownerGet = await handleRequest(ownerReq, ctx);
   assert.equal(ownerGet.status, 200);
   assert.match(ownerGet.headers.get("content-type"), /image\/jpeg/);
+  const ownerView = await call(ctx, "GET", "/api/profiles/photo-draft", { token });
+  assert.equal(ownerView.data.review.photos.length, 1);
+  assert.equal(ownerView.data.review.photos[0].id, row.id);
 });
 
 test("publish needs photo title and description, then stays off public lists until approved", async () => {

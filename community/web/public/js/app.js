@@ -472,13 +472,35 @@ function fileToBase64(file) {
   });
 }
 
+async function ownerPhotoUrl(profileId, photoId) {
+  const res = await fetch(`${apiBase()}/api/profiles/${encodeURIComponent(profileId)}/photos/${encodeURIComponent(photoId)}`, {
+    headers: { authorization: `Bearer ${getToken()}`, accept: "image/*" },
+  });
+  if (!res.ok) return "";
+  return URL.createObjectURL(await res.blob());
+}
+
 async function loadBuilderSources(builder) {
   const [library, mine] = await Promise.all([
     api("/api/profiles?pack=culinary").catch(() => []),
     api("/api/me/profiles").catch(() => ({ profiles: [] })),
   ]);
   const off = await api("/api/profiles?pack=psilocybin").catch(() => []);
-  builder.setCatalog([...(library || []), ...(off || [])]);
+  const summaries = [...(library || []), ...(off || [])];
+  builder.resolveSource = async (id) => {
+    const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
+    return { ...(data.profile || data), unlocked: Boolean(data.unlocked) };
+  };
+  const full = await Promise.all(
+    summaries.map(async (item) => {
+      try {
+        return await builder.resolveSource(item.id);
+      } catch {
+        return item;
+      }
+    })
+  );
+  builder.setCatalog(full);
   builder.setOwnProfiles((mine.profiles || []).map((item) => ({ ...item.profile, unlocked: true, author: item.profile.author || "you" })));
 }
 
@@ -497,11 +519,17 @@ async function renderPublish() {
       const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
       builder.setProfile(data.profile, { locked: Boolean(data.profile.locked) || !data.unlocked });
       if (data.review) {
+        const photos = [];
+        for (const photo of data.review.photos || []) {
+          const preview = await ownerPhotoUrl(id, photo.id);
+          photos.push({ ...photo, preview });
+        }
         builder.setPublishState({
           status: data.review.status || "draft",
           reason: data.review.reason || "",
           title: data.review.title || data.profile.name,
           description: data.review.description || data.profile.summary || "",
+          photos,
         });
       }
     } catch (err) {
@@ -575,26 +603,30 @@ async function renderModerate() {
   try {
     const data = await api("/api/moderation/queue");
     const box = $("#queue");
-    box.innerHTML = (data.items || []).length
-      ? data.items
-          .map((item) => {
-            const p = item.profile;
-            const r = item.review || {};
-            return `<article class="card" style="padding:1.1rem">
+    const items = [];
+    for (const item of data.items || []) {
+      const p = item.profile;
+      const r = item.review || {};
+      const thumbs = [];
+      for (const photo of r.photos || []) {
+        const src = await ownerPhotoUrl(p.id, photo.id);
+        if (src) thumbs.push(`<img src="${src}" alt="Submitted photo">`);
+      }
+      items.push(`<article class="card" style="padding:1.1rem">
               <p><span class="chip">${escapeHtml(p.pack === "psilocybin" ? "Off-menu" : "Culinary")}</span>${r.offmenu_flag ? `<span class="chip">Off-menu flag</span>` : ""}${r.blocklist_hit ? `<span class="chip">Text flag</span>` : ""}</p>
               <h2>${escapeHtml(r.title || p.name)}</h2>
               <p>${escapeHtml(r.description || p.summary || "")}</p>
               <p class="muted">${escapeHtml(p.species || "")}</p>
+              ${thumbs.length ? `<div class="pb-photos">${thumbs.join("")}</div>` : ""}
               <label>Reason <input id="reason-${escapeHtml(p.id)}" placeholder="Required to reject or ask for changes"></label>
               <p class="pb-actions">
                 <button type="button" data-mod="approve" data-id="${escapeHtml(p.id)}">Approve</button>
                 <button type="button" class="secondary" data-mod="request-changes" data-id="${escapeHtml(p.id)}">Ask for changes</button>
                 <button type="button" class="secondary" data-mod="reject" data-id="${escapeHtml(p.id)}">Reject</button>
               </p>
-            </article>`;
-          })
-          .join("")
-      : `<p class="muted">Nothing waiting.</p>`;
+            </article>`);
+    }
+    box.innerHTML = items.length ? items.join("") : `<p class="muted">Nothing waiting.</p>`;
     box.addEventListener("click", async (ev) => {
       const btn = ev.target.closest("[data-mod]");
       if (!btn) return;

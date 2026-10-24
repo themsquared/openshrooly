@@ -170,6 +170,8 @@ export function blankProfile({ id = "", name = "", pack = "culinary" } = {}) {
 
 export function applyPackRules(profile) {
   const next = structuredClone(profile);
+  if (!Array.isArray(next.tags)) next.tags = [];
+  if (!Array.isArray(next.stages)) next.stages = blankProfile().stages;
   if (isPsilocybin(next)) {
     next.pack = "psilocybin";
     next.restricted = true;
@@ -195,7 +197,7 @@ export function redactLockedProfile(profile) {
     pack: profile.pack,
     restricted: profile.restricted,
     tags: profile.tags,
-    stages: (profile.stages || []).map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
+    stages: (Array.isArray(profile.stages) ? profile.stages : []).map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
     locked: true,
   };
 }
@@ -260,7 +262,7 @@ export function collectProfileIssues(profile) {
   }
 
   const seen = new Set();
-  for (const stage of profile.stages || []) {
+  for (const stage of Array.isArray(profile.stages) ? profile.stages : []) {
     const label = stage.name || stage.id || "phase";
     if (!stage.id) addIssue(issues, `stages.${stage.id || "unknown"}.id`, `${label} needs an id.`);
     if (seen.has(stage.id)) addIssue(issues, `stages.${stage.id}`, `Two phases use the id ${stage.id}.`);

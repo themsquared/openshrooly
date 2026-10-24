@@ -91,3 +91,12 @@ test("temperature unit helpers round trip", () => {
   assert.equal(Math.round(fToC(68)), 20);
   assert.equal(slugify("Pearl Oyster"), "pearl-oyster");
 });
+
+test("list summaries with a stage count do not crash validation or clone", () => {
+  const summary = { id: "pearl-oyster", name: "Pearl Oyster", species: "Pleurotus ostreatus", pack: "culinary", stages: 3 };
+  const issues = collectProfileIssues(summary);
+  assert.ok(issues.some((i) => i.path === "stages"));
+  const cloned = cloneProfile(summary, { id: "pearl-oyster-copy", name: "Pearl Oyster copy" });
+  assert.ok(Array.isArray(cloned.stages));
+  assert.ok(cloned.stages.length >= 1);
+});

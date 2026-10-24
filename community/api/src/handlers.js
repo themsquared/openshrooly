@@ -613,17 +613,19 @@ async function showProfile(request, db, env, profileId) {
         summary: profile.summary,
         pricing: profile.pricing,
         pack: profile.pack,
-        stages: (profile.stages || []).map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
+        stages: (Array.isArray(profile.stages) ? profile.stages : []).map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
         locked: true,
       };
   const offMenu = isOffMenu(profile) || isPsilocybin(profile);
+  const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profileId]);
+  const staff = owner || (user && (user.role === "moderator" || user.role === "admin"));
   return json({
     profile: {
       ...lockedDoc,
       pack_label: packLabel(profile.pack),
       legal_notice: offMenu ? PSI_LEGAL_NOTICE : lockedDoc.legal_notice,
     },
-    review: owner ? reviewView(review) : review ? { status: review.status } : { status: "published" },
+    review: staff ? reviewView(review, photos) : review ? { status: review.status } : { status: "published" },
     unlocked,
     ratings,
     avg: avgRow?.a ?? null,

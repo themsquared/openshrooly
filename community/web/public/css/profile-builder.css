@@ -41,6 +41,11 @@
   background: linear-gradient(180deg, #a34b3a, #6a241d);
 }
 
+body[data-page="moderate"] #queue.cards {
+  grid-template-columns: 1fr;
+  max-width: 44rem;
+}
+
 .pb-panel {
   background: var(--sl-bg-glass);
   border: 1px solid var(--sl-line);
