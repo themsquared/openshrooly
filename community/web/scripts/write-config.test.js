@@ -23,6 +23,7 @@ test("write-config emits apiBase and turnstileSiteKey from env", () => {
     const written = readFileSync(configPath, "utf8");
     assert.match(written, /apiBase: "https:\/\/api.shroomlabs.io"/);
     assert.match(written, /turnstileSiteKey: "0x4AAAAAAFjd0Rzec6mAd5y6"/);
+    assert.match(written, /showPsilocybin: true/);
     assert.match(written, /deviceClaiming: false/);
     const live = spawnSync(process.execPath, [script], {
       encoding: "utf8",

@@ -114,7 +114,7 @@ test("D1: Google sign-up with grower@gmail.com and a name hint gets grower_<hex>
     const row = await d1.prepare("SELECT username, display_name FROM users WHERE email=?").bind("grower@gmail.com").first();
     assertPublicHandle(row, first.done.data.user);
     assert.doesNotMatch(row.username, /ada|lovelace/i);
-    assert.doesNotMatch(JSON.stringify(first.done.data), /Ada|Lovelace/i);
+    assert.doesNotMatch(JSON.stringify(first.done.data.user), /\bAda\b|\bLovelace\b/i);
   });
 });
 

@@ -3,6 +3,7 @@ import { handleRequest, withCors } from "./handlers.js";
 import { SCHEMA_SQL } from "./schema.js";
 import { createOptionalStorage } from "./storage.js";
 import { runAlerts } from "./alerts/cron.js";
+import { reclassifyUnconfirmedLegacyBatch } from "./review.js";
 
 async function envContext(env) {
   if (!env._ctx) {
@@ -69,9 +70,20 @@ export default {
   /** Cron Trigger: evaluate grow alerts. Overlapping or repeated runs are safe (see alerts/cron.js). */
   async scheduled(event, env, executionCtx) {
     const ctx = await envContext(env);
-    const work = runAlerts(ctx, { now: Number(event?.scheduledTime) || Date.now() })
-      .then((summary) => console.log(JSON.stringify({ level: "info", event: "alerts_cron", ...summary })))
-      .catch((err) => console.log(JSON.stringify({ level: "error", event: "alerts_cron_failed", message: String(err?.message || err).slice(0, 200) })));
+    const work = (async () => {
+      let summary = {};
+      try {
+        summary = await runAlerts(ctx, { now: Number(event?.scheduledTime) || Date.now() });
+      } catch (err) {
+        console.log(JSON.stringify({ level: "error", event: "alerts_cron_failed", message: String(err?.message || err).slice(0, 200) }));
+      }
+      try {
+        const reclass = await reclassifyUnconfirmedLegacyBatch(ctx.db);
+        console.log(JSON.stringify({ level: "info", event: "alerts_cron", ...summary, reclass }));
+      } catch (err) {
+        console.log(JSON.stringify({ level: "error", event: "legacy_reclass_failed", message: String(err?.message || err).slice(0, 200) }));
+      }
+    })();
     executionCtx.waitUntil(work);
     await work;
   },

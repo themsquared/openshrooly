@@ -3,6 +3,7 @@ Allow: /
 Disallow: /profile.html
 Disallow: /account.html
 Disallow: /publish.html
+Disallow: /moderate.html
 Disallow: /device.html
 Disallow: /alerts-unsub.html
 Disallow: /auth/

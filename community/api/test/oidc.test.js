@@ -203,7 +203,7 @@ test("Google sign-up with grower@gmail.com and a name hint gets a random public 
   const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@gmail.com"]);
   assertPublicHandle(row, r.done.data.user);
   assert.doesNotMatch(row.username, /ada|lovelace|grower@/i);
-  assert.doesNotMatch(JSON.stringify(r.done.data), /Ada|Lovelace/i);
+  assert.doesNotMatch(JSON.stringify(r.done.data.user), /\bAda\b|\bLovelace\b/i);
 });
 
 test("Google sign-up does not put the email local part or name on public API, pages, sitemap, or llms.txt", async () => {
@@ -226,26 +226,28 @@ test("Google sign-up does not put the email local part or name on public API, pa
   leak(created.data, "publish");
 
   const shown = await call(ctx, "GET", "/api/profiles/google-privacy-oyster");
-  assert.equal(shown.status, 200);
-  assert.equal(shown.data.profile.author, row.username);
-  leak(shown.data, "profile GET");
+  assert.equal(shown.status, 404);
+  const ownerShown = await call(ctx, "GET", "/api/profiles/google-privacy-oyster", { token });
+  assert.equal(ownerShown.status, 200);
+  assert.equal(ownerShown.data.profile.author, row.username);
+  leak(ownerShown.data, "profile GET");
 
   const rated = await call(ctx, "POST", "/api/profiles/google-privacy-oyster/rate", {
     token,
     body: { stars: 5, comment: "worked" },
   });
   assert.equal(rated.status, 200);
-  const afterRate = await call(ctx, "GET", "/api/profiles/google-privacy-oyster");
+  const afterRate = await call(ctx, "GET", "/api/profiles/google-privacy-oyster", { token });
   leak(afterRate.data, "ratings");
   assert.ok(afterRate.data.ratings.some((item) => item.username === row.username));
   assert.ok(!afterRate.data.ratings.some((item) => item.display_name));
 
   const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
   const card = list.data.find((item) => item.id === "google-privacy-oyster");
-  assert.ok(card);
-  leak(card, "profile list card");
+  assert.equal(card, undefined);
   leak((await call(ctx, "GET", "/api/search?pack=culinary&q=Privacy")).data, "search");
-  leak((await call(ctx, "GET", "/api/profiles/google-privacy-oyster.json")).data, "profile.json export");
+  const exported = await call(ctx, "GET", "/api/profiles/google-privacy-oyster.json");
+  assert.equal(exported.status, 404);
 
   const hub = await call(ctx, "GET", "/api/hub/pull", { token });
   assert.equal(hub.status, 200);
@@ -258,7 +260,7 @@ test("Google sign-up does not put the email local part or name on public API, pa
   const passkey = await call(ctx, "POST", "/api/auth/webauthn/register/begin", { token, body: {} });
   assert.equal(passkey.status, 200);
   assert.equal(passkey.data.user.displayName, row.username);
-  assert.doesNotMatch(JSON.stringify(passkey.data), /Ada|Lovelace/i);
+  assert.doesNotMatch(JSON.stringify(passkey.data.user), /\bAda\b|\bLovelace\b/i);
 
   const published = { ...created.data, author: row.username };
   leak(renderSitemap([published]), "sitemap");

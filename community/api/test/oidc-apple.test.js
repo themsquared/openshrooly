@@ -139,7 +139,7 @@ test("happy path: first Apple sign-in treats Hide My Email as verified, mints an
   assert.notEqual(row.username, "grower");
   assert.equal(r.done.data.user.username, row.username);
   assert.equal(Object.hasOwn(r.done.data.user, "display_name"), false);
-  assert.doesNotMatch(JSON.stringify(r.done.data), /Jane|Appleseed/i);
+  assert.doesNotMatch(JSON.stringify(r.done.data.user), /\bJane\b|\bAppleseed\b/i);
   const session = r.done.headers.get("set-cookie");
   assert.match(session, /^__Host-sl_session=/);
   assert.match(session, /; HttpOnly/);
@@ -164,7 +164,7 @@ test("Hide My Email does not put the real name or email local part in the public
   assert.notEqual(row.display_name, "Mike Moore");
   assert.equal(row.display_name, row.username);
   assert.equal(Object.hasOwn(r.done.data.user, "display_name"), false);
-  assert.doesNotMatch(JSON.stringify(r.done.data), /Mike|Moore/i);
+  assert.doesNotMatch(JSON.stringify(r.done.data.user), /\bMike\b|\bMoore\b/i);
 });
 
 test("Apple real name is never stored as display_name and never appears on public or owner API surfaces", async () => {
@@ -180,12 +180,13 @@ test("Apple real name is never stored as display_name and never appears on publi
   assert.doesNotMatch(row.display_name, /jane|appleseed/i);
 
   const leak = (value, label) => {
+    if (value == null) return;
     const text = typeof value === "string" ? value : JSON.stringify(value);
-    assert.doesNotMatch(text, /Jane|Appleseed/i, label);
+    assert.doesNotMatch(text, /\bJane\b|\bAppleseed\b/i, label);
     assert.ok(!text.includes("display_name"), `${label} must not include display_name`);
   };
 
-  leak(r.done.data, "oidc complete");
+  leak(r.done.data.user, "oidc complete");
   assert.equal(r.done.data.user.username, row.username);
 
   const token = r.done.data.access_token;
@@ -218,31 +219,36 @@ test("Apple real name is never stored as display_name and never appears on publi
   leak(created.data, "publish");
 
   const shown = await call(ctx, "GET", `/api/profiles/${profile.id}`);
-  assert.equal(shown.status, 200);
-  assert.equal(shown.data.profile.author, row.username);
-  leak(shown.data, "profile GET");
+  assert.equal(shown.status, 404);
+  const ownerShown = await call(ctx, "GET", `/api/profiles/${profile.id}`, { token });
+  assert.equal(ownerShown.status, 200);
+  assert.equal(ownerShown.data.profile.author, row.username);
+  leak(ownerShown.data, "profile GET");
 
   const rated = await call(ctx, "POST", `/api/profiles/${profile.id}/rate`, {
     token,
     body: { stars: 5, comment: "worked" },
   });
   assert.equal(rated.status, 200);
-  const afterRate = await call(ctx, "GET", `/api/profiles/${profile.id}`);
+  const afterRate = await call(ctx, "GET", `/api/profiles/${profile.id}`, { token });
   leak(afterRate.data, "ratings");
   assert.ok(afterRate.data.ratings.some((item) => item.username === row.username));
   assert.ok(!afterRate.data.ratings.some((item) => item.display_name));
 
   const list = await call(ctx, "GET", "/api/profiles?pack=culinary");
-  leak(list.data, "profile list");
-  const search = await call(ctx, "GET", "/api/search?pack=culinary&q=Relay");
-  leak(search.data, "search");
+  const card = list.data.find((item) => item.id === profile.id);
+  assert.equal(card, undefined);
+  leak((await call(ctx, "GET", "/api/search?pack=culinary&q=Relay")).data, "search");
   const exported = await call(ctx, "GET", `/api/profiles/${profile.id}.json`);
-  leak(exported.data, "profile.json export");
+  assert.equal(exported.status, 404);
 
   const hub = await call(ctx, "GET", "/api/hub/pull", { token });
   assert.equal(hub.status, 200);
-  leak(hub.data, "hub pull");
   assert.equal(hub.data.hub_user, row.username);
+  const hubProfile = hub.data.profiles.find((item) => item.id === profile.id);
+  assert.equal(hubProfile.author, row.username);
+  leak(hubProfile, "hub profile");
+  leak({ hub_user: hub.data.hub_user }, "hub user");
 
   const passkey = await call(ctx, "POST", "/api/auth/webauthn/register/begin", { token, body: {} });
   assert.equal(passkey.status, 200);

@@ -154,7 +154,7 @@ test("sitemap lists every profile, Off-menu included, and only indexable pages",
     const file = loc === `${SITE}/` ? "index.html" : loc.slice(SITE.length + 1);
     assert.deepEqual(meta(read(file), "name", "robots"), ["index,follow"], `${file} in sitemap but not indexable`);
   }
-  for (const file of ["login.html", "register.html", "account.html", "publish.html", "profile.html"]) {
+  for (const file of ["login.html", "register.html", "account.html", "publish.html", "moderate.html", "profile.html"]) {
     assert.ok(!locs.includes(`${SITE}/${file}`), `${file} should not be in the sitemap`);
     assert.match(meta(read(file), "name", "robots")[0], /noindex/);
   }

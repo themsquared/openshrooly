@@ -66,6 +66,7 @@ export async function capabilities() {
       photos: false,
       coach: false,
       push: false,
+      show_psilocybin: window.SHROOM_LABS?.showPsilocybin !== false,
       stubs: false,
     };
   }

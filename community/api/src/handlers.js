@@ -5,9 +5,13 @@ import {
   assertAffiliateAllowed,
   isFree,
   isPsilocybin,
+  serveProfileDocument,
+  stripCommunityAffiliates,
   validateProfile,
   ValidationError,
 } from "./profile.js";
+import { reviewConfirmExtra, slugify } from "./profile-schema.js";
+import { decodePhotoBase64, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES } from "./photos.js";
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
@@ -15,14 +19,29 @@ import { handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
-import { corsAllowlist, originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
+import { corsAllowlist, originAllowed, rateLimit, rateLimitClient, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 import { handleAlerts } from "./alerts/http.js";
-import { decodePhotoBase64, IMAGE_TYPES, mediaFilename, sanitizeGrowPhoto, sniffImage } from "./image.js";
+import { handleReview } from "./review-http.js";
 import { readJsonLimited } from "./http-body.js";
-import { canSeeMedia, getMedia, insertMedia, mediaApiUrl, mediaApproved, pendingPhotoKey } from "./media-acl.js";
+import { canSeeMedia, getMedia, mediaApiUrl, mediaApproved } from "./media-acl.js";
+import {
+  canSeeProfile,
+  getReview,
+  isModerator,
+  isPublicProfile,
+  canSeePhoto,
+  canServeReportPhoto,
+  photoIsPublic,
+  publicDocument,
+  reportPhotoApproved,
+  requireVisibleRow,
+  reviewView,
+  saveDraftReview,
+  storeReportPhoto,
+} from "./review.js";
 
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
@@ -105,8 +124,28 @@ const SEED_DOCS = new Map(seeds.map((profile) => [profile.id, profile]));
  * fixes in data/profiles ship with the Worker. D1 rows are never rewritten for that.
  */
 function parseProfile(row) {
-  if (row.author_id === null && SEED_DOCS.has(row.id)) return structuredClone(SEED_DOCS.get(row.id));
-  return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  try {
+    if (row.author_id === null && SEED_DOCS.has(row.id)) return structuredClone(SEED_DOCS.get(row.id));
+    return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  } catch (err) {
+    console.log(
+      JSON.stringify({
+        level: "warn",
+        event: "malformed_profile_document",
+        id: row?.id,
+        message: String(err?.message || err).slice(0, 200),
+      })
+    );
+    return null;
+  }
+}
+
+function serveExtra(review, profile) {
+  return {
+    ...reviewConfirmExtra(review, profile),
+    title: review?.title,
+    description: review?.description,
+  };
 }
 
 function showPsi(env) {
@@ -121,18 +160,27 @@ async function canRead(db, user, profile) {
 }
 
 async function listProfiles(db, env, pack, q) {
-  const rows = await db.all("SELECT * FROM profiles WHERE published=1");
+  const rows = await db.all("SELECT * FROM profiles");
   const query = (q || "").toLowerCase();
-  return rows
-    .map((row) => parseProfile(row))
-    .filter((profile) => {
-      if (pack === "culinary" && isPsilocybin(profile)) return false;
-      if (pack === "psilocybin" && !isPsilocybin(profile)) return false;
-      if (isPsilocybin(profile) && !showPsi(env)) return false;
-      if (!query) return true;
+  const out = [];
+  for (const row of rows) {
+    if (!(await isPublicProfile(db, row))) continue;
+    const review = await getReview(db, row.id);
+    const working = parseProfile(row);
+    if (!working) continue;
+    const extra = serveExtra(review, working);
+    const profile = serveProfileDocument(publicDocument(row, review, working), extra);
+    if (!profile) continue;
+    if (pack === "culinary" && isPsilocybin(profile, extra)) continue;
+    if (pack === "psilocybin" && !isPsilocybin(profile, extra)) continue;
+    if (isPsilocybin(profile, extra) && !showPsi(env)) continue;
+    if (query) {
       const blob = `${profile.name} ${profile.species} ${profile.strain} ${profile.summary} ${(profile.tags || []).join(" ")}`.toLowerCase();
-      return blob.includes(query);
-    });
+      if (!blob.includes(query)) continue;
+    }
+    out.push(profile);
+  }
+  return out;
 }
 
 export async function handleRequest(request, env) {
@@ -222,6 +270,13 @@ async function route(method, path, url, request, env) {
   if (coachResponse) return coachResponse;
   const alertsResponse = await handleAlerts(method, path, url, request, env);
   if (alertsResponse) return alertsResponse;
+  const reviewResponse = await handleReview(method, path, url, request, env, {
+    seeds: SEED_DOCS,
+    parseProfileRow: parseProfile,
+    upsertProfile,
+    requireProfile,
+  });
+  if (reviewResponse) return reviewResponse;
 
   if (method === "GET" && path === "/health") {
     return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver, capabilities: capabilities(env, request) });
@@ -317,10 +372,16 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
-    const profile = validateProfile(await readJson(request));
+    const profile = validateProfile(stripCommunityAffiliates(await readJson(request)));
     profile.author = user.username;
-    await upsertProfile(db, profile, user.id);
-    return json(profile, 201);
+    const reserved = reservedProfileIdReason(profile.id);
+    if (reserved) throw new ValidationError(reserved, 409);
+    const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
+    if (existing) throw new ValidationError("That profile id is already used.", 409);
+    await upsertProfile(db, profile, user, { published: 0 });
+    await saveDraftReview(db, profile);
+    const review = await getReview(db, profile.id);
+    return json({ ...profile, review: reviewView(review) }, 201);
   }
 
   const rateMatch = path.match(/^\/api\/profiles\/([^/]+)\/rate$/);
@@ -331,7 +392,8 @@ async function route(method, path, url, request, env) {
     const body = await readJson(request);
     const stars = Number(body.stars);
     if (stars < 1 || stars > 5) throw new ValidationError("stars must be 1-5");
-    await requireProfile(db, decodeURIComponent(rateMatch[1]));
+    const rateRow = await requireVisibleRow(db, user, decodeURIComponent(rateMatch[1]));
+    await requireProfile(db, rateRow.id);
     await db.run("INSERT OR REPLACE INTO ratings (user_id, profile_id, stars, comment, created_at) VALUES (?, ?, ?, ?, ?)", [
       user.id,
       decodeURIComponent(rateMatch[1]),
@@ -347,10 +409,16 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
-    const source = await requireProfile(db, decodeURIComponent(forkMatch[1]));
+    const forkRow = await requireVisibleRow(db, user, decodeURIComponent(forkMatch[1]));
+    const forkReview = await getReview(db, forkRow.id);
+    const forkWorking = parseProfile(forkRow);
+    if (!forkWorking) throw new ValidationError("not found", 404);
+    const staff = isModerator(user) || Number(user.id) === Number(forkRow.author_id);
+    const source = staff ? forkWorking : publicDocument(forkRow, forkReview, forkWorking);
+    if (!source) throw new ValidationError("not found", 404);
     if (!(await canRead(db, user, source))) return json({ error: "purchase required" }, 402);
     const forked = structuredClone(source);
-    forked.id = `${source.id}-fork-${user.username}`;
+    forked.id = await nextForkId(db, source.id, user.username);
     forked.name = `${source.name} (fork)`;
     forked.fork_of = source.id;
     forked.author = user.username;
@@ -360,8 +428,10 @@ async function route(method, path, url, request, env) {
       forked.affiliates_allowed = false;
       forked.affiliate_links = [];
     }
-    validateProfile(forked);
-    await upsertProfile(db, forked, user.id);
+    const cleaned = validateProfile(stripCommunityAffiliates(forked));
+    Object.assign(forked, cleaned);
+    await upsertProfile(db, forked, user, { published: 0 });
+    await saveDraftReview(db, forked);
     return json(forked, 201);
   }
 
@@ -371,19 +441,22 @@ async function route(method, path, url, request, env) {
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
     const profileId = decodeURIComponent(reportMatch[1]);
-    await requireProfile(db, profileId);
+    await requireVisibleRow(db, user, profileId);
     const body = await readJson(request);
     if (!["success", "partial", "fail"].includes(body.outcome)) throw new ValidationError("bad outcome");
+    const reportLimit = await rateLimit(db, `report:${user.id}:${rateLimitClient(request)}`, 20, 3600);
+    if (!reportLimit.ok) throw new ValidationError("Too many grow reports this hour.", 429);
     let photoKey = null;
     let photoStatus = "approved";
     if (body.photo_base64) {
+      const raw = decodePhotoBase64(body.photo_base64);
       const caps = capabilities(env, request);
       if (caps.photos) {
-        const photo = sanitizeGrowPhoto(decodePhotoBase64(body.photo_base64));
-        photoKey = pendingPhotoKey("reports", profileId, photo.ext);
-        await storage.put(photoKey, photo.bytes, photo.contentType);
-        photoStatus = "pending";
-        await insertMedia(db, { photo_key: photoKey, owner_id: user.id, status: "pending", kind: "report" });
+        const stored = await storeReportPhoto(db, env, request, { profileId, user, raw });
+        photoKey = stored.photoKey;
+        photoStatus = stored.photoStatus;
+      } else {
+        processPhoto(raw);
       }
     }
     await db.run(
@@ -397,7 +470,7 @@ async function route(method, path, url, request, env) {
         body.flushes ? Number(body.flushes) : null,
         body.device_name || null,
         photoKey,
-        photoStatus,
+        photoKey ? photoStatus : "approved",
         nowIso(),
       ]
     );
@@ -409,8 +482,10 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
     requireVerified(user);
-    const profile = await requireProfile(db, decodeURIComponent(checkoutMatch[1]));
-    if (isPsilocybin(profile)) {
+    const checkoutRow = await requireVisibleRow(db, user, decodeURIComponent(checkoutMatch[1]));
+    const profile = await profileForAction(db, user, checkoutRow);
+    const checkoutReview = await getReview(db, checkoutRow.id);
+    if (isPsilocybin(profile, serveExtra(checkoutReview, profile))) {
       throw new ValidationError("Psilocybin pack is free-only. Card processors cannot be attached.");
     }
     if (isFree(profile)) throw new ValidationError("free items do not go through checkout");
@@ -456,11 +531,14 @@ async function route(method, path, url, request, env) {
 
   const goMatch = path.match(/^\/api\/go\/([^/]+)\/([^/]+)$/);
   if (goMatch && method === "GET") {
-    const profile = await requireProfile(db, decodeURIComponent(goMatch[1]));
-    const link = affiliateLinksFor(profile).find((item) => item.id === decodeURIComponent(goMatch[2]));
+    const user = await userFromAuth(request, db);
+    const goRow = await requireVisibleRow(db, user, decodeURIComponent(goMatch[1]));
+    const profile = await profileForAction(db, user, goRow);
+    const goReview = await getReview(db, goRow.id);
+    const goExtra = serveExtra(goReview, profile);
+    const link = affiliateLinksFor(profile, goExtra).find((item) => item.id === decodeURIComponent(goMatch[2]));
     if (!link) return json({ error: "no affiliate link" }, 404);
     assertAffiliateAllowed(profile, link);
-    const user = await userFromAuth(request, db);
     await db.run(
       "INSERT INTO affiliate_clicks (link_id, profile_id, user_id, destination, created_at) VALUES (?, ?, ?, ?, ?)",
       [link.id, profile.id, user?.id || null, link.url, nowIso()]
@@ -482,14 +560,22 @@ async function route(method, path, url, request, env) {
     const bytes = file.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file.bytes);
     const kind = sniffImage(bytes);
     if (!kind) return json({ error: "not found" }, 404);
-    const type = IMAGE_TYPES[kind];
+    const gallery = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [key]);
+    if (gallery && !photoIsPublic(gallery)) {
+      const ownerRow = await db.one("SELECT * FROM profiles WHERE id=?", [gallery.profile_id]);
+      if (!canSeePhoto(gallery, viewer, ownerRow?.author_id)) return json({ error: "not found" }, 404);
+    }
+    const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
+    if (report && !(await canServeReportPhoto(db, viewer, report))) return json({ error: "not found" }, 404);
     const headers = {
-      "content-type": type.mime,
+      "content-type": PHOTO_TYPES[kind],
       "x-content-type-options": "nosniff",
       "content-disposition": `inline; filename="${mediaFilename(kind)}"`,
       "content-security-policy": "default-src 'none'",
     };
-    if (!mediaApproved(row)) headers["cache-control"] = "private, no-store";
+    if (!mediaApproved(row) || (report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery))) {
+      headers["cache-control"] = "private, no-store";
+    }
     return new Response(bytes, { headers });
   }
 
@@ -502,6 +588,12 @@ async function route(method, path, url, request, env) {
     for (const profile of [...culinary, ...extra]) {
       if (isPsilocybin(profile) || (await canRead(db, user, profile))) exported.push(profile);
     }
+    const mine = await db.all("SELECT * FROM profiles WHERE author_id=?", [user.id]);
+    for (const row of mine) {
+      const profile = parseProfile(row);
+      if (!profile) continue;
+      if (!exported.some((p) => p.id === profile.id)) exported.push(profile);
+    }
     return json({ profiles: exported, hub_user: user.username });
   }
 
@@ -509,21 +601,13 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "hub token required" }, 401);
     const payload = await readJson(request);
-    let imported = 0;
+    const results = [];
     for (const item of payload.profiles || []) {
-      const profile = validateProfile(item);
-      if (isPsilocybin(profile)) {
-        profile.affiliates_allowed = false;
-        profile.affiliate_links = [];
-        profile.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
-        profile.allowed_payment_providers = [];
-      }
-      await upsertProfile(db, profile, user.id);
-      imported += 1;
+      results.push(await pushOneProfile(db, item, user));
     }
     for (const report of payload.grow_reports || []) {
       const exists = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
-      if (!exists) continue;
+      if (!exists || !(await canSeeProfile(db, user, exists))) continue;
       await db.run(
         "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, photo_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
@@ -540,7 +624,8 @@ async function route(method, path, url, request, env) {
         ]
       );
     }
-    return json({ imported, reports: (payload.grow_reports || []).length });
+    const imported = results.filter((row) => row.status === "created" || row.status === "updated").length;
+    return json({ imported, results, reports: (payload.grow_reports || []).length });
   }
 
   if (method === "GET" && path === "/api/supplies") {
@@ -575,34 +660,120 @@ async function mintToken(db, userId, name) {
   return token;
 }
 
-async function upsertProfile(db, profile, authorId) {
+function reservedProfileIdReason(id) {
+  if (typeof id !== "string" || !id) return "Give this profile an id, like pearl-oyster.";
+  if (id.includes("-fork-")) return "That id is reserved for profile forks.";
+  if (SEED_DOCS.has(id)) return "That profile id is reserved for the official catalog.";
+  return null;
+}
+
+async function nextForkId(db, sourceId, username) {
+  const handle = slugify(username) || "grower";
+  let id = `${sourceId}-fork-${handle}`;
+  let n = 2;
+  while (await db.one("SELECT * FROM profiles WHERE id=?", [id])) {
+    id = `${sourceId}-fork-${handle}-${n}`;
+    n += 1;
+  }
+  return id;
+}
+
+async function pushOneProfile(db, item, user) {
+  const id = item?.id || "";
+  try {
+    const reserved = reservedProfileIdReason(id);
+    if (reserved) return { id, status: "skipped", reason: SEED_DOCS.has(id) ? "official" : "reserved_fork_id" };
+    const profile = validateProfile(stripCommunityAffiliates(item));
+    if (isPsilocybin(profile)) {
+      profile.affiliates_allowed = false;
+      profile.affiliate_links = [];
+      profile.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
+      profile.allowed_payment_providers = [];
+    }
+    const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
+    if (existing && existing.author_id == null) {
+      return { id: profile.id, status: "skipped", reason: "official" };
+    }
+    if (existing && Number(existing.author_id) !== Number(user.id)) {
+      return { id: profile.id, status: "skipped", reason: "owned_by_other" };
+    }
+    const priorRow = existing ? { ...existing, document: existing.document } : null;
+    await upsertProfile(db, profile, user, { published: 0 });
+    await saveDraftReview(db, profile, { priorRow });
+    return { id: profile.id, status: existing ? "updated" : "created" };
+  } catch (err) {
+    return { id, status: "skipped", reason: err?.message || "invalid" };
+  }
+}
+
+async function upsertProfile(db, profile, user, { published = 0 } = {}) {
   const ts = nowIso();
+  const authorId = user?.id ?? user;
+  const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
+  if (existing) {
+    if (existing.author_id == null) {
+      throw new ValidationError("That profile id is already used.", 409);
+    }
+    if (Number(existing.author_id) !== Number(authorId)) {
+      throw new ValidationError("That profile id is already used.", 409);
+    }
+    await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(profile), ts, profile.id]);
+    return;
+  }
   await db.run(
-    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
-    [profile.id, JSON.stringify(profile), authorId, ts, ts]
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [profile.id, JSON.stringify(profile), authorId, published, ts, ts]
   );
+}
+
+async function profileForAction(db, user, row) {
+  const working = parseProfile(row);
+  if (!working) throw new ValidationError("not found", 404);
+  const review = await getReview(db, row.id);
+  const staff = isModerator(user) || (user && Number(user.id) === Number(row.author_id));
+  const doc = staff ? working : publicDocument(row, review, working);
+  if (!doc) throw new ValidationError("not found", 404);
+  return validateProfile(doc, serveExtra(review, working));
 }
 
 async function requireProfile(db, profileId) {
   const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
   if (!row) throw new ValidationError("profile not found", 404);
-  return validateProfile(parseProfile(row));
+  const working = parseProfile(row);
+  if (!working) throw new ValidationError("profile not found", 404);
+  const review = await getReview(db, profileId);
+  return validateProfile(working, serveExtra(review, working));
 }
 
 async function showProfile(request, db, env, profileId) {
-  const profile = await requireProfile(db, profileId);
-  if (isPsilocybin(profile) && !showPsi(env)) return json({ error: "not found" }, 404);
+  const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
+  if (!row) throw new ValidationError("profile not found", 404);
+  const working = parseProfile(row);
+  if (!working) throw new ValidationError("profile not found", 404);
+  const review = await getReview(db, profileId);
   const user = await userFromAuth(request, db);
+  const owner = user && Number(user.id) === Number(row.author_id);
+  const publicDoc = publicDocument(row, review, working);
+  if (!publicDoc && !owner && !(user && (user.role === "moderator" || user.role === "admin"))) {
+    return json({ error: "not found" }, 404);
+  }
+  const raw = owner || (user && (user.role === "moderator" || user.role === "admin")) ? working : publicDoc;
+  const extra = serveExtra(review, raw);
+  const profile = serveProfileDocument(raw, extra);
+  if (isPsilocybin(profile, extra) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
   const unlocked = await canRead(db, user, profile);
   const ratings = await db.all(
     "SELECT ratings.*, users.username FROM ratings JOIN users ON users.id = ratings.user_id WHERE profile_id=?",
     [profileId]
   );
   const avgRow = await db.one("SELECT AVG(stars) AS a FROM ratings WHERE profile_id=?", [profileId]);
-  const reports = (await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId])).map(
-    (report) => ({ ...report, ...reportPhotoPayload(env, report, user) })
-  );
-  const publicDoc = unlocked
+  const staff = owner || (user && (user.role === "moderator" || user.role === "admin"));
+  const reportRows = await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId]);
+  const reports = [];
+  for (const report of reportRows) {
+    reports.push({ ...report, ...reportPhotoPayload(env, report, user) });
+  }
+  const lockedDoc = unlocked
     ? profile
     : {
         id: profile.id,
@@ -611,20 +782,23 @@ async function showProfile(request, db, env, profileId) {
         summary: profile.summary,
         pricing: profile.pricing,
         pack: profile.pack,
-        stages: profile.stages.map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
+        stages: (Array.isArray(profile.stages) ? profile.stages : []).map((s) => ({ id: s.id, name: s.name, duration_days: s.duration_days })),
+        locked: true,
       };
-  const offMenu = isOffMenu(profile) || isPsilocybin(profile);
+  const offMenu = isOffMenu(profile) || isPsilocybin(profile, extra);
+  const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profileId]);
   return json({
     profile: {
-      ...publicDoc,
+      ...lockedDoc,
       pack_label: packLabel(profile.pack),
-      legal_notice: offMenu ? PSI_LEGAL_NOTICE : publicDoc.legal_notice,
+      legal_notice: offMenu ? PSI_LEGAL_NOTICE : lockedDoc.legal_notice,
     },
+    review: staff ? reviewView(review, photos) : review ? { status: review.status } : { status: "published" },
     unlocked,
     ratings,
     avg: avgRow?.a ?? null,
     reports,
-    links: offMenu ? [] : unlocked ? affiliateLinksFor(profile) : [],
+    links: offMenu ? [] : unlocked ? affiliateLinksFor(profile, extra) : [],
     disclosure: offMenu ? "" : DISCLOSURE,
     resources: offMenu
       ? { disclaimer: PSI_RESOURCE_DISCLAIMER, spore_law: PSI_SPORE_LAW, links: PSI_RESOURCES }
@@ -633,10 +807,19 @@ async function showProfile(request, db, env, profileId) {
 }
 
 async function exportProfile(request, db, env, profileId) {
-  const profile = await requireProfile(db, profileId);
-  if (isPsilocybin(profile) && !showPsi(env)) return json({ error: "not found" }, 404);
   const user = await userFromAuth(request, db);
-  if (!(await canRead(db, user, profile))) return json({ error: "purchase required" }, 402);
+  const row = await requireVisibleRow(db, user, profileId);
+  const owner = user && Number(user.id) === Number(row.author_id);
+  const review = await getReview(db, profileId);
+  const working = parseProfile(row);
+  if (!working) return json({ error: "not found" }, 404);
+  const staff = owner || isModerator(user);
+  const raw = staff ? working : publicDocument(row, review, working);
+  if (!raw) return json({ error: "not found" }, 404);
+  const extra = serveExtra(review, raw);
+  const profile = serveProfileDocument(raw, extra);
+  if (isPsilocybin(profile, extra) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
+  if (!staff && !(await canRead(db, user, profile))) return json({ error: "purchase required" }, 402);
   await db.run("UPDATE profiles SET downloads=downloads+1 WHERE id=?", [profileId]);
   return json(profile);
 }

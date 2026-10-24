@@ -35,12 +35,20 @@ export function isPsi(profile) {
   return isOffMenu(profile);
 }
 
+export function isIndexableProfile(profile, review) {
+  if (!profile?.id) return false;
+  if (!review) return true;
+  if (Number(review.published_live) === 1) return true;
+  return review.status === "published";
+}
+
 export function loadProfiles() {
   const out = [];
   for (const pack of ["culinary", "psilocybin"]) {
     const dir = join(DATA, pack);
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
-      out.push(JSON.parse(readFileSync(join(dir, file), "utf8")));
+      const profile = JSON.parse(readFileSync(join(dir, file), "utf8"));
+      if (isIndexableProfile(profile)) out.push(profile);
     }
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -419,7 +427,8 @@ export function renderFaqPage(profiles = []) {
 }
 
 export function renderSitemap(profiles) {
-  const urls = [...Object.values(PAGES).filter((p) => p.sitemap).map((p) => p.path), ...profiles.map((p) => `/profiles/${p.id}.html`)];
+  const indexed = profiles.filter((p) => isIndexableProfile(p));
+  const urls = [...Object.values(PAGES).filter((p) => p.sitemap).map((p) => p.path), ...indexed.map((p) => `/profiles/${p.id}.html`)];
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map((path) => `  <url><loc>${SITE}${path}</loc><changefreq>weekly</changefreq></url>`).join("\n")}
@@ -561,14 +570,15 @@ export const PAGES = {
   "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs sessions, home hub, claimed chambers, alerts, Grow Coach, and purchases." },
   "device.html": { active: "", path: "/device.html", robots: PRIVATE, title: "Chamber alerts · Shroom Labs", description: "Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts." },
   "alerts-unsub.html": { active: "", path: "/alerts-unsub.html", robots: PRIVATE, title: "Alert emails · Shroom Labs", description: "Turn off Shroom Labs alert emails with one click. Alerts still show in your account." },
-  "publish.html": { active: "", path: "/publish.html", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Publish a mushroom grow profile to the Shroom Labs library." },
+  "publish.html": { active: "", path: "/publish.html", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Build a mushroom grow profile for your chambers, or send it to the Shroom Labs library." },
+  "moderate.html": { active: "", path: "/moderate.html", robots: "noindex,nofollow", title: "Review queue · Shroom Labs", description: "Moderator queue for community mushroom grow profiles." },
   "profile.html": { active: "profiles", path: "/profile.html", robots: PRIVATE, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
   "legacy-preview.html": { active: "", path: "/legacy-preview.html", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
   "auth/callback.html": { active: "", path: "/auth/callback.html", robots: "noindex,nofollow", title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
 };
 
 export function renderRobots() {
-  return `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /device.html\nDisallow: /alerts-unsub.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`;
+  return `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /moderate.html\nDisallow: /device.html\nDisallow: /alerts-unsub.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`;
 }
 
 export function writeSeoFiles(dir = PUBLIC) {
