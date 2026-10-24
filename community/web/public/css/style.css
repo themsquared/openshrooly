@@ -120,8 +120,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   font-weight: 700;
 }
 .brand svg { color: var(--sl-spore); filter: drop-shadow(0 0 8px var(--sl-spore)); flex: 0 0 auto; }
-.site-nav, nav { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-.site-nav a, .site-nav button.link, nav a, nav button.link {
+.site-nav, .footer-nav, nav { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.site-nav a, .site-nav button.link, .footer-nav a, nav a, nav button.link {
   color: var(--sl-ink-dim);
   text-decoration: none;
   background: none;
@@ -129,7 +129,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   font: inherit;
   cursor: pointer;
 }
-.site-nav a:hover, .site-nav button.link:hover, nav a:hover, nav button.link:hover { color: var(--sl-spore); }
+.site-nav a:hover, .site-nav button.link:hover, .footer-nav a:hover, nav a:hover, nav button.link:hover { color: var(--sl-spore); }
+.site-nav a[aria-current="page"] { color: var(--sl-spore); }
 .nav-toggle {
   display: none;
   width: auto;
@@ -470,7 +471,12 @@ button.nav-toggle {
   border-top: 1px solid var(--sl-line);
   text-align: center;
   font-size: 13px;
+  display: grid;
+  gap: 0.6rem;
 }
+.site-footer .footer-nav { justify-content: center; }
+.answer-first { font-size: 1.05rem; }
+.legal-prominent { padding: 1rem 1.15rem; border-width: 1.5px; margin: 0 0 1.2rem; }
 .supplies { margin-top: 2.4rem; }
 .coach-hero { min-height: 280px; }
 .coach-toolbar {

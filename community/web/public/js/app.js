@@ -1,7 +1,7 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
-import { bindMobileNav } from "./shell.js";
+import { bindMobileNav, mountChrome } from "./chrome.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -73,27 +73,27 @@ async function renderHome() {
   }
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
-  $("#pack-label").textContent = pack === "psilocybin" ? "Off-menu" : "Culinary library";
-  $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
+  const off = pack === "psilocybin";
+  $("#pack-label").textContent = off ? "Off-menu" : "Culinary Profiles";
+  $("#legal")?.classList.toggle("hidden", !off);
   $("#q").value = q;
   $("#pack").value = pack;
-  $("#pack-culinary")?.classList.toggle("is-on", pack !== "psilocybin");
-  $("#pack-restricted")?.classList.toggle("is-on", pack === "psilocybin");
-  $("#pack-culinary")?.setAttribute("aria-pressed", pack !== "psilocybin" ? "true" : "false");
-  $("#pack-restricted")?.setAttribute("aria-pressed", pack === "psilocybin" ? "true" : "false");
+  $("#pack-culinary")?.classList.toggle("is-on", !off);
+  $("#pack-offmenu")?.classList.toggle("is-on", off);
+  $("#pack-culinary")?.setAttribute("aria-pressed", !off ? "true" : "false");
+  $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
   const supplies = $("#supplies");
-  if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
-  $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
-  $("#nav-coach")?.classList.toggle("hidden", pack === "psilocybin");
+  if (supplies) supplies.classList.toggle("hidden", off);
+  $("#coach-promo")?.classList.toggle("hidden", off);
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML = profiles.length
     ? profiles
         .map(
           (p) => `
-    <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
+    <a class="profile-card" href="${off ? `/profile.html?id=${encodeURIComponent(p.id)}` : `/profiles/${encodeURIComponent(p.id)}.html`}">
       <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack)}</div>
       <div class="profile-body">
-        <p><span class="chip">${escapeHtml(p.pack)}</span>${
+        <p><span class="chip">${escapeHtml(off ? "Off-menu" : "Culinary")}</span>${
           p.pricing?.kind === "paid"
             ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
             : `<span class="chip">free</span>`
@@ -398,6 +398,8 @@ function fileToBase64(file) {
   });
 }
 
+const PAGE_NAV = { home: "profiles", faq: "faq", coach: "coach", claim: "claim", docs: "docs", install: "install" };
+mountChrome(PAGE_NAV[document.body.dataset.page] || "profiles");
 renderNav();
 bindMobileNav();
 const page = document.body.dataset.page;
@@ -412,6 +414,7 @@ if (page === "home") {
   });
   $("#pack-culinary")?.addEventListener("click", () => selectPack("culinary"));
   $("#pack-restricted")?.addEventListener("click", () => selectPack("psilocybin"));
+  $("#pack-offmenu")?.addEventListener("click", () => selectPack("psilocybin"));
   window.addEventListener("popstate", () => renderHome().catch(() => {}));
 }
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));

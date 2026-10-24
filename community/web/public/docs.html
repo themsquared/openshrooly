@@ -4,7 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Docs · Shroom Labs</title>
-  <meta name="description" content="How to browse profiles, claim a chamber, and apply a grow recipe from Shroom Labs.">
+  <meta name="description" content="What Profiles, Hub, Grow Coach, and Community are, and how a chamber running OpenShrooly uses them.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/docs.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Docs · Shroom Labs">
+  <meta property="og:description" content="What Profiles, Hub, Grow Coach, and Community are, and how a chamber running OpenShrooly uses them.">
+  <meta property="og:url" content="https://shroomlabs.io/docs.html">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.svg">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
@@ -12,32 +20,42 @@
   <script src="/js/config.js"></script>
 </head>
 <body data-page="docs">
+  <!--CHROME_HEADER-->
   <div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="/">
-      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-      <span>Shroom Labs<small>works with OpenShrooly</small></span>
-    </a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site">
-      <a href="/">Profiles</a>
-      <a href="/faq.html">FAQ</a>
-      <a href="/coach.html">Grow Coach</a>
-      <a href="/claim.html">Claim device</a>
-      <a href="/docs.html" aria-current="page">Docs</a>
-      <span id="session-nav"></span>
-    </nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/install.html">Install</a><a href="/faq.html">FAQ</a><a href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html" aria-current="page">Docs</a><span id="session-nav"></span></nav>
   </header>
+  <!--/CHROME_HEADER-->
   <main id="main">
-    <section class="card">
-      <p class="eyebrow">Guides</p>
-      <h1>How Shroom Labs works</h1>
-      <p class="muted">Browse a profile, pull it to a hub on your network, then apply a stage to the chamber. The device stays yours and works offline.</p>
-      <p><a class="button" href="/">Open the library</a> <a class="button ghost" href="/claim.html">Claim a chamber</a></p>
-    </section>
+    <article class="profile-page">
+      <p class="eyebrow">Docs</p>
+      <h1>How the pieces fit.</h1>
+      <p class="lede answer-first">Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.</p>
+      <h2>Profiles</h2>
+      <p>A Profile is a chamber recipe: humidity, temperature, FAE, light, and days for each stage. Browse culinary Profiles on this site. Pull the profile to your Hub.</p>
+      <h2>Hub</h2>
+      <p>Hub is the local app on your network. It stores Profiles and sends setpoints to a chamber. Growing does not need the cloud.</p>
+      <h2>Grow Coach</h2>
+      <p>Grow Coach is a $3.99 per month culinary subscription. It learns one chamber and suggests safer setpoints. Photo checks and harvest alerts included.</p>
+      <h2>Community</h2>
+      <p>Community is this site: the public catalog, ratings, grow reports, and forks. Works with Shrooly devices running OpenShrooly.</p>
+      <h2>Claim a chamber</h2>
+      <p>Optional. The device shows a 6-character code. Claiming binds it to your account for cloud tools. Local controls still win if the cloud is down.</p>
+      <h2>Install firmware</h2>
+      <p>Flash OpenShrooly over USB from the Install page. Same ESP Web Tools flow as openshrooly.com. After reboot, join OpenShrooly and open the on-device app at 192.168.4.1.</p>
+      <p><a class="button" href="/">Browse Profiles</a> <a class="button secondary" href="/install.html">Install firmware</a> <a class="button secondary" href="/faq.html">Read the FAQ</a></p>
+    </article>
   </main>
-  <footer class="site-footer">Shroom Labs. shroomlabs.io. Works with Shrooly devices running OpenShrooly.</footer>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/install.html">Install</a><a href="/faq.html">FAQ</a><a href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>
