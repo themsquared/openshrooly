@@ -39,18 +39,27 @@ def main() -> None:
     assert "\nfont:" not in f"\n{lvgl}", "lvgl_config.yaml must not define font: (merge drops it or the display.yaml list)"
 
     main_yaml = MAIN.read_text(encoding="utf-8")
-    assert "id: grow_rh_unit" in main_yaml
-    assert "x: 212" not in main_yaml, "humidity % must not use a fixed x=212"
+    assert "id: main_humidity_value" in main_yaml
+    assert "x: 212" not in main_yaml, "humidity must not use a fixed x=212"
+    assert "id: grow_rh_unit" not in main_yaml
     assert "id: main_status_message" in main_yaml
     assert "hidden: true" not in main_yaml.split("id: main_status_message", 1)[1][:240]
 
     render = RENDER.read_text(encoding="utf-8")
     assert '"-:%%/?!,+=-"' in render or "+=-" in render
-    assert "160 + hero.text_width" in render
+    assert "RH_RIGHT - hero.text_width" in render
     assert "Join OpenShrooly, then 192.168.4.1" in render
 
-    for name in ("spleen-8x16.bdf", "spleen-16x32.bdf"):
+    for name in ("spleen-12x24.bdf", "spleen-24x48.bdf"):
         assert_hyphen(FONTS / name)
+    hero_bb = next(
+        line for line in (FONTS / "spleen-24x48.bdf").read_text(encoding="ascii").splitlines()
+        if line.startswith("FONTBOUNDINGBOX")
+    )
+    assert int(hero_bb.split()[2]) >= 40, hero_bb
+    assert "spleen-24x48.bdf" in display
+    assert "text_font: font_hero" in main_yaml
+    assert "text_font: font1" in main_yaml.split("id: grow_phase_label", 1)[1][:160]
 
     esphome = shutil.which("esphome")
     if esphome:

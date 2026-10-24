@@ -50,59 +50,23 @@
         id: main_temp_value
         text: !lambda |-
           if (id(temperature).has_state()) {
-            return str_sprintf("%.1f", id(temperature).state);
+            return str_sprintf("%.1fC", id(temperature).state);
           }
-          return std::string("--.-");
+          return std::string("--.-C");
 
     - lvgl.label.update:
         id: main_humidity_value
         text: !lambda |-
           if (id(humidity).has_state()) {
-            return str_sprintf("%.0f", id(humidity).state);
+            return str_sprintf("%.0f%%", id(humidity).state);
           }
-          return std::string("--");
+          return std::string("--%");
 
     - lambda: |-
-        // Spleen 16x32 is a fixed 16px cell. Park '%' after the last RH glyph.
+        // Spleen 24x48 is a fixed 24px cell. Pin humidity to the right edge.
         const char *rh = lv_label_get_text(id(main_humidity_value));
-        const int n = rh ? (int) strlen(rh) : 2;
-        lv_obj_set_x(id(grow_rh_unit), 160 + 16 * n + 4);
-
-    - lvgl.label.update:
-        id: grow_temp_meta
-        text: !lambda |-
-          if (!id(temperature).has_state() || !id(temperature_target).has_state()) {
-            return std::string("tgt --");
-          }
-          const float value = id(temperature).state;
-          const float target = id(temperature_target).state;
-          const float hyst = id(temperature_hysteresis).has_state() ? id(temperature_hysteresis).state : 1.0f;
-          const char *band = "OK";
-          if (id(temperature_warning_minimum).has_state() && value < id(temperature_warning_minimum).state) {
-            band = "LOW";
-          } else if (id(temperature_warning_maximum).has_state() && value > id(temperature_warning_maximum).state) {
-            band = "HIGH";
-          } else if (fabsf(value - target) > hyst) {
-            band = "DRIFT";
-          }
-          return str_sprintf("tgt %.0f  %s", target, band);
-
-    - lvgl.label.update:
-        id: grow_humidity_meta
-        text: !lambda |-
-          if (!id(humidity).has_state() || !id(target_humidity).has_state()) {
-            return std::string("tgt --");
-          }
-          const float value = id(humidity).state;
-          const float target = id(target_humidity).state;
-          const float hyst = id(humidity_hysteresis).has_state() ? id(humidity_hysteresis).state : 2.0f;
-          const char *band = "OK";
-          if (fabsf(value - target) > 10.0f) {
-            band = value < target ? "LOW" : "HIGH";
-          } else if (fabsf(value - target) > hyst) {
-            band = "DRIFT";
-          }
-          return str_sprintf("tgt %.0f  %s", target, band);
+        const int n = rh ? (int) strlen(rh) : 3;
+        lv_obj_set_x(id(main_humidity_value), 290 - 24 * n);
 
     - lvgl.label.update:
         id: grow_next_event
@@ -186,28 +150,15 @@
           return alert;
 
     - lambda: |-
-        const std::string phase = id(grow_phase).current_option();
-        const int day = id(grow_day).has_state() ? (int) id(grow_day).state : 0;
-        const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
-        const bool growing = !phase.empty() && phase != "Idle" && total > 0;
-
-        if (growing) {
-          lv_obj_clear_flag(id(grow_progress_track), LV_OBJ_FLAG_HIDDEN);
-          int width = (284 * day) / total;
-          if (width < 1) width = 1;
-          if (width > 284) width = 284;
-          lv_obj_set_width(id(grow_progress_fill), width);
-        } else {
-          lv_obj_add_flag(id(grow_progress_track), LV_OBJ_FLAG_HIDDEN);
-        }
-
         const bool water_low = id(water_level_percent).has_state() && id(water_level_percent).state < 15.0f;
         const bool alerting = water_low || id(alert_temp_too_low).state || id(alert_temp_too_high).state ||
                               id(alert_humidity_failure).state;
         if (alerting) {
           lv_obj_clear_flag(id(grow_alert_bar), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(grow_next_event), LV_OBJ_FLAG_HIDDEN);
         } else {
           lv_obj_add_flag(id(grow_alert_bar), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_clear_flag(id(grow_next_event), LV_OBJ_FLAG_HIDDEN);
         }
 
     - lvgl.label.update:

@@ -3,23 +3,17 @@
 # Display-only layout on top of upstream climate / light / FAE / water
 # entities. Select (button 4) still opens the settings menu.
 # Canvas is 296x128 after LVGL rotation 90 (Waveshare 2.90inv2-r2).
-# Keep content in y=0..104 so apply_display_layout's 20px flip still fits.
+# Type: 24x48 heroes, 12x24 clock, 6x12 stage / status.
 # ========================================================================
 
 - id: aaaa
   bg_color: paper_white
   widgets:
-    - image:
-        id: grow_mark
-        src: mark_16
-        x: 4
-        y: 2
-
     - label:
         id: main_time_label
         text: "--:--"
         align: TOP_LEFT
-        x: 22
+        x: 5
         y: 2
         text_font: font_ui
 
@@ -28,95 +22,39 @@
         text: "Idle"
         align: TOP_RIGHT
         x: -5
-        y: 2
-        text_font: font_ui
-
-    - obj:
-        id: grow_progress_track
-        x: 5
-        y: 20
-        width: 286
-        height: 6
-        bg_color: paper_white
-        border_color: paper_black
-        border_width: 1
-        radius: 0
-        pad_all: 0
-        hidden: true
-        widgets:
-          - obj:
-              id: grow_progress_fill
-              x: 0
-              y: 0
-              width: 1
-              height: 6
-              bg_color: paper_black
-              border_width: 0
-              radius: 0
-              pad_all: 0
+        y: 8
+        text_font: font1
 
     - label:
         id: main_temp_value
-        text: "--.-"
+        text: "--.-C"
         align: TOP_LEFT
-        x: 8
-        y: 30
+        x: 6
+        y: 28
         text_font: font_hero
-
-    - label:
-        id: grow_temp_unit
-        text: "C"
-        align: TOP_LEFT
-        x: 76
-        y: 46
-        text_font: font_ui
 
     - label:
         id: main_humidity_value
-        text: "--"
+        text: "--%"
         align: TOP_LEFT
-        x: 160
-        y: 30
+        x: 218
+        y: 28
         text_font: font_hero
-
-    - label:
-        id: grow_rh_unit
-        text: "%"
-        align: TOP_LEFT
-        x: 196
-        y: 46
-        text_font: font_ui
-
-    - label:
-        id: grow_temp_meta
-        text: "tgt --"
-        align: TOP_LEFT
-        x: 8
-        y: 66
-        text_font: font1
-
-    - label:
-        id: grow_humidity_meta
-        text: "tgt --"
-        align: TOP_LEFT
-        x: 160
-        y: 66
-        text_font: font1
 
     - label:
         id: grow_next_event
         text: ""
         align: TOP_LEFT
         x: 5
-        y: 78
+        y: 80
         text_font: font1
 
     - obj:
         id: grow_alert_bar
         x: 0
-        y: 90
+        y: 78
         width: 296
-        height: 14
+        height: 24
         bg_color: paper_black
         radius: 0
         pad_all: 0

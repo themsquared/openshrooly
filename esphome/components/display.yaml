@@ -9,10 +9,10 @@ font:
   - file: 'fonts/spleen-6x12.bdf'
     id: font1
     bpp: 1
-  - file: 'fonts/spleen-8x16.bdf'
+  - file: 'fonts/spleen-12x24.bdf'
     id: font_ui
     bpp: 1
-  - file: 'fonts/spleen-16x32.bdf'
+  - file: 'fonts/spleen-24x48.bdf'
     id: font_hero
     bpp: 1
 
@@ -25,10 +25,6 @@ image:
   - platform: file
     file: "images/splash_logo.png"
     id: splash_logo
-    type: BINARY
-  - platform: file
-    file: "images/mark_16.png"
-    id: mark_16
     type: BINARY
 
 # E-paper Display Configuration
