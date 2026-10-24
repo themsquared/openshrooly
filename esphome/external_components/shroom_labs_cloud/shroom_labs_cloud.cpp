@@ -58,11 +58,11 @@ struct SavedIdentity {
   uint8_t has_cert;
 } __attribute__((packed));
 
-static void nvs_put_blob(nvs_handle_t h, const char *key, const void *data, size_t len) {
+static void nvs_write_blob(nvs_handle_t h, const char *key, const void *data, size_t len) {
   nvs_set_blob(h, key, data, len);
 }
 
-static bool nvs_get_blob(nvs_handle_t h, const char *key, void *data, size_t len) {
+static bool nvs_read_blob(nvs_handle_t h, const char *key, void *data, size_t len) {
   size_t n = len;
   return nvs_get_blob(h, key, data, &n) == ESP_OK && n == len;
 }
@@ -230,7 +230,7 @@ void ShroomLabsCloud::load_() {
   if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK)
     return;
   SavedIdentity s{};
-  bool have = nvs_get_blob(h, "id", &s, sizeof(s));
+  bool have = nvs_read_blob(h, "id", &s, sizeof(s));
   size_t pem_len = 0;
   if (nvs_get_str(h, "pem", nullptr, &pem_len) == ESP_OK && pem_len > 1 && pem_len < 2048) {
     this->cert_pem_.assign(pem_len, '\0');
@@ -294,7 +294,7 @@ void ShroomLabsCloud::save_identity_() {
   nvs_handle_t h;
   if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK)
     return;
-  nvs_put_blob(h, "id", &s, sizeof(s));
+  nvs_write_blob(h, "id", &s, sizeof(s));
   nvs_commit(h);
   nvs_close(h);
 }
