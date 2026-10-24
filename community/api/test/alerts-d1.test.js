@@ -62,7 +62,7 @@ test("migration 0003 is additive and safe to run twice", async () => {
   for (const s of statements(MIGRATION)) assert.match(s, /^CREATE (TABLE|INDEX) IF NOT EXISTS /, s.slice(0, 60));
   await withD1(async (d1) => {
     await apply(d1, baseSchema());
-    await d1.prepare("INSERT INTO users (username, email, email_verified, role, created_at) VALUES ('keep', 'keep@example.com', 1, 'user', '2026-01-01T00:00:00Z')").run();
+    await d1.prepare("INSERT INTO users (username, password_hash, email, email_verified, role, created_at) VALUES ('keep', '!no-password', 'keep@example.com', 1, 'user', '2026-01-01T00:00:00Z')").run();
     const before = (await d1.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all()).results.map((r) => r.name);
     await apply(d1, MIGRATION);
     await apply(d1, MIGRATION);
