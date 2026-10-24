@@ -1036,9 +1036,9 @@ test("moderator queue shows flag reasons and the UI can confirm culinary", async
   assert.ok(item.review.offmenu_reasons.some((reason) => /allowlist|restricted|genus|placeholder/i.test(reason)));
   assert.equal(item.review.can_confirm_culinary, true);
   const app = readFileSync(join(root, "community/web/public/js/app.js"), "utf8");
-  const queue = readFileSync(join(root, "community/web/public/js/moderate-queue.js"), "utf8");
-  assert.match(queue, /Confirm culinary/);
-  assert.match(queue, /can_confirm_culinary/);
+  const queueJs = readFileSync(join(root, "community/web/public/js/moderate-queue.js"), "utf8");
+  assert.match(queueJs, /Confirm culinary/);
+  assert.match(queueJs, /can_confirm_culinary/);
   assert.match(app, /pack:\s*["']culinary["']/);
 });
 
