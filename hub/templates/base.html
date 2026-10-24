@@ -3,31 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}OpenShrooly Hub{% endblock %}</title>
+  <title>{% block title %}Hub · Shroom Labs{% endblock %}</title>
+  <meta name="description" content="Local Hub for Shroom Labs Profiles. Works with Shrooly devices running OpenShrooly.">
   <link rel="stylesheet" href="/design/tokens.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
+  <header class="site-header" data-chrome="header">
     <a class="brand" href="/">
-      <svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-      <span>OpenShrooly Hub<small>Shroom Labs · local-first</small></span>
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Hub<small>Works with Shrooly devices running OpenShrooly</small></span>
     </a>
-    <nav>
+    <nav class="site-nav" aria-label="Hub">
       <a href="/">Fleet</a>
       <a href="/devices">Devices</a>
       <a href="/profiles">Profiles</a>
       <a href="/history">History</a>
     </nav>
   </header>
-  <main>
-    {% if not enable_psilocybin %}
-    <p class="muted">Psilocybin pack is disabled. Set <code>HUB_ENABLE_PSILOCYBIN=1</code> only where legal.</p>
-    {% else %}
-    <p class="notice">Psilocybin pack is enabled on this hub. Legality varies by jurisdiction.</p>
+  <main id="main">
+    {% if enable_psilocybin %}
+    <p class="notice">Educational climate recipes are on for this Hub. Check the laws where you live.</p>
     {% endif %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="muted">Local-first. Works with Shrooly devices running OpenShrooly. Optional sync to Shroom Labs (shroomlabs.io).</footer>
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Fleet</a>
+      <a href="/devices">Devices</a>
+      <a href="/profiles">Profiles</a>
+      <a href="/history">History</a>
+    </nav>
+    <p class="muted">Local-first Hub. Optional sync to Community.</p>
+  </footer>
 </body>
 </html>

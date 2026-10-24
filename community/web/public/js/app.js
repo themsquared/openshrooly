@@ -1,6 +1,7 @@
 import { api, apiBase, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
+import { DISCLOSURE, mountChrome } from "./chrome.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -53,35 +54,40 @@ async function renderHome() {
   if (canvas) startHero(canvas);
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
-  $("#pack-label").textContent = pack === "psilocybin" ? "Restricted pack" : "Culinary library";
-  $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
+  const off = pack === "psilocybin";
+  $("#pack-label").textContent = off ? "Off-menu" : "Culinary Profiles";
+  $("#legal")?.classList.toggle("hidden", !off);
   $("#q").value = q;
   $("#pack").value = pack;
+  $("#pack-culinary")?.classList.toggle("is-on", !off);
+  $("#pack-offmenu")?.classList.toggle("is-on", off);
+  $("#pack-culinary")?.setAttribute("aria-pressed", !off ? "true" : "false");
+  $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
   const supplies = $("#supplies");
-  if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
-  $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
-  $("#nav-coach")?.classList.toggle("hidden", pack === "psilocybin");
+  if (supplies) supplies.classList.toggle("hidden", off);
+  $("#coach-promo")?.classList.toggle("hidden", off);
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
-  $("#cards").innerHTML =
-    profiles
-      .map(
-        (p) => `
-    <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
-      <div class="profile-art">${speciesArt(p.species, p.strain, p.name)}</div>
+  $("#cards").innerHTML = profiles.length
+    ? profiles
+        .map(
+          (p, i) => `
+    <a class="profile-card" href="${off ? `/profile.html?id=${encodeURIComponent(p.id)}` : `/profiles/${encodeURIComponent(p.id)}.html`}">
+      <div class="profile-art">${speciesArt(p.species, p.strain, p.name, i === 0)}</div>
       <div class="profile-body">
-        <p><span class="chip">${escapeHtml(p.pack)}</span>${
+        <p><span class="chip">${escapeHtml(off ? "Off-menu" : "Culinary")}</span>${
           p.pricing?.kind === "paid"
             ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
             : `<span class="chip">free</span>`
         }</p>
         <h2>${escapeHtml(p.name)}</h2>
-        <p class="muted">${escapeHtml(p.species)}${p.strain ? " · " + escapeHtml(p.strain) : ""}</p>
+        <p class="muted">${escapeHtml(p.species)}${p.strain ? ", " + escapeHtml(p.strain) : ""}</p>
         <p>${escapeHtml(p.summary || "")}</p>
         ${stageDots(p.stage_list || [])}
       </div>
     </a>`
-      )
-      .join("") || "<p>No profiles match.</p>";
+        )
+        .join("")
+    : `<div class="empty-state"><h2>Nothing in this flush</h2><p>No Profiles match that search. Try oyster, lion's mane, or clear the query.</p></div>`;
 }
 
 async function renderProfile() {
@@ -90,15 +96,14 @@ async function renderProfile() {
   const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
   const p = data.profile;
   $("#title").textContent = p.name;
-  $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${p.pack}`;
+  $("#meta").textContent = `${p.species || ""} ${p.strain ? ", " + p.strain : ""}`;
   $("#summary").textContent = p.summary || "";
-  $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack || "")}</span>`;
+  $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack === "psilocybin" ? "Off-menu" : "Culinary")}</span>`;
   $("#art").innerHTML = speciesArt(p.species, p.strain, p.name);
   if (p.legal_notice) {
     $("#legal").textContent = p.legal_notice;
     $("#legal").classList.remove("hidden");
   }
-  $("#nav-coach")?.classList.toggle("hidden", p.pack === "psilocybin");
   if (!data.unlocked) {
     $("#locked").classList.remove("hidden");
     $("#price").textContent = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
@@ -128,16 +133,16 @@ async function renderProfile() {
   $("#sources").innerHTML = (p.source_notes || [])
     .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
     .join("");
-  if (data.links?.length) {
+  if (p.pack !== "psilocybin" && data.links?.length) {
     $("#affiliates").innerHTML =
-      `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
+      `<p class="muted">${escapeHtml(data.disclosure || DISCLOSURE)}</p><ul>` +
       data.links
         .map((l) => `<li><a href="${apiBase()}/api/go/${id}/${l.id}">${escapeHtml(l.label)}</a></li>`)
         .join("") +
       "</ul>";
   }
   $("#ratings").innerHTML =
-    data.ratings.map((r) => `<li>${escapeHtml(r.username)} — ${r.stars}/5 — ${escapeHtml(r.comment || "")}</li>`).join("") ||
+    data.ratings.map((r) => `<li>${escapeHtml(r.username)}: ${r.stars}/5. ${escapeHtml(r.comment || "")}</li>`).join("") ||
     "<li class='muted'>No ratings yet.</li>";
   $("#reports").innerHTML =
     data.reports
@@ -246,7 +251,7 @@ async function renderAccount() {
   const me = await api("/api/me");
   $("#who").textContent = me.user.email || me.user.username;
   $("#verified").textContent = me.user.email_verified
-    ? "Email verified — you can publish, buy, and claim devices."
+    ? "Email verified. You can publish, buy, and claim devices."
     : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
   $("#ents").innerHTML =
@@ -328,6 +333,8 @@ function fileToBase64(file) {
   });
 }
 
+const PAGE_NAV = { home: "profiles", faq: "faq", coach: "coach", claim: "claim", docs: "docs" };
+mountChrome(PAGE_NAV[document.body.dataset.page] || "profiles");
 renderNav();
 const page = document.body.dataset.page;
 if (page === "home") renderHome().catch((err) => ($("#cards").textContent = err.message));
@@ -353,7 +360,7 @@ function showCoachError(err) {
 }
 
 function fmtNum(value, digits = 1) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
+  if (value == null || Number.isNaN(Number(value))) return "-";
   return Number(value).toFixed(digits);
 }
 
@@ -425,7 +432,7 @@ async function renderCoach() {
       .join("");
     $("#alerts").innerHTML =
       (data.alerts || [])
-        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong> — ${escapeHtml(a.message)}</li>`)
+        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong>: ${escapeHtml(a.message)}</li>`)
         .join("") || `<li class="info">No alerts right now.</li>`;
     const s = data.suggestion || {};
     $("#suggestion").innerHTML = s.humidity_percent

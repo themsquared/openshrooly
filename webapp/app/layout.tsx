@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'OpenShrooly · Shroom Labs',
-  description: 'On-device chamber dashboard for OpenShrooly',
+  description: 'On-device chamber dashboard. Works with Shrooly devices running OpenShrooly.',
 }
 
 export default function RootLayout({
@@ -13,7 +13,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <header className="site-header">
+          <strong>OpenShrooly</strong>
+          <small>Works with Shrooly devices running OpenShrooly</small>
+        </header>
+        {children}
+      </body>
     </html>
   )
 }

@@ -21,13 +21,21 @@
   --sl-warn: #ffb347;
   --sl-bad: #ff6b6b;
   --sl-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --sl-shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.28);
   --sl-radius: 20px;
   --sl-radius-sm: 12px;
+  --sl-radius-pill: 999px;
   --sl-font: "Avenir Next", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --sl-display: Georgia, "Iowan Old Style", Palatino, serif;
   --sl-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sl-fs-xs: 0.75rem;
+  --sl-fs-sm: 0.875rem;
+  --sl-fs-md: 1rem;
+  --sl-fs-lg: 1.25rem;
   --sl-space-1: 8px;
   --sl-space-2: 16px;
   --sl-space-3: 24px;
   --sl-space-4: 32px;
   --sl-max: 1120px;
+  --sl-motion: 160ms ease;
 }

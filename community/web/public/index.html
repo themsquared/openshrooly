@@ -3,69 +3,100 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shroom Labs — mushroom profiles for OpenShrooly</title>
-  <meta name="description" content="Browse, fork, and apply researched mushroom grow profiles. Local-first. Works with Shrooly devices running OpenShrooly.">
+  <title>Shroom Labs · Chamber profiles for OpenShrooly</title>
+  <meta name="description" content="Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Shroom Labs · Chamber profiles for OpenShrooly">
+  <meta property="og:description" content="Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.">
+  <meta property="og:url" content="https://shroomlabs.io/">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Shroom Labs · Chamber profiles for OpenShrooly">
+  <meta name="twitter:description" content="Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.svg">
   <link rel="stylesheet" href="/css/style.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://shroomlabs.io#org","name":"Shroom Labs","url":"https://shroomlabs.io","description":"Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly."},{"@type":"WebSite","@id":"https://shroomlabs.io#website","url":"https://shroomlabs.io","name":"Shroom Labs","publisher":{"@id":"https://shroomlabs.io#org"},"potentialAction":{"@type":"SearchAction","target":"https://shroomlabs.io/?q={search_term_string}","query-input":"required name=search_term_string"}},{"@type":"SoftwareApplication","name":"OpenShrooly","applicationCategory":"UtilitiesApplication","operatingSystem":"ESPHome","description":"Firmware for a home mushroom chamber. Works with Shrooly devices running OpenShrooly.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}]}</script>
   <script src="/js/config.js"></script>
 </head>
 <body data-page="home">
+  <!--CHROME_HEADER-->
   <div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="/">
-      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-      <span>Shroom Labs<small>works with OpenShrooly</small></span>
-    </a>
-    <nav>
-      <a href="/?pack=culinary">Culinary</a>
-      <a href="/?pack=psilocybin">Restricted pack</a>
-      <a href="/publish.html">Publish</a>
-      <a href="/claim.html">Claim device</a>
-      <a id="nav-coach" href="/coach.html">Grow Coach</a>
-      <span id="session-nav"></span>
-    </nav>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/" aria-current="page">Profiles</a><a href="/faq.html">FAQ</a><a href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
   </header>
+  <!--/CHROME_HEADER-->
   <main id="main">
     <section class="hero" aria-label="Shroom Labs">
       <canvas id="mycelium" aria-hidden="true"></canvas>
       <div class="hero-copy">
-        <p class="eyebrow" id="pack-label">Culinary library</p>
-        <h1>Recipes for the chamber at home.</h1>
-        <p class="lede">Humidity, light, and air — written as stages you can watch through the glass. Apply from a hub on your LAN. The device stays yours, offline-first.</p>
-        <form class="search-bar" method="get" role="search">
+        <p class="eyebrow" id="pack-label">Culinary Profiles</p>
+        <h1>Grow the flush you planned.</h1>
+        <p class="lede">A chamber that guesses climate wastes a block. Each species wants its own humidity, temperature, fresh air, and light. Shroom Labs publishes those setpoints as Profiles you read, fork, and apply.</p>
+        <div class="hero-actions">
+          <a class="button" href="#library">Browse Profiles</a>
+          <a class="button secondary" href="/claim.html">Claim a chamber</a>
+        </div>
+        <form class="search-bar" method="get" role="search" action="#library">
           <input type="hidden" name="pack" id="pack" value="culinary">
-          <label>Search the library
-            <input name="q" id="q" placeholder="lion’s mane, oyster, shiitake" autocomplete="off">
+          <label>Search Profiles
+            <input name="q" id="q" placeholder="lion's mane, oyster, shiitake" autocomplete="off">
           </label>
           <button type="submit">Search</button>
         </form>
       </div>
     </section>
-    <p id="legal" class="legal hidden">Legality of cultivating Psilocybe species varies by jurisdiction. These cards are free environmental setpoints only. They are never sold and never carry affiliate links.</p>
-    <div id="cards" class="cards"></div>
-    <section class="how" aria-label="How it works">
-      <h2 class="display" style="font-size:1.8rem">How a profile reaches the chamber</h2>
+    <section id="library" class="library" aria-label="Profile library">
+      <div class="browse-filters" role="group" aria-label="Browse filter">
+        <a id="pack-culinary" class="filter-chip is-on" href="/#library" aria-pressed="true">Culinary</a>
+        <a id="pack-offmenu" class="filter-chip" href="/?pack=psilocybin#library" aria-pressed="false">Off-menu</a>
+      </div>
+      <p id="legal" class="legal legal-prominent hidden">Psilocybin mushrooms are illegal to grow, possess or sell in most countries and in most US states under federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.</p>
+      <div id="cards" class="cards"><p class="loading-state">Loading Profiles.</p></div>
+    </section>
+    <section class="story how" aria-label="How it works">
+      <h2>How it works</h2>
       <div class="cards">
-        <article class="card" style="padding:1.2rem"><p class="chip">01</p><h3>Browse</h3><p class="muted">Pick a researched variety. Each card is a window onto stages, not a shop SKU.</p></article>
-        <article class="card" style="padding:1.2rem"><p class="chip">02</p><h3>Pull to the hub</h3><p class="muted">Your Pi or home computer syncs the JSON. No cloud is required to grow.</p></article>
-        <article class="card" style="padding:1.2rem"><p class="chip">03</p><h3>Apply a stage</h3><p class="muted">The hub talks to OpenShrooly over the LAN. You watch the flush at home.</p></article>
+        <article class="card" style="padding:1.2rem"><p class="chip">01</p><h3>Browse a Profile</h3><p class="muted">Pick a culinary variety. Each card is humidity, temperature, FAE, light, and days. Not a shop SKU.</p></article>
+        <article class="card" style="padding:1.2rem"><p class="chip">02</p><h3>Pull it to your Hub</h3><p class="muted">Hub is the local app on your network. It stores Profiles. No cloud is required to grow.</p></article>
+        <article class="card" style="padding:1.2rem"><p class="chip">03</p><h3>Apply a stage</h3><p class="muted">Hub talks to OpenShrooly over the LAN. You watch the flush at home.</p></article>
       </div>
     </section>
-    <section id="coach-promo" class="how" aria-label="Grow Coach">
-      <h2 class="display" style="font-size:1.8rem">Grow Coach</h2>
-      <p class="muted">A $3.99/month culinary subscription that learns each chamber from telemetry and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included. Not sold with the restricted pack.</p>
+    <section id="coach-promo" class="story how" aria-label="Grow Coach">
+      <h2>Grow Coach</h2>
+      <p class="muted">A $3.99/month culinary subscription that learns one chamber from telemetry and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included.</p>
       <p><a class="button" href="/coach.html">Open Grow Coach</a></p>
     </section>
+    <section class="story how" aria-label="Community">
+      <h2>Community</h2>
+      <p class="muted">People rate Profiles, publish grow reports, and fork a recipe when their chamber runs wet or dry. Culinary first.</p>
+    </section>
+    <section class="story how" aria-label="Open source">
+      <h2>Open source</h2>
+      <p class="muted">Firmware, Hub, and this Community site are MIT licensed. Read the code. Run it at home.</p>
+      <p><a class="button secondary" href="https://github.com/themsquared/openshrooly" rel="noopener">View source</a></p>
+    </section>
     <section id="supplies" class="supplies">
-      <h2 class="display" style="font-size:1.8rem">Supplies</h2>
+      <h2>Supplies</h2>
       <p class="muted">Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.</p>
       <ul>
-        <li>Hardwood pellets — example affiliate on culinary profile pages</li>
-        <li>Filter-patch grow bags — example affiliate on culinary profile pages</li>
+        <li>Hardwood pellets on culinary Profile pages</li>
+        <li>Filter-patch grow bags on culinary Profile pages</li>
       </ul>
     </section>
+    <p class="hero-actions"><a class="button" href="#library">Browse Profiles</a></p>
   </main>
-  <footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</footer>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

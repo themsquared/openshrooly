@@ -5,39 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Grow Coach · Shroom Labs</title>
   <meta name="description" content="Culinary grow coaching for your chamber: learned setpoints, photo checks, and alerts. $3.99/month.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/coach.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Grow Coach · Shroom Labs">
+  <meta property="og:description" content="Culinary grow coaching for your chamber: learned setpoints, photo checks, and alerts. $3.99/month.">
+  <meta property="og:url" content="https://shroomlabs.io/coach.html">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.svg">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="coach">
+  <!--CHROME_HEADER-->
   <div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="/">
-      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-      <span>Shroom Labs<small>works with OpenShrooly</small></span>
-    </a>
-    <nav>
-      <a href="/?pack=culinary">Culinary</a>
-      <a href="/claim.html">Claim device</a>
-      <a href="/coach.html" aria-current="page">Grow Coach</a>
-      <span id="session-nav"></span>
-    </nav>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a href="/coach.html" aria-current="page">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
   </header>
+  <!--/CHROME_HEADER-->
   <main id="main">
     <section class="hero coach-hero" aria-label="Grow Coach">
       <div class="hero-copy">
-        <p class="eyebrow">Culinary subscription · $3.99 / month</p>
+        <p class="eyebrow">Culinary subscription, $3.99 / month</p>
         <h1>A coach that learns your chamber.</h1>
         <p class="lede">Grow Coach watches humidity drift, sensor offset, and past culinary flushes, then suggests safer setpoints. Photo checks flag mold, dryness, and pinning. Alerts catch a stall before you lose a block.</p>
-        <p class="muted">Sold for general home cultivation only. It is not marketed or billed with the restricted pack.</p>
+        <p class="muted">Sold for general home cultivation only.</p>
         <p id="coach-status" class="muted"></p>
-        <p id="coach-error" class="notice hidden" role="alert"></p>
+        <p id="coach-error" class="error-state hidden" role="alert"></p>
         <div id="subscribe-panel" class="hidden">
-          <button type="button" id="subscribe">Subscribe · $3.99</button>
+          <button type="button" id="subscribe">Subscribe, $3.99</button>
         </div>
       </div>
     </section>
-
     <div id="gated" class="hidden">
       <div class="coach-toolbar card">
         <label>Chamber
@@ -49,7 +51,6 @@
         </label>
         <p id="usage" class="muted"></p>
       </div>
-
       <div class="coach-grid">
         <section class="card coach-panel" aria-labelledby="model-title">
           <h2 id="model-title">This chamber</h2>
@@ -58,13 +59,12 @@
           <div id="suggestion"></div>
           <p class="row">
             <button type="button" class="secondary" id="refresh-model">Refresh model</button>
-            <button type="button" id="approve">Approve &amp; queue setpoints</button>
+            <button type="button" id="approve">Approve and queue setpoints</button>
           </p>
         </section>
-
         <section class="card coach-panel" aria-labelledby="chat-title">
           <h2 id="chat-title">Ask the coach</h2>
-          <p class="muted">Answers are grounded in this chamber’s telemetry, your culinary journal, and the profile library.</p>
+          <p class="muted">Answers are grounded in this chamber's telemetry, your culinary journal, and the Profile library.</p>
           <div id="chat-log" class="chat-log" aria-live="polite"></div>
           <form id="chat-form">
             <label>Message
@@ -74,16 +74,15 @@
           </form>
         </section>
       </div>
-
       <section class="card coach-panel" aria-labelledby="photo-title">
         <h2 id="photo-title">Photo check</h2>
-        <p class="muted">Upload a culinary grow photo. The coach returns stage, contamination or dryness flags, confidence, and a next step. Stored in R2 under your account.</p>
+        <p class="muted">Upload a culinary grow photo. The coach returns stage, flags, confidence, and a next step.</p>
         <form id="photo-form">
           <label>Photo
             <input id="photo-file" type="file" accept="image/*">
           </label>
           <label>Notes
-            <input id="photo-hint" maxlength="200" placeholder="Optional — what you are seeing">
+            <input id="photo-hint" maxlength="200" placeholder="Optional notes">
           </label>
           <button type="submit">Check photo</button>
         </form>
@@ -91,7 +90,13 @@
       </section>
     </div>
   </main>
-  <footer class="site-footer">Grow Coach is culinary-only. Local controls still win if the cloud is unreachable.</footer>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

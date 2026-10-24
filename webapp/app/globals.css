@@ -20,6 +20,17 @@ body {
   font-size: 16px;
   position: relative;
 }
+.site-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--sl-bg-glass);
+  border-bottom: 1px solid var(--sl-line);
+}
+.site-header small { color: var(--sl-mycelium); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 
 body::before {
   content: '';

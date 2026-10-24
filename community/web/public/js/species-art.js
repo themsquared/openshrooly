@@ -50,10 +50,12 @@ export function speciesPhoto(species, strain = "", name = "") {
   return FALLBACK;
 }
 
-export function speciesArt(species, strain = "", name = "") {
+export function speciesArt(species, strain = "", name = "", eager = false) {
   const src = speciesPhoto(species, strain, name);
-  const label = [name, species].filter(Boolean).join(" — ") || "mushroom";
-  return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" loading="lazy" decoding="async">`;
+  const label = [name, species].filter(Boolean).join(", ") || "mushroom";
+  const loading = eager ? "eager" : "lazy";
+  const fetch = eager ? ' fetchpriority="high"' : "";
+  return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" loading="${loading}" decoding="async"${fetch}>`;
 }
 
 function escapeAttr(value) {

@@ -4,15 +4,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Finishing sign-in · Shroom Labs</title>
+  <meta name="description" content="Completing your Shroom Labs sign-in.">
+  <meta name="robots" content="noindex,nofollow">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="callback">
-  <main class="card auth-panel">
-    <h1>Finishing sign-in…</h1>
-    <p id="status" class="muted">Completing your magic link or OIDC callback.</p>
-    <p id="error" class="notice hidden"></p>
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/" aria-current="page">Profiles</a><a href="/faq.html">FAQ</a><a href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <section class="card auth-panel">
+      <h1>Finishing sign-in</h1>
+      <p id="status" class="muted">Completing your email link.</p>
+      <p id="error" class="error-state hidden"></p>
+    </section>
   </main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>
