@@ -123,24 +123,63 @@ async function listProfiles(db, env, pack, q) {
 }
 
 export async function handleRequest(request, env) {
-  if (!env._seeded) {
-    // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
-    // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
-    await seedMissing(env.db, seeds);
-    env._seeded = true;
-  }
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
   if (method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env, request) });
 
   try {
+    if (!env._seeded) {
+      // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
+      // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
+      await seedMissing(env.db, seeds);
+      env._seeded = true;
+    }
     return await route(method, path, url, request, env);
   } catch (err) {
     if (err instanceof ValidationError) return json({ error: err.message }, err.status || 400);
-    if (String(err.message) === "UNIQUE") return json({ error: "username taken" }, 409);
-    return json({ error: err.message || "server error" }, 500);
+    if (String(err?.message) === "UNIQUE") return json({ error: "username taken" }, 409);
+    return internalError(err, method, path);
   }
+}
+
+export const INTERNAL_ERROR_MESSAGE = "Something went wrong on our side. Please try again.";
+
+const REDACTIONS = [
+  [/-----BEGIN [^-]+-----[\s\S]*?(?:-----END [^-]+-----|$)/g, "[pem]"],
+  [/\b(bearer|basic)\s+\S+/gi, "$1 [redacted]"],
+  [/\b(token|secret|password|passwd|api[_-]?key|authorization|cookie|session|sig(?:nature)?)(["']?\s*[:=]\s*)\S+/gi, "$1$2[redacted]"],
+  [/[A-Za-z0-9+/_=-]{24,}/g, "[redacted]"],
+];
+
+/** Strip anything that looks like a credential before it reaches the log. */
+export function redactForLog(value, max = 2000) {
+  let text = String(value ?? "");
+  for (const [re, replacement] of REDACTIONS) text = text.replace(re, replacement);
+  return text.length > max ? `${text.slice(0, max)}...` : text;
+}
+
+function newRequestId() {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Generic 500 for clients; the detail goes to the server log under the same request id. */
+export function internalError(err, method, path) {
+  const requestId = newRequestId();
+  console.error(
+    JSON.stringify({
+      level: "error",
+      request_id: requestId,
+      method,
+      path: redactForLog(path, 200),
+      name: redactForLog(err?.name || typeof err, 100),
+      message: redactForLog(err?.message ?? err),
+      stack: redactForLog(err?.stack || "", 4000),
+    })
+  );
+  return json({ error: INTERNAL_ERROR_MESSAGE, request_id: requestId }, 500, { "x-request-id": requestId });
 }
 
 async function route(method, path, url, request, env) {

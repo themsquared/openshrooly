@@ -103,3 +103,35 @@ test("shared chrome uses an accessible mobile menu button", () => {
   }
   assert.deepEqual(missing, []);
 });
+
+const API_SRC = join(dirname(fileURLToPath(import.meta.url)), "../src");
+const STRING_LITERAL = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
+const DASH_ESCAPE = /\\u(?:2013|2014|\{201[34]\})/i;
+
+function withoutComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[\s;{}(),])\/\/.*$/gm, "$1");
+}
+
+test("API error messages and other API strings never use en or em dashes", () => {
+  const hits = [];
+  for (const name of readdirSync(API_SRC).filter((file) => /\.(js|json)$/.test(file))) {
+    const source = readFileSync(join(API_SRC, name), "utf8");
+    const code = name.endsWith(".json") ? source : withoutComments(source);
+    for (const literal of code.match(STRING_LITERAL) || []) {
+      if (DASH.test(literal) || DASH_ESCAPE.test(literal)) hits.push(`src/${name}: ${literal.slice(0, 80)}`);
+    }
+  }
+  assert.deepEqual(hits, []);
+});
+
+test("thrown API errors and json error bodies are dash-free", () => {
+  const hits = [];
+  const errorCall = /(?:new\s+\w*Error\s*\(|\berror\s*:)\s*([\s\S]{0,200}?)[,)}]/g;
+  for (const name of readdirSync(API_SRC).filter((file) => file.endsWith(".js"))) {
+    const code = withoutComments(readFileSync(join(API_SRC, name), "utf8"));
+    for (const match of code.matchAll(errorCall)) {
+      if (DASH.test(match[1])) hits.push(`src/${name}: ${match[1].slice(0, 80)}`);
+    }
+  }
+  assert.deepEqual(hits, []);
+});

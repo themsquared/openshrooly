@@ -58,12 +58,14 @@ export function speciesPhoto(species, strain = "", name = "", pack = "") {
   return FALLBACK;
 }
 
-export function speciesArt(species, strain = "", name = "", pack = "") {
+/** Pass { priority: true } only for the largest above-the-fold image (the LCP candidate). */
+export function speciesArt(species, strain = "", name = "", pack = "", { priority = false } = {}) {
   const src = speciesPhoto(species, strain, name, pack);
   const label = isOffMenuArt(species, strain, name, pack)
     ? [name, species].filter(Boolean).join(" · ") || "Off-menu variety"
     : [name, species].filter(Boolean).join(" · ") || "mushroom";
-  return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" loading="lazy" decoding="async">`;
+  const loading = priority ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
+  return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" ${loading} decoding="async">`;
 }
 
 function escapeAttr(value) {
