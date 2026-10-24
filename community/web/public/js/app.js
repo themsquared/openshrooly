@@ -25,6 +25,13 @@ function params() {
   return new URLSearchParams(location.search);
 }
 
+/** Post sign-in destinations stay on this site: a same-origin path, never a scheme or another host. */
+function safeNext(value, fallback = "/account.html") {
+  const next = String(value || "");
+  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\") || /[\u0000-\u001f]/.test(next)) return fallback;
+  return next;
+}
+
 function renderNav() {
   const nav = $("#session-nav");
   if (!nav) return;
@@ -253,25 +260,23 @@ async function renderAuth(mode) {
     $("#form")?.classList.add("hidden");
     $("#email-soon")?.classList.remove("hidden");
   }
-  if (!caps.google) {
-    $("#google")?.classList.add("hidden");
-  }
-  if (!caps.apple) {
-    $("#apple")?.classList.add("hidden");
-  }
+  $("#google")?.classList.toggle("hidden", !caps.google);
+  $("#apple")?.classList.toggle("hidden", !caps.apple);
   if (!caps.google && !caps.apple) {
     $("#oidc-soon")?.classList.remove("hidden");
   }
-  $("#google")?.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    if (!caps.google) return;
-    location.href = oidcStart("google");
-  });
-  $("#apple")?.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    if (!caps.apple) return;
-    location.href = oidcStart("apple");
-  });
+  if (params().get("error") === "oidc") {
+    $("#error").textContent = "Google sign-in didn't finish. Try again, or use an email link.";
+    $("#error").classList.remove("hidden");
+  }
+  const oidcNext = params().get("next") ? safeNext(params().get("next"), "") : "";
+  for (const provider of ["google", "apple"]) {
+    $(`#${provider}`)?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      if (!caps[provider]) return;
+      location.href = oidcStart(provider, oidcNext);
+    });
+  }
   $("#passkey")?.addEventListener("click", async () => {
     $("#error").textContent = "Passkey login needs a registered authenticator on this account.";
     $("#error").classList.remove("hidden");
@@ -300,16 +305,21 @@ async function renderAuth(mode) {
 
 async function renderCallback() {
   const token = params().get("token");
-  const code = params().get("code");
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const handoff = hash.get("oidc");
   try {
+    if (handoff) {
+      // One-time handoff from the Google callback. Drop it from the address bar and history first.
+      history.replaceState(null, "", location.pathname);
+      const data = await api("/api/auth/oidc/complete", { method: "POST", jsonBody: { token: handoff } });
+      if (data.access_token) setToken(data.access_token);
+      location.replace(safeNext(hash.get("next")));
+      return;
+    }
     if (token) {
       const data = await api("/api/auth/magic/complete", { method: "POST", jsonBody: { token } });
       if (data.access_token) setToken(data.access_token);
-      location.href = params().get("next") || "/account.html";
-      return;
-    }
-    if (code) {
-      $("#status").textContent = "You are signed in. You can close this tab if it did not move on by itself.";
+      location.href = safeNext(params().get("next"));
       return;
     }
     $("#error").textContent = "This sign-in link is missing or expired.";

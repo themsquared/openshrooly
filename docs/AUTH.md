@@ -23,14 +23,32 @@ Authorized redirect URIs:
 - `http://127.0.0.1:8787/api/auth/oidc/google/callback`
 - `http://localhost:8787/api/auth/oidc/google/callback`
 
-Secrets:
+The client ID is public and lives in `community/api/wrangler.toml` `[vars]` as `GOOGLE_CLIENT_ID`. The client secret is a Wrangler secret. Pipe it in so it never lands in shell history or logs:
 
 ```
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_CLIENT_SECRET
+printf %s "$GOOGLE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET
 ```
+
+"Continue with Google" shows on sign-in and register only when both values are set (`/api/capabilities` `google: true`).
 
 Optional override: `GOOGLE_REDIRECT_URI=https://api.shroomlabs.io/api/auth/oidc/google/callback`
+
+### How Google sign-in works
+
+Code: `community/api/src/auth.js` (routes) and `community/api/src/oidc.js` (token checks). Tests: `community/api/test/oidc.test.js` (mocked Google JWKS and token endpoint).
+
+1. `GET /api/auth/oidc/google/start?next=/path` sets a 10-minute `__Host-sl_oidc` cookie (HttpOnly, Secure, SameSite=Lax) and redirects to Google with `state = SHA-256(cookie)`, a `nonce`, PKCE `S256`, and `scope=openid email profile`. `next` must be a same-site path; anything else is a 400.
+2. `GET /api/auth/oidc/google/callback` needs the cookie and the matching state. The state row is deleted on first use, so a replayed callback fails. The code is exchanged with the PKCE verifier.
+3. The `id_token` must have a valid RS256 signature from Google's JWKS (cached per the `Cache-Control` max-age, refetched at most once a minute for an unknown key), `iss` Google, `aud`/`azp` our client ID, a live `exp`, a sane `iat`, our `nonce`, a `sub`, and `email_verified: true`.
+4. On success the browser goes to `/auth/callback.html#oidc=<one-time token>&next=<path>`. The page trades that 2-minute, single-use token at `POST /api/auth/oidc/complete` for a normal session (TOTP still applies). The token sits in the URL fragment, so it is not sent to servers or in `Referer`.
+5. Every failure lands on `/login.html?error=oidc` with one generic message. The specific reason is written to `security_events` as `oidc_google_fail`. Start, callback and complete are rate limited.
+
+### Account linking policy
+
+- A Google account (`sub`) that is already linked signs in to its linked Shroom Labs account.
+- Otherwise, if a Shroom Labs account has the same email **and that email is verified** (magic link or an earlier provider), the Google identity is linked to it. An account already linked to a different Google `sub` is never re-linked by email.
+- An account whose email is **not** verified is never linked or signed in by Google. The sign-in fails, so nobody can pre-register a victim's address and wait.
+- Otherwise a new account is created with the email marked verified. The public username and `display_name` are a random `grower_<hex>` handle, not the email local part or a provider name. Existing accounts are not renamed.
 
 ### Apple Services ID + key (required once the Expo app offers Google)
 
