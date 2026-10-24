@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "export": "next build",
-    "test": "node --test lib/setup-state.test.js lib/ui-copy.test.js"
+    "test": "node --test lib/setup-state.test.js lib/ui-copy.test.js lib/card-text.test.js"
   },
   "keywords": [],
   "author": "",

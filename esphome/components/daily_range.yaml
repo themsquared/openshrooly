@@ -1,0 +1,79 @@
+# Today's low and high for temperature and humidity, shown on the dashboard
+# cards so they add something the rings do not. Resets at local midnight once
+# the clock has synced; before that it covers the time since the last restart.
+globals:
+  - id: range_day
+    type: int
+    initial_value: "-1"
+  - id: range_temp_lo
+    type: float
+    initial_value: "NAN"
+  - id: range_temp_hi
+    type: float
+    initial_value: "NAN"
+  - id: range_hum_lo
+    type: float
+    initial_value: "NAN"
+  - id: range_hum_hi
+    type: float
+    initial_value: "NAN"
+
+interval:
+  - interval: 30s
+    then:
+      - lambda: |-
+          auto now = id(sntp_time).now();
+          if (now.is_valid() && now.day_of_month != id(range_day)) {
+            // A new day (or the first clock sync): start the range again.
+            id(range_day) = now.day_of_month;
+            id(range_temp_lo) = id(range_temp_hi) = NAN;
+            id(range_hum_lo) = id(range_hum_hi) = NAN;
+          }
+          const float t = id(temp_ha).state;
+          if (!std::isnan(t)) {
+            if (std::isnan(id(range_temp_lo)) || t < id(range_temp_lo)) id(range_temp_lo) = t;
+            if (std::isnan(id(range_temp_hi)) || t > id(range_temp_hi)) id(range_temp_hi) = t;
+          }
+          const float h = id(humidity_ha).state;
+          if (!std::isnan(h)) {
+            if (std::isnan(id(range_hum_lo)) || h < id(range_hum_lo)) id(range_hum_lo) = h;
+            if (std::isnan(id(range_hum_hi)) || h > id(range_hum_hi)) id(range_hum_hi) = h;
+          }
+          id(temp_low_today).publish_state(id(range_temp_lo));
+          id(temp_high_today).publish_state(id(range_temp_hi));
+          id(hum_low_today).publish_state(id(range_hum_lo));
+          id(hum_high_today).publish_state(id(range_hum_hi));
+
+sensor:
+  - platform: template
+    id: temp_low_today
+    name: "Temperature Low Today"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    update_interval: never
+    web_server:
+      sorting_group_id: grp_hidden
+  - platform: template
+    id: temp_high_today
+    name: "Temperature High Today"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    update_interval: never
+    web_server:
+      sorting_group_id: grp_hidden
+  - platform: template
+    id: hum_low_today
+    name: "Humidity Low Today"
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    update_interval: never
+    web_server:
+      sorting_group_id: grp_hidden
+  - platform: template
+    id: hum_high_today
+    name: "Humidity High Today"
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    update_interval: never
+    web_server:
+      sorting_group_id: grp_hidden
