@@ -17,6 +17,14 @@
 #include <cstring>
 #include <memory>
 
+#if defined(USE_ARDUINO) && defined(USE_OTA_ROLLBACK)
+// The Arduino core marks a freshly installed image as good while it starts,
+// before anything has run. Leave that to safe_mode instead, which confirms the
+// image only after a good boot, so the bootloader can still go back to the
+// previous version when a new one fails to start.
+extern "C" bool verifyRollbackLater() { return true; }
+#endif
+
 namespace esphome {
 namespace signed_update {
 
