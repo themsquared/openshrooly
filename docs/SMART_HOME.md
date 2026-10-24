@@ -24,7 +24,7 @@ The bridge talks only to the hub (`GET /api/smart-home/state`). It never opens a
 
 The pairing code is a secret. It lives on the hub volume / bridge data directory. The hub Smart Home page shows it only after you sign in as `admin`, and only before the first pair. It is not written to logs and is not sent to shroomlabs.io.
 
-Sign in at `http://<hub-host>:8090/login`. The password is `HUB_ADMIN_PASSWORD`, or the generated value in the hub data file `admin.json`. Scripts can use HTTP Basic `admin:<password>`, same as the chamber. Writes (sign in, sign out) need a CSRF token and must come from this hub's own page.
+Sign in at `http://<hub-host>:8090/login`. The password is `HUB_ADMIN_PASSWORD`, or the generated value in the hub data file `admin.json`. The hub writes a random session secret to `hub.secret` on first run (mode 0600). Do not set `HUB_SECRET` to the old published default. Scripts can use HTTP Basic `admin:<password>`, same as the chamber. Writes (sign in, sign out, add or remove a device, apply a profile, import a profile, sync) need a CSRF token and must come from this hub's own host.
 
 ### Once, for Google Home
 
@@ -55,28 +55,54 @@ Matter advertises over mDNS (IPv4 and IPv6 multicast) on UDP port 5540. A Docker
 
 On Linux (a Pi or a Linux box):
 
-- `docker-compose.yml` gives **both** the hub and the bridge `network_mode: host`.
+- `docker compose --profile linux up` starts **both** the hub and the bridge with `network_mode: host`.
+- The `bridge` service is on the `linux` compose profile. It is not started by a plain `docker compose up`.
 - The status server listens on `127.0.0.1:8091` only. It does not listen on Wi-Fi or Ethernet.
 - The hub reads `http://127.0.0.1:8091/status`. Because both processes share the host network, that loopback address works.
 - The sidecar also writes `/shared/status.json` on a compose volume. The hub reads that file if HTTP is down.
 
-Do not publish port 8091. Do not bind the status server to `0.0.0.0`.
+Do not publish port 8091. Do not bind the status server to every interface.
 
 ## Mac mini notes
 
 This hub is meant to stay on Mike's always-on Mac mini.
 
-Docker Desktop on macOS runs Linux in a VM. `network_mode: host` attaches to that VM, not to the Mac's Wi-Fi or Ethernet. Matter multicast from a container on a Mac is unreliable.
+Docker Desktop on macOS runs Linux in a VM. Host networking needs Docker Desktop 4.34 or newer, must be turned on while you are signed in, and does not work with Enhanced Container Isolation. Even then it only carries TCP and UDP. Matter mDNS is multicast, so a bridge container on a Mac will not be found by Apple Home or Google Home.
 
-Run the bridge with Node 22 on the Mac, not in Docker:
+The supported macOS path is:
+
+1. Run the Matter bridge with Node on the Mac (not in Docker).
+2. Run the hub on the Mac as well, or in Docker with a published port and a bind-mounted status file.
+
+Native bridge:
 
 ```bash
-cd bridge
-npm ci
-MATTER_STORAGE_PATH="$HOME/shroom-labs-bridge" HUB_URL=http://127.0.0.1:8090 node src/index.js
+scripts/macos/run-matter-bridge.sh
 ```
 
-Run the hub on the Mac as well (or with host networking). Point `HUB_URL` at `http://127.0.0.1:8090` and `BRIDGE_STATUS_URL` at `http://127.0.0.1:8091`. A hub container on Docker Desktop's VM network cannot reach a status server that is bound only to the Mac's loopback.
+That script stores the fabric in `$HOME/shroom-labs-bridge` and writes `$HOME/shroom-labs-bridge/status.json`. To start it at login, copy `scripts/macos/com.shroomlabs.openshrooly-bridge.plist`, replace the `REPLACE` paths, then:
+
+```bash
+cp scripts/macos/com.shroomlabs.openshrooly-bridge.plist ~/Library/LaunchAgents/
+# edit the copy so the repo path and home path are real
+launchctl load ~/Library/LaunchAgents/com.shroomlabs.openshrooly-bridge.plist
+```
+
+Native hub (same Mac, loopback status HTTP works):
+
+```bash
+scripts/macos/run-hub.sh
+```
+
+Hub in Docker on a Mac, bridge still native:
+
+```bash
+mkdir -p "$HOME/shroom-labs-bridge"
+touch "$HOME/shroom-labs-bridge/status.json"
+docker compose -f docker-compose.yml -f docker-compose.macos.yml up hub
+```
+
+Do not start the compose `bridge` service on a Mac. A hub container on Docker Desktop's VM network cannot reach a status server that is bound only to the Mac's loopback, so the macos overlay reads the status file instead.
 
 Keep `$HOME/shroom-labs-bridge`. That directory is the fabric. Deleting it unpairs every home app.
 
@@ -124,7 +150,7 @@ Native Matter on the chamber, HAP-python, and Google cloud-to-cloud stay out of 
 ## Tests
 
 ```bash
-PYTHONPATH=shared:. python -m pytest -q tests/test_smart_home.py tests/test_hub_auth.py tests/test_bridge_status_reachability.py
+PYTHONPATH=shared:. python -m pytest -q tests/test_smart_home.py tests/test_hub_auth.py tests/test_bridge_status_reachability.py tests/test_hub_targets.py
 cd bridge && npm test
 ```
 

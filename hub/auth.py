@@ -5,8 +5,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import secrets
+import threading
 import time
 from typing import Any
 from urllib.parse import quote
@@ -21,6 +23,10 @@ SESSION_COOKIE = "hub_session"
 CSRF_COOKIE = "hub_csrf"
 SESSION_TTL_S = 7 * 24 * 60 * 60
 _PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+LOGIN_IP_MAX_FAILURES = 5
+LOGIN_GLOBAL_MAX_FAILURES = 20
+LOGIN_WINDOW_S = 10 * 60
+LOGIN_LOCKOUT_S = 60
 
 
 def random_password(length: int = 12) -> str:
@@ -61,6 +67,11 @@ def _unb64(text: str) -> bytes:
 
 def _sign(value: str) -> str:
     digest = hmac.new(config.SECRET.encode("utf-8"), value.encode("utf-8"), hashlib.sha256).digest()
+    return f"{value}.{_b64(digest)}"
+
+
+def sign_with_secret(value: str, secret: str) -> str:
+    digest = hmac.new(secret.encode("utf-8"), value.encode("utf-8"), hashlib.sha256).digest()
     return f"{value}.{_b64(digest)}"
 
 
@@ -118,6 +129,44 @@ def parse_basic(header: str | None) -> tuple[str, str] | None:
     return user, password
 
 
+def hostname_from_host_header(host: str | None) -> str | None:
+    if not host:
+        return None
+    text = host.strip()
+    if not text:
+        return None
+    if text.startswith("["):
+        end = text.find("]")
+        if end == -1:
+            return None
+        return text[1:end].lower()
+    if text.count(":") == 1:
+        name, _, port = text.rpartition(":")
+        if port.isdigit():
+            text = name
+    return text.lower().rstrip(".") or None
+
+
+def host_allowed(host_header: str | None, allowed: frozenset[str] | None = None) -> bool:
+    hostname = hostname_from_host_header(host_header)
+    if not hostname:
+        return False
+    names = allowed if allowed is not None else config.ALLOWED_HOSTS
+    if hostname in names or f"[{hostname}]" in names:
+        return True
+    if hostname.endswith(".local"):
+        return True
+    try:
+        ip = ipaddress.ip_address(hostname.strip("[]"))
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    if ip.is_private and not ip.is_link_local:
+        return True
+    return False
+
+
 def origin_self(host: str | None) -> str | None:
     if not host:
         return None
@@ -127,6 +176,8 @@ def origin_self(host: str | None) -> str | None:
 def same_origin(request: Request, require_header: bool = False) -> bool:
     """Ship 9 rule: Origin wins, then Referer. POST without a header is a script."""
     host = request.headers.get("host")
+    if not host_allowed(host):
+        return False
     self = origin_self(host)
     if not self:
         return False
@@ -168,13 +219,11 @@ def write_rejected(message: str, status_code: int = 403) -> Response:
 
 
 def require_write_guard(request: Request, form_token: str | None = None) -> Response | None:
-    """CSRF on writes: foreign Origin is refused. Browser posts also need the token."""
+    """CSRF on every write, including HTTP Basic. Foreign Origin is refused."""
     if request.method in {"GET", "HEAD", "OPTIONS"}:
         return None
     if not same_origin(request, require_header=False):
         return write_rejected("This change must be made from the hub's own page.")
-    if basic_ok(request) and not request.headers.get("origin"):
-        return None
     if not csrf_ok(request, form_token):
         return write_rejected("CSRF token missing or wrong.")
     return None
@@ -197,6 +246,101 @@ def require_admin(request: Request) -> Response | None:
         {"ok": False, "error": "sign_in_required"},
         status_code=401,
         headers={"WWW-Authenticate": 'Basic realm="OpenShrooly Hub"'},
+    )
+
+
+def require_admin_write(request: Request, form_token: str | None = None) -> Response | None:
+    denied = require_admin(request)
+    if denied:
+        return denied
+    return require_write_guard(request, form_token)
+
+
+def safe_next_path(value: str | None, default: str = "/smart-home") -> str:
+    """Same-origin relative path only. One leading slash, no host, no scheme."""
+    if not isinstance(value, str):
+        return default
+    path = value.strip()
+    if not path or path[0] != "/":
+        return default
+    if len(path) > 1 and path[1] in "/\\":
+        return default
+    if "\\" in path or "://" in path:
+        return default
+    if any(ord(ch) < 32 for ch in path):
+        return default
+    return path
+
+
+def client_ip(request: Request) -> str:
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+class LoginGuard:
+    def __init__(self) -> None:
+        self._ip: dict[str, list[float]] = {}
+        self._global: list[float] = []
+        self._lock = threading.Lock()
+
+    def reset(self) -> None:
+        with self._lock:
+            self._ip.clear()
+            self._global.clear()
+
+    def _prune(self, times: list[float], now: float) -> list[float]:
+        return [stamp for stamp in times if now - stamp < LOGIN_WINDOW_S]
+
+    def _locked(self, times: list[float], now: float, limit: int) -> int:
+        recent = self._prune(times, now)
+        if len(recent) < limit:
+            return 0
+        wait = int(LOGIN_LOCKOUT_S - (now - recent[-1]))
+        return wait if wait > 0 else 0
+
+    def retry_after(self, ip: str, now: float | None = None) -> int:
+        stamp = time.time() if now is None else now
+        with self._lock:
+            ip_wait = self._locked(self._ip.get(ip, []), stamp, LOGIN_IP_MAX_FAILURES)
+            global_wait = self._locked(self._global, stamp, LOGIN_GLOBAL_MAX_FAILURES)
+        return max(ip_wait, global_wait)
+
+    def record_failure(self, ip: str, now: float | None = None) -> None:
+        stamp = time.time() if now is None else now
+        with self._lock:
+            self._ip[ip] = self._prune(self._ip.get(ip, []), stamp) + [stamp]
+            self._global = self._prune(self._global, stamp) + [stamp]
+
+    def record_success(self, ip: str) -> None:
+        with self._lock:
+            self._ip.pop(ip, None)
+
+
+LOGIN_GUARD = LoginGuard()
+
+
+def reset_login_guard() -> None:
+    LOGIN_GUARD.reset()
+
+
+def login_retry_after(ip: str) -> int:
+    return LOGIN_GUARD.retry_after(ip)
+
+
+def record_login_failure(ip: str) -> None:
+    LOGIN_GUARD.record_failure(ip)
+
+
+def record_login_success(ip: str) -> None:
+    LOGIN_GUARD.record_success(ip)
+
+
+def login_locked_response(retry_after: int) -> Response:
+    return JSONResponse(
+        {"ok": False, "error": "too_many_login_attempts", "retry_after": retry_after},
+        status_code=429,
+        headers={"Retry-After": str(max(1, retry_after))},
     )
 
 

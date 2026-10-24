@@ -40,6 +40,8 @@ def test_compose_keeps_status_off_the_lan():
     assert "BRIDGE_STATUS_FILE: /shared/status.json" in text
     assert "host.docker.internal" not in text
     assert "0.0.0.0" not in text
+    assert "profiles:" in text
+    assert "- linux" in text
 
 
 def test_hub_reads_status_file_used_by_compose(tmp_path, monkeypatch):

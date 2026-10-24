@@ -29,6 +29,7 @@ from openshrooly_lib.webutil import json_dumps  # noqa: E402
 from . import auth  # noqa: E402
 from . import config  # noqa: E402
 from . import db  # noqa: E402
+from . import targets  # noqa: E402
 from .discover import discover_esphome  # noqa: E402
 from .smart_home import pairing_qr_svg, smart_home_state  # noqa: E402
 from .species_art import species_photo  # noqa: E402
@@ -152,6 +153,10 @@ def maybe_advance_grow(conn, device_id: int) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if config.SECRET == config.FORBIDDEN_DEFAULT_SECRET:
+        raise config.InsecureHubSecret(
+            "HUB_SECRET is the published default. Unset it or set a new random value."
+        )
     conn = db.init_db(config.DB_PATH)
     seed_library(conn)
     app.state.conn = conn
@@ -185,15 +190,40 @@ def entity_reading(status: dict) -> dict:
     return {"temperature": val("temperature"), "humidity": val("humidity"), "water": val("water_level")}
 
 
+@app.middleware("http")
+async def allowlisted_host(request: Request, call_next):
+    if not auth.host_allowed(request.headers.get("host")):
+        return JSONResponse({"ok": False, "error": "unknown_host"}, status_code=400)
+    return await call_next(request)
+
+
 def page(request: Request, name: str, **context):
+    token = context.get("csrf") or request.cookies.get(auth.CSRF_COOKIE) or auth.new_csrf()
     context.update(
         {
             "enable_psilocybin": config.ENABLE_PSILOCYBIN,
             "community_url": config.COMMUNITY_URL,
             "admin_signed_in": auth.is_authenticated(request),
+            "csrf": token,
         }
     )
-    return templates.TemplateResponse(request, name, context)
+    response = templates.TemplateResponse(request, name, context)
+    if request.cookies.get(auth.CSRF_COOKIE) != token:
+        response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
+    return response
+
+
+def saved_devices(conn):
+    return [dict(row) for row in conn.execute("SELECT * FROM devices ORDER BY name")]
+
+
+def device_host_rejected(request: Request, host: str) -> Response | None:
+    message = targets.device_host_error(host)
+    if not message:
+        return None
+    if auth.wants_html(request):
+        return page(request, "devices.html", devices=saved_devices(request.app.state.conn), discovered=[], error=message)
+    return JSONResponse({"ok": False, "error": message}, status_code=400)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -240,7 +270,14 @@ def add_device(
     name: str = Form(...),
     host: str = Form(...),
     port: int = Form(80),
+    csrf: str = Form(""),
 ):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
+    blocked = device_host_rejected(request, host)
+    if blocked:
+        return blocked
     conn = request.app.state.conn
     conn.execute(
         "INSERT INTO devices (name, host, port, added_at) VALUES (?, ?, ?, ?)",
@@ -252,7 +289,10 @@ def add_device(
 
 
 @app.post("/devices/{device_id}/delete")
-def delete_device(request: Request, device_id: int):
+def delete_device(request: Request, device_id: int, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     conn.execute("DELETE FROM devices WHERE id=?", (device_id,))
     conn.commit()
@@ -260,14 +300,17 @@ def delete_device(request: Request, device_id: int):
 
 
 @app.post("/devices/discover")
-def discover_devices(request: Request):
+def discover_devices(request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     discovered = discover_esphome()
     existing = {row["host"] for row in conn.execute("SELECT host FROM devices")}
     return page(
         request,
         "devices.html",
-        devices=[dict(row) for row in conn.execute("SELECT * FROM devices ORDER BY name")],
+        devices=saved_devices(conn),
         discovered=[d for d in discovered if d.addresses and d.addresses[0] not in existing],
     )
 
@@ -299,7 +342,10 @@ def device_detail(request: Request, device_id: int):
 
 
 @app.post("/devices/{device_id}/refresh")
-def refresh_device(device_id: int, request: Request):
+def refresh_device(device_id: int, request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     return RedirectResponse(f"/devices/{device_id}", status_code=303)
 
 
@@ -310,7 +356,11 @@ def apply_profile(
     profile_id: str = Form(...),
     stage_id: str = Form(""),
     start_grow: str = Form("1"),
+    csrf: str = Form(""),
 ):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     device = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
     if not device:
@@ -362,7 +412,10 @@ def api_profile(request: Request, profile_id: str):
 
 
 @app.post("/profiles/import")
-async def import_profile(request: Request, document: str = Form(...)):
+async def import_profile(request: Request, document: str = Form(...), csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     try:
         payload = json.loads(document)
@@ -390,7 +443,10 @@ def history_page(request: Request):
 
 
 @app.post("/sync/push")
-def sync_push(request: Request):
+def sync_push(request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     if not config.COMMUNITY_TOKEN:
         raise HTTPException(400, "COMMUNITY_TOKEN is not set")
@@ -434,7 +490,10 @@ def sync_push(request: Request):
 
 
 @app.post("/sync/pull")
-def sync_pull(request: Request):
+def sync_pull(request: Request, csrf: str = Form("")):
+    denied = auth.require_admin_write(request, csrf)
+    if denied:
+        return denied
     conn = request.app.state.conn
     if not config.COMMUNITY_TOKEN:
         raise HTTPException(400, "COMMUNITY_TOKEN is not set")
@@ -509,10 +568,7 @@ def fetch_bridge_status() -> dict:
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, next: str = "/smart-home"):
-    token = auth.new_csrf()
-    response = page(request, "login.html", error=None, next_path=next, csrf=token)
-    response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
-    return response
+    return page(request, "login.html", error=None, next_path=auth.safe_next_path(next), csrf=auth.new_csrf())
 
 
 @app.post("/login")
@@ -526,12 +582,24 @@ def login_submit(
     blocked = auth.require_write_guard(request, csrf)
     if blocked:
         return blocked
+    ip = auth.client_ip(request)
+    retry_after = auth.login_retry_after(ip)
+    if retry_after:
+        return auth.login_locked_response(retry_after)
     if username != auth.ADMIN_USER or not auth.passwords_match(password, auth.admin_password()):
-        token = auth.new_csrf()
-        response = page(request, "login.html", error="Wrong user name or password.", next_path=next, csrf=token)
-        response.set_cookie(auth.CSRF_COOKIE, token, httponly=True, samesite="lax", path="/")
-        return response
-    target = next if next.startswith("/") else "/smart-home"
+        auth.record_login_failure(ip)
+        retry_after = auth.login_retry_after(ip)
+        if retry_after:
+            return auth.login_locked_response(retry_after)
+        return page(
+            request,
+            "login.html",
+            error="Wrong user name or password.",
+            next_path=auth.safe_next_path(next),
+            csrf=auth.new_csrf(),
+        )
+    auth.record_login_success(ip)
+    target = auth.safe_next_path(next)
     response = RedirectResponse(target, status_code=303)
     response.set_cookie(
         auth.SESSION_COOKIE,

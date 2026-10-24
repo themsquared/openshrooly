@@ -21,7 +21,7 @@
       <a href="/history">History</a>
       {% if admin_signed_in %}
       <form class="nav-auth" method="post" action="/logout">
-        <input type="hidden" name="csrf" value="{{ request.cookies.get('hub_csrf', '') }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
         <button type="submit" class="link">Sign out</button>
       </form>
       {% else %}

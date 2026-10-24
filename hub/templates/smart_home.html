@@ -9,7 +9,7 @@
 {% if not bridge.reachable %}
 <article class="card">
   <p class="bad">The Matter bridge is not running.</p>
-  <p>Start the <code>bridge</code> service on this computer, then reload this page. See <code>docs/SMART_HOME.md</code>.</p>
+  <p>Start the Matter bridge on this computer, then reload this page. On a Mac, run <code>scripts/macos/run-matter-bridge.sh</code>. On Linux, use the compose <code>linux</code> profile. See <code>docs/SMART_HOME.md</code>.</p>
 </article>
 {% else %}
 <div class="cards">

@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from hub import auth
 from hub import config
 
 PASSWORD = "test-admin-9x"
+OLD_DEFAULT_SECRET = "openshrooly-hub-dev-secret"
 
 
 @pytest.fixture
@@ -27,11 +29,13 @@ def client(tmp_path, monkeypatch):
     config.ADMIN_PASSWORD = PASSWORD
     config.BRIDGE_STATUS_URL = "http://127.0.0.1:1"
     config.BRIDGE_STATUS_FILE = ""
+    auth.reset_login_guard()
     with TestClient(app) as test_client:
         yield test_client
+    auth.reset_login_guard()
 
 
-def _login(client, password=PASSWORD, origin="http://testserver", csrf=None):
+def _login(client, password=PASSWORD, origin="http://testserver", csrf=None, next_path="/smart-home"):
     client.get("/login")
     token = csrf if csrf is not None else client.cookies.get("hub_csrf")
     headers = {}
@@ -39,7 +43,7 @@ def _login(client, password=PASSWORD, origin="http://testserver", csrf=None):
         headers["Origin"] = origin
     return client.post(
         "/login",
-        data={"username": "admin", "password": password, "csrf": token, "next": "/smart-home"},
+        data={"username": "admin", "password": password, "csrf": token, "next": next_path},
         headers=headers,
         follow_redirects=False,
     )
@@ -123,3 +127,154 @@ def test_password_file_is_created_when_env_empty(tmp_path, monkeypatch):
     assert saved["username"] == "admin"
     assert saved["password"] == password
     assert auth.admin_password() == password
+
+
+def test_old_default_secret_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setenv("HUB_SECRET", OLD_DEFAULT_SECRET)
+    with pytest.raises(config.InsecureHubSecret, match="published default"):
+        config.resolve_secret(tmp_path)
+
+
+def test_stored_old_default_secret_is_refused(tmp_path, monkeypatch):
+    monkeypatch.delenv("HUB_SECRET", raising=False)
+    path = tmp_path / "hub.secret"
+    path.write_text(OLD_DEFAULT_SECRET + "\n", encoding="utf-8")
+    with pytest.raises(config.InsecureHubSecret, match="published default"):
+        config.resolve_secret(tmp_path)
+
+
+def test_generated_secret_file_is_private(tmp_path, monkeypatch):
+    monkeypatch.delenv("HUB_SECRET", raising=False)
+    secret = config.resolve_secret(tmp_path)
+    path = tmp_path / "hub.secret"
+    assert path.is_file()
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert secret == path.read_text(encoding="utf-8").strip()
+    assert secret != OLD_DEFAULT_SECRET
+    assert config.resolve_secret(tmp_path) == secret
+
+
+def test_cookie_signed_with_old_default_secret_is_rejected(client):
+    expiry = int(time.time()) + auth.SESSION_TTL_S
+    forged = auth.sign_with_secret(f"{auth.ADMIN_USER}:{expiry}", OLD_DEFAULT_SECRET)
+    response = client.get("/api/smart-home/pairing", cookies={auth.SESSION_COOKIE: forged})
+    assert response.status_code == 401
+    body = response.json()
+    assert body["ok"] is False
+    assert "qr" not in body
+    assert "manual_code" not in body
+
+
+def test_safe_next_path_is_same_origin_only():
+    assert auth.safe_next_path("/smart-home") == "/smart-home"
+    assert auth.safe_next_path("/devices/1") == "/devices/1"
+    assert auth.safe_next_path("//evil.example") == "/smart-home"
+    assert auth.safe_next_path("/\\evil.example") == "/smart-home"
+    assert auth.safe_next_path("https://evil.example") == "/smart-home"
+    assert auth.safe_next_path("evil.example") == "/smart-home"
+    assert auth.safe_next_path("///evil.example") == "/smart-home"
+
+
+def test_login_rejects_protocol_relative_next(client):
+    response = _login(client, next_path="//evil.example")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/smart-home"
+
+
+def test_login_get_sanitizes_protocol_relative_next(client):
+    page = client.get("/login", params={"next": "//evil.example"})
+    assert page.status_code == 200
+    assert b'name="next" value="//evil.example"' not in page.content
+    assert b'name="next" value="/smart-home"' in page.content
+
+
+def test_per_ip_login_lockout(client):
+    for _ in range(auth.LOGIN_IP_MAX_FAILURES - 1):
+        page = _login(client, password="nope")
+        assert page.status_code == 200
+    locked = _login(client, password="nope")
+    assert locked.status_code == 429
+    assert locked.headers["retry-after"]
+    still = _login(client, password=PASSWORD)
+    assert still.status_code == 429
+
+
+def test_global_login_lockout(client):
+    for index in range(auth.LOGIN_GLOBAL_MAX_FAILURES):
+        auth.record_login_failure(f"203.0.113.{index}")
+    locked = _login(client, password=PASSWORD)
+    assert locked.status_code == 429
+    assert locked.json()["error"] == "too_many_login_attempts"
+
+
+def test_unknown_host_header_is_rejected(client):
+    response = client.get("/health", headers={"Host": "evil.example"})
+    assert response.status_code == 400
+    assert response.json()["error"] == "unknown_host"
+
+
+def test_lan_host_header_is_allowed(client):
+    response = client.get("/health", headers={"Host": "192.168.1.10:8090"})
+    assert response.status_code == 200
+
+
+def test_basic_auth_write_still_needs_csrf(client):
+    basic = base64.b64encode(f"admin:{PASSWORD}".encode()).decode()
+    denied = client.post(
+        "/devices/add",
+        data={"name": "Kitchen", "host": "192.168.1.50", "port": "80"},
+        headers={"Authorization": f"Basic {basic}", "Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    assert denied.status_code == 403
+    client.get("/login")
+    token = client.cookies.get("hub_csrf")
+    allowed = client.post(
+        "/devices/add",
+        data={"name": "Kitchen", "host": "192.168.1.50", "port": "80", "csrf": token},
+        headers={"Authorization": f"Basic {basic}", "Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    assert allowed.status_code == 303
+
+
+def test_device_add_without_login_is_401(client):
+    response = client.post(
+        "/devices/add",
+        data={"name": "Kitchen", "host": "192.168.1.50", "port": "80"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 401
+
+
+def test_device_add_rejects_loopback_and_metadata(client):
+    assert _login(client).status_code == 303
+    token = client.cookies.get("hub_csrf")
+    for host in ("127.0.0.1", "localhost", "169.254.169.254", "169.254.1.1", "metadata.google.internal"):
+        response = client.post(
+            "/devices/add",
+            data={"name": "Nope", "host": host, "port": "80", "csrf": token},
+            headers={"Origin": "http://testserver"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 400, host
+        assert client.get("/api/devices").json() == []
+
+
+def test_profile_import_without_login_is_401(client):
+    response = client.post("/profiles/import", data={"document": "{}"}, follow_redirects=False)
+    assert response.status_code == 401
+
+
+def test_sync_routes_without_login_are_401(client):
+    assert client.post("/sync/push", follow_redirects=False).status_code == 401
+    assert client.post("/sync/pull", follow_redirects=False).status_code == 401
+
+
+def test_device_apply_without_login_is_401(client):
+    response = client.post(
+        "/devices/1/apply",
+        data={"profile_id": "pearl-oyster"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 401

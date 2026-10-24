@@ -1,0 +1,18 @@
+# Mac mini overlay. The Matter bridge is not a container on macOS.
+# Start the hub with:
+#   docker compose -f docker-compose.yml -f docker-compose.macos.yml up hub
+# Start the bridge on the Mac with Node:
+#   scripts/macos/run-matter-bridge.sh
+#
+# Create the status file before the first hub start so Docker mounts a file:
+#   mkdir -p "$HOME/shroom-labs-bridge" && touch "$HOME/shroom-labs-bridge/status.json"
+services:
+  hub:
+    network_mode: bridge
+    ports:
+      - "8090:8090"
+    environment:
+      BRIDGE_STATUS_URL: ""
+      BRIDGE_STATUS_FILE: /shared/status.json
+    volumes:
+      - ${HOME}/shroom-labs-bridge/status.json:/shared/status.json:ro
