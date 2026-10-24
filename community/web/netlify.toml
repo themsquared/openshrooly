@@ -2,6 +2,11 @@
   command = "node scripts/write-config.js && node scripts/generate-seo.js"
   publish = "public"
 
+# Serve the HTML exactly as committed. Netlify would otherwise rewrite
+# /faq.html links to /faq, which no longer match the canonical URLs and sitemap.
+[build.processing.html]
+  pretty_urls = false
+
 [build.environment]
   NODE_VERSION = "20"
   # Production defaults. Override in the Netlify UI if needed.
