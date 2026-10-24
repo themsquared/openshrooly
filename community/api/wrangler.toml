@@ -1,18 +1,18 @@
-name = "shroom-labs-api"
+name = "shroomlabs-api"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
 
-# Replace database_id after: npx wrangler d1 create shroomlabs
 [[d1_databases]]
 binding = "DB"
 database_name = "shroomlabs"
-database_id = "00000000-0000-0000-0000-000000000001"
+database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
 
-# Replace bucket after: npx wrangler r2 bucket create shroomlabs-media
-# Attach a public custom domain cdn.shroomlabs.io to this bucket in the dashboard.
-[[r2_buckets]]
-binding = "PHOTOS"
-bucket_name = "shroomlabs-media"
+# R2 is not enabled on the account yet. Do not bind PHOTOS until:
+#   npx wrangler r2 bucket create shroomlabs-media
+# Then uncomment and attach cdn.shroomlabs.io in the dashboard.
+# [[r2_buckets]]
+# binding = "PHOTOS"
+# bucket_name = "shroomlabs-media"
 
 [ai]
 binding = "AI"
@@ -22,17 +22,16 @@ SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
 # Browser origins allowed to call api.shroomlabs.io with Authorization headers.
 CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888"
-# Public R2 custom domain for grow-report photos.
+# Public R2 custom domain for grow-report photos (unused until the bucket exists).
 CDN_BASE_URL = "https://cdn.shroomlabs.io"
 # Grow Coach: Workers AI in production; local Node defaults GROW_COACH_STUB=1.
 GROW_COACH_PROVIDER = "workers-ai"
 GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
 GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 
-# Custom API hostname (enable after shroomlabs.io DNS is on Cloudflare):
-# [[routes]]
-# pattern = "api.shroomlabs.io/*"
-# zone_name = "shroomlabs.io"
+[[routes]]
+pattern = "api.shroomlabs.io"
+custom_domain = true
 
 # Secrets (do not put live payment keys here):
 #   npx wrangler secret put COMMUNITY_SECRET

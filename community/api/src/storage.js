@@ -32,3 +32,26 @@ export function createR2Storage(bucket) {
     },
   };
 }
+
+/** R2 is optional until the account enables it. Missing/broken bindings must not crash the Worker. */
+export function createOptionalStorage(bucket) {
+  if (!bucket) return createMemoryStorage();
+  const inner = createR2Storage(bucket);
+  return {
+    driver: "r2",
+    async put(key, bytes, contentType = "application/octet-stream") {
+      try {
+        return await inner.put(key, bytes, contentType);
+      } catch {
+        return key;
+      }
+    },
+    async get(key) {
+      try {
+        return await inner.get(key);
+      } catch {
+        return null;
+      }
+    },
+  };
+}

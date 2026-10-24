@@ -14,7 +14,7 @@ import { handleDevices } from "./devices.js";
 import { activateCoachSub, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { originAllowed, securityHeaders } from "./security.js";
-import { seedIfEmpty } from "./db.js";
+import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 
 const DISCLOSURE =
@@ -126,7 +126,9 @@ async function listProfiles(db, env, pack, q) {
 
 export async function handleRequest(request, env) {
   if (!env._seeded) {
-    await seedIfEmpty(env.db, seeds);
+    // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
+    // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
+    await seedMissing(env.db, seeds);
     env._seeded = true;
   }
   const url = new URL(request.url);

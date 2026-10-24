@@ -327,7 +327,7 @@ See the pull request body for a checklist. Short version:
 
 **Works:** schema, seeds, hub against stock firmware REST, local community API, static web against that API, auth, ratings/forks/reports, hub sync protocol, affiliate policy, Stripe-shaped stub checkout, R2-shaped photo store (memory locally), Grow Coach gating + device learning + stub chat/vision.
 
-**Stubbed:** live Stripe/BTCPay, creator payouts, real affiliate merchants, production D1/R2 IDs in `wrangler.toml`, email, moderation, firmware recipe objects, live Cloudflare client-cert API (Worker CA used until Mike adds `CF_API_TOKEN`), live Workers AI until the Worker `[ai]` binding is deployed.
+**Stubbed:** live Stripe/BTCPay, creator payouts, real affiliate merchants, R2 (`shroomlabs-media` not created yet — Worker stays unbound), email, moderation, firmware recipe objects, live Cloudflare client-cert API (Worker CA used until Mike adds `CF_API_TOKEN`), live Workers AI until the Worker `[ai]` binding is deployed. D1 `shroomlabs` id and `api.shroomlabs.io` are in `wrangler.toml`. Seed with `npm run db:seed:remote` (insert-if-missing), not the first API request.
 
 ## Credits
 

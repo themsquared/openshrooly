@@ -63,6 +63,13 @@ export function createMemoryDb() {
     async run(sql, params = []) {
       return dispatch("run", tables, ids, sql, params);
     },
+    async batch(statements = []) {
+      const results = [];
+      for (const statement of statements) {
+        results.push(await dispatch("run", tables, ids, statement.sql, statement.params || []));
+      }
+      return results;
+    },
   };
 }
 
@@ -84,6 +91,12 @@ export function createD1Db(d1) {
     async run(sql, params = []) {
       const stmt = params.length ? d1.prepare(sql).bind(...params) : d1.prepare(sql);
       return stmt.run();
+    },
+    async batch(statements = []) {
+      const prepared = statements.map((statement) =>
+        statement.params?.length ? d1.prepare(statement.sql).bind(...statement.params) : d1.prepare(statement.sql)
+      );
+      return d1.batch(prepared);
     },
   };
 }
@@ -337,6 +350,19 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT id, name, created_at FROM api_tokens")) {
     return tables.api_tokens.filter((t) => t.user_id === Number(params[0])).map(({ token_hash, ...rest }) => rest);
   }
+  if (q.startsWith("INSERT OR IGNORE INTO profiles")) {
+    if (tables.profiles.some((p) => p.id === params[0])) return {};
+    tables.profiles.push({
+      id: params[0],
+      document: params[1],
+      author_id: params[2],
+      published: 1,
+      created_at: params[3],
+      updated_at: params[4],
+      downloads: 0,
+    });
+    return {};
+  }
   if (q.startsWith("INSERT INTO profiles") || q.startsWith("INSERT OR REPLACE INTO profiles")) {
     const row = {
       id: params[0],
@@ -458,6 +484,18 @@ function dispatch(mode, tables, ids, sql, params) {
     });
     return {};
   }
+  if (q.startsWith("INSERT OR IGNORE INTO guides")) {
+    if (tables.guides.some((g) => g.id === params[0])) return {};
+    tables.guides.push({
+      id: params[0],
+      title: params[1],
+      body: params[2],
+      pricing: params[3],
+      allowed_payment_providers: params[4],
+      created_at: params[5],
+    });
+    return {};
+  }
   if (q.startsWith("INSERT INTO guides")) {
     tables.guides.push({
       id: params[0],
@@ -471,6 +509,9 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("SELECT COUNT(*) AS n FROM guides") || q.startsWith("SELECT COUNT(*) as n FROM guides")) {
     return [{ n: tables.guides.length }];
+  }
+  if (q.startsWith("SELECT * FROM guides WHERE id=")) {
+    return tables.guides.filter((g) => g.id === params[0]);
   }
   if (q.startsWith("SELECT * FROM guides")) {
     return tables.guides;
@@ -685,28 +726,4 @@ function dispatch(mode, tables, ids, sql, params) {
   return [];
 }
 
-export async function seedIfEmpty(db, profiles) {
-  const existing = await db.one("SELECT * FROM profiles WHERE published=1");
-  if (existing) return;
-  const ts = nowIso();
-  for (const profile of profiles) {
-    await db.run(
-      "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
-      [profile.id, JSON.stringify(profile), null, ts, ts]
-    );
-  }
-  const guides = await db.one("SELECT COUNT(*) AS n FROM guides");
-  if (!guides || !guides.n) {
-    await db.run(
-      "INSERT INTO guides (id, title, body, pricing, allowed_payment_providers, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        "block-prep-101",
-        "Hardwood block prep (premium guide stub)",
-        "Stub grow guide. $3.99 demo item routed through the Stripe stub.",
-        JSON.stringify({ kind: "paid", amount_cents: 399, currency: "USD", creator_share_percent: 70 }),
-        JSON.stringify(["stripe"]),
-        ts,
-      ]
-    );
-  }
-}
+export { seedMissing as seedIfEmpty } from "./seed.js";

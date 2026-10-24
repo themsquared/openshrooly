@@ -42,9 +42,10 @@ Local `config.js` points at `http://127.0.0.1:8787`. The Worker allows `https://
 ```bash
 cd community/api
 npx wrangler d1 create shroomlabs
-npx wrangler r2 bucket create shroomlabs-media
-# paste database_id into wrangler.toml
+# R2 is optional until the account enables it:
+# npx wrangler r2 bucket create shroomlabs-media
 npm run db:init
+npm run db:seed
 npm run dev:worker
 ```
 
@@ -54,12 +55,13 @@ API (Cloudflare):
 
 ```bash
 cd community/api
-# first time: wrangler login && wrangler d1 create shroomlabs && wrangler r2 bucket create shroomlabs-media
+# Worker name shroomlabs-api, D1 shroomlabs, route api.shroomlabs.io — see wrangler.toml
 npm run deploy
 npm run db:init:remote
+npm run db:seed:remote
 npx wrangler secret put COMMUNITY_SECRET
-# then in the dashboard: Worker custom domain api.shroomlabs.io
-# and R2 custom domain cdn.shroomlabs.io on bucket shroomlabs-media
+# R2: leave unbound until the account enables R2, then create shroomlabs-media
+# and uncomment [[r2_buckets]] in wrangler.toml.
 ```
 
 Frontend (Netlify):

@@ -92,6 +92,7 @@ Existing D1:
 npx wrangler d1 execute shroomlabs --remote --file=schema-auth.sql
 npx wrangler d1 execute shroomlabs --remote --file=schema-devices.sql
 npx wrangler d1 execute shroomlabs --remote --file=schema-coach.sql
+cd community/api && npm run db:seed:remote
 ```
 
 Device mTLS secrets (optional until chambers are linked): `CF_API_TOKEN`, `CF_ZONE_ID`. See [`docs/DEVICES.md`](DEVICES.md).
