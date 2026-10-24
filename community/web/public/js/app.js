@@ -1,4 +1,5 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
+import { bindAccountTotp, finishPasskeyLogin, finishPasswordLogin, handleFirstFactorResult, showTotpChallenge } from "./totp-ui.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
@@ -298,8 +299,32 @@ async function renderAuth(mode) {
     location.href = oidcStart("apple");
   });
   $("#passkey")?.addEventListener("click", async () => {
-    $("#error").textContent = "Passkey login needs a registered authenticator on this account.";
-    $("#error").classList.remove("hidden");
+    try {
+      const data = await finishPasskeyLogin();
+      handleAuthSuccess(data);
+    } catch (err) {
+      if (err?.data?.totp_required) {
+        handleAuthSuccess(err.data);
+        return;
+      }
+      $("#error").textContent = err.message || "Passkey login needs a registered authenticator on this account.";
+      $("#error").classList.remove("hidden");
+    }
+  });
+  $("#password-form")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(ev.target);
+    try {
+      const data = await finishPasswordLogin(String(fd.get("email") || "").trim(), String(fd.get("password") || ""));
+      handleAuthSuccess(data);
+    } catch (err) {
+      if (err?.data?.totp_required) {
+        handleAuthSuccess(err.data);
+        return;
+      }
+      $("#error").textContent = err.message;
+      $("#error").classList.remove("hidden");
+    }
   });
   $("#form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -323,15 +348,42 @@ async function renderAuth(mode) {
   });
 }
 
+function handleAuthSuccess(data) {
+  const next = params().get("next") || "/account.html";
+  if (data?.totp_required && data.totp_token) {
+    $("#form")?.classList.add("hidden");
+    $("#first-factors")?.classList.add("hidden");
+    $("#error")?.classList.add("hidden");
+    showTotpChallenge({ form: $("#totp-form"), token: data.totp_token, next });
+    return;
+  }
+  handleFirstFactorResult(data, { form: $("#totp-form"), next });
+}
+
 async function renderCallback() {
   const token = params().get("token");
+  const totpToken = params().get("totp_token");
   const code = params().get("code");
+  const next = params().get("next") || "/account.html";
   try {
-    if (token) {
-      const data = await api("/api/auth/magic/complete", { method: "POST", jsonBody: { token } });
-      if (data.access_token) setToken(data.access_token);
-      location.href = params().get("next") || "/account.html";
+    if (totpToken) {
+      $("#status").textContent = "Enter your sign-in code to finish.";
+      showTotpChallenge({ form: $("#totp-form"), token: totpToken, next });
       return;
+    }
+    if (token) {
+      try {
+        const data = await api("/api/auth/magic/complete", { method: "POST", jsonBody: { token } });
+        handleAuthSuccess(data);
+        return;
+      } catch (err) {
+        if (err?.data?.totp_required && err.data.totp_token) {
+          $("#status").textContent = "Enter your sign-in code to finish.";
+          showTotpChallenge({ form: $("#totp-form"), token: err.data.totp_token, next });
+          return;
+        }
+        throw err;
+      }
     }
     if (code) {
       $("#status").textContent = "You are signed in. You can close this tab if it did not move on by itself.";
@@ -374,6 +426,7 @@ async function renderAccount() {
     setToken("");
     location.href = "/";
   });
+  bindAccountTotp($("#totp-panel"), me);
   const devices = await api("/api/devices").catch(() => ({ devices: [] }));
   $("#devices").innerHTML =
     (devices.devices || [])

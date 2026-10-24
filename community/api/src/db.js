@@ -32,6 +32,7 @@ export function createMemoryDb() {
     coach_usage: [],
     coach_cache: [],
     totp_pending: [],
+    totp_recovery_codes: [],
     payment_events: [],
   };
   let ids = {
@@ -47,6 +48,7 @@ export function createMemoryDb() {
     webauthn_challenges: 1,
     oauth_states: 1,
     security_events: 1,
+    totp_recovery_codes: 1,
     device_certs: 1,
     device_commands: 1,
     device_telemetry: 1,
@@ -327,6 +329,42 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("DELETE FROM totp_pending WHERE token_hash=")) {
     tables.totp_pending = tables.totp_pending.filter((s) => s.token_hash !== params[0]);
+    return {};
+  }
+  if (q.startsWith("INSERT INTO totp_recovery_codes")) {
+    tables.totp_recovery_codes.push({
+      id: ids.totp_recovery_codes++,
+      user_id: Number(params[0]),
+      code_hash: params[1],
+      used_at: params[2] ?? null,
+      created_at: params[3],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT COUNT(*) AS n FROM totp_recovery_codes WHERE user_id=? AND used_at IS NULL")) {
+    const n = tables.totp_recovery_codes.filter((s) => s.user_id === Number(params[0]) && !s.used_at).length;
+    return [{ n }];
+  }
+  if (q.startsWith("SELECT COUNT(*) AS n FROM totp_recovery_codes WHERE user_id=")) {
+    const n = tables.totp_recovery_codes.filter((s) => s.user_id === Number(params[0])).length;
+    return [{ n }];
+  }
+  if (q.startsWith("UPDATE totp_recovery_codes SET used_at=? WHERE code_hash=? AND user_id=? AND used_at IS NULL")) {
+    const row = tables.totp_recovery_codes.find(
+      (s) => s.code_hash === params[1] && s.user_id === Number(params[2]) && !s.used_at
+    );
+    if (!row) return { changes: 0, meta: { changes: 0 } };
+    row.used_at = params[0];
+    return { changes: 1, meta: { changes: 1 } };
+  }
+  if (q.startsWith("UPDATE totp_recovery_codes SET used_at=? WHERE code_hash=? AND used_at IS NULL")) {
+    const row = tables.totp_recovery_codes.find((s) => s.code_hash === params[1] && !s.used_at);
+    if (!row) return { changes: 0, meta: { changes: 0 } };
+    row.used_at = params[0];
+    return { changes: 1, meta: { changes: 1 } };
+  }
+  if (q.startsWith("DELETE FROM totp_recovery_codes WHERE user_id=")) {
+    tables.totp_recovery_codes = tables.totp_recovery_codes.filter((s) => s.user_id !== Number(params[0]));
     return {};
   }
   if (q.startsWith("INSERT OR IGNORE INTO payment_events") || q.startsWith("INSERT INTO payment_events")) {
