@@ -60,6 +60,7 @@ async function renderHome() {
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
   $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
+  $("#nav-coach")?.classList.toggle("hidden", pack === "psilocybin");
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML =
     profiles
@@ -97,6 +98,7 @@ async function renderProfile() {
     $("#legal").textContent = p.legal_notice;
     $("#legal").classList.remove("hidden");
   }
+  $("#nav-coach")?.classList.toggle("hidden", p.pack === "psilocybin");
   if (!data.unlocked) {
     $("#locked").classList.remove("hidden");
     $("#price").textContent = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
@@ -252,7 +254,7 @@ async function renderAccount() {
     "<li class='muted'>No paid items yet.</li>";
   if ($("#coach-account") && me.grow_coach) {
     $("#coach-account").textContent = me.grow_coach.entitled
-      ? `Active culinary subscription through ${me.grow_coach.period_end || "this period"}.`
+      ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
       : "Not subscribed. Grow Coach is $3.99/month for culinary chambers only.";
   }
   if (me.sessions) {
@@ -355,6 +357,13 @@ function fmtNum(value, digits = 1) {
   return Number(value).toFixed(digits);
 }
 
+function fmtDate(iso) {
+  if (!iso) return "this period";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 async function renderCoach() {
   const catalog = await api("/api/coach").catch((err) => {
     showCoachError(err);
@@ -362,7 +371,7 @@ async function renderCoach() {
   });
   if (!catalog) return;
   $("#coach-status").textContent = catalog.entitled
-    ? `Active through ${catalog.period_end || "this period"}. Culinary chambers only.`
+    ? `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
     : catalog.marketing;
   if (!isSignedIn()) {
     $("#subscribe-panel").classList.remove("hidden");
