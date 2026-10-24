@@ -1,8 +1,5 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createMemoryDb } from "../src/db.js";
-import { handleRequest } from "../src/handlers.js";
-import { createMemoryStorage } from "../src/storage.js";
 import { nowIso } from "../src/crypto.js";
 import {
   buildDeviceModel,
@@ -12,45 +9,22 @@ import {
   refuseRestrictedPack,
   suggestSetpoints,
 } from "../src/coach-learn.js";
+import { call, register, signedWebhook, testEnv } from "./helpers.js";
 
 function env() {
-  return {
-    db: createMemoryDb(),
-    storage: createMemoryStorage(),
-    CORS_ORIGIN: "http://127.0.0.1:8888",
-    SHOW_PSILOCYBIN: "1",
-    SITE_NAME: "test",
-    AUTH_DEBUG: "1",
-    HIBP_DISABLED: "1",
-    SITE_ORIGIN: "http://127.0.0.1:8888",
-    OIDC_STUB: "1",
-    GROW_COACH_STUB: "1",
-  };
-}
-
-async function call(ctx, method, path, { token, body } = {}) {
-  const headers = { "content-type": "application/json" };
-  if (token) headers.authorization = `Bearer ${token}`;
-  const request = new Request(`http://test${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const res = await handleRequest(request, ctx);
-  const text = await res.text();
-  return { status: res.status, data: text ? JSON.parse(text) : null };
-}
-
-async function register(ctx, email = "coach@example.com") {
-  const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email } });
-  const res = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
-  return { token: res.data.access_token, user: res.data.user };
+  return testEnv({ GROW_COACH_STUB: "1" });
 }
 
 async function subscribe(ctx, token) {
   const session = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
   assert.equal(session.status, 200, JSON.stringify(session.data));
-  const paid = await call(ctx, "POST", `/api/pay/${session.data.id}/complete`, { token, body: {} });
+  const me = await call(ctx, "GET", "/api/me", { token });
+  const paid = await signedWebhook(ctx, {
+    session_id: session.data.id,
+    item_id: session.data.item_id,
+    user_id: me.data.user.id,
+    item_type: "subscription",
+  });
   assert.equal(paid.status, 200, JSON.stringify(paid.data));
   return paid;
 }
