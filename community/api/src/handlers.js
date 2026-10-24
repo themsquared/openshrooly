@@ -11,7 +11,7 @@ import {
   ValidationError,
 } from "./profile.js";
 import { reviewConfirmExtra, slugify } from "./profile-schema.js";
-import { decodeBase64Photo, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES } from "./photos.js";
+import { decodePhotoBase64, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES } from "./photos.js";
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
@@ -141,7 +141,11 @@ function parseProfile(row) {
 }
 
 function serveExtra(review, profile) {
-  return reviewConfirmExtra(review, profile);
+  return {
+    ...reviewConfirmExtra(review, profile),
+    title: review?.title,
+    description: review?.description,
+  };
 }
 
 function showPsi(env) {
@@ -431,7 +435,7 @@ async function route(method, path, url, request, env) {
     let photoKey = null;
     let photoStatus = "approved";
     if (body.photo_base64) {
-      const raw = decodeBase64Photo(body.photo_base64);
+      const raw = decodePhotoBase64(body.photo_base64);
       const caps = capabilities(env, request);
       if (caps.photos) {
         const stored = await storeReportPhoto(db, env, request, { profileId, user, raw });

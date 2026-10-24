@@ -26,7 +26,7 @@ import {
   storePhoto,
   submitForReview,
 } from "./review.js";
-import { decodeBase64Photo } from "./photos.js";
+import { decodePhotoBase64 } from "./photos.js";
 import { readJsonLimited } from "./http-body.js";
 
 function json(body, status = 200) {
@@ -176,7 +176,7 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const row = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
     if (Number(row.author_id) !== Number(user.id)) return json({ error: "forbidden" }, 403);
     const body = await readJson(request);
-    const raw = body.photo_base64 ? decodeBase64Photo(body.photo_base64) : null;
+    const raw = body.photo_base64 ? decodePhotoBase64(body.photo_base64) : null;
     const photo = await storePhoto(db, env, request, { profile, user, raw, contentType: body.photo_type });
     return json({ photo: { id: photo.id, status: photo.status, width: photo.width, height: photo.height } }, 201);
   }
