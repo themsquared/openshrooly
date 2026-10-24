@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { X509Certificate } from "node:crypto";
 import assert from "node:assert/strict";
 import { buildCsr, createWorkerCa, generateP256, issueDeviceCertificate, verifyCsr } from "../src/pki.js";
 
@@ -21,4 +22,18 @@ test("tampered CSR is rejected", async () => {
   const body = lines.find((line) => line && !line.startsWith("-----"));
   const mangled = csr.replace(body, "A".repeat(body.length));
   await assert.rejects(() => verifyCsr(mangled));
+});
+
+test("CA and device certs are valid X.509 to standard verifiers (KeyUsage encoding)", async () => {
+  const ca = await createWorkerCa();
+  const device = await generateP256();
+  const csr = await buildCsr(device.privateKey, device.publicKey, "sldev_ku");
+  const leaf = new X509Certificate((await issueDeviceCertificate(ca, csr, { cn: "sldev_ku", days: 7 })).pem);
+  const root = new X509Certificate(ca.certPem);
+  assert.equal(root.ca, true);
+  assert.equal(root.checkIssued(root), true);
+  assert.equal(leaf.checkIssued(root), true);
+  assert.equal(leaf.verify(root.publicKey), true);
+  assert.deepEqual(leaf.keyUsage, ["1.3.6.1.5.5.7.3.2"]);
+  assert.equal("keyPem" in ca, false);
 });
