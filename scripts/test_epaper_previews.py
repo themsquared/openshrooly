@@ -15,7 +15,7 @@ DISPLAY = ROOT / "esphome" / "components" / "display.yaml"
 LVGL = ROOT / "esphome" / "components" / "lvgl_config.yaml"
 MAIN = ROOT / "esphome" / "lvgl_screens" / "00_main_screen.yaml"
 RENDER = ROOT / "scripts" / "render_epaper_previews.py"
-STEMS = ("growing-in-range", "growing-alert", "idle", "boot-splash")
+STEMS = ("growing-in-range", "growing-alert", "idle", "boot-splash", "wifi-setup")
 
 
 def assert_hyphen(path: Path) -> None:
@@ -62,7 +62,10 @@ def main() -> None:
     render = RENDER.read_text(encoding="utf-8")
     assert '"-:%%/?!,+=-"' in render or "+=-" in render
     assert "RH_RIGHT - hero.text_width" in render
-    assert "Join OpenShrooly, then 192.168.4.1" in render
+    assert "No Wi-Fi. Menu, System, Wi-Fi setup" in render and "No Wi-Fi. Menu, System, Wi-Fi setup" in script
+    assert "id: setup_overlay" in main_yaml and "setup_overlay" in script
+    assert main_yaml.index("id: setup_overlay") < main_yaml.index("id: main_status_message"), \
+        "setup_overlay must come before the buttons so flipping the panel keeps working"
 
     for name in ("spleen-12x24.bdf", "spleen-24x48.bdf"):
         assert_hyphen(FONTS / name)

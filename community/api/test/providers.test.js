@@ -148,3 +148,14 @@ test("push provider stubs only when DEV_STUBS is on a non-prod host", async () =
   assert.equal(dead.name, "disabled");
   assert.equal((await dead.send({ title: "hi" })).ok, false);
 });
+
+test("an email key turns on email but never push", async () => {
+  const prod = new Request("https://api.shroomlabs.io/health", { headers: { host: "api.shroomlabs.io" } });
+  const env = { RESEND_API_KEY: "re_test_only", EMAIL_API_KEY: "x", PUSH_KEY: "y" };
+  const caps = capabilities(env, prod);
+  assert.equal(caps.email, true);
+  assert.equal(caps.push, false);
+  const push = createPushProvider(env, prod);
+  assert.equal(push.name, "disabled");
+  assert.equal((await push.send({ title: "hi" })).ok, false);
+});

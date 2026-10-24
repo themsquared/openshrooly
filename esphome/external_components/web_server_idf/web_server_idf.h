@@ -226,7 +226,13 @@ class AsyncWebServer {
 
   httpd_handle_t get_server() { return this->server_; }
 
+  // Shroom Labs: optional check that runs before any handler sees a request. It
+  // returns false after sending its own reply (401 or 403), and the request stops.
+  using RequestGuard = bool (*)(AsyncWebServerRequest *request);
+  static void set_request_guard(RequestGuard guard) { request_guard_ = guard; }
+
  protected:
+  static RequestGuard request_guard_;
   uint16_t port_{};
   httpd_handle_t server_{};
   static esp_err_t request_handler(httpd_req_t *r);

@@ -20,8 +20,11 @@ function baseSchema() {
   try {
     return execFileSync("git", ["show", "0edd16e:community/api/schema.sql"], { cwd: root, encoding: "utf8" });
   } catch {
-    // Without git history, strip this change's tables from the current schema.
-    return readFileSync(new URL("schema.sql", root), "utf8").split("-- Grow alerts")[0];
+    // Shallow clones (CI) lack that commit: drop every statement of this migration from the current schema.
+    const norm = (s) => s.replace(/\s+/g, " ");
+    const added = new Set(statements(MIGRATION).map(norm));
+    const kept = statements(readFileSync(new URL("schema.sql", root), "utf8")).filter((s) => !added.has(norm(s)));
+    return kept.join(";\n") + ";\n";
   }
 }
 
@@ -62,7 +65,7 @@ test("migration 0003 is additive and safe to run twice", async () => {
   for (const s of statements(MIGRATION)) assert.match(s, /^CREATE (TABLE|INDEX) IF NOT EXISTS /, s.slice(0, 60));
   await withD1(async (d1) => {
     await apply(d1, baseSchema());
-    await d1.prepare("INSERT INTO users (username, email, email_verified, role, created_at) VALUES ('keep', 'keep@example.com', 1, 'user', '2026-01-01T00:00:00Z')").run();
+    await d1.prepare("INSERT INTO users (username, password_hash, email, email_verified, role, created_at) VALUES ('keep', '!no-password', 'keep@example.com', 1, 'user', '2026-01-01T00:00:00Z')").run();
     const before = (await d1.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all()).results.map((r) => r.name);
     await apply(d1, MIGRATION);
     await apply(d1, MIGRATION);

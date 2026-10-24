@@ -12,10 +12,13 @@ app_html_include: ../webapp/out/index.html
 
 | State | How we know | What the grower sees |
 | --- | --- | --- |
-| Unreachable | REST and `/events` both fail | Retry. Same Wi-Fi, or `OpenShrooly` AP at `192.168.4.1` |
+| Unreachable | REST and `/events` both fail | Retry. Same Wi-Fi, or the `OpenShrooly-XXXX` setup network at `192.168.4.1` |
 | First-run Wi-Fi | `wifi_mode=Access Point` or SSID `OpenShrooly*` | Setup banner + link to `/` for the stock Wi-Fi form |
 | Empty grow | `grow_phase` is Idle / missing, or `grow_days_total=0` | Culinary presets. Climate sliders still work |
 | Ready | Station Wi-Fi + an active phase | Gauges, grow strip, light timeline |
+
+Reading is open on the home network. Changes need the web login (user `admin`, password on the
+chamber screen). See [`SECURITY.md`](SECURITY.md).
 
 Helpers live in `webapp/lib/setup-state.js` (no DOM). Tests: `cd webapp && npm test`.
 
@@ -68,7 +71,7 @@ This UI is on-device. After a firmware flash that embeds the new `out/index.html
 
 ## Hardware checklist
 
-1. Factory / erased NVS: join `OpenShrooly`, open `http://192.168.4.1/app/`. Setup banner, not a wall of zeroed cards.
+1. Factory / erased NVS: join `OpenShrooly-XXXX` with the password on the chamber screen, open `http://192.168.4.1/app/`. Setup banner, not a wall of zeroed cards.
 2. Use `/` or the phone captive portal to join home Wi-Fi. Reload `/app/` on the home network. Banner should clear.
 3. Idle chamber: "No grow is running" plus the four presets. Climate sliders still change RH / temp / light.
 4. Tap **Oyster fruiting, 10 days**. E-paper (Ship 5a) should show `Fruiting, day 1 of 10`. Sliders should read RH 90, 22 °C, 12 h light.

@@ -16,6 +16,7 @@ import {
 } from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } from "./providers.js";
+import { renderSignInEmail } from "./email-layout.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, rateLimitClient, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
 import { safeEqual, safeNextPath, sha256B64url, verifyIdToken } from "./oidc.js";
@@ -191,11 +192,7 @@ export async function handleAuth(method, path, url, request, env) {
     const link = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/auth/callback.html?token=${token}`;
     const sent = await sendEmail(
       env,
-      {
-        to: email,
-        subject: "Your Shroom Labs sign-in link",
-        text: `Sign in (expires in 15 minutes):\n${link}\nIf you did not request this, ignore the email.`,
-      },
+      { to: email, ...renderSignInEmail(link, MAGIC_MS / 60000) },
       request
     );
     if (!sent.ok) return json({ error: sent.error || "Email sign-in is not configured yet.", coming_soon: true }, 503);

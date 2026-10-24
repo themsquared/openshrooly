@@ -375,7 +375,7 @@ def draw_growing(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
         ui.draw(img, (WIDTH - ui.text_width(alert)) // 2, ALERT_Y, alert, color=1)
     else:
         small.draw(img, 5, NEXT_Y, state["next_event"])
-    small.draw(img, 5, STATUS_Y, state.get("status", "Join OpenShrooly, then 192.168.4.1"))
+    small.draw(img, 5, STATUS_Y, state.get("status", NO_WIFI_STATUS))
     draw_select(img, small)
     return img
 
@@ -387,8 +387,33 @@ def draw_idle(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
     draw_heroes(img, fonts, state["temp"], state["rh"])
     draw_meta(img, small, *state["meta"])
     small.draw(img, 5, NEXT_Y, "No grow running")
-    small.draw(img, 5, STATUS_Y, state.get("status", "Join OpenShrooly, then 192.168.4.1"))
+    small.draw(img, 5, STATUS_Y, state.get("status", NO_WIFI_STATUS))
     draw_select(img, small)
+    return img
+
+
+NO_WIFI_STATUS = "No Wi-Fi. Menu, System, Wi-Fi setup"
+# Wi-Fi setup box (setup_overlay): y 20, 296x86, 2px border, text at +4,+3 inside
+# the border, 12px lines with 3px spacing.
+SETUP_BOX = (0, 20, 295, 105)
+
+
+def draw_wifi_setup(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
+    """Main screen while the Wi-Fi setup network is on (mirror of update_growing_screen)."""
+    img = draw_idle({**state, "status": "Wi-Fi setup is on"}, fonts)
+    draw = ImageDraw.Draw(img)
+    x0, y0, x1, y1 = SETUP_BOX
+    draw.rectangle([x0, y0, x1, y1], fill=1)
+    draw.rectangle([x0, y0, x1, y1], outline=0, width=2)
+    lines = [
+        "Wi-Fi setup: join this network",
+        f"Name: {state['ssid']}",
+        f"Password: {state['ap_password']}",
+        "Then open 192.168.4.1",
+        f"Web login: admin / {state['web_password']}",
+    ]
+    for i, line in enumerate(lines):
+        fonts["6x12"].draw(img, x0 + 2 + 4, y0 + 2 + 3 + i * 15, line)
     return img
 
 
@@ -467,11 +492,27 @@ def main() -> None:
                 "temp": "21.4C",
                 "rh": "55%",
                 "meta": ("22", "OK", "70", "LOW"),
-                "status": "Join OpenShrooly, then 192.168.4.1",
+                "status": NO_WIFI_STATUS,
             },
             fonts,
         ),
         "idle",
+    )
+    save_pair(
+        draw_wifi_setup(
+            {
+                "time": "08:05",
+                "temp": "21.4C",
+                "rh": "55%",
+                "meta": ("22", "OK", "70", "LOW"),
+                # Example values only. Every chamber makes its own.
+                "ssid": "OpenShrooly-A1B2",
+                "ap_password": "abcd2345efgh",
+                "web_password": "wxyz6789mnpq",
+            },
+            fonts,
+        ),
+        "wifi-setup",
     )
     save_pair(draw_splash(fonts), "boot-splash")
     print(f"wrote fonts, logos, and previews under {PREVIEWS}")

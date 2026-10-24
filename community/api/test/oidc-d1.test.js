@@ -16,9 +16,9 @@ function schema() {
     return readFileSync(process.env.PROD_SCHEMA_FILE, "utf8").split(";\n").map((s) => s.trim()).filter(Boolean);
   }
   const sql = readFileSync(new URL("../schema.sql", import.meta.url), "utf8");
-  const out = sql.replace(/password_hash TEXT,/, "password_hash TEXT NOT NULL,");
-  assert.notEqual(out, sql, "schema.sql users.password_hash line changed; update this test");
-  return out.replace(/--.*$/gm, "").split(";").map((s) => s.trim()).filter(Boolean);
+  // Production has users.password_hash NOT NULL; schema.sql must keep matching it or this test proves nothing.
+  assert.match(sql, /password_hash TEXT NOT NULL/, "schema.sql users.password_hash must be NOT NULL like production");
+  return sql.replace(/--.*$/gm, "").split(";").map((s) => s.trim()).filter(Boolean);
 }
 
 async function withD1(fn) {

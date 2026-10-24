@@ -96,9 +96,61 @@ static void unit_tests() {
   CHECK(!signature_valid(pub, "x", sig));
   pub[0] ^= 1;
   CHECK(!signature_valid(pub, "", sig));
+
+  // Signature block on files installed from the chamber page.
+  auto block = [](const std::string &text) {
+    std::string b(LAN_TRAILER_SIZE, '\0');
+    b.replace(0, text.size(), text);
+    b.replace(LAN_TRAILER_SIZE - 8, 8, "OSSIGNv1");
+    return b;
+  };
+  auto parse = [](const std::string &b, LanTrailer *t) {
+    return parse_lan_trailer(reinterpret_cast<const uint8_t *>(b.data()), b.size(), t);
+  };
+  LanTrailer t;
+  const std::string good = "channel=stable\nversion=1.0.3-sl.2\nurl=" + p + "x.ota.bin\nsig=AAAA\n";
+  CHECK(parse(block(good), &t) && t.channel == "stable" && t.version == "1.0.3-sl.2" && t.signature == "AAAA");
+  std::string bad = block(good);
+  bad[LAN_TRAILER_SIZE - 1] = '2';
+  CHECK(!parse(bad, &t));                                          // wrong magic
+  bad = block(good);
+  bad[good.size() + 4] = 'x';
+  CHECK(!parse(bad, &t));                                          // junk after the text
+  CHECK(!parse(block(good).substr(1), &t));                        // wrong length
+  CHECK(!parse(block("version=1\nchannel=stable\nurl=u\nsig=s\n"), &t));  // wrong order
+  CHECK(!parse(block("channel=\nversion=1\nurl=u\nsig=s\n"), &t));        // empty value
+  CHECK(!parse(block("channel=a b\nversion=1\nurl=u\nsig=s\n"), &t));     // space
+  CHECK(!parse(block("channel=a\nversion=1\nurl=u\nsig=s"), &t));          // no final newline
+  CHECK(!parse(block(good + "x=1\n"), &t));                       // extra field
+  CHECK(!parse(block(""), &t));                                    // unsigned
+  CHECK(!parse(std::string(LAN_TRAILER_SIZE, '\0'), &t));
 }
 
 int main(int argc, char **argv) {
+  if (argc == 5 && std::string(argv[1]) == "lan") {
+    // lan mode: <pub hex> <file> <sha256 hex of all but the last 512 bytes>
+    uint8_t pub[32];
+    if (!hex32(argv[2], pub))
+      return 2;
+    FILE *f = std::fopen(argv[3], "rb");
+    if (!f)
+      return 2;
+    std::string data;
+    char b[4096];
+    size_t r;
+    while ((r = std::fread(b, 1, sizeof(b), f)) > 0)
+      data.append(b, r);
+    std::fclose(f);
+    if (data.size() <= LAN_TRAILER_SIZE)
+      return 1;
+    const size_t image = data.size() - LAN_TRAILER_SIZE;
+    std::string version;
+    return lan_image_valid(pub, "openshrooly", "stable", "https://shroomlabs.io/firmware/stable/",
+                           reinterpret_cast<const uint8_t *>(data.data()) + image, LAN_TRAILER_SIZE, image, argv[4],
+                           &version)
+               ? 0
+               : 1;
+  }
   if (argc == 4) {
     // verify mode: <pub hex> <message file> <signature base64>
     uint8_t pub[32];

@@ -7,6 +7,8 @@
 // The private key must live outside this repository (the release key is kept offline).
 // The script refuses to sign if the key's public half differs from the one compiled
 // into the device (esphome/components/updates.yaml), and checks its own signatures.
+// It writes openshrooly-<version>.ota.bin, .factory.bin, .signed.bin (the OTA image
+// with its signature block, for installing from the chamber page) and manifest.json.
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -41,6 +43,18 @@ export function devicePublicKeyHex(repo = REPO) {
   const m = yaml.match(/public_key:\s*"([0-9a-f]{64})"/);
   if (!m) throw new Error("public_key not found in esphome/components/updates.yaml");
   return m[1];
+}
+
+// Files installed from the chamber's own web page carry the OTA signature in a
+// 512 byte block at the end (see esphome/external_components/signed_update/update_logic.h).
+export const LAN_TRAILER_SIZE = 512;
+export function lanTrailer({ channel, version, url, signature }) {
+  const text = Buffer.from(`channel=${channel}\nversion=${version}\nurl=${url}\nsig=${signature}\n`);
+  if (text.length > LAN_TRAILER_SIZE - 8) throw new Error("signature block too long");
+  const block = Buffer.alloc(LAN_TRAILER_SIZE);
+  text.copy(block);
+  block.write("OSSIGNv1", LAN_TRAILER_SIZE - 8, "ascii");
+  return block;
 }
 
 function rawPublicHex(publicKey) {
@@ -96,6 +110,12 @@ export function signRelease(opts, repo = REPO) {
     sha256: files.factory.sha256,
     url: base + files.factory.name,
   });
+  // Same image plus its signature block, for "Install from file" on the chamber page.
+  const signedName = `openshrooly-${opts.version}.signed.bin`;
+  writeFileSync(
+    join(opts.out, signedName),
+    Buffer.concat([readFileSync(join(opts.out, files.ota.name)), lanTrailer(ota)]),
+  );
   const manifest = { ...ota, usb, chip: "ESP32-S3", key: rawPublicHex(publicKey).slice(0, 16) };
   writeFileSync(join(opts.out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
   return manifest;

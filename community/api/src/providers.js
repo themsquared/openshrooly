@@ -49,8 +49,9 @@ export function coachAiConfigured(env = {}) {
   return Boolean(env.AI) && String(env.GROW_COACH_PROVIDER || "").toLowerCase() !== "stub";
 }
 
-export function pushConfigured(env = {}) {
-  return Boolean(String(env.PUSH_KEY || env.RESEND_API_KEY || env.EMAIL_API_KEY || "").trim());
+// Push delivery is not built yet, so it is never available in production, whatever keys are set.
+export function pushConfigured() {
+  return false;
 }
 
 export function capabilities(env = {}, request) {
@@ -62,7 +63,7 @@ export function capabilities(env = {}, request) {
     payments: paymentsConfigured(env) || stubs,
     photos: photosConfigured(env) || stubs,
     coach: coachAiConfigured(env) || stubs,
-    push: pushConfigured(env) || stubs,
+    push: pushConfigured() || stubs,
     stubs,
   };
 }
@@ -75,14 +76,6 @@ export function comingSoonBody(feature) {
 }
 
 export function createPushProvider(env = {}, request) {
-  if (pushConfigured(env) && !devStubsEnabled(env, request)) {
-    return {
-      name: "email",
-      async send() {
-        return { ok: false, error: "push delivery is not wired yet", coming_soon: true };
-      },
-    };
-  }
   if (devStubsEnabled(env, request)) {
     const outbox = [];
     return {

@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
-    password_hash TEXT,
+    password_hash TEXT NOT NULL, -- matches production; accounts without a password store "!no-password"
     email TEXT UNIQUE,
     email_verified INTEGER NOT NULL DEFAULT 0,
     display_name TEXT,
