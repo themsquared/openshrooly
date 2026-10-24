@@ -741,6 +741,14 @@ button.nav-toggle {
 .profile-page-art img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
 .profile-page-art .species-photo img { aspect-ratio: auto; object-fit: contain; background: #0c1410; }
 .profile-page .grow-timeline p { margin: 0.35rem 0 0; color: var(--sl-ink-dim); }
+.light-recipe { margin: 1.6rem 0 0; }
+.light-recipe h3 { font-family: var(--display); font-size: 1.2rem; margin: 1.1rem 0 0.45rem; }
+.light-recipe-table { width: 100%; border-collapse: collapse; margin: 0.8rem 0 0; font-size: 0.95rem; }
+.light-recipe-table caption { text-align: left; font-weight: 700; margin: 0 0 0.45rem; color: var(--sl-ink); }
+.light-recipe-table th, .light-recipe-table td { text-align: left; padding: 0.4rem 0.55rem 0.4rem 0; border-bottom: 1px solid var(--sl-line); vertical-align: top; }
+.light-recipe-table th { color: var(--sl-ink-dim); font-weight: 600; }
+.light-recipe ul { padding-left: 1.2rem; margin: 0.4rem 0 0; }
+.light-recipe a { color: var(--sl-mycelium); }
 .faq-links { padding-left: 1.2rem; }
 .faq-links li { margin: 0 0 0.6rem; }
 

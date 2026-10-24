@@ -184,7 +184,7 @@ def maybe_advance_grow(conn, device_id: int) -> None:
     if stage.id != grow["current_stage_id"]:
         device = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
         try:
-            result = device_client(device).apply_stage(stage)
+            result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
         except HTTPException:
             return
         conn.execute("UPDATE grows SET current_stage_id=? WHERE id=?", (stage.id, grow["id"]))
@@ -424,7 +424,7 @@ def apply_profile(
     profile = get_profile(conn, profile_id)
     stage = profile.stage_by_id(stage_id) if stage_id else profile.stages[0]
     try:
-        result = device_client(device).apply_stage(stage)
+        result = device_client(device).apply_stage(stage, recipe=profile.light_recipe)
     except HTTPException as exc:
         kind = "blocked" if getattr(exc.__cause__, "blocked", True) else "offline"
         return RedirectResponse(f"/devices/{device_id}?apply={kind}", status_code=303)
@@ -462,7 +462,7 @@ def profile_detail(request: Request, profile_id: str):
         request,
         "profile.html",
         profile=profile,
-        preview={stage.id: commands_as_preview(stage) for stage in profile.stages},
+        preview={stage.id: commands_as_preview(stage, profile.light_recipe) for stage in profile.stages},
     )
 
 

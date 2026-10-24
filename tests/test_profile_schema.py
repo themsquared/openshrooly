@@ -20,6 +20,37 @@ def test_all_seed_profiles_validate():
         validate_profile(profile)
         assert profile.stages
         assert profile.source_notes
+        assert profile.light_recipe
+        assert profile.light_recipe.why
+        assert profile.light_recipe.wavelength_note
+        assert profile.light_recipe.sources
+        assert "colonization" in profile.light_recipe.phases
+        assert "fruiting" in profile.light_recipe.phases
+
+
+def test_light_recipe_ranges_and_sources():
+    raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+    validate_profile(raw)
+    raw["light_recipe"]["phases"]["fruiting"]["photoperiod_hours"] = 30
+    with pytest.raises(ValidationError, match="photoperiod"):
+        validate_profile(raw)
+    raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+    raw["light_recipe"]["phases"]["fruiting"]["white_brightness_percent"] = 140
+    with pytest.raises(ValidationError, match="white brightness"):
+        validate_profile(raw)
+    raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+    raw["light_recipe"]["sources"] = []
+    with pytest.raises(ValidationError, match="source"):
+        validate_profile(raw)
+    raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+    del raw["light_recipe"]["phases"]["colonization"]
+    with pytest.raises(ValidationError, match="colonization"):
+        validate_profile(raw)
+    for bad_url in ("javascript:alert(1)", "data:text/html,hi", "http://example.com/paper"):
+        raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+        raw["light_recipe"]["sources"][0]["url"] = bad_url
+        with pytest.raises(ValidationError, match="https"):
+            validate_profile(raw)
 
 
 def test_psilocybin_cannot_be_paid_or_affiliated():

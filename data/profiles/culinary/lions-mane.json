@@ -34,15 +34,15 @@
     {
       "id": "colonization",
       "name": "Colonization",
-      "duration_days": 16,
-      "humidity_percent": 90,
+      "duration_days": 16.0,
+      "humidity_percent": 90.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 22,
+      "temperature_c": 22.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 17,
-      "temperature_warning_max_c": 27,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
         "duration_hours": 0,
@@ -61,22 +61,22 @@
     {
       "id": "pinning",
       "name": "Pinning",
-      "duration_days": 5,
-      "humidity_percent": 94,
+      "duration_days": 5.0,
+      "humidity_percent": 94.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 18,
+      "temperature_c": 18.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 13,
-      "temperature_warning_max_c": 23,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 23.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 10,
-        "white_led_lux": 180,
+        "duration_hours": 12,
+        "white_led_lux": 190,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 20,
@@ -88,22 +88,22 @@
     {
       "id": "fruiting",
       "name": "Fruiting",
-      "duration_days": 12,
-      "humidity_percent": 90,
+      "duration_days": 12.0,
+      "humidity_percent": 90.0,
       "humidity_hysteresis": 2.0,
-      "temperature_c": 17,
+      "temperature_c": 17.0,
       "temperature_hysteresis": 1.0,
       "temperature_control_enabled": true,
-      "temperature_warning_min_c": 12,
-      "temperature_warning_max_c": 22,
-      "humidifier_speed_percent": 75,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 22.0,
+      "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 10,
-        "white_led_lux": 200,
+        "duration_hours": 12,
+        "white_led_lux": 190,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 18,
@@ -142,5 +142,41 @@
   "firmware_compat": {
     "min_version": "1.0.0",
     "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 26% white, mapped from Jozifek et al. 2025 additional tests at 200 lux on a 12 h cycle, which produced white basidiocarps. Their main 500 lux treatment was 24 h continuous light and caused pink stress coloring, so that schedule is not used. RGB is the general blue mix; that paper used white fluorescent, not a measured blue ratio.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Jozifek et al. 2025",
+        "detail": "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). The main cultivation used 500 lux for 24 h continuous light and caused pink stress coloring. Additional tests at 200 lux or lower on a 12 h cycle produced white basidiocarps. This recipe uses that 200 lux, 12 h schedule. 200 lux maps to 26% white.",
+        "url": "https://doi.org/10.3390/agriculture15050460"
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 26,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
   }
 }

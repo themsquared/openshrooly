@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .mapping import DeviceCommand, stage_to_commands
-from .models import ProfileStage
+from .models import LightRecipe, ProfileStage
 
 DEFAULT_TIMEOUT_S = 5.0
 
@@ -147,9 +147,9 @@ class ESPHomeDeviceClient:
                 return True, entity_id
         return False, None
 
-    def apply_stage(self, stage: ProfileStage) -> ApplyResult:
+    def apply_stage(self, stage: ProfileStage, recipe: LightRecipe | None = None) -> ApplyResult:
         result = ApplyResult(ok=True)
-        for command in stage_to_commands(stage):
+        for command in stage_to_commands(stage, recipe):
             ok, entity_id = self.apply_command(command)
             row = {
                 "field": command.field,

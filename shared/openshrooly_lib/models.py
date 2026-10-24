@@ -27,6 +27,15 @@ class SourceNote:
         return cls(title=data["title"], detail=data["detail"], url=data.get("url"))
 
 
+WAVELENGTH_NOTE = (
+    "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of "
+    "cited wavelengths, not a measured spectrum."
+)
+
+COLONIZATION_LIKE_STAGES = frozenset({"colonization", "rest", "browning", "cold_shock"})
+FRUITING_LIKE_STAGES = frozenset({"pinning", "fruiting", "flush"})
+
+
 @dataclass
 class LightSchedule:
     sunrise_hour: int = 8
@@ -50,6 +59,77 @@ class LightSchedule:
             red_percent=int(data.get("red_percent", 0)),
             green_percent=int(data.get("green_percent", 0)),
             blue_percent=int(data.get("blue_percent", 0)),
+        )
+
+
+@dataclass
+class LightPhase:
+    photoperiod_hours: float
+    white_brightness_percent: float
+    red_percent: int = 0
+    green_percent: int = 0
+    blue_percent: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "photoperiod_hours": self.photoperiod_hours,
+            "white_brightness_percent": self.white_brightness_percent,
+            "red_percent": self.red_percent,
+            "green_percent": self.green_percent,
+            "blue_percent": self.blue_percent,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "LightPhase":
+        if not data:
+            return cls(0, 0, 0, 0, 0)
+        return cls(
+            photoperiod_hours=float(data.get("photoperiod_hours", 0)),
+            white_brightness_percent=float(data.get("white_brightness_percent", 0)),
+            red_percent=int(data.get("red_percent", 0)),
+            green_percent=int(data.get("green_percent", 0)),
+            blue_percent=int(data.get("blue_percent", 0)),
+        )
+
+
+@dataclass
+class LightRecipe:
+    why: str
+    sources: list[SourceNote]
+    phases: dict[str, LightPhase]
+    wavelength_note: str = WAVELENGTH_NOTE
+
+    def phase_for(self, stage_id: str) -> LightPhase:
+        if stage_id in self.phases:
+            return self.phases[stage_id]
+        if stage_id in FRUITING_LIKE_STAGES and "fruiting" in self.phases:
+            return self.phases["fruiting"]
+        if stage_id in COLONIZATION_LIKE_STAGES and "colonization" in self.phases:
+            return self.phases["colonization"]
+        if "fruiting" in self.phases:
+            return self.phases["fruiting"]
+        return next(iter(self.phases.values()))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "why": self.why,
+            "wavelength_note": self.wavelength_note,
+            "sources": [note.to_dict() for note in self.sources],
+            "phases": {name: phase.to_dict() for name, phase in self.phases.items()},
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "LightRecipe | None":
+        if not data:
+            return None
+        phases = {
+            name: LightPhase.from_dict(phase) for name, phase in (data.get("phases") or {}).items()
+        }
+        return cls(
+            why=data.get("why", ""),
+            wavelength_note=data.get("wavelength_note") or WAVELENGTH_NOTE,
+            sources=[SourceNote.from_dict(note) for note in data.get("sources", [])],
+            phases=phases,
         )
 
 
@@ -203,6 +283,7 @@ class MushroomProfile:
             "uses_existing_entities_only": True,
         }
     )
+    light_recipe: LightRecipe | None = None
 
     @property
     def is_psilocybin(self) -> bool:
@@ -230,7 +311,7 @@ class MushroomProfile:
         return self.stages[-1]
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "schema_version": self.schema_version,
             "id": self.id,
             "name": self.name,
@@ -254,6 +335,9 @@ class MushroomProfile:
             "author": self.author,
             "firmware_compat": dict(self.firmware_compat),
         }
+        if self.light_recipe:
+            data["light_recipe"] = self.light_recipe.to_dict()
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "MushroomProfile":
@@ -287,6 +371,7 @@ class MushroomProfile:
                     {"min_version": "1.0.0", "uses_existing_entities_only": True},
                 )
             ),
+            light_recipe=LightRecipe.from_dict(data.get("light_recipe")),
         )
 
 

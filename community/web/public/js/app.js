@@ -184,6 +184,39 @@ async function renderProfile() {
       </li>`
     )
     .join("");
+  const recipeBox = $("#light-recipe");
+  if (recipeBox && p.light_recipe) {
+    const recipe = p.light_recipe;
+    const rows = Object.entries(recipe.phases || {})
+      .map(
+        ([id, phase]) =>
+          `<tr><th scope="row">${escapeHtml(id)}</th><td>${phase.photoperiod_hours} h on</td><td>white ${phase.white_brightness_percent}%</td><td>RGB ${phase.red_percent} / ${phase.green_percent} / ${phase.blue_percent}</td></tr>`
+      )
+      .join("");
+    const sources = (recipe.sources || [])
+      .map((note) => {
+        const title = escapeHtml(note.title);
+        const detail = escapeHtml(note.detail);
+        const href = httpsSourceHref(note.url);
+        if (href) {
+          const rel = off ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
+          return `<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`;
+        }
+        return `<li><strong>${title}.</strong> ${detail}</li>`;
+      })
+      .join("");
+    recipeBox.classList.remove("hidden");
+    recipeBox.innerHTML = `<h2 id="light-recipe-heading">Light recipe</h2>
+      <p>${escapeHtml(recipe.why)}</p>
+      <p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p>
+      <table class="light-recipe-table">
+        <caption>Photoperiod and mix for this chamber</caption>
+        <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <h3>Recipe sources</h3>
+      <ul>${sources}</ul>`;
+  }
   $("#sources").innerHTML = (p.source_notes || [])
     .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
     .join("");
@@ -408,6 +441,16 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function httpsSourceHref(url) {
+  if (url == null || String(url).trim() === "") return "";
+  try {
+    const parsed = new URL(String(url).trim());
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
 }
 
 bindMobileNav();
