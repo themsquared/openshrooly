@@ -26,6 +26,9 @@ export function createMemoryDb() {
     device_certs: [],
     device_commands: [],
     device_telemetry: [],
+    coach_subs: [],
+    coach_usage: [],
+    coach_cache: [],
   };
   let ids = {
     users: 1,
@@ -400,6 +403,9 @@ function dispatch(mode, tables, ids, sql, params) {
     tables.grow_reports.push(row);
     return { lastRowId: row.id };
   }
+  if (q.startsWith("SELECT * FROM grow_reports WHERE author_id=")) {
+    return tables.grow_reports.filter((r) => Number(r.author_id) === Number(params[0]));
+  }
   if (q.startsWith("SELECT * FROM grow_reports")) {
     return tables.grow_reports.filter((r) => r.profile_id === params[0]).reverse();
   }
@@ -606,6 +612,65 @@ function dispatch(mode, tables, ids, sql, params) {
     const row = tables.device_commands.find((c) => c.id === params[1]);
     if (row) row.consumed_at = params[0];
     return {};
+  }
+  if (q.startsWith("SELECT * FROM device_telemetry WHERE device_id=")) {
+    return tables.device_telemetry.filter((t) => t.device_id === params[0]);
+  }
+  if (q.startsWith("INSERT INTO coach_subs")) {
+    tables.coach_subs.push({
+      user_id: params[0],
+      status: params[1],
+      period_end: params[2],
+      auto_tune: params[3],
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM coach_subs WHERE user_id=")) {
+    return tables.coach_subs.filter((s) => Number(s.user_id) === Number(params[0]));
+  }
+  if (q.startsWith("UPDATE coach_subs SET status=?, period_end=")) {
+    const row = tables.coach_subs.find((s) => Number(s.user_id) === Number(params[2]));
+    if (row) {
+      row.status = params[0];
+      row.period_end = params[1];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE coach_subs SET auto_tune=")) {
+    const row = tables.coach_subs.find((s) => Number(s.user_id) === Number(params[1]));
+    if (row) row.auto_tune = params[0];
+    return {};
+  }
+  if (q.startsWith("INSERT INTO coach_usage")) {
+    tables.coach_usage.push({
+      user_id: params[0],
+      day: params[1],
+      chats: params[2] ?? 0,
+      photos: params[3] ?? 0,
+      neurons: params[4] ?? 0,
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM coach_usage WHERE user_id=? AND day=")) {
+    return tables.coach_usage.filter((u) => Number(u.user_id) === Number(params[0]) && u.day === params[1]);
+  }
+  if (q.startsWith("UPDATE coach_usage SET chats=?")) {
+    const row = tables.coach_usage.find((u) => Number(u.user_id) === Number(params[3]) && u.day === params[4]);
+    if (row) {
+      row.chats = params[0];
+      row.photos = params[1];
+      row.neurons = params[2];
+    }
+    return {};
+  }
+  if (q.startsWith("INSERT OR REPLACE INTO coach_cache") || q.startsWith("INSERT INTO coach_cache")) {
+    tables.coach_cache = tables.coach_cache.filter((c) => c.cache_key !== params[0]);
+    tables.coach_cache.push({ cache_key: params[0], value: params[1], expires_at: params[2] });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM coach_cache WHERE cache_key=")) {
+    return tables.coach_cache.filter((c) => c.cache_key === params[0]);
   }
   if (q.startsWith("INSERT INTO device_telemetry")) {
     tables.device_telemetry.push({

@@ -14,6 +14,9 @@ database_id = "00000000-0000-0000-0000-000000000001"
 binding = "PHOTOS"
 bucket_name = "shroomlabs-media"
 
+[ai]
+binding = "AI"
+
 [vars]
 SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
@@ -21,6 +24,10 @@ SHOW_PSILOCYBIN = "1"
 CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888"
 # Public R2 custom domain for grow-report photos.
 CDN_BASE_URL = "https://cdn.shroomlabs.io"
+# Grow Coach: Workers AI in production; local Node defaults GROW_COACH_STUB=1.
+GROW_COACH_PROVIDER = "workers-ai"
+GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
+GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 
 # Custom API hostname (enable after shroomlabs.io DNS is on Cloudflare):
 # [[routes]]

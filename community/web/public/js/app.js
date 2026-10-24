@@ -59,6 +59,7 @@ async function renderHome() {
   $("#pack").value = pack;
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
+  $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML =
     profiles
@@ -249,6 +250,11 @@ async function renderAccount() {
   $("#ents").innerHTML =
     me.entitlements.map((e) => `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`).join("") ||
     "<li class='muted'>No paid items yet.</li>";
+  if ($("#coach-account") && me.grow_coach) {
+    $("#coach-account").textContent = me.grow_coach.entitled
+      ? `Active culinary subscription through ${me.grow_coach.period_end || "this period"}.`
+      : "Not subscribed. Grow Coach is $3.99/month for culinary chambers only.";
+  }
   if (me.sessions) {
     $("#sessions").innerHTML = me.sessions
       .map((s) => `<li>${escapeHtml(s.created_at)} · expires ${escapeHtml(s.expires_at)}${s.current ? " · this device" : ""}</li>`)
@@ -329,6 +335,164 @@ if (page === "callback") renderCallback();
 if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
 if (page === "publish") renderPublish();
 if (page === "claim") renderClaim();
+if (page === "coach") renderCoach().catch((err) => {
+  const box = $("#coach-error");
+  if (box) {
+    box.textContent = err.message;
+    box.classList.remove("hidden");
+  }
+});
+
+function showCoachError(err) {
+  const box = $("#coach-error");
+  if (!box) return;
+  box.textContent = err.message || String(err);
+  box.classList.remove("hidden");
+}
+
+function fmtNum(value, digits = 1) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return Number(value).toFixed(digits);
+}
+
+async function renderCoach() {
+  const catalog = await api("/api/coach").catch((err) => {
+    showCoachError(err);
+    return null;
+  });
+  if (!catalog) return;
+  $("#coach-status").textContent = catalog.entitled
+    ? `Active through ${catalog.period_end || "this period"}. Culinary chambers only.`
+    : catalog.marketing;
+  if (!isSignedIn()) {
+    $("#subscribe-panel").classList.remove("hidden");
+    $("#subscribe").textContent = "Sign in to subscribe";
+    $("#subscribe").addEventListener("click", () => {
+      location.href = `/login.html?next=${encodeURIComponent("/coach.html")}`;
+    });
+    return;
+  }
+  if (!catalog.entitled) {
+    $("#subscribe-panel").classList.remove("hidden");
+    $("#subscribe").addEventListener("click", async () => {
+      try {
+        const session = await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
+        await api(`/api/pay/${session.id}/complete`, { method: "POST", jsonBody: {} });
+        location.reload();
+      } catch (err) {
+        showCoachError(err);
+      }
+    });
+    return;
+  }
+  $("#gated").classList.remove("hidden");
+  const devices = await api("/api/devices").catch(() => ({ devices: [] }));
+  const claimed = (devices.devices || []).filter((d) => d.status !== "revoked");
+  $("#device").innerHTML =
+    `<option value="">All culinary history</option>` +
+    claimed.map((d) => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name || d.id)}</option>`).join("");
+
+  const deviceId = () => $("#device").value || "";
+  $("#auto-tune").checked = Boolean(catalog.auto_tune);
+
+  async function refreshUsage() {
+    const usage = await api("/api/coach/usage").catch(() => null);
+    if (!usage) return;
+    $("#usage").textContent = `${usage.chats}/${usage.caps.chats} chats · ${usage.photos}/${usage.caps.photos} photo checks today`;
+  }
+
+  async function refreshModel() {
+    const qs = deviceId() ? `?device_id=${encodeURIComponent(deviceId())}` : "";
+    const data = await api(`/api/coach/model${qs}`);
+    const m = data.model || {};
+    $("#stats").innerHTML = [
+      ["Samples", m.sample_count ?? 0, 0],
+      ["RH error", m.humidity_error, 1],
+      ["RH droop", m.humidity_droop, 1],
+      ["Temp offset", m.temperature_offset, 1],
+      ["Success rate", m.outcome_success_rate == null ? null : m.outcome_success_rate * 100, 0],
+    ]
+      .map(([label, value, digits]) => `<div class="stat"><strong>${fmtNum(value, digits)}${label === "Success rate" && value != null ? "%" : ""}</strong><span>${label}</span></div>`)
+      .join("");
+    $("#alerts").innerHTML =
+      (data.alerts || [])
+        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong> — ${escapeHtml(a.message)}</li>`)
+        .join("") || `<li class="info">No alerts right now.</li>`;
+    const s = data.suggestion || {};
+    $("#suggestion").innerHTML = s.humidity_percent
+      ? `<p>Suggested <strong>${s.humidity_percent}% RH</strong> · <strong>${s.temperature_c} °C</strong> · fan ${s.fan_speed_percent}%. ${
+          (s.reasons || []).join(" ") || "No change needed yet."
+        }</p>`
+      : "<p class='muted'>Need a few telemetry samples before I can tune this chamber.</p>";
+    $("#suggestion").dataset.ready = s.within_bounds ? "1" : "0";
+  }
+
+  $("#device").addEventListener("change", () => refreshModel().catch(showCoachError));
+  $("#refresh-model").addEventListener("click", () => refreshModel().catch(showCoachError));
+  $("#auto-tune").addEventListener("change", async () => {
+    try {
+      await api("/api/coach/auto-tune", { method: "POST", jsonBody: { enabled: $("#auto-tune").checked } });
+    } catch (err) {
+      showCoachError(err);
+    }
+  });
+  $("#approve").addEventListener("click", async () => {
+    try {
+      const data = await api("/api/coach/suggest", {
+        method: "POST",
+        jsonBody: { device_id: deviceId() || undefined, apply: true, approve: true },
+      });
+      $("#suggestion").innerHTML += `<p class="muted">Queued for the chamber${data.applied ? "" : " (not applied)"}.</p>`;
+    } catch (err) {
+      showCoachError(err);
+    }
+  });
+  $("#chat-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const message = $("#chat-message").value.trim();
+    if (!message) return;
+    $("#chat-log").insertAdjacentHTML("beforeend", `<div class="chat-bubble you">${escapeHtml(message)}</div>`);
+    $("#chat-message").value = "";
+    try {
+      const data = await api("/api/coach/chat", { method: "POST", jsonBody: { message, device_id: deviceId() || undefined } });
+      $("#chat-log").insertAdjacentHTML("beforeend", `<div class="chat-bubble">${escapeHtml(data.reply)}</div>`);
+      await refreshUsage();
+    } catch (err) {
+      showCoachError(err);
+    }
+  });
+  $("#photo-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const file = $("#photo-file").files?.[0];
+    if (!file) {
+      showCoachError(new Error("Choose a photo first."));
+      return;
+    }
+    try {
+      const data = await api("/api/coach/photo", {
+        method: "POST",
+        jsonBody: {
+          photo_base64: await fileToBase64(file),
+          photo_type: file.type,
+          photo_ext: (file.name.split(".").pop() || "jpg").toLowerCase(),
+          hint: $("#photo-hint").value,
+        },
+      });
+      $("#photo-result").innerHTML = `
+        <p>Stage <strong>${escapeHtml(data.stage)}</strong> · confidence ${fmtNum((data.confidence || 0) * 100, 0)}%</p>
+        <div class="photo-flags">${(data.flags || [])
+          .map((f) => `<span class="chip">${escapeHtml(f.label || f.kind)} · ${fmtNum((f.confidence || 0) * 100, 0)}%</span>`)
+          .join("")}</div>
+        <p>${escapeHtml(data.next_steps || "")}</p>`;
+      await refreshUsage();
+    } catch (err) {
+      showCoachError(err);
+    }
+  });
+
+  await refreshModel().catch(showCoachError);
+  await refreshUsage();
+}
 
 async function renderClaim() {
   if (!getToken()) {

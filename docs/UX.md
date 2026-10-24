@@ -37,6 +37,14 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 | On-device | Lightweight cousin: gauges, light timeline, profile strip, system fonts |
 | Expo app | Same tokens; scaffold only |
 
+## Grow Coach
+
+- Culinary copy only. Price is $3.99/month, said in plain language. Never pair the page with the restricted pack.
+- Subscribe is one button (stub checkout). Gated tools stay hidden until paid.
+- Chamber picker, learned stats, alerts, then **Approve & queue setpoints**. Auto-tune is an explicit checkbox with “inside safe bounds” in the label.
+- Chat and photo check show remaining daily caps. Photo result always includes confidence and a next step, not color alone.
+- Errors name the next action (sign in, pay, daily cap, not your device).
+
 ## Cloud claim
 
 - The chamber shows a **large 6-character code** (and a QR that is just `https://shroomlabs.io/claim.html?code=…`). No password typed on the device.

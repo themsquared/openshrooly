@@ -333,6 +333,74 @@ button.ghost {
   font-size: 13px;
 }
 .supplies { margin-top: 2.4rem; }
+.coach-hero { min-height: 280px; }
+.coach-toolbar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
+}
+.coach-toolbar label { margin: 0; min-width: 180px; }
+.coach-toolbar .toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.coach-toolbar .toggle input { width: auto; }
+.coach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.1rem;
+  margin-bottom: 1.2rem;
+}
+.coach-panel { padding: 1.2rem 1.3rem 1.4rem; }
+.coach-panel h2 {
+  font-family: var(--display);
+  font-size: 1.45rem;
+  margin: 0 0 0.5rem;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 0.6rem 0 1rem;
+}
+.stat {
+  border: 1px solid var(--sl-line);
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  background: rgba(7, 17, 14, 0.45);
+}
+.stat strong { display: block; font-size: 1.15rem; }
+.stat span { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sl-muted); }
+.alert-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.alert-list li {
+  border-left: 3px solid var(--sl-cap);
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 8px;
+  background: rgba(212, 120, 74, 0.1);
+  border-radius: 0 10px 10px 0;
+}
+.alert-list li.info { border-left-color: var(--sl-humid); background: rgba(94, 228, 255, 0.08); }
+.chat-log {
+  min-height: 180px;
+  max-height: 320px;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+  margin: 0.7rem 0 1rem;
+}
+.chat-bubble {
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid var(--sl-line);
+  background: rgba(7, 17, 14, 0.5);
+}
+.chat-bubble.you { border-color: rgba(125, 255, 179, 0.28); }
+.photo-flags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.6rem 0; }
 @media (max-width: 700px) {
   .hero-copy { padding: 1.6rem 1.2rem; }
   .site-header { align-items: flex-start; }

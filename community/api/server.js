@@ -31,6 +31,8 @@ const env = {
   DEVICE_ISSUER: process.env.DEVICE_ISSUER || "worker",
   DEVICE_CA_KEY: process.env.DEVICE_CA_KEY,
   DEVICE_CA_CERT: process.env.DEVICE_CA_CERT,
+  GROW_COACH_STUB: process.env.GROW_COACH_STUB || "1",
+  GROW_COACH_PROVIDER: process.env.GROW_COACH_PROVIDER || "stub",
 };
 
 const server = createServer(async (req, res) => {

@@ -14,7 +14,7 @@ The 1.0.2 release is recommended if you are using an earlier version.
 
 Mike's fork adds a **local hub** and **[Shroom Labs](https://shroomlabs.io)** on top of the stock firmware. Devices stay offline-first. Shroom Labs works with Shrooly devices running OpenShrooly; it is not a Shrooly-branded product.
 
-- Architecture, data model, sync, monetization, and hosting costs: [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- Architecture, data model, sync, monetization, Grow Coach, and hosting costs: [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/COACH.md`](docs/COACH.md)
 - Profile JSON (culinary + optional restricted pack): [`data/profiles/`](data/profiles/)
 - Local hub (Pi / Docker): [`hub/README.md`](hub/README.md)
 - Shroom Labs (shroomlabs.io frontend, api.shroomlabs.io, cdn.shroomlabs.io): [`community/README.md`](community/README.md)

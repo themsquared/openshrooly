@@ -11,6 +11,8 @@ import {
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
+import { activateCoachSub, handleCoach, hasGrowCoach } from "./coach.js";
+import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { originAllowed, securityHeaders } from "./security.js";
 import { seedIfEmpty } from "./db.js";
 import seeds from "./seeds.json" with { type: "json" };
@@ -150,6 +152,8 @@ async function route(method, path, url, request, env) {
   if (authResponse) return authResponse;
   const deviceResponse = await handleDevices(method, path, url, request, env);
   if (deviceResponse) return deviceResponse;
+  const coachResponse = await handleCoach(method, path, url, request, env);
+  if (coachResponse) return coachResponse;
 
   if (method === "GET" && path === "/health") {
     return json({ ok: true, site: env.SITE_NAME || "Shroom Labs", driver: db.driver });
@@ -164,6 +168,7 @@ async function route(method, path, url, request, env) {
       "SELECT id, created_at, expires_at, revoked_at, user_agent FROM sessions WHERE user_id=?",
       [user.id]
     );
+    const coachSub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
     return json({
       user: {
         id: user.id,
@@ -175,6 +180,12 @@ async function route(method, path, url, request, env) {
       tokens,
       entitlements,
       sessions,
+      grow_coach: {
+        entitled: await hasGrowCoach(db, user),
+        period_end: coachSub?.period_end || null,
+        auto_tune: Boolean(Number(coachSub?.auto_tune)),
+        product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, pack: "culinary" },
+      },
       disclosure: DISCLOSURE,
     });
   }
@@ -354,6 +365,17 @@ async function route(method, path, url, request, env) {
     const checkout = await db.one("SELECT * FROM checkouts WHERE id=?", [completeMatch[1]]);
     if (!checkout || checkout.user_id !== user.id) return json({ error: "not found" }, 404);
     await db.run("UPDATE checkouts SET status=? WHERE id=?", ["paid", checkout.id]);
+    const details = (() => {
+      try {
+        return JSON.parse(checkout.details || "{}");
+      } catch {
+        return {};
+      }
+    })();
+    if (checkout.item_id === COACH_ITEM || details.item_type === "subscription") {
+      const periodEnd = await activateCoachSub(db, user.id);
+      return json({ ok: true, item_id: checkout.item_id, item_type: "subscription", period_end: periodEnd });
+    }
     await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
       user.id,
       checkout.item_id,
@@ -371,6 +393,10 @@ async function route(method, path, url, request, env) {
     }
     if (body.pack === "psilocybin") {
       throw new ValidationError("psilocybin pack cannot receive payment webhooks");
+    }
+    if (body.item_id === COACH_ITEM || body.item_type === "subscription") {
+      const periodEnd = await activateCoachSub(db, Number(body.user_id));
+      return json({ ok: true, provider, item_id: body.item_id, item_type: "subscription", period_end: periodEnd });
     }
     await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
       Number(body.user_id),

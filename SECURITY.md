@@ -13,6 +13,7 @@ Shroom Labs and OpenShrooly treat **security and UX as non-negotiable**. If a ch
 | Grow photos | Public object leak | R2 keys, no secrets in git, least-privilege Worker bindings |
 | Psilocybin pack | Commerce / affiliate ToS | Validators hard-block paid + affiliates |
 | Device identity | Stolen chamber / cloned cert / malicious cloud apply | On-device P-256 key; short-lived client certs; revoke + re-claim; local setpoints win |
+| Grow Coach | Unpaid inference, prompt leak of another chamber, restricted-pack coaching | Entitlement + daily caps; device ownership check; culinary-only refusal; slim grounding (no raw telemetry dump); approve or opt-in auto-tune inside hard bounds |
 
 Trust boundaries:
 

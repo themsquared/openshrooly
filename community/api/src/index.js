@@ -42,6 +42,11 @@ async function envContext(env) {
       DEVICE_CA_KEY: env.DEVICE_CA_KEY,
       DEVICE_CA_CERT: env.DEVICE_CA_CERT,
       DEVICE_CA_CN: env.DEVICE_CA_CN,
+      AI: env.AI,
+      GROW_COACH_STUB: env.GROW_COACH_STUB,
+      GROW_COACH_PROVIDER: env.GROW_COACH_PROVIDER,
+      GROW_COACH_TEXT_MODEL: env.GROW_COACH_TEXT_MODEL,
+      GROW_COACH_VISION_MODEL: env.GROW_COACH_VISION_MODEL,
     };
   }
   return env._ctx;

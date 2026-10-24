@@ -112,16 +112,17 @@ Cold shock (shiitake) **cannot** be done inside the chamber; the profile documen
 
 ## Monetization
 
-**Shroom Labs** is a **free hosted SaaS**. Revenue is meant to come from small paid items and affiliates, not subscriptions or ads on the firmware.
+**Shroom Labs** is a **free hosted SaaS**. Revenue is meant to come from small paid culinary items, affiliates, and the optional **Grow Coach** subscription — not ads on the firmware.
 
 | Stream | This pass | Notes |
 | --- | --- | --- |
 | Free profiles | Working | Entire culinary starter pack except one demo |
 | Paid profiles $1–$5 (up to $20 capped) | Stub checkout | `PaymentRouter` + Stripe stub; entitlement row |
+| **Grow Coach** subscription | Stub checkout · **$3.99 / mo** | Culinary only. Entitlement + `coach_subs`. See Phase 0d |
 | Creator revenue share | Field only | `creator_share_percent` default 70%; no payouts |
 | Grow guides | One stub row | Same checkout interface |
 | Affiliate links | Working (example URLs) | Click tracking + FTC-style disclosure |
-| Psilocybin pack | **Free, no affiliates, no card checkout** | Enforced in validators |
+| Psilocybin pack | **Free, no affiliates, no card checkout** | Enforced in validators. **Never marketed with Grow Coach** |
 
 Payments are **provider-agnostic**: an item lists `allowed_payment_providers`. The router picks the first configured provider. **Stripe is stubbed** (no live keys). Completing `/api/pay/{id}/complete` grants an entitlement locally. `/api/payments/webhook` is the inbound hook shape for a future live provider.
 
@@ -197,7 +198,54 @@ Affiliate example links are placeholders (`example.com`). Real networks (3–8%)
 
 This is not a forecast. The firmware stays free and MIT-licensed regardless.
 
+### Grow Coach cost vs $3.99 list (Phase 0d)
+
+Learning (droop, sensor offset, rise rate, alerts) is **plain JavaScript** — no model call. Chat and photo-check go through a swappable provider (`GROW_COACH_PROVIDER`). Production default: **Cloudflare Workers AI**.
+
+| Piece | Model | Why |
+| --- | --- | --- |
+| Chat | `@cf/meta/llama-3.2-3b-instruct` | Cheap text, culinary system prompt |
+| Photo check | `@cf/meta/llama-3.2-11b-vision-instruct` | Stage + contamination flags |
+| Learning / alerts | Deterministic JS | Testable, $0 inference |
+
+Caps (per verified user / UTC day): **40 chats**, **8 photo checks**, **80k neurons**. Identical chat text is cached 10 minutes. Grounding sent to the model is a slim snapshot (no raw telemetry dump).
+
+Published-order Workers AI math (verify on the Cloudflare dashboard; neurons + token rates move):
+
+| At the daily cap, 30 days | Approx. neurons | Approx. $ |
+| --- | --- | --- |
+| 1,200 chats (~800 in / 200 out) | ~12k | ~$0.13 |
+| 240 photo checks (~2k in / 250 out, vision) | ~6k | ~$0.07 |
+| **Cap-month AI, one subscriber** | **~18k** | **~$0.20–0.50** |
+
+Workers Paid is **$5 / month** for the whole API (shared with catalog, auth, mTLS). 10k neurons/day free on that plan covers a quiet community; overage is ~$0.011 / 1k neurons.
+
+| Subscribers | Shared Worker | AI at cap (worst) | Cost / sub | List | Rough gross after Stripe-ish 3%+$0.30 |
+| --- | --- | --- | --- | --- | --- |
+| 10 | $5 | $5 | ~$1.00 | $3.99 | ~$2.50 net / sub before support |
+| 50 | $5 | $25 | ~$0.60 | $3.99 | ~$3.20 net / sub |
+| Real usage (not everyone at cap) | $5 | much less | **well under $1** | $3.99 | Comfortable margin |
+
+**Do not** point Grow Coach at a frontier API by default — one verbose vision call there can erase a month of $3.99. Swap the provider (`GROW_COACH_PROVIDER`) only after measuring `coach_usage.neurons`.
+
+Marketing and checkout copy stay on **general culinary cultivation**. Subscribe with `pack=psilocybin` is rejected; chat / photo / auto-tune refuse the restricted pack.
+
+Details: [`docs/COACH.md`](COACH.md).
+
 ## Phased plan
+
+### Phase 0d — Grow Coach (this follow-up)
+
+Paid culinary AI after device mTLS. $3.99/month, entitlement-gated.
+
+- [x] Per-device model from telemetry + culinary grow outcomes
+- [x] Suggest setpoints (user approve) or opt-in auto-tune inside safe bounds (RH 70–96, 16–28 °C, Δ 6% / 2 °C)
+- [x] Chat grounded in device, journal, culinary library
+- [x] Photo check → R2 + stage / contamination / dryness / pinning + next steps
+- [x] Alerts: humidity trouble, stalled colonization, time to harvest
+- [x] Workers AI provider + stub; caps, cache, neuron tracking
+- [x] Tests for gating, restricted-pack refusal, learning, auto-tune
+- [ ] Live Stripe subscription + Workers AI binding in production (`[ai]` in `wrangler.toml`)
 
 ### Phase 0c — device identity + opt-in SaaS control (this follow-up)
 
@@ -277,9 +325,9 @@ See `mobile/ROADMAP.md`. Talks to `api.shroomlabs.io` and the local hub. Same to
 
 See the pull request body for a checklist. Short version:
 
-**Works:** schema, seeds, hub against stock firmware REST, local community API, static web against that API, auth, ratings/forks/reports, hub sync protocol, affiliate policy, Stripe-shaped stub checkout, R2-shaped photo store (memory locally).
+**Works:** schema, seeds, hub against stock firmware REST, local community API, static web against that API, auth, ratings/forks/reports, hub sync protocol, affiliate policy, Stripe-shaped stub checkout, R2-shaped photo store (memory locally), Grow Coach gating + device learning + stub chat/vision.
 
-**Stubbed:** live Stripe/BTCPay, creator payouts, real affiliate merchants, production D1/R2 IDs in `wrangler.toml`, email, moderation, firmware recipe objects, live Cloudflare client-cert API (Worker CA used until Mike adds `CF_API_TOKEN`).
+**Stubbed:** live Stripe/BTCPay, creator payouts, real affiliate merchants, production D1/R2 IDs in `wrangler.toml`, email, moderation, firmware recipe objects, live Cloudflare client-cert API (Worker CA used until Mike adds `CF_API_TOKEN`), live Workers AI until the Worker `[ai]` binding is deployed.
 
 ## Credits
 
