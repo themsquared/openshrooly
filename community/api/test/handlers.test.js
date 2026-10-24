@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickCorsOrigin, withCors } from "../src/handlers.js";
+import { allowedOrigins, pickCorsOrigin, withCors } from "../src/handlers.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 function env() {
@@ -67,6 +67,30 @@ test("CORS allows shroomlabs.io and local frontend", async () => {
   const res = withCors(new Response("ok"), ctx, request);
   assert.equal(res.headers.get("access-control-allow-origin"), "https://shroomlabs.io");
   assert.ok(res.headers.get("content-security-policy"));
+});
+
+test("prod CORS never reflects localhost even when CORS_ORIGIN lists it", () => {
+  const ctx = {
+    CORS_ORIGIN: "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888",
+    DEV_STUBS: "1",
+  };
+  const request = new Request("https://api.shroomlabs.io/health", {
+    headers: { origin: "http://127.0.0.1:8888" },
+  });
+  assert.deepEqual(allowedOrigins(ctx, request), ["https://shroomlabs.io", "https://www.shroomlabs.io"]);
+  assert.equal(pickCorsOrigin(ctx, request), "https://shroomlabs.io");
+  const res = withCors(new Response("ok"), ctx, request);
+  assert.equal(res.headers.get("access-control-allow-origin"), "https://shroomlabs.io");
+  assert.equal(res.headers.get("access-control-allow-credentials"), "true");
+});
+
+test("Netlify deploy-preview CORS is only allowed when DEV_STUBS is on", () => {
+  const preview = "https://deploy-preview-18--shroomlabs.netlify.app";
+  const local = new Request("http://127.0.0.1:8787/health", { headers: { origin: preview } });
+  assert.ok(allowedOrigins({ DEV_STUBS: "1" }, local).includes(preview));
+  assert.equal(allowedOrigins({ DEV_STUBS: "" }, local).includes(preview), false);
+  const prod = new Request("https://api.shroomlabs.io/health", { headers: { origin: preview } });
+  assert.equal(allowedOrigins({ DEV_STUBS: "1" }, prod).includes(preview), false);
 });
 
 test("affiliate click is blocked for psilocybin ids", async () => {

@@ -19,11 +19,11 @@
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). L. edodes: long spawn run, bark-like browning, then 5\u201310 \u00b0C shock and 13\u201318 \u00b0C fruiting."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). L. edodes: long spawn run, bark-like browning, then 5 to 10 \u00b0C shock and 13 to 18 \u00b0C fruiting."
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Block shiitake cards commonly list 80\u201390% RH and high FAE after shock."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Block shiitake cards commonly list 80 to 90% RH and high FAE after shock."
     }
   ],
   "stages": [
@@ -52,7 +52,7 @@
         "run_duration_s": 15,
         "speed_percent": 20
       },
-      "notes": "Wait for full white, then browning \u2014 do not fruit early."
+      "notes": "Wait for full white, then browning: do not fruit early."
     },
     {
       "id": "browning",
@@ -106,7 +106,7 @@
         "run_duration_s": 15,
         "speed_percent": 20
       },
-      "notes": "Firmware cannot reach fridge temps. Shock 12\u201324 h at 5\u201310 \u00b0C, then apply fruiting."
+      "notes": "Firmware cannot reach fridge temps. Shock 12 to 24 h at 5 to 10 \u00b0C, then apply fruiting."
     },
     {
       "id": "fruiting",

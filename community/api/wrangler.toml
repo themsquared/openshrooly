@@ -21,7 +21,7 @@ binding = "AI"
 SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
 # Browser origins allowed to call api.shroomlabs.io with Authorization headers.
-CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888"
+CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
 # Public R2 custom domain for grow-report photos (unused until the bucket exists).
 CDN_BASE_URL = "https://cdn.shroomlabs.io"
 # Grow Coach: Workers AI in production; local Node defaults GROW_COACH_STUB=1.
