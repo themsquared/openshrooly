@@ -99,7 +99,7 @@ class CloudEngine {
   bool sign_(const uint8_t *data, size_t len, uint8_t sig[64]);
   bool make_csr_(std::string *pem);
   HttpResponse http_(const char *method, const char *path, const std::string &body, bool pop, bool with_serial);
-  int fetch_nonce_(std::string *nonce);
+  int fetch_nonce_(std::string *nonce, std::string *body = nullptr);
   bool handle_enroll_();
   bool handle_csr_();
   bool handle_rotate_();

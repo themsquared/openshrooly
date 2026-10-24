@@ -247,11 +247,13 @@ bool CloudEngine::queue_(CloudJob job) {
   if (start_job_ != nullptr) {
     if (start_job_(start_ctx_, job))
       return true;
-    queued_ = job;
+    if (job != CloudJob::REVOKE)
+      queued_ = job;
     return false;
   }
   if (!try_begin(job)) {
-    queued_ = job;
+    if (job != CloudJob::REVOKE)
+      queued_ = job;
     return false;
   }
   if (sync_jobs_) {
@@ -577,9 +579,11 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   req.headers.emplace_back("Content-Type", "application/json");
   if (pop) {
     std::string nonce;
-    const int nonce_status = fetch_nonce_(&nonce);
+    std::string nonce_body;
+    const int nonce_status = fetch_nonce_(&nonce, &nonce_body);
     if (nonce_status != 200) {
       fail.status = nonce_status;
+      fail.body = nonce_body;
       return fail;
     }
     char body_hex[65];
@@ -607,7 +611,7 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   return r;
 }
 
-int CloudEngine::fetch_nonce_(std::string *nonce) {
+int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body) {
   std::string id;
   {
     std::lock_guard<std::mutex> g(lock_);
@@ -618,6 +622,8 @@ int CloudEngine::fetch_nonce_(std::string *nonce) {
   std::string path = "/api/devices/" + id + "/nonce";
   request_count_++;
   HttpResponse r = transport_->execute({"POST", https_url(api_host_.c_str(), path.c_str()), "", {}});
+  if (body != nullptr)
+    *body = r.body;
   if (!response_usable(r))
     return r.status > 0 ? r.status : 0;
   if (r.status != 200)
@@ -689,7 +695,7 @@ bool CloudEngine::handle_enroll_() {
   std::string body = enroll_body_json(crypto_->hardware_id().c_str(), jwk.c_str(), "Chamber");
   bool pop = snap.has_key && !snap.device_id.empty();
   HttpResponse r = http_("POST", "/api/devices/enroll", body, pop, false);
-  if (pop && !r.ok && r.status == 404) {
+  if (pop && !r.ok && r.status == 404 && r.body.find("device not found") != std::string::npos) {
     {
       std::lock_guard<std::mutex> g(lock_);
       device_id_.clear();
@@ -948,10 +954,10 @@ bool CloudEngine::confirm_relink_() {
     relink_seen_ms_ = now;
     return false;
   }
-  const int32_t dt = static_cast<int32_t>(now - relink_seen_ms_);
-  if (dt < static_cast<int32_t>(RELINK_CONFIRM_MS))
+  const uint32_t dt = now - relink_seen_ms_;
+  if (dt < RELINK_CONFIRM_MS)
     return false;
-  if (dt > static_cast<int32_t>(RELINK_WINDOW_MS)) {
+  if (dt > RELINK_WINDOW_MS) {
     relink_seen_ms_ = now;
     return false;
   }

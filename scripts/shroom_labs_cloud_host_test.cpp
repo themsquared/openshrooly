@@ -429,6 +429,7 @@ int main() {
     int nonce_limit = 60;
     int nonce_count = 0;
     int nonce_status = 200;
+    std::string nonce_error_body = "{\"error\":\"not found\"}";
     int enroll_with_proof = 0;
     std::function<void(const HttpRequest &)> hook;
     HttpResponse execute(const HttpRequest &req) override {
@@ -456,7 +457,7 @@ int main() {
           missing.ok = true;
           missing.status = nonce_status;
           missing.complete = true;
-          missing.body = "{\"error\":\"not found\"}";
+          missing.body = nonce_error_body;
           return missing;
         }
         if (nonce_count > nonce_limit) {
@@ -825,6 +826,26 @@ int main() {
   eng18d.rotate_now();
   expect(eng18d.state() == CloudState::Relink, "two sightings within 24h relink");
 
+  HostStore store18d2;
+  ScriptTransport tr18d2;
+  tr18d2.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                  {"/csr", ok_body(200, cert_ok)},
+                  {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                  {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                  {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")}};
+  CloudEngine eng18d2(&tr18d2, &clk, &store18d2, &crypto);
+  const uint32_t gap30d = 30u * 86400000u;
+  clk.now = 450000;
+  eng18d2.connect();
+  eng18d2.csr_now();
+  eng18d2.rotate_now();
+  clk.now = 450000 + gap30d;
+  eng18d2.rotate_now();
+  expect(eng18d2.state() == CloudState::Linked, "30-day gap restarts window");
+  clk.now = 450000 + gap30d + RELINK_CONFIRM_MS;
+  eng18d2.rotate_now();
+  expect(eng18d2.state() == CloudState::Relink, "hour after 30-day restart relinks");
+
   HostStore store18e;
   ScriptTransport tr18e;
   tr18e.steps = {{"/enroll", ok_body(200, enroll_ok)},
@@ -859,6 +880,7 @@ int main() {
   eng18f.rotate_now();
   expect(eng18f.state() == CloudState::Relink, "gone start Relink");
   tr18f.nonce_status = 404;
+  tr18f.nonce_error_body = "{\"error\":\"device not found\"}";
   int proofs_gone = tr18f.enroll_with_proof;
   size_t enrolls_before = 0;
   for (const auto &u : tr18f.urls)
@@ -872,6 +894,36 @@ int main() {
     if (u.find("/enroll") != std::string::npos)
       enrolls_after++;
   expect(enrolls_after > enrolls_before, "gone row posted enroll");
+
+  HostStore store18g;
+  ScriptTransport tr18g;
+  tr18g.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                 {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng18g(&tr18g, &clk, &store18g, &crypto);
+  clk.now = 650000;
+  eng18g.connect();
+  eng18g.csr_now();
+  eng18g.rotate_now();
+  clk.now = 650000 + RELINK_CONFIRM_MS;
+  eng18g.rotate_now();
+  expect(eng18g.state() == CloudState::Relink, "other-404 start Relink");
+  tr18g.nonce_status = 404;
+  tr18g.nonce_error_body = "{\"error\":\"not found\"}";
+  std::string id_before_404 = eng18g.device_id();
+  size_t enrolls_other = 0;
+  for (const auto &u : tr18g.urls)
+    if (u.find("/enroll") != std::string::npos)
+      enrolls_other++;
+  eng18g.connect();
+  expect(eng18g.device_id() == id_before_404, "other 404 keeps device id");
+  size_t enrolls_other_after = 0;
+  for (const auto &u : tr18g.urls)
+    if (u.find("/enroll") != std::string::npos)
+      enrolls_other_after++;
+  expect(enrolls_other_after == enrolls_other, "other 404 does not re-enroll");
 
   HostStore store19;
   ScriptTransport tr19;
@@ -1012,7 +1064,8 @@ int main() {
   tr19g.steps = {{"/enroll", ok_body(200, enroll_ok)},
                  {"/csr", ok_body(200, cert_ok)},
                  {"/self-revoke", ok_body(200, "{\"ok\":true}")},
-                 {"/enroll", ok_body(200, enroll_ok)}};
+                 {"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)}};
   CloudEngine eng19g(&tr19g, &clk, &store19g, &crypto);
   eng19g.connect();
   eng19g.csr_now();
@@ -1027,6 +1080,37 @@ int main() {
   eng19g.drain_queued();
   expect(eng19g.state() == CloudState::PendingClaim, "disc-then-connect enrolls");
   expect(eng19g.cloud_enabled(), "disc-then-connect stays on");
+  eng19g.csr_now();
+  expect(eng19g.state() == CloudState::Linked, "disc-then-connect ends Linked");
+
+  HostStore store19i;
+  ScriptTransport tr19i;
+  tr19i.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/self-revoke", ok_body(503, "{}")},
+                 {"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)}};
+  CloudEngine eng19i(&tr19i, &clk, &store19i, &crypto);
+  eng19i.connect();
+  eng19i.csr_now();
+  eng19i.set_sync_jobs(false);
+  eng19i.set_start_job(+start_false, nullptr);
+  expect(eng19i.try_begin(CloudJob::CSR), "stale-revoke begin");
+  eng19i.disconnect();
+  expect(eng19i.has_key(), "stale-revoke waits");
+  eng19i.run_job(CloudJob::CSR);
+  expect(eng19i.state() == CloudState::Off, "stale-revoke wipes");
+  expect(eng19i.revoke_failed(), "stale-revoke flags fail");
+  eng19i.finish();
+  eng19i.drain_queued();
+  expect(eng19i.revoke_failed(), "stale-revoke hint survives drain");
+  expect(std::strstr(eng19i.display_hint().c_str(), "shroomlabs.io") != nullptr, "stale-revoke copy survives");
+  eng19i.set_start_job(nullptr, nullptr);
+  eng19i.set_sync_jobs(true);
+  eng19i.connect();
+  expect(eng19i.state() == CloudState::PendingClaim, "stale-revoke then connect enrolls");
+  eng19i.csr_now();
+  expect(eng19i.state() == CloudState::Linked, "stale-revoke then connect ends Linked");
 
   HostStore store19h;
   ScriptTransport tr19h;

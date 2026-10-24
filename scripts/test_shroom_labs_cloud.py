@@ -63,6 +63,9 @@ def compile_host(cxx, exe, idf):
     )
     if idf is not None:
         cmd.append(str(idf / "library/sha256.c"))
+        platform = idf / "library/platform_util.c"
+        if platform.is_file():
+            cmd.append(str(platform))
     else:
         cmd.extend(["-lmbedtls", "-lmbedcrypto"])
     cmd.extend(["-o", str(exe)])
