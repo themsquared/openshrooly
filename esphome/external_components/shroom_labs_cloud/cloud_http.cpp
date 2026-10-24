@@ -47,67 +47,94 @@ int parse_retry_after(const char *value) {
   return static_cast<int>(v);
 }
 
+bool response_usable(const HttpResponse &r) { return r.ok && r.complete && r.status > 0; }
+
+bool idf_headers_ok(int64_t fetch_headers_len, int status) { return fetch_headers_len >= 0 && status > 0; }
+
+std::string json_code(const char *body) {
+  std::string code;
+  if (json_get_string(body, "code", &code) && !code.empty())
+    return code;
+  json_get_string(body, "status", &code);
+  return code;
+}
+
 static bool server_error(int status) { return status >= 500 && status <= 599; }
 
-HttpOutcome enroll_outcome(bool transport_ok, int status) {
-  if (!transport_ok || server_error(status))
+static HttpOutcome auth_from_body(int status, const char *body, HttpOutcome fallback) {
+  const std::string code = json_code(body);
+  if (status == 403 && code == "revoked")
+    return HttpOutcome::AuthFail;
+  if (code == "revoked")
+    return HttpOutcome::AuthFail;
+  if (code == "cert_expired")
+    return HttpOutcome::CertExpired;
+  if (code == "proof_invalid")
+    return HttpOutcome::ProofInvalid;
+  return fallback;
+}
+
+HttpOutcome enroll_outcome(bool transport_ok, int status, const char *body) {
+  if (!transport_ok || status <= 0 || server_error(status))
     return HttpOutcome::TransientFail;
   if (status == 200)
-    return HttpOutcome::Success;
+    return enroll_fields_ok(body) ? HttpOutcome::Success : HttpOutcome::TransientFail;
   if (status == 409)
-    return HttpOutcome::AlreadyOwned;
+    return json_code(body) == "claim_in_progress" ? HttpOutcome::ClaimBusy : HttpOutcome::AlreadyOwned;
   if (status == 429)
     return HttpOutcome::RateLimited;
   return HttpOutcome::HardFail;
 }
 
-HttpOutcome csr_outcome(bool transport_ok, int status) {
-  if (!transport_ok || server_error(status))
+HttpOutcome csr_outcome(bool transport_ok, int status, const char *body) {
+  if (!transport_ok || status <= 0 || server_error(status))
     return HttpOutcome::TransientFail;
   if (status == 200)
-    return HttpOutcome::Success;
-  if (status == 403)
-    return HttpOutcome::WaitingClaim;
+    return cert_fields_ok(body) ? HttpOutcome::Success : HttpOutcome::TransientFail;
   if (status == 429)
     return HttpOutcome::RateLimited;
-  if (status == 401)
-    return HttpOutcome::AuthFail;
+  if (status == 401 || status == 403) {
+    const HttpOutcome auth = auth_from_body(status, body, HttpOutcome::WaitingClaim);
+    if (auth != HttpOutcome::WaitingClaim)
+      return auth;
+    return status == 403 ? HttpOutcome::WaitingClaim : HttpOutcome::ProofInvalid;
+  }
   return HttpOutcome::HardFail;
 }
 
-HttpOutcome rotate_outcome(bool transport_ok, int status) {
-  if (!transport_ok || server_error(status))
+HttpOutcome rotate_outcome(bool transport_ok, int status, const char *body) {
+  if (!transport_ok || status <= 0 || server_error(status))
     return HttpOutcome::TransientFail;
   if (status == 200)
-    return HttpOutcome::Success;
+    return cert_fields_ok(body) ? HttpOutcome::Success : HttpOutcome::TransientFail;
   if (status == 429)
     return HttpOutcome::RateLimited;
-  if (status == 401)
-    return HttpOutcome::AuthFail;
+  if (status == 401 || status == 403)
+    return auth_from_body(status, body, status == 401 ? HttpOutcome::ProofInvalid : HttpOutcome::HardFail);
   return HttpOutcome::HardFail;
 }
 
-HttpOutcome reclaim_outcome(bool transport_ok, int status) {
-  if (!transport_ok || server_error(status))
+HttpOutcome reclaim_outcome(bool transport_ok, int status, const char *body) {
+  if (!transport_ok || status <= 0 || server_error(status))
     return HttpOutcome::TransientFail;
   if (status == 200)
-    return HttpOutcome::Success;
+    return enroll_fields_ok(body) ? HttpOutcome::Success : HttpOutcome::TransientFail;
   if (status == 429)
     return HttpOutcome::RateLimited;
-  if (status == 401)
-    return HttpOutcome::AuthFail;
+  if (status == 401 || status == 403)
+    return auth_from_body(status, body, HttpOutcome::HardFail);
   return HttpOutcome::HardFail;
 }
 
-HttpOutcome probe_outcome(bool transport_ok, int status) {
-  if (!transport_ok || server_error(status))
+HttpOutcome probe_outcome(bool transport_ok, int status, const char *body) {
+  if (!transport_ok || status <= 0 || server_error(status))
     return HttpOutcome::TransientFail;
   if (status == 200)
     return HttpOutcome::Success;
-  if (status == 401)
-    return HttpOutcome::AuthFail;
   if (status == 429)
     return HttpOutcome::RateLimited;
+  if (status == 401 || status == 403)
+    return auth_from_body(status, body, status == 401 ? HttpOutcome::ProofInvalid : HttpOutcome::HardFail);
   return HttpOutcome::HardFail;
 }
 
@@ -117,6 +144,8 @@ CloudEvent event_for_enroll(HttpOutcome o) {
       return CloudEvent::EnrollOk;
     case HttpOutcome::AlreadyOwned:
       return CloudEvent::EnrollOwned;
+    case HttpOutcome::ClaimBusy:
+      return CloudEvent::EnrollBusy;
     case HttpOutcome::RateLimited:
       return CloudEvent::RateLimited;
     case HttpOutcome::TransientFail:
@@ -135,8 +164,10 @@ CloudEvent event_for_csr(HttpOutcome o) {
     case HttpOutcome::RateLimited:
       return CloudEvent::RateLimited;
     case HttpOutcome::AuthFail:
-      return CloudEvent::CsrAuthFail;
+      return CloudEvent::LinkRevoked;
+    case HttpOutcome::ProofInvalid:
     case HttpOutcome::TransientFail:
+    case HttpOutcome::CertExpired:
       return CloudEvent::NetworkFail;
     default:
       return CloudEvent::CsrFail;
@@ -148,7 +179,11 @@ CloudEvent event_for_rotate(HttpOutcome o) {
     case HttpOutcome::Success:
       return CloudEvent::RotateOk;
     case HttpOutcome::AuthFail:
-      return CloudEvent::LinkAuthFail;
+      return CloudEvent::LinkRevoked;
+    case HttpOutcome::CertExpired:
+      return CloudEvent::CertExpired;
+    case HttpOutcome::ProofInvalid:
+      return CloudEvent::ProofInvalid;
     case HttpOutcome::RateLimited:
       return CloudEvent::RateLimited;
     case HttpOutcome::TransientFail:
@@ -164,6 +199,7 @@ CloudEvent event_for_reclaim(HttpOutcome o) {
       return CloudEvent::ReclaimOk;
     case HttpOutcome::RateLimited:
     case HttpOutcome::TransientFail:
+    case HttpOutcome::ProofInvalid:
       return CloudEvent::NetworkFail;
     default:
       return CloudEvent::ReclaimFail;
@@ -173,10 +209,27 @@ CloudEvent event_for_reclaim(HttpOutcome o) {
 CloudEvent event_for_probe(HttpOutcome o) {
   switch (o) {
     case HttpOutcome::AuthFail:
-      return CloudEvent::LinkAuthFail;
+      return CloudEvent::LinkRevoked;
+    case HttpOutcome::CertExpired:
+      return CloudEvent::CertExpired;
+    case HttpOutcome::ProofInvalid:
+      return CloudEvent::ProofInvalid;
     default:
       return CloudEvent::NetworkFail;
   }
+}
+
+bool enroll_fields_ok(const char *body) {
+  std::string id, code, token;
+  return json_get_string(body, "device_id", &id) && !id.empty() && json_get_string(body, "claim_code", &code) &&
+         claim_code_ok(format_claim_code(code.c_str()).c_str()) && json_get_string(body, "enroll_token", &token) &&
+         !token.empty();
+}
+
+bool cert_fields_ok(const char *body) {
+  std::string pem, serial;
+  return json_get_string(body, "certificate", &pem) && pem.find("BEGIN CERTIFICATE") != std::string::npos &&
+         json_get_string(body, "serial", &serial) && !serial.empty();
 }
 
 uint32_t next_backoff_ms(uint32_t current_ms, uint32_t jitter) {
@@ -188,8 +241,11 @@ uint32_t next_backoff_ms(uint32_t current_ms, uint32_t jitter) {
   if (n > BACKOFF_MAX_MS)
     n = BACKOFF_MAX_MS;
   const uint32_t span = n / 5 + 1;
-  return n - span / 2 + (jitter % span);
+  uint32_t out = n - span / 2 + (jitter % span);
+  return out > BACKOFF_MAX_MS ? BACKOFF_MAX_MS : out;
 }
+
+uint32_t claim_poll_ms(uint32_t jitter) { return CLAIM_POLL_MS + (jitter % (CLAIM_POLL_JITTER_MS + 1)); }
 
 uint32_t retry_after_backoff_ms(int retry_after_s, uint32_t current_ms, uint32_t jitter) {
   uint32_t from_header = 0;
@@ -214,7 +270,8 @@ CloudState persist_state(CloudState state) {
 
 bool state_has_retry(CloudState state) {
   return state == CloudState::Connecting || state == CloudState::PendingClaim || state == CloudState::Issuing ||
-         state == CloudState::Error || state == CloudState::Rotating || state == CloudState::Linked;
+         state == CloudState::Error || state == CloudState::Rotating || state == CloudState::Linked ||
+         state == CloudState::WaitClaim;
 }
 
 bool should_auto_enroll(uint8_t claim_cycles) { return claim_cycles < MAX_CLAIM_CYCLES; }

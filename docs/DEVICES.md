@@ -66,7 +66,7 @@ shroomlabs-device-pop-v1
 
 Rotate validates the new CSR first, so a bad CSR never kills the working cert. On the Worker CA path the new cert is issued and then the old serial is marked `superseded`. On the Cloudflare path the old Cloudflare id is deleted **before** the new cert is minted (zero overlap). The rotate call authenticates with the current serial plus PoP at the app layer, so the device can still prove possession after the Cloudflare slot is freed.
 
-Rate limits: nonce 120 per 10 minutes per client and 60 per 10 minutes per device; CSR, rotate, and reclaim 10 per hour per device.
+Rate limits: nonce 120 per 10 minutes per client and 60 per 10 minutes per device; pending-claim CSR polls 240 per 15 minutes (`device-csr-poll`); CSR issue, rotate, reclaim, and self-revoke 10 per hour per device.
 
 ### Why not multi-zone?
 
@@ -102,7 +102,9 @@ Trust boundaries:
 3. Device `GET /api/devices/ca` (optional pin), gets a nonce, then `POST /api/devices/:id/csr` `{ csr, enroll_token }` with PoP → 7-day client cert (`issuer` is `worker-ca` or `cloudflare-managed`).
 4. Device calls `GET /api/devices/:id/inbox` and `POST /api/devices/:id/telemetry` with `x-device-cert-serial` plus a fresh nonce and proof on every request.
 5. Silent rotate at ~3.5 days: new CSR + current serial + PoP → new cert, then the predecessor is superseded.
-6. `POST /api/devices/:id/revoke` (account) or `/reclaim` (device after revoke, PoP by the key on file).
+6. Account `POST /api/devices/:id/revoke` (session). Device Disconnect calls `POST /api/devices/:id/self-revoke` with the same nonce + key proof as other device routes. Both set status=revoked, revoke certs, and audit. The chamber then wipes its key. A later Connect enrolls a new key (allowed once the row is revoked).
+7. Auth errors are distinguishable JSON `code` values: `revoked` (403, wipe the key), `cert_expired` (401, keep the key and renew by proof for 30 days), `proof_invalid` (401, back off and retry). Do not treat every 401 as a revoke.
+8. Pending-claim CSR polls are rate-limited separately (`device-csr-poll`, 240 / 15 min) and do not count against the 10/hour issue limit. The chamber polls about every 5 s until the code expires.
 
 Commands the SaaS may queue: `apply_profile`, `setpoints`, `schedule`, `firmware_notice`. The device decides whether to apply.
 
@@ -123,14 +125,18 @@ The component is in the default 1.0.x-sl build (`esphome/components/cloud.yaml`)
 
 The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 96.3% full (~68 KB free). OTA still fits. The next feature of this size will not.
 
-Do not flash a new table from this pairing ship. A later layout change should keep OTA and rollback working for chambers already in the field:
+Do not flash a new table from this pairing ship. A later layout change needs its own design. Rewriting the table from the running app and writing both slots cannot survive a power cut: a bad table cannot be undone by OTA rollback, and a 6 MB ota_0 would overlap the running image and today's NVS at 0x3A0000.
 
-1. Keep the 4 MB table until a dedicated layout ship.
-2. That ship boots on the old table, copies NVS (Wi-Fi, admin password, setpoints) to RAM, writes a 16 MB table with two ~6 MB OTA slots, writes the new image to both slots, and restores NVS to the new offset.
-3. Chambers that never got that migrator can still USB-restore a full 16 MB backup.
-4. Do not move NVS without a migrator: today's NVS lives at 0x3A0000-0x400000. A new table that just sets `flash_size: 16MB` would look like a factory reset.
+A safe later plan:
+
+1. Keep the 4 MB table until that dedicated ship.
+2. Stage the copy: write the new table and the new image to unused flash above 4 MB first, then flip a single boot field. If power dies mid-write, the old table and running slot are still intact.
+3. Keep USB Serial/JTAG recovery as the hard fallback (`docs/RECOVERY.md`): a full 16 MB `read_flash` / `write_flash` of a known-good image, including the old table.
+4. Do not move NVS without a migrator: today's NVS lives at 0x3A0000-0x400000. A table that only sets `flash_size: 16MB` would look like a factory reset.
 
 Until that ship, leave the 4 MB table. If an image does not fit, stop and cut scope rather than the OTA slots.
+
+Host tests (`scripts/test_shroom_labs_cloud.py`) compile `cloud_engine.cpp` with ASan/UBSan and drive the real `handle_*()`, `store_*()`, and `loop()` code against a fake HTTPS transport, clock, NVS, and crypto. `IdfTransport` (open / write / fetch_headers / read, plus `idf_headers_ok` and `is_complete_data_received`) is the ESP-IDF adapter. A live mock HTTPS run on the IDF `linux` target or QEMU is not in CI: this tree has no exported ESP-IDF environment and no `qemu-system-xtensa`, and ESPHome's linux target is not part of the firmware workflow. The adapter rules and 16 KB cap are covered on the host.
 
 ## Mike’s production checklist
 

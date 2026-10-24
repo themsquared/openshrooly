@@ -27,6 +27,8 @@ const char *state_name(CloudState state) {
       return "revoked";
     case CloudState::Owned:
       return "owned";
+    case CloudState::WaitClaim:
+      return "wait_claim";
     case CloudState::Error:
     default:
       return "error";
@@ -51,6 +53,8 @@ const char *state_message(CloudState state) {
       return "Unlinked from the account. Refresh on this chamber to claim it again.";
     case CloudState::Owned:
       return "Already linked to an account. Remove it at shroomlabs.io, then press Refresh.";
+    case CloudState::WaitClaim:
+      return "Wait a few minutes, then press Refresh.";
     case CloudState::Error:
     default:
       return "Could not reach Shroom Labs. Press Refresh to try again. Your chamber still works on its own.";
@@ -70,6 +74,8 @@ CloudState next_state(CloudState state, CloudEvent event) {
         return CloudState::PendingClaim;
       if (event == CloudEvent::EnrollOwned)
         return CloudState::Owned;
+      if (event == CloudEvent::EnrollBusy)
+        return CloudState::WaitClaim;
       if (event == CloudEvent::NetworkFail || event == CloudEvent::RateLimited)
         return CloudState::Connecting;
       if (event == CloudEvent::EnrollFail || event == CloudEvent::ReclaimFail)
@@ -81,7 +87,7 @@ CloudState next_state(CloudState state, CloudEvent event) {
         return CloudState::PendingClaim;
       if (event == CloudEvent::CsrOk)
         return CloudState::Linked;
-      if (event == CloudEvent::CsrAuthFail)
+      if (event == CloudEvent::CsrAuthFail || event == CloudEvent::LinkRevoked)
         return CloudState::Revoked;
       if (event == CloudEvent::Refresh || event == CloudEvent::Expired || event == CloudEvent::Enable)
         return CloudState::Connecting;
@@ -91,7 +97,7 @@ CloudState next_state(CloudState state, CloudEvent event) {
         return CloudState::Linked;
       if (event == CloudEvent::CsrWaiting || event == CloudEvent::NetworkFail || event == CloudEvent::CsrFail)
         return CloudState::PendingClaim;
-      if (event == CloudEvent::CsrAuthFail)
+      if (event == CloudEvent::CsrAuthFail || event == CloudEvent::LinkRevoked)
         return CloudState::Revoked;
       if (event == CloudEvent::RateLimited)
         return CloudState::Issuing;
@@ -99,17 +105,18 @@ CloudState next_state(CloudState state, CloudEvent event) {
     case CloudState::Linked:
       if (event == CloudEvent::RotateDue)
         return CloudState::Rotating;
-      if (event == CloudEvent::LinkAuthFail)
+      if (event == CloudEvent::LinkAuthFail || event == CloudEvent::LinkRevoked)
         return CloudState::Revoked;
-      if (event == CloudEvent::Enable)
+      if (event == CloudEvent::CertExpired || event == CloudEvent::ProofInvalid || event == CloudEvent::Enable)
         return CloudState::Linked;
       break;
     case CloudState::Rotating:
       if (event == CloudEvent::RotateOk)
         return CloudState::Linked;
-      if (event == CloudEvent::LinkAuthFail)
+      if (event == CloudEvent::LinkAuthFail || event == CloudEvent::LinkRevoked)
         return CloudState::Revoked;
-      if (event == CloudEvent::CsrFail || event == CloudEvent::RateLimited || event == CloudEvent::NetworkFail)
+      if (event == CloudEvent::CsrFail || event == CloudEvent::RateLimited || event == CloudEvent::NetworkFail ||
+          event == CloudEvent::CertExpired || event == CloudEvent::ProofInvalid)
         return CloudState::Linked;
       break;
     case CloudState::Revoked:
@@ -121,6 +128,7 @@ CloudState next_state(CloudState state, CloudEvent event) {
         return CloudState::Revoked;
       break;
     case CloudState::Owned:
+    case CloudState::WaitClaim:
       if (event == CloudEvent::Refresh || event == CloudEvent::Enable)
         return CloudState::Connecting;
       break;

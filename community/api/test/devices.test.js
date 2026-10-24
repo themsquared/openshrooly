@@ -223,7 +223,9 @@ test("claim, issue, rotate to a new key, and revoke", async () => {
   const revoked = await call(ctx, "POST", `/api/devices/${deviceId}/revoke`, { token, body: {} });
   assert.equal(revoked.status, 200);
   const dead = await deviceCall(ctx, "GET", inboxPath, { deviceId, key: newKeys.privateKey, cert: rotated.data });
-  assert.equal(dead.status, 401);
+  assert.equal(dead.status, 403);
+  assert.equal(dead.data.code, "revoked");
+  assert.equal(dead.data.status, "revoked");
 });
 
 test("a bad CSR on rotate leaves the current cert working", async () => {
@@ -592,4 +594,126 @@ test("Worker CA pin endpoint is public and returns only the certificate", async 
   assert.equal(res.data.auth, "app-layer");
   assert.match(String(res.data.certificate || ""), /BEGIN CERTIFICATE/);
   assert.doesNotMatch(res.text, /PRIVATE/);
+});
+
+test("device self-revoke uses key proof, is rate limited, and audits", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeff7788");
+  const noProof = await call(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, { body: {} });
+  assert.equal(noProof.status, 401);
+  assert.equal(noProof.data.code, "proof_invalid");
+  const ok = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: {},
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(ok.data.status, "revoked");
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(row.status, "revoked");
+  const listed = await call(ctx, "GET", "/api/devices", { token });
+  assert.equal(listed.data.devices[0].status, "revoked");
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+  });
+  assert.equal(inbox.status, 403);
+  assert.equal(inbox.data.code, "revoked");
+  const audits = await ctx.db.all("SELECT * FROM security_events WHERE kind=?", ["device_self_revoke"]);
+  assert.ok(audits.some((a) => String(a.detail) === d.deviceId));
+  for (let i = 0; i < 9; i++) {
+    await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, {
+      deviceId: d.deviceId,
+      key: d.pair.keys.privateKey,
+      cert: d.issued.data,
+      body: {},
+    });
+  }
+  const limited = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/self-revoke`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: {},
+  });
+  assert.equal(limited.status, 429);
+});
+
+test("401 codes distinguish revoke, expired cert, and bad proof", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeff8899");
+  const path = `/api/devices/${d.deviceId}/inbox`;
+  const badProof = await call(ctx, "GET", path, { device: d.issued.data });
+  assert.equal(badProof.status, 401);
+  assert.equal(badProof.data.code, "proof_invalid");
+
+  const certs = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
+  const yesterday = new Date(Date.now() - 86400000).toISOString();
+  for (const row of certs) row.not_after = yesterday;
+  const expired = await deviceCall(ctx, "GET", path, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+  });
+  assert.equal(expired.status, 401);
+  assert.equal(expired.data.code, "cert_expired");
+
+  const csr2 = await buildCsr(d.pair.keys.privateKey, d.pair.keys.publicKey, d.deviceId);
+  const renewed = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { csr: csr2 },
+  });
+  assert.equal(renewed.status, 200, JSON.stringify(renewed.data));
+  assert.ok(renewed.data.serial);
+  assert.notEqual(renewed.data.serial, d.issued.data.serial);
+});
+
+test("pending claim polls do not count against the CSR issue limit", async () => {
+  const ctx = env();
+  const pair = await devicePair();
+  const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9901", public_jwk: pair.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(enrolled.status, 200);
+  const deviceId = enrolled.data.device_id;
+  const csr = await buildCsr(pair.keys.privateKey, pair.keys.publicKey, deviceId);
+  const body = { csr, enroll_token: enrolled.data.enroll_token };
+  for (let i = 0; i < 12; i++) {
+    const poll = await deviceCall(ctx, "POST", `/api/devices/${deviceId}/csr`, { deviceId, key: pair.keys.privateKey, body });
+    assert.equal(poll.status, 403, `poll ${i} ${JSON.stringify(poll.data)}`);
+  }
+  const { token } = await register(ctx);
+  const claimed = await call(ctx, "POST", "/api/devices/claim", { token, body: { code: enrolled.data.claim_code } });
+  assert.equal(claimed.status, 200);
+  const issued = await deviceCall(ctx, "POST", `/api/devices/${deviceId}/csr`, { deviceId, key: pair.keys.privateKey, body });
+  assert.equal(issued.status, 200, JSON.stringify(issued.data));
+});
+
+test("enroll 409 codes distinguish already claimed from a claim in progress", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeff9902");
+  const other = await devicePair();
+  const claimed = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9902", public_jwk: other.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(claimed.status, 409);
+  assert.equal(claimed.data.code, "already_claimed");
+
+  const first = await devicePair();
+  const pending = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9903", public_jwk: first.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(pending.status, 200);
+  const busy = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9903", public_jwk: other.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(busy.status, 409);
+  assert.equal(busy.data.code, "claim_in_progress");
+  void d;
 });

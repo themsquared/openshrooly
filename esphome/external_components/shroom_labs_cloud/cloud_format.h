@@ -26,6 +26,7 @@ enum class CloudState : uint8_t {
   Rotating,
   Revoked,
   Owned,
+  WaitClaim,
   Error,
 };
 
@@ -33,7 +34,8 @@ enum class CloudEvent : uint8_t {
   Enable,
   Disable,
   EnrollOk,
-  EnrollOwned,  // 409: already claimed. Stop. Do not enroll or reclaim again.
+  EnrollOwned,  // 409 already_claimed. Stop.
+  EnrollBusy,   // 409 claim_in_progress
   EnrollFail,
   CsrWaiting,  // 403: not claimed yet
   CsrOk,
@@ -43,7 +45,10 @@ enum class CloudEvent : uint8_t {
   RateLimited,
   RotateDue,
   RotateOk,
-  LinkAuthFail,  // 401 on rotate or inbox probe
+  LinkAuthFail,  // legacy wipe
+  LinkRevoked,   // explicit revoked
+  CertExpired,
+  ProofInvalid,
   ReclaimOk,
   ReclaimFail,
   Refresh,
@@ -67,7 +72,7 @@ bool claim_url_ok(const char *url, const char *code);
 bool claim_code_ok(const char *code);
 std::string format_claim_code(const char *code);  // "AB2C3D" as received, uppercased
 
-// Worker PoP: SHA-256 of the body is lowercase hex, not base64url (docs/DEVICES.md is wrong here).
+// Worker PoP: SHA-256 of the body is lowercase hex (see docs/DEVICES.md).
 std::string proof_payload(const char *device_id, const char *nonce, const char *method, const char *path,
                           const char *body_sha256_hex);
 

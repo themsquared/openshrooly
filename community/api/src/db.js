@@ -421,6 +421,12 @@ function dispatch(mode, tables, ids, sql, params) {
     });
     return {};
   }
+  if (q.startsWith("SELECT * FROM security_events WHERE kind=")) {
+    return tables.security_events.filter((e) => e.kind === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM security_events")) {
+    return tables.security_events.slice();
+  }
   if (q.startsWith("SELECT * FROM rate_limits WHERE key=")) {
     return tables.rate_limits.filter((s) => s.key === params[0]);
   }
