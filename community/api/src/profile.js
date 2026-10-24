@@ -84,6 +84,21 @@ export function validateProfile(profile) {
   return profile;
 }
 
+export function isHttpsSourceUrl(url) {
+  if (url == null || String(url).trim() === "") return true;
+  try {
+    return new URL(String(url).trim()).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function httpsSourceHref(url) {
+  if (url == null || String(url).trim() === "") return "";
+  if (!isHttpsSourceUrl(url)) return "";
+  return new URL(String(url).trim()).href;
+}
+
 export function validateLightRecipe(recipe) {
   require(Boolean(String(recipe.why || "").trim()), "light_recipe.why is required");
   require(Boolean(String(recipe.wavelength_note || "").trim()), "light_recipe.wavelength_note is required");
@@ -91,6 +106,7 @@ export function validateLightRecipe(recipe) {
   for (const note of recipe.sources) {
     require(Boolean(String(note.title || "").trim()), "light_recipe source title is required");
     require(Boolean(String(note.detail || "").trim()), "light_recipe source detail is required");
+    require(isHttpsSourceUrl(note.url), "light_recipe source url must be https");
   }
   const phases = recipe.phases || {};
   require(Boolean(phases.colonization), "light_recipe needs a colonization phase");

@@ -61,6 +61,11 @@ test("light recipe validation rejects bad ranges and missing sources", () => {
   const noSources = structuredClone(pearl);
   noSources.light_recipe.sources = [];
   assert.throws(() => validateProfile(noSources), ValidationError);
+  for (const badUrl of ["javascript:alert(1)", "data:text/html,hi", "http://example.com/paper"]) {
+    const bad = structuredClone(pearl);
+    bad.light_recipe.sources[0].url = badUrl;
+    assert.throws(() => validateProfile(bad), /https/);
+  }
 });
 
 test("psilocybin pack rejects payments and affiliates", () => {

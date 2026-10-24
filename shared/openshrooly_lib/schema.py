@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 from .models import MushroomProfile
 
@@ -29,6 +30,17 @@ PSILOCYBIN_BLOCKED_PROVIDERS = {"stripe", "paypal", "square"}
 
 class ValidationError(ValueError):
     """Raised when a profile document is not usable."""
+
+
+def is_https_source_url(url: str | None) -> bool:
+    """True when a source link is absent or is an https URL with a host."""
+    if url is None:
+        return True
+    text = str(url).strip()
+    if not text:
+        return True
+    parsed = urlparse(text)
+    return parsed.scheme == "https" and bool(parsed.netloc)
 
 
 def _require(condition: bool, message: str) -> None:
@@ -106,6 +118,7 @@ def _validate_light_recipe(profile: MushroomProfile) -> None:
     for note in recipe.sources:
         _require(bool(note.title.strip()), "light_recipe source title is required")
         _require(bool(note.detail.strip()), "light_recipe source detail is required")
+        _require(is_https_source_url(note.url), "light_recipe source url must be https")
     _require("colonization" in recipe.phases, "light_recipe needs a colonization phase")
     _require("fruiting" in recipe.phases, "light_recipe needs a fruiting phase")
     for name, phase in recipe.phases.items():
