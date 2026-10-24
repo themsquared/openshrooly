@@ -142,6 +142,6 @@ Local / CI uses the Worker CA (`DEVICE_ISSUER=worker`). Never commit the CA key.
 
 ## UX
 
-- Device: large 6-character code + claim URL (QR payload). No account password on the chamber.
-- Site: `/claim.html?code=` (camera / typed). Account list + revoke.
-- Copy: “Cloud is optional. Your chamber still works if we are down.”
+- Device (next firmware): large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. Not in shipped firmware yet.
+- Site: `/claim.html` explains pairing. The code form is shown for `?code=` (camera / typed) or when `deviceClaiming` is on. Account list + revoke.
+- Copy: cloud linking needs a firmware update that is not out yet; the chamber still works on your own network.

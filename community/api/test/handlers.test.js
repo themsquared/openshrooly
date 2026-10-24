@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { allowedOrigins, pickCorsOrigin, withCors } from "../src/handlers.js";
-import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
+import { assertPublicHandle, call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 function env() {
   return testEnv();
@@ -108,6 +108,8 @@ test("magic link sign-in creates a verified user and session cookie", async () =
   assert.equal(done.status, 200);
   assert.match(done.headers.get("set-cookie") || "", /__Host-sl_session=/);
   assert.equal(done.data.user.email_verified, true);
+  const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@example.com"]);
+  assertPublicHandle(row, done.data.user);
   const reuse = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
   assert.equal(reuse.status, 401);
 });
@@ -117,9 +119,16 @@ test("OIDC Google stub and passkey challenge", async () => {
   const start = await call(ctx, "GET", "/api/auth/oidc/google/start");
   assert.equal(start.status, 200);
   assert.ok(start.data.authorize_url.includes("accounts.google.com"));
-  const cb = await call(ctx, "GET", `/api/auth/oidc/google/callback?state=${start.data.state}&code=stub`);
+  const binding = String(start.headers.get("set-cookie")).split(";")[0];
+  assert.match(binding, /^__Host-sl_oidc=/);
+  const cb = await call(ctx, "GET", `/api/auth/oidc/google/callback?state=${start.data.state}&code=stub`, {
+    headers: { cookie: binding },
+  });
   assert.equal(cb.status, 200);
   assert.equal(cb.data.user.email, "google.user@example.com");
+  const stub = await ctx.db.one("SELECT * FROM users WHERE email=?", ["google.user@example.com"]);
+  assertPublicHandle(stub, cb.data.user);
+  assert.notEqual(stub.username, "google.user");
   const { token } = await register(ctx, "passkey@example.com");
   const begin = await call(ctx, "POST", "/api/auth/webauthn/register/begin", { token, body: {} });
   assert.equal(begin.status, 200);
