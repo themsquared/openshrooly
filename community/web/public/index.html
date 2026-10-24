@@ -3,8 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shroom Labs. Mushroom profiles for OpenShrooly</title>
-  <meta name="description" content="Browse, fork, and apply researched mushroom grow profiles. Local-first. Works with Shrooly devices running OpenShrooly.">
+  <!--SEO_HEAD-->
+  <title>Shroom Labs · Chamber profiles for OpenShrooly</title>
+  <meta name="description" content="Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Shroom Labs · Chamber profiles for OpenShrooly">
+  <meta property="og:description" content="Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.">
+  <meta property="og:url" content="https://shroomlabs.io/">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Shroom Labs · Chamber profiles for OpenShrooly">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Shroom Labs · Chamber profiles for OpenShrooly">
+  <meta name="twitter:description" content="Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/","description":"Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.","logo":"https://shroomlabs.io/apple-touch-icon.png","sameAs":["https://github.com/themsquared/openshrooly"]},{"@type":"WebSite","@id":"https://shroomlabs.io/#website","url":"https://shroomlabs.io/","name":"Shroom Labs","description":"Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.","inLanguage":"en","publisher":{"@id":"https://shroomlabs.io/#org"},"potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://shroomlabs.io/?q={search_term_string}#library"},"query-input":"required name=search_term_string"}}]}</script>
+  <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
@@ -12,28 +30,20 @@
   <script src="/js/config.js"></script>
 </head>
 <body data-page="home">
+  <!--CHROME_HEADER-->
   <div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="/">
-      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-      <span>Shroom Labs<small>works with OpenShrooly</small></span>
-    </a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site">
-      <a href="/" aria-current="page">Profiles</a>
-      <a href="/faq.html">FAQ</a>
-      <a id="nav-coach" href="/coach.html">Grow Coach</a>
-      <a href="/claim.html">Claim device</a>
-      <a href="/docs.html">Docs</a>
-      <span id="session-nav"></span>
-    </nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/" aria-current="page">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
   </header>
+  <!--/CHROME_HEADER-->
   <main id="main">
     <section class="hero" aria-label="Shroom Labs">
       <canvas id="mycelium" aria-hidden="true"></canvas>
       <div class="hero-copy">
-        <p class="eyebrow" id="pack-label">Culinary library</p>
+        <p class="eyebrow" id="pack-label">Culinary Profiles</p>
         <h1>Grow the flush you planned.</h1>
         <p class="lede">Humidity, light, and air as living setpoints you watch through the glass. Offline first. The chamber stays yours.</p>
         <div class="hero-actions">
@@ -42,8 +52,8 @@
         </div>
         <form class="search-bar" method="get" role="search" action="#library">
           <input type="hidden" name="pack" id="pack" value="culinary">
-          <label>Search the library
-            <input name="q" id="q" placeholder="lion’s mane, oyster, shiitake" autocomplete="off">
+          <label>Search Profiles
+            <input name="q" id="q" placeholder="lion's mane, oyster, shiitake" autocomplete="off">
           </label>
           <button type="submit">Search</button>
         </form>
@@ -53,7 +63,7 @@
       <div class="library-toolbar">
         <div class="pack-toggle" role="group" aria-label="Library pack filter">
           <button type="button" id="pack-culinary" aria-pressed="true">Culinary</button>
-          <button type="button" id="pack-restricted" aria-pressed="false">Off-menu</button>
+          <button type="button" id="pack-offmenu" aria-pressed="false">Off-menu</button>
         </div>
         <p class="pack-hint">A few varieties stay off the printed menu. Open them only if growing them is legal where you live.</p>
       </div>
@@ -70,7 +80,7 @@
     </section>
     <section id="coach-promo" class="how" aria-label="Grow Coach">
       <h2 class="display" style="font-size:1.8rem">Grow Coach</h2>
-      <p class="muted">A $3.99/month culinary subscription that learns each chamber from telemetry and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included. Not sold with Off-menu profiles.</p>
+      <p class="muted">A $3.99/month culinary subscription that learns each chamber from its readings and past flushes, then suggests safer humidity and temperature. Photo checks and harvest alerts included. Not sold with Off-menu Profiles.</p>
       <p><a class="button" href="/coach.html">Open Grow Coach</a></p>
     </section>
     <section id="supplies" class="supplies">
@@ -82,7 +92,13 @@
       </ul>
     </section>
   </main>
-  <footer class="site-footer">Shroom Labs. shroomlabs.io. Works with Shrooly devices running OpenShrooly. Photos on cdn.shroomlabs.io.</footer>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html">Grow Coach</a><a href="/claim.html">Claim device</a><a href="/docs.html">Docs</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

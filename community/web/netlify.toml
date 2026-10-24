@@ -1,5 +1,5 @@
 [build]
-  command = "node scripts/write-config.js"
+  command = "node scripts/write-config.js && node scripts/generate-seo.js"
   publish = "public"
 
 [build.environment]

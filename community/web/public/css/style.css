@@ -120,8 +120,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   font-weight: 700;
 }
 .brand svg { color: var(--sl-spore); filter: drop-shadow(0 0 8px var(--sl-spore)); flex: 0 0 auto; }
-.site-nav, nav { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-.site-nav a, .site-nav button.link, nav a, nav button.link {
+.site-nav, .footer-nav, nav { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.site-nav a, .site-nav button.link, .footer-nav a, nav a, nav button.link {
   color: var(--sl-ink-dim);
   text-decoration: none;
   background: none;
@@ -129,7 +129,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   font: inherit;
   cursor: pointer;
 }
-.site-nav a:hover, .site-nav button.link:hover, nav a:hover, nav button.link:hover { color: var(--sl-spore); }
+.site-nav a:hover, .site-nav button.link:hover, .footer-nav a:hover, nav a:hover, nav button.link:hover { color: var(--sl-spore); }
+.site-nav a[aria-current="page"] { color: var(--sl-spore); }
 .nav-toggle {
   display: none;
   width: auto;
@@ -245,6 +246,8 @@ h1, .display {
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 1.1rem;
 }
+/* Hold space for the library until profiles load, so the sections below do not jump (CLS). */
+.cards:empty { min-height: max(100vh, 960px); }
 .profile-card, .card {
   background: var(--sl-bg-glass);
   backdrop-filter: blur(16px);
@@ -480,7 +483,12 @@ button.nav-toggle {
   border-top: 1px solid var(--sl-line);
   text-align: center;
   font-size: 13px;
+  display: grid;
+  gap: 0.6rem;
 }
+.site-footer .footer-nav { justify-content: center; }
+.answer-first { font-size: 1.05rem; }
+.legal-prominent { padding: 1rem 1.15rem; border-width: 1.5px; margin: 0 0 1.2rem; }
 .supplies { margin-top: 2.4rem; }
 .coach-hero { min-height: 280px; }
 .coach-toolbar {
@@ -636,3 +644,23 @@ button.nav-toggle {
   * { animation: none !important; transition: none !important; }
   .profile-card:hover, .profile-card:focus-visible { transform: none; }
 }
+
+/* Article pages: docs, FAQ, and the static profile pages. */
+.profile-page { max-width: 46rem; margin: 0 auto; }
+.profile-page h1 { font-size: clamp(2.4rem, 6vw, 3.8rem); line-height: 1.02; }
+.profile-page h2 { font-family: var(--display); font-weight: 600; font-size: 1.45rem; margin: 2rem 0 0.5rem; }
+.profile-page p.eyebrow {
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--sl-mycelium);
+  font-weight: 700;
+  margin: 0 0 0.85rem;
+}
+.profile-page .lede { color: var(--sl-ink-dim); }
+.profile-page .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 2rem; }
+.profile-page-art { padding: 0; margin-bottom: 1.4rem; }
+.profile-page-art img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.profile-page .grow-timeline p { margin: 0.35rem 0 0; color: var(--sl-ink-dim); }
+.faq-links { padding-left: 1.2rem; }
+.faq-links li { margin: 0 0 0.6rem; }
