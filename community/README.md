@@ -12,7 +12,7 @@ The data layer is portable: standard SQL (`api/schema.sql`) and plain `fetch` ha
 
 Opt-in device cloud: claim at `/claim.html`, mTLS on `link.shroomlabs.io`. See [`docs/DEVICES.md`](../docs/DEVICES.md). Default firmware does not open a cloud socket.
 
-**Grow Coach** (`/coach.html`) is a $3.99/month culinary subscription: per-chamber learning, chat, photo checks, alerts. Not marketed with the restricted pack. See [`docs/COACH.md`](../docs/COACH.md).
+**Grow Coach** (`/coach.html`) is a culinary subscription, coming soon at $3.99/month. It uses a device's readings and past grows to tailor humidity and temperature advice. Photo checks come later. Not marketed with off-menu varieties. See [`docs/COACH.md`](../docs/COACH.md).
 
 Psilocybin profiles are tagged, free-only, and never carry affiliate links or payment providers.
 
@@ -73,6 +73,8 @@ API_BASE_URL=https://api.shroomlabs.io MEDIA_BASE_URL=https://cdn.shroomlabs.io 
 ```
 
 Production CORS on the Worker is `https://shroomlabs.io` and `https://www.shroomlabs.io`.
+
+Built-in profiles live in `data/profiles/`. The API bundles them into `src/seeds.json` on every test and deploy and serves seeded rows from that bundle, so copy fixes ship with the Worker without touching D1. The web `npm run deploy` (and the Netlify build command) runs `scripts/generate-seo.js` first, so every built-in profile gets its static `/profiles/<id>.html` page. A profile with no static page yet, such as a community upload, falls back through the `/profiles/:id` redirect to `profile.html`, which loads it from the API. `test/site.test.js` fails if the committed pages are out of date.
 
 ## Auth and CORS
 

@@ -12,18 +12,18 @@
     "oyster"
   ],
   "restricted": false,
-  "summary": "Forgiving beginner oyster. Fast, high FAE, cool-to-room fruiting.",
+  "summary": "Forgiving beginner oyster. Fast, lots of fresh air, cool-to-room fruiting.",
   "notes": "Clusters fruit quickly. Prioritize fresh air over extra humidity once pins form.",
   "chamber_notes": "Shrooly-sized chamber works well. Keep surfaces just barely glistening, not dripping.",
   "legal_notice": null,
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. ostreatus spawn run ~24 \u00b0C; fruiting often 10 to 21 \u00b0C at 85 to 90% RH."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. ostreatus spawn run ~24 \u00b0C; fruiting often 10 to 21 \u00b0C at 85 to 90% humidity."
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Pearl/grey oysters typically 12 to 12 light and strong FAE."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Pearl/grey oysters typically 12 to 12 light and plenty of fresh air."
     },
     {
       "title": "Stock firmware",
@@ -56,7 +56,7 @@
         "run_duration_s": 15,
         "speed_percent": 20
       },
-      "notes": "Dark, low FAE until the block is white."
+      "notes": "Dark, little fresh air until the block is white."
     },
     {
       "id": "pinning",
@@ -83,7 +83,7 @@
         "run_duration_s": 35,
         "speed_percent": 35
       },
-      "notes": "Drop temperature and open FAE to trigger clusters."
+      "notes": "Drop temperature and add fresh air to trigger clusters."
     },
     {
       "id": "fruiting",

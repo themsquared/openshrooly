@@ -12,18 +12,18 @@
     "woodlover"
   ],
   "restricted": false,
-  "summary": "Warm, wet jelly fungus. High RH matters more than light intensity.",
+  "summary": "Warm, wet jelly fungus. High humidity matters more than light intensity.",
   "notes": "",
   "chamber_notes": "",
   "legal_notice": null,
   "source_notes": [
     {
       "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Auricularia spp. fruit warm (often 20 to 30 \u00b0C) at 85 to 95% RH."
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Auricularia spp. fruit warm (often 20 to 30 \u00b0C) at 85 to 95% humidity."
     },
     {
       "title": "Vendor cards",
-      "detail": "Asian vendor cards list short, frequent misting-equivalent humidity rather than cold FAE."
+      "detail": "Asian vendor cards list short, frequent misting-equivalent humidity rather than cold fresh air."
     }
   ],
   "stages": [

@@ -12,9 +12,9 @@
     "medicinal"
   ],
   "restricted": false,
-  "summary": "Tooth fungus. Moderate FAE: too much air yellows spines.",
+  "summary": "Tooth fungus. Moderate fresh air, since too much air yellows the spines.",
   "notes": "",
-  "chamber_notes": "If spines brown or yellow, cut FAE and raise RH slightly. Original Shrooly lion's mane recipe used a gentle fan ramp.",
+  "chamber_notes": "If spines brown or yellow, cut fresh air and raise humidity slightly. Original Shrooly lion's mane recipe used a gentle fan ramp.",
   "legal_notice": null,
   "source_notes": [
     {
@@ -23,7 +23,7 @@
     },
     {
       "title": "Vendor cards",
-      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Lion's mane cards usually 85 to 95% RH and 8 to 12 h light."
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Lion's mane cards usually 85 to 95% humidity and 8 to 12 h light."
     },
     {
       "title": "Stock firmware",
