@@ -61,9 +61,9 @@ function cookie(value, maxAge) {
 }
 
 /**
- * Browser-binding cookie for an OIDC round trip.
- * Google uses Lax (top-level GET redirect). Apple uses form_post, a cross-site POST, so Lax would drop
- * the cookie; None keeps it on that POST. The session cookie stays Lax.
+ * Browser-binding cookie for an OIDC round trip (__Host-, Path=/, Secure, HttpOnly, 10 min).
+ * Google uses Lax (top-level GET redirect). Apple form_post is a cross-site POST, so only the
+ * Apple start path sets SameSite=None. The session cookie stays Lax. Cleared on callback.
  */
 function oidcCookie(value, maxAgeMs, sameSite = "Lax") {
   return `${OIDC_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=${sameSite}; Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`;

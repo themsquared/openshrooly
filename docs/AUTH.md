@@ -58,10 +58,8 @@ Create these in [Apple Developer](https://developer.apple.com/account/resources/
 2. **Services ID** (Identifiers > Services IDs), for example `io.shroomlabs.web`. Enable Sign in with Apple and click Configure:
    - Primary App ID: the App ID from step 1.
    - Domains and Subdomains: `shroomlabs.io`, `www.shroomlabs.io`, `api.shroomlabs.io`.
-   - Return URLs (exact):
+   - Return URL (exact). Apple requires https on a real domain. It rejects localhost and IP addresses:
      - `https://api.shroomlabs.io/api/auth/oidc/apple/callback`
-     - `http://127.0.0.1:8787/api/auth/oidc/apple/callback`
-     - `http://localhost:8787/api/auth/oidc/apple/callback`
 3. **Key** (Keys). Create a key, enable Sign in with Apple, configure it for the same primary App ID, and download the `.p8` file. Apple shows the file once. Note the Key ID.
 4. **Team ID**. Shown in the top right of the developer account (Membership).
 
@@ -84,13 +82,13 @@ Do not set `APPLE_CLIENT_SECRET`. The Worker signs a short-lived ES256 JWT from 
 
 Same checks as Google (`community/api/src/oidc.js`). Differences:
 
-1. `GET /api/auth/oidc/apple/start?next=/path` sets the same `__Host-sl_oidc` cookie, but `SameSite=None`. Apple uses `response_mode=form_post`, so the callback is a cross-site POST from `appleid.apple.com`. A Lax cookie would be dropped on that POST. The session cookie stays Lax. CSRF for the rest of the site is unchanged: only this callback accepts Origin `https://appleid.apple.com`. The cookie-bound `state` still has to match.
+1. `GET /api/auth/oidc/apple/start?next=/path` is the only path that sets the Apple state cookie. It is `__Host-sl_oidc` (so Secure, Path=/, no Domain), HttpOnly, `SameSite=None`, 10 minutes. Apple uses `response_mode=form_post`, so the callback is a cross-site POST from `appleid.apple.com`. A Lax cookie would be dropped on that POST. The session cookie stays Lax. The state row is deleted on first use (replay fails) and the cookie is cleared on the callback. CSRF for the rest of the site is unchanged: only this callback accepts Origin `https://appleid.apple.com`. The cookie-bound `state` still has to match.
 2. Authorize URL includes `response_mode=form_post`, `scope=name email`, PKCE `S256`, `state`, and `nonce`.
 3. `POST /api/auth/oidc/apple/callback` reads `code`, `state`, `error`, and optional `user` from the form body. The `id_token` must have a valid RS256 signature from `https://appleid.apple.com/auth/keys`, `iss` Apple, `aud` our Services ID, a live `exp`, a sane `iat`, our `nonce`, a `sub`, and a verified email. Hide My Email addresses (`@privaterelay.appleid.com`) count as verified.
 4. Apple sends the person's name only on the first authorization, in the `user` form field. Later sign-ins omit it. Missing name is fine.
 5. Failures, rate limits, handoff, `next`, and account linking match Google (`oidc_apple_fail` in the audit log).
 
-Tests: `community/api/test/oidc-apple.test.js` and `community/api/test/oidc-apple-d1.test.js` (local EC key + fake Apple JWKS, including D1/miniflare).
+Local testing does not talk to Apple. There is no localhost return URL. Use `community/api/test/oidc-apple.test.js` and `community/api/test/oidc-apple-d1.test.js`: a locally generated EC key and a fake Apple JWKS, including D1/miniflare.
 
 WebAuthn RP ID: `shroomlabs.io` (`WEBAUTHN_RP_ID`).
 
