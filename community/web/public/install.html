@@ -3,12 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Install OpenShrooly · Shroom Labs</title>
-  <meta name="description" content="Flash OpenShrooly over USB from Chrome or Edge. Same ESP Web Tools installer as openshrooly.com.">
+  <!--SEO_HEAD-->
+  <title>Install OpenShrooly over USB · Shroom Labs</title>
+  <meta name="description" content="Put OpenShrooly on a Shrooly from Chrome or Edge with a USB-C cable. Only releases signed by Shroom Labs are offered.">
+  <link rel="canonical" href="https://shroomlabs.io/install.html">
+  <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="install">
+  <!--CHROME_HEADER-->
   <div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
@@ -16,30 +23,42 @@
       <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       <span>Shroom Labs<small>works with OpenShrooly</small></span>
     </a>
-    <nav>
-      <a href="/">Catalog</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site">
+      <a href="/">Profiles</a>
       <a href="/install.html" aria-current="page">Install</a>
+      <a href="/faq.html">FAQ</a>
+      <a id="nav-coach" href="/coach.html">Grow Coach</a>
+      <a href="/claim.html">Claim device</a>
+      <a href="/docs.html">Docs</a>
       <span id="session-nav"></span>
     </nav>
   </header>
+  <!--/CHROME_HEADER-->
   <main id="main">
     <section class="card auth-panel install-panel">
-      <p class="eyebrow">USB installer</p>
-      <h1>Flash the chamber from the browser</h1>
-      <p class="muted">This is the same ESP Web Tools flow as <a href="https://openshrooly.com">openshrooly.com</a>. Use Chrome or Edge on a computer. Hold BOOT if the port does not appear.</p>
-      <p id="status" class="muted">Loading the signed release manifest…</p>
+      <p class="eyebrow">Install over USB</p>
+      <h1>Put OpenShrooly on your Shrooly</h1>
+      <p class="muted">Use Chrome or Edge on a computer and a USB-C data cable. This page only offers releases signed by Shroom Labs, and your browser checks the signature before anything is sent to your Shrooly.</p>
+      <p id="status" class="install-status" aria-live="polite">Checking the latest signed release…</p>
       <p id="error" class="notice hidden" role="alert"></p>
-      <esp-web-install-button id="install-button" class="hidden"></esp-web-install-button>
-      <ol class="muted">
-        <li>Plug the chamber in over USB-C.</li>
-        <li>Click Install and pick the USB serial port.</li>
-        <li>After reboot, join <strong>OpenShrooly</strong> and open <code>http://192.168.4.1/app/</code>.</li>
+      <esp-web-install-button id="install-button" class="hidden">
+        <button slot="activate" class="button" type="button">Install</button>
+        <span slot="unsupported" class="muted">This installer needs Chrome or Edge on a computer.</span>
+        <span slot="not-allowed" class="muted">Open this page from https://shroomlabs.io to use the installer.</span>
+      </esp-web-install-button>
+      <ol class="muted install-steps">
+        <li>Plug your Shrooly into this computer with a USB-C data cable.</li>
+        <li>Press Install and choose your Shrooly from the list. If it does not show up, hold the BOOT button while you plug it in.</li>
+        <li>When it finishes, you can enter your Wi-Fi details right here. If you skip that, join the Wi-Fi network named <strong>OpenShrooly</strong> on your phone and follow the setup page that opens.</li>
       </ol>
-      <p class="muted">OTA files on this page are checksummed and Ed25519-signed when the release includes <code>SHA256SUMS</code> + <code>SHA256SUMS.sig</code>. <code>POST /api/firmware/verify</code> refuses an unsigned <code>.ota.bin</code> when the Worker has <code>FIRMWARE_SIGNING_PUB</code>.</p>
+      <p class="muted">Already running OpenShrooly? Open your Shrooly's page, go to Settings, and press Check for updates. New versions install over Wi-Fi and are checked the same way.</p>
     </section>
   </main>
-  <footer class="site-footer">Shroom Labs — shroomlabs.io. Works with Shrooly devices running OpenShrooly.</footer>
-  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer">Shroom Labs. shroomlabs.io. Works with Shrooly devices running OpenShrooly.</footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/vendor/esp-web-tools-10.4.0/install-button.js"></script>
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/install.js"></script>
 </body>
