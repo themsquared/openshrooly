@@ -15,6 +15,13 @@ import {
   vp8xPayload,
 } from "./image-fixtures.js";
 
+function hasJpegMarker(bytes, marker) {
+  for (let i = 0; i < bytes.length - 1; i += 1) {
+    if (bytes[i] === 0xff && bytes[i + 1] === marker) return true;
+  }
+  return false;
+}
+
 test("sniff accepts JPEG PNG WebP and rejects SVG HTML GIF", () => {
   assert.equal(sniffImage(buildJpeg()), "jpeg");
   assert.equal(sniffImage(buildPng()), "png");
@@ -123,14 +130,34 @@ test("WebP VP8X 1x1 then VP8L bomb is rejected", () => {
   assert.throws(() => sanitizeGrowPhoto(mismatch), ValidationError);
 });
 
-test("JPEG JPGn HTML is dropped and APP14 Adobe is kept", () => {
-  const dirty = buildJpeg({
-    apps: [jpegSegment(0xf0, "<html>jpgn</html>"), jpegSegment(0xee, "Adobe\0")],
-  });
+test("baseline JPEG drops an FFF0 JPGn segment carrying HTML", () => {
+  const dirty = buildJpeg({ apps: [jpegSegment(0xf0, "<html>jpgn</html>")] });
   assert.ok(includesAscii(dirty, "<html>"));
   const clean = sanitizeGrowPhoto(dirty);
   assert.equal(includesAscii(clean.bytes, "<html>"), false);
-  assert.ok(includesAscii(clean.bytes, "Adobe"));
+  assert.equal(hasJpegMarker(clean.bytes, 0xf0), false);
+});
+
+test("progressive JPEG drops FFF0 HTML before SOF and between scans", () => {
+  const dirty = buildJpeg({
+    progressive: true,
+    apps: [jpegSegment(0xf0, "<html>before</html>")],
+    segmentsBetweenScans: [jpegSegment(0xf0, "<html>between</html>")],
+  });
+  assert.ok(includesAscii(dirty, "<html>before</html>"));
+  assert.ok(includesAscii(dirty, "<html>between</html>"));
+  const clean = sanitizeGrowPhoto(dirty);
+  assert.equal(includesAscii(clean.bytes, "<html>"), false);
+  assert.equal(includesAscii(clean.bytes, "before"), false);
+  assert.equal(includesAscii(clean.bytes, "between"), false);
+  assert.equal(hasJpegMarker(clean.bytes, 0xf0), false);
+});
+
+test("APP14 Adobe is kept only for CMYK and dropped otherwise", () => {
+  const rgb = buildJpeg({ apps: [jpegSegment(0xee, "Adobe\0")] });
+  assert.equal(includesAscii(sanitizeGrowPhoto(rgb).bytes, "Adobe"), false);
+  const cmyk = buildJpeg({ components: 4, apps: [jpegSegment(0xee, "Adobe\0")] });
+  assert.ok(includesAscii(sanitizeGrowPhoto(cmyk).bytes, "Adobe"));
 });
 
 test("overlong photo_base64 is rejected before decode", () => {

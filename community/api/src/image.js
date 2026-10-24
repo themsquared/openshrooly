@@ -102,18 +102,56 @@ function asBytes(input) {
   return new Uint8Array(input || []);
 }
 
-function jpegKeep(marker) {
+function jpegKeep(marker, keepApp14) {
   if (marker >= 0xd0 && marker <= 0xd7) return true;
   if (marker === 0xd9 || marker === 0xda) return true;
   if (isSofMarker(marker)) return true;
-  if (marker === 0xc4 || marker === 0xcc) return true;
+  if (marker === 0xc4) return true;
   if (marker === 0xdb || marker === 0xdd) return true;
-  if (marker === 0xee) return true;
+  if (marker === 0xee) return keepApp14;
   return false;
+}
+
+function jpegSofComponents(input) {
+  let i = 2;
+  while (i + 3 < input.length) {
+    if (input[i] !== 0xff) return 0;
+    while (i < input.length && input[i] === 0xff) i += 1;
+    if (i >= input.length) return 0;
+    const marker = input[i];
+    i += 1;
+    if (marker === 0xd9) return 0;
+    if (marker >= 0xd0 && marker <= 0xd7) continue;
+    if (i + 1 >= input.length) return 0;
+    const len = (input[i] << 8) | input[i + 1];
+    if (len < 2 || i + len > input.length) return 0;
+    if (isSofMarker(marker) && len >= 8) return input[i + 7];
+    i += len;
+    if (marker !== 0xda) continue;
+    while (i + 1 < input.length) {
+      if (input[i] !== 0xff) {
+        i += 1;
+        continue;
+      }
+      const next = input[i + 1];
+      if (next === 0x00 || (next >= 0xd0 && next <= 0xd7)) {
+        i += 2;
+        continue;
+      }
+      if (next === 0xff) {
+        i += 1;
+        continue;
+      }
+      break;
+    }
+  }
+  return 0;
 }
 
 function sanitizeJpeg(input) {
   if (input.length < 4 || input[0] !== 0xff || input[1] !== 0xd8) throw new ValidationError("invalid JPEG");
+  const sofComponents = jpegSofComponents(input);
+  const keepApp14 = sofComponents === 4;
   const out = new Uint8Array(input.length);
   out[0] = 0xff;
   out[1] = 0xd8;
@@ -122,7 +160,6 @@ function sanitizeJpeg(input) {
   let sawSof = false;
   let sawSos = false;
   let sawApp14 = false;
-  let sofComponents = 0;
   while (i < input.length) {
     if (input[i] !== 0xff) throw new ValidationError("invalid JPEG");
     while (i < input.length && input[i] === 0xff) i += 1;
@@ -145,10 +182,9 @@ function sanitizeJpeg(input) {
     if (i + 1 >= input.length) throw new ValidationError("invalid JPEG");
     const len = (input[i] << 8) | input[i + 1];
     if (len < 2 || i + len > input.length) throw new ValidationError("invalid JPEG");
-    const keep = jpegKeep(marker);
+    const keep = jpegKeep(marker, keepApp14);
     if (keep) {
       if (marker === 0xee) sawApp14 = true;
-      if (isSofMarker(marker) && len >= 8) sofComponents = input[i + 7];
       out[o] = 0xff;
       out[o + 1] = marker;
       o += 2;

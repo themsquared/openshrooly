@@ -52,14 +52,18 @@ export function buildJpeg({
   width = 8,
   height = 8,
   progressive = false,
+  components = 1,
   comments = [],
   apps = [],
   commentsBetweenScans = [],
+  segmentsBetweenScans = [],
   afterEoi,
 } = {}) {
+  const comps = [];
+  for (let n = 1; n <= components; n += 1) comps.push(n, 0x11, 0);
   const sof = jpegSegment(
     progressive ? 0xc2 : 0xc0,
-    u8(8, ...be16(height), ...be16(width), 1, 1, 0x11, 0)
+    u8(8, ...be16(height), ...be16(width), components, ...comps)
   );
   const dqt = jpegSegment(0xdb, u8(0, ...new Array(64).fill(1)));
   const dht = jpegSegment(0xc4, u8(0, ...new Array(16).fill(0)));
@@ -69,6 +73,7 @@ export function buildJpeg({
   for (const comment of comments) parts.push(jpegSegment(0xfe, comment));
   parts.push(sos, scan);
   for (const comment of commentsBetweenScans) parts.push(jpegSegment(0xfe, comment));
+  for (const segment of segmentsBetweenScans) parts.push(segment);
   if (progressive) parts.push(sos, scan);
   parts.push(u8(0xff, 0xd9));
   if (afterEoi) parts.push(afterEoi);
