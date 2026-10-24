@@ -378,10 +378,15 @@ async function renderAccount() {
   $("#devices").innerHTML =
     (devices.devices || [])
       .map(
-        (d) => `<li>
-          <strong>${escapeHtml(d.name)}</strong> · ${escapeHtml(d.status)}
-          <span class="muted">${escapeHtml(d.id)}</span>
-          ${d.status !== "revoked" ? `<button type="button" class="secondary revoke" data-id="${escapeHtml(d.id)}">Revoke</button>` : ""}
+        (d) => `<li id="device-${escapeHtml(d.id)}">
+          <div class="device-info">
+            <strong>${escapeHtml(d.name)}</strong>
+            <span class="muted">${escapeHtml(d.status)} · ${escapeHtml(d.id)}</span>
+          </div>
+          <div class="device-actions">
+            ${d.status === "active" ? `<a class="button secondary" href="/device.html?id=${encodeURIComponent(d.id)}">Alerts</a>` : ""}
+            ${d.status !== "revoked" ? `<button type="button" class="secondary revoke" data-id="${escapeHtml(d.id)}">Revoke</button>` : ""}
+          </div>
         </li>`
       )
       .join("") || "<li class='muted'>No chambers linked yet.</li>";
@@ -392,6 +397,7 @@ async function renderAccount() {
       location.reload();
     });
   }
+  renderAlertSettings().catch((err) => showAlertsStatus(err.message));
   $("#mint").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
@@ -457,6 +463,16 @@ if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
 if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
 if (page === "publish") renderPublish();
+if (page === "device") renderDevice().catch((err) => {
+  if (err.status === 401) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  const box = $("#device-error");
+  box.textContent = err.status === 403 ? "This chamber is not on your account." : err.message;
+  box.classList.remove("hidden");
+});
+if (page === "alerts-unsub") renderUnsubscribe();
 if (page === "claim") renderClaim();
 if (page === "coach") renderCoach().catch((err) => {
   const box = $("#coach-error");
@@ -662,4 +678,224 @@ async function renderClaim() {
       $("#error").classList.remove("hidden");
     }
   });
+}
+
+/* Alerts: account settings, one chamber's rules, and the one click unsubscribe page. */
+
+const ALERT_STATUS = {
+  sent: "Emailed",
+  stub: "Saved here. Email sending is not switched on yet.",
+  pending: "Sending",
+  sending: "Sending",
+  held: "Waiting for quiet hours to end",
+  suppressed: "Not emailed, so you are not sent repeats",
+  expired: "Not emailed, it cleared during quiet hours",
+  unverified: "Not emailed, your email is not verified",
+  muted: "Not emailed, alert emails are off",
+  capped: "Not emailed, daily limit reached",
+  failed: "Email could not be sent",
+};
+const ALERT_KIND = { open: "", recovered: "is-ok", milestone: "is-info", test: "is-info" };
+
+function fmtWhen(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function alertItems(alerts) {
+  if (!alerts.length) return "<li class='muted empty'>No alerts yet. When something needs you, it shows up here.</li>";
+  return alerts
+    .map(
+      (a) => `<li class="${ALERT_KIND[a.kind] || ""}">
+        <strong>${escapeHtml(a.title)}</strong>
+        <span>${escapeHtml(a.detail)}</span>
+        <small class="muted">${escapeHtml(fmtWhen(a.created_at))} · ${escapeHtml(ALERT_STATUS[a.status] || a.status)}</small>
+      </li>`
+    )
+    .join("");
+}
+
+function deliveryNotice(data) {
+  if (!data.email_ready) return "Verify your email to get alert emails. Alerts are still saved here.";
+  if (data.prefs?.unsubscribed && !data.prefs?.email) return "You turned off alert emails from a link in an email. Turn on Email me alerts in alert settings to get them again.";
+  if (data.delivery?.email !== "live") return "Email sending is not switched on yet. Alerts are saved here so you can see them.";
+  return "";
+}
+
+function showAlertsStatus(text) {
+  const box = $("#alerts-status");
+  if (!box) return;
+  box.textContent = text;
+  box.classList.toggle("hidden", !text);
+}
+
+function timeZones(current) {
+  let zones = [];
+  try {
+    zones = Intl.supportedValuesOf("timeZone");
+  } catch {
+    zones = ["America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York", "Europe/London", "Europe/Berlin", "Asia/Tokyo", "Australia/Sydney", "UTC"];
+  }
+  if (!zones.includes(current)) zones = [current, ...zones];
+  return zones.map((z) => `<option value="${escapeHtml(z)}"${z === current ? " selected" : ""}>${escapeHtml(z.replaceAll("_", " "))}</option>`).join("");
+}
+
+function flash(el, text) {
+  if (!el) return;
+  el.textContent = text;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => (el.textContent = ""), 6000);
+}
+
+async function renderAlertSettings() {
+  const form = $("#alert-prefs");
+  if (!form) return;
+  const data = await api("/api/alerts");
+  const fill = (view) => {
+    const p = view.prefs;
+    form.email.checked = Boolean(p.email);
+    form.timezone.innerHTML = timeZones(p.timezone);
+    form.cooldown_minutes.value = String(p.cooldown_minutes);
+    if (form.cooldown_minutes.value !== String(p.cooldown_minutes)) {
+      form.cooldown_minutes.insertAdjacentHTML("beforeend", `<option value="${Number(p.cooldown_minutes)}">${Number(p.cooldown_minutes)} minutes</option>`);
+      form.cooldown_minutes.value = String(p.cooldown_minutes);
+    }
+    form.quiet_enabled.checked = Boolean(p.quiet?.enabled);
+    form.quiet_start.value = p.quiet?.start || "22:00";
+    form.quiet_end.value = p.quiet?.end || "07:00";
+    showAlertsStatus(deliveryNotice(view));
+  };
+  fill(data);
+  $("#alert-list").innerHTML = alertItems(data.alerts || []);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const msg = $("#alert-prefs-msg");
+    try {
+      const view = await api("/api/alerts/prefs", {
+        method: "PUT",
+        jsonBody: {
+          email: form.email.checked,
+          timezone: form.timezone.value,
+          cooldown_minutes: Number(form.cooldown_minutes.value),
+          quiet: { enabled: form.quiet_enabled.checked, start: form.quiet_start.value, end: form.quiet_end.value },
+        },
+      });
+      fill(view);
+      flash(msg, "Saved.");
+    } catch (err) {
+      flash(msg, err.message);
+    }
+  });
+  $("#alert-test").addEventListener("click", async () => {
+    const msg = $("#alert-prefs-msg");
+    try {
+      await api("/api/alerts/test", { method: "POST", jsonBody: {} });
+      const fresh = await api("/api/alerts");
+      $("#alert-list").innerHTML = alertItems(fresh.alerts || []);
+      flash(msg, fresh.delivery?.email === "live" ? "Test alert sent. Check your inbox." : "Test alert saved below.");
+    } catch (err) {
+      flash(msg, err.status === 429 ? "That is enough tests for this hour." : err.message);
+    }
+  });
+}
+
+const STATE_LABEL = { temperature: "Temperature", humidity: "Humidity", water: "Water", offline: "Online", fruiting: "Fruiting day" };
+
+async function renderDevice() {
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  const id = params().get("id") || "";
+  if (!id) {
+    const box = $("#device-error");
+    box.innerHTML = `Pick a chamber from your <a href="/account.html">account</a>.`;
+    box.classList.remove("hidden");
+    return;
+  }
+  const path = `/api/devices/${encodeURIComponent(id)}/alerts`;
+  const data = await api(path);
+  const form = $("#rules-form");
+  $("#device-name").textContent = `${data.device.name} alerts`;
+  document.title = `${data.device.name} alerts · Shroom Labs`;
+  $("#device-meta").textContent = data.device.last_seen_at
+    ? `Last report ${fmtWhen(data.device.last_seen_at)}`
+    : "No reports from this chamber yet.";
+  const notice = deliveryNotice(data);
+  if (notice) {
+    $("#device-status").innerHTML = `${escapeHtml(notice)} <a href="/account.html#alerts">Alert settings</a>`;
+    $("#device-status").classList.remove("hidden");
+  }
+  const showStates = (states) => {
+    $("#device-states").innerHTML = Object.entries(STATE_LABEL)
+      .filter(([rule]) => rule !== "fruiting")
+      .map(([rule, label]) => {
+        const open = states[rule] === "open";
+        const text = rule === "offline" ? (open ? "Offline" : "Online") : `${label} ${open ? "needs a look" : "ok"}`;
+        return `<li class="${open ? "is-open" : "is-ok"}">${escapeHtml(text)}</li>`;
+      })
+      .join("");
+  };
+  const fill = (rules) => {
+    $("#grow-profile").innerHTML =
+      `<option value="">Not tracking a grow</option>` +
+      data.profiles.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join("");
+    $("#grow-profile").value = rules.grow?.profile_id || "";
+    $("#grow-start").value = rules.grow?.started_on || "";
+    for (const rule of ["temperature", "humidity", "water", "offline", "fruiting"]) form[`${rule}_enabled`].checked = Boolean(rules[rule]?.enabled);
+    form.temperature_minutes.value = rules.temperature.minutes;
+    form.humidity_minutes.value = rules.humidity.minutes;
+    form.humidity_margin.value = rules.humidity.margin;
+    form.water_below.value = rules.water.below;
+    form.offline_minutes.value = rules.offline.minutes;
+  };
+  showStates(data.states);
+  fill(data.rules);
+  $("#device-alerts").innerHTML = alertItems(data.alerts || []);
+  $("#device-body").classList.remove("hidden");
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const msg = $("#rules-msg");
+    const profile = $("#grow-profile").value;
+    const started = $("#grow-start").value;
+    if (profile && !started) {
+      flash(msg, "Add the day you started the grow.");
+      return;
+    }
+    try {
+      const saved = await api(path, {
+        method: "PUT",
+        jsonBody: {
+          temperature: { enabled: form.temperature_enabled.checked, minutes: Number(form.temperature_minutes.value) },
+          humidity: { enabled: form.humidity_enabled.checked, minutes: Number(form.humidity_minutes.value), margin: Number(form.humidity_margin.value) },
+          water: { enabled: form.water_enabled.checked, below: Number(form.water_below.value) },
+          offline: { enabled: form.offline_enabled.checked, minutes: Number(form.offline_minutes.value) },
+          fruiting: { enabled: form.fruiting_enabled.checked },
+          grow: profile ? { profile_id: profile, started_on: started } : null,
+        },
+      });
+      fill(saved.rules);
+      flash(msg, "Saved.");
+    } catch (err) {
+      flash(msg, err.status === 429 ? "Too many changes this hour. Try again later." : err.message);
+    }
+  });
+}
+
+async function renderUnsubscribe() {
+  const msg = $("#unsub-msg");
+  const token = params().get("token") || "";
+  history.replaceState(null, "", location.pathname);
+  try {
+    if (!token) throw new Error("missing");
+    await api("/api/alerts/unsubscribe", { method: "POST", jsonBody: { token } });
+    msg.textContent = "Done. You will not get alert emails from Shroom Labs anymore. Alerts still show in your account, and you can switch emails back on there.";
+  } catch (err) {
+    msg.textContent =
+      err.status === 429
+        ? "Too many tries from here. Wait a bit, or sign in and turn off alert emails in your account."
+        : "This link has expired or is not valid. Sign in and turn off alert emails in your account settings instead.";
+  }
+  $("#unsub-next").classList.remove("hidden");
 }

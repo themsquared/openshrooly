@@ -1,6 +1,7 @@
 /** Portable SQL access: D1 on Cloudflare, in-memory SQLite-shaped store for tests/local. */
 
 import { nowIso } from "./crypto.js";
+import { dispatchAlerts } from "./alerts/memory.js";
 
 export function createMemoryDb() {
   const tables = {
@@ -106,6 +107,8 @@ export function createD1Db(d1) {
 
 function dispatch(mode, tables, ids, sql, params) {
   const q = sql.replace(/\s+/g, " ").trim();
+  const alertResult = dispatchAlerts(tables, ids, q, params);
+  if (alertResult !== undefined) return alertResult;
   if (q.startsWith("INSERT INTO users")) {
     const row =
       params.length >= 7

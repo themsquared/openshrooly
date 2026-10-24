@@ -1,15 +1,76 @@
 # Alerts (email first)
 
-**Status: plan only. Do not implement until Ships 5b and 5c have landed.**
+**Status: shipped in Ship 8.** Email delivery runs in stub mode until `RESEND_API_KEY` is set on the Worker. In stub mode every alert is still evaluated, stored, and shown on the account and chamber pages, and the Worker logs one line per alert (alert ids, rule, kind; never the address).
 
-This is **Ship 8** in the restack. It sits after device link / mTLS (`#9`) because every cloud event is derived from opted-in `POST /api/devices/:id/telemetry` and `last_seen_at`. It also waits for:
+The original plan is kept below for history. Where the build differs from the plan, the "What shipped" section wins.
 
-- **Ship 5b** (offline device web UI) so a grow actually has a phase / day the device can report
-- **Ship 5c** (USB installer + signed OTA) so `firmware_available` has a real notice
+## What shipped
 
-Push is **not** this ship. Expo push and web push are later channels on the same pipeline, shipped with the Expo app (`mobile/ROADMAP.md`).
+Code lives in `community/api/src/alerts/`:
 
-Grow Coach in-app alerts (`detectAlerts` in `community/api/src/coach-learn.js`) stay on `/coach.html`. This ship is **outbound** notification. Do not email every Coach hint.
+| File | Role |
+| --- | --- |
+| `rules.js` | Pure evaluator: defaults, validation, streaks, recovery, quiet hours (DST safe via `Intl`), cooldown decisions |
+| `profiles.js` | Grow tracking uses bundled free culinary profiles only |
+| `engine.js` | Turns readings + saved state into notices (open, recovered, milestone) |
+| `cron.js` | Cron entry: lease, device cursor (25 per run), dedupe, delivery, release of held alerts |
+| `store.js` / `memory.js` | SQL for D1 and the local memory DB |
+| `channels.js` | Channel interface. `email` (Resend or stub). `push` is a named slot that throws "not wired" |
+| `templates.js` | Plain text + branded HTML, phone width, no dashes, footer "Works with Shrooly devices running OpenShrooly." |
+| `unsub.js` | Signed, single purpose, expiring one click unsubscribe links (HMAC with `COMMUNITY_SECRET`) |
+| `http.js` | `/api/alerts*` and `/api/devices/:id/alerts` endpoints |
+
+Rules per chamber (defaults, all adjustable on `device.html?id=`):
+
+| Rule | Default | Fires when |
+| --- | --- | --- |
+| Temperature | on, 30 min | out of the tracked profile's stage range (or set point ±3 °C) for longer than N minutes |
+| Humidity | on, 30 min, margin 8 | out of range for longer than N minutes |
+| Water | on, below 15% | the latest reading is under the mark; recovers 5 points above it |
+| Offline | on, 30 min | no report for longer than N minutes |
+| Fruiting day | on | the tracked grow reaches its fruiting stage (once per grow) |
+
+Account settings (`account.html#alerts`): email on or off, time zone, quiet hours (default 22:00 to 07:00, on), wait before repeating an alert (default 6 hours), send a test alert, recent alerts.
+
+Anti spam:
+
+- One open alert per problem episode (unique dedupe key per device, rule, episode, kind).
+- Cooldown per rule, then one recovery notice after readings stay back in range for 10 minutes, only if the open alert was not skipped by the cooldown.
+- Quiet hours hold everything (offline included) and send one combined email when they end. Problems that cleared overnight are marked expired instead of mailed.
+- Daily cap of 12 emails per person.
+- Only verified emails receive mail. Unsubscribed or muted accounts still see alerts in app.
+- Every email has a one click link (`/alerts-unsub.html?token=…`, valid 60 days) plus `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` pointing at `POST /api/alerts/unsubscribe`.
+
+Idempotency: a lease row lets one run work at a time, state rows update with a compare and swap on `rev`, the dedupe key is unique, and alerts are claimed (`pending` to `sending`) before any send. Overlapping or repeated runs cannot send twice. Known gap: a crash between the state update and the alert insert can drop that one alert; it can never duplicate one.
+
+Auth: every endpoint needs a signed in, verified user; device endpoints check ownership (403 "not your device" for someone else's or an unknown id); rule and settings writes share the write limit (30 per hour per user); test emails are 5 per hour; unsubscribe POSTs are 30 per hour per client.
+
+Data: migration `community/api/migrations/0003_grow_alerts.sql` (additive: `alert_prefs`, `alert_rules`, `alert_state`, `alerts`, `alert_cron`, one telemetry index). Cron: `[triggers] crons = ["*/5 * * * *"]` on the `shroomlabs-api` Worker.
+
+Deviations from the plan below: quiet hours also hold offline alerts (the request was quiet hours per user, no exceptions); phase change and firmware events are replaced by the fruiting day milestone from grow tracking; there is no per device override of quiet hours; evaluation runs on the cron only (not on telemetry POST); the hub SMTP path is not built.
+
+## Turning on real email
+
+1. In Resend, add the sending domain (for example `shroomlabs.io`, or a subdomain such as `mail.shroomlabs.io`). Resend shows the exact records to add. They are normally:
+   - `TXT resend._domainkey.<domain>` with the DKIM public value Resend gives you
+   - `MX send.<domain>` to `feedback-smtp.<region>.amazonses.com`, priority 10 (bounces)
+   - `TXT send.<domain>` with `v=spf1 include:amazonses.com ~all`
+   - Optional, recommended: `TXT _dmarc.<domain>` with `v=DMARC1; p=none;` to start
+2. Wait for Resend to show the domain as verified.
+3. Create an API key with sending access only, then on the Worker:
+   ```bash
+   npx wrangler secret put RESEND_API_KEY -c wrangler.deploy.toml
+   ```
+4. Optional: set `EMAIL_FROM` (for example `Shroom Labs <alerts@shroomlabs.io>`) as a Worker var. The default is `Shroom Labs <noreply@shroomlabs.io>`. The address must be on the verified domain.
+5. Send a test from `account.html#alerts`. The account page stops showing "Email sending is not switched on yet" once the key is present.
+
+The same key also turns on magic link sign in emails, which share `sendEmail`.
+
+## Hooking up push later
+
+Add a channel next to `email` in `channels.js` with `configured(env)` and `deliver(env, { to, message, alertIds, rule, kind })`, store push subscriptions in a new table, and pick the channel in `deliver()` in `cron.js`. The evaluator, state, dedupe, and templates do not change.
+
+## Original plan
 
 ## Stack position
 
