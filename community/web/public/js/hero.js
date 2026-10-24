@@ -8,9 +8,9 @@ export function startHero(canvas) {
   let running = true;
   let t0 = performance.now();
 
-  const nodes = Array.from({ length: 46 }, (_, i) => {
-    const ring = 0.18 + (i % 7) * 0.1;
-    const a = (i / 46) * Math.PI * 2 + (i % 3) * 0.4;
+  const nodes = Array.from({ length: 58 }, (_, i) => {
+    const ring = 0.14 + (i % 8) * 0.09;
+    const a = (i / 58) * Math.PI * 2 + (i % 3) * 0.4;
     return {
       x: 0.5 + Math.cos(a) * ring * (0.7 + Math.random() * 0.5),
       y: 0.42 + Math.sin(a) * ring * 0.55,
@@ -26,7 +26,7 @@ export function startHero(canvas) {
     for (let j = i + 1; j < nodes.length; j += 1) {
       const dx = nodes[i].x - nodes[j].x;
       const dy = nodes[i].y - nodes[j].y;
-      if (Math.hypot(dx, dy) < 0.2) hyphae.push([i, j, Math.random()]);
+      if (Math.hypot(dx, dy) < 0.26) hyphae.push([i, j, Math.random()]);
     }
   }
 
@@ -45,9 +45,9 @@ export function startHero(canvas) {
   }
 
   function paint(width, height, now, animate) {
-    const glow = ctx.createRadialGradient(width * 0.28, height * 0.35, 20, width * 0.4, height * 0.5, width * 0.7);
-    glow.addColorStop(0, "rgba(125,255,179,0.16)");
-    glow.addColorStop(0.45, "rgba(94,228,255,0.05)");
+    const glow = ctx.createRadialGradient(width * 0.3, height * 0.38, 10, width * 0.42, height * 0.48, width * 0.62);
+    glow.addColorStop(0, "rgba(125,255,179,0.28)");
+    glow.addColorStop(0.35, "rgba(94,228,255,0.1)");
     glow.addColorStop(1, "rgba(7,17,14,0)");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
@@ -58,11 +58,11 @@ export function startHero(canvas) {
       const dx = a.x - b.x;
       const dy = a.y - b.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > 0.24) continue;
-      const pulse = animate ? 0.55 + 0.45 * Math.sin(now / 900 + a.pulse) : 0.7;
-      const alpha = (0.24 - dist) * 2.4 * pulse;
-      ctx.strokeStyle = a.gold || b.gold ? `rgba(201,164,92,${alpha})` : `rgba(125,255,179,${alpha})`;
-      ctx.lineWidth = dist < 0.1 ? 1.6 : 1;
+      if (dist > 0.3) continue;
+      const pulse = animate ? 0.62 + 0.38 * Math.sin(now / 820 + a.pulse) : 0.85;
+      const alpha = Math.min(0.85, (0.3 - dist) * 3.4 * pulse);
+      ctx.strokeStyle = a.gold || b.gold ? `rgba(246,193,91,${alpha})` : `rgba(125,255,179,${alpha})`;
+      ctx.lineWidth = dist < 0.1 ? 2.1 : 1.35;
       ctx.beginPath();
       ctx.moveTo(a.x * width, a.y * height);
       const mx = ((a.x + b.x) / 2 + (bend - 0.5) * 0.08) * width;
@@ -72,11 +72,11 @@ export function startHero(canvas) {
     }
 
     for (const node of nodes) {
-      const beat = animate ? 0.65 + 0.35 * Math.sin(now / 700 + node.pulse) : 0.85;
-      const r = (node.gold ? 2.6 : 1.8) * beat;
-      ctx.shadowColor = node.gold ? "rgba(201,164,92,0.9)" : "rgba(125,255,179,0.85)";
-      ctx.shadowBlur = 12 * beat;
-      ctx.fillStyle = node.gold ? `rgba(246,193,91,${0.75 + beat * 0.2})` : `rgba(125,255,179,${0.7 + beat * 0.25})`;
+      const beat = animate ? 0.7 + 0.3 * Math.sin(now / 640 + node.pulse) : 0.95;
+      const r = (node.gold ? 3.4 : 2.3) * beat;
+      ctx.shadowColor = node.gold ? "rgba(246,193,91,1)" : "rgba(125,255,179,1)";
+      ctx.shadowBlur = 18 * beat;
+      ctx.fillStyle = node.gold ? `rgba(255,214,120,${0.85 + beat * 0.15})` : `rgba(160,255,200,${0.8 + beat * 0.2})`;
       ctx.beginPath();
       ctx.arc(node.x * width, node.y * height, r, 0, Math.PI * 2);
       ctx.fill();
