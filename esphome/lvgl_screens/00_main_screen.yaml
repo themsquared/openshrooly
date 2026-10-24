@@ -3,18 +3,26 @@
 # Display-only layout on top of upstream climate / light / FAE / water
 # entities. Select (button 4) still opens the settings menu.
 # Canvas is 296x128 after LVGL rotation 90 (Waveshare 2.90inv2-r2).
-# Type: 24x48 heroes, 12x24 clock, 6x12 stage / status.
+# Type: 24x48 heroes, 12x24 clock, 6x12 stage / targets / status.
 # ========================================================================
 
 - id: aaaa
   bg_color: paper_white
   widgets:
+    # 16px mark + clock. Header ink sits in rows 3..18.
+    - image:
+        id: header_mark
+        src: mark_16
+        align: TOP_LEFT
+        x: 5
+        y: 3
+
     - label:
         id: main_time_label
         text: "--:--"
         align: TOP_LEFT
-        x: 5
-        y: 2
+        x: 25
+        y: 0
         text_font: font_ui
 
     - label:
@@ -22,15 +30,38 @@
         text: "Idle"
         align: TOP_RIGHT
         x: -5
-        y: 8
+        y: 6
         text_font: font1
 
+    # Thin grow-progress bar (day / total). Hidden when Idle.
+    - bar:
+        id: grow_progress
+        x: 5
+        y: 21
+        width: 286
+        height: 4
+        min_value: 0
+        max_value: 100
+        value: 0
+        radius: 0
+        bg_color: paper_white
+        bg_opa: COVER
+        border_width: 1
+        border_color: paper_black
+        pad_all: 0
+        hidden: true
+        indicator:
+          bg_color: paper_black
+          bg_opa: COVER
+          radius: 0
+
+    # 24x48 heroes. Digit ink sits in cell rows 8..37, so y 20 puts ink at 28..57.
     - label:
         id: main_temp_value
         text: "--.-C"
         align: TOP_LEFT
         x: 6
-        y: 28
+        y: 20
         text_font: font_hero
 
     - label:
@@ -38,15 +69,76 @@
         text: "--%"
         align: TOP_LEFT
         x: 218
-        y: 28
+        y: 20
         text_font: font_hero
+
+    # In-range lines under each number: "target 24  OK", LOW / HIGH inverted.
+    - label:
+        id: grow_temp_target
+        text: ""
+        align: TOP_LEFT
+        x: 6
+        y: 62
+        text_font: font1
+
+    - label:
+        id: grow_temp_band
+        text: ""
+        align: TOP_LEFT
+        x: 72
+        y: 62
+        text_font: font1
+
+    - label:
+        id: grow_temp_band_bad
+        text: ""
+        align: TOP_LEFT
+        x: 72
+        y: 62
+        text_font: font1
+        text_color: paper_white
+        bg_color: paper_black
+        bg_opa: COVER
+        pad_left: 1
+        pad_right: 1
+        hidden: true
+
+    - label:
+        id: grow_rh_target
+        text: ""
+        align: TOP_LEFT
+        x: 206  # set at runtime so the line right-aligns to x 290
+        y: 62
+        text_font: font1
+
+    - label:
+        id: grow_rh_band
+        text: ""
+        align: TOP_LEFT
+        x: 278
+        y: 62
+        text_font: font1
+
+    - label:
+        id: grow_rh_band_bad
+        text: ""
+        align: TOP_LEFT
+        x: 278
+        y: 62
+        text_font: font1
+        text_color: paper_white
+        bg_color: paper_black
+        bg_opa: COVER
+        pad_left: 1
+        pad_right: 1
+        hidden: true
 
     - label:
         id: grow_next_event
         text: ""
         align: TOP_LEFT
         x: 5
-        y: 80
+        y: 84
         text_font: font1
 
     - obj:
@@ -73,7 +165,7 @@
         text: "Join OpenShrooly, then 192.168.4.1"
         align: TOP_LEFT
         x: 5
-        y: 110
+        y: 112
         text_font: font1
 
     # Button 4: same size and place as upstream so navigation stays identical.

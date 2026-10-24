@@ -15,7 +15,7 @@
           return std::string("--:--");
 
     - lambda: |-
-        // Display-only grow day: 1 + elapsed midnights since grow start.
+        // Display-only grow day: 1 + whole 24h periods since grow start (auto-advances).
         // Does not call climate, humidifier, fan, or light managers.
         const std::string phase = id(grow_phase).current_option();
         const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
@@ -67,6 +67,68 @@
         const char *rh = lv_label_get_text(id(main_humidity_value));
         const int n = rh ? (int) strlen(rh) : 3;
         lv_obj_set_x(id(main_humidity_value), 290 - 24 * n);
+
+    - lambda: |-
+        // In-range lines under the heroes: "target 24  OK", LOW / HIGH inverted.
+        // Reads upstream targets and hysteresis only. Spleen 6x12 is a fixed 6px cell.
+        auto band = [](bool has, float v, bool has_t, float t, float h) -> std::string {
+          if (!has || !has_t) return "";
+          if (v < t - h) return "LOW";
+          if (v > t + h) return "HIGH";
+          return "OK";
+        };
+        auto fmt_target = [](float t) -> std::string {
+          const float r = roundf(t);
+          return fabsf(t - r) < 0.05f ? str_sprintf("target %.0f", r) : str_sprintf("target %.1f", t);
+        };
+        auto show = [](lv_obj_t *ok, lv_obj_t *bad, const std::string &b, int x) {
+          const bool alarm = (b == "LOW" || b == "HIGH");
+          lv_label_set_text(ok, alarm ? "" : b.c_str());
+          lv_label_set_text(bad, alarm ? b.c_str() : "");
+          lv_obj_set_x(ok, x);
+          lv_obj_set_x(bad, x - 1);
+          if (alarm) {
+            lv_obj_add_flag(ok, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(bad, LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_clear_flag(ok, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(bad, LV_OBJ_FLAG_HIDDEN);
+          }
+        };
+
+        const bool t_has_t = id(temperature_target).has_state();
+        const std::string t_tgt = t_has_t ? fmt_target(id(temperature_target).state) : std::string("");
+        const std::string t_band = band(id(temperature).has_state(), id(temperature).state, t_has_t,
+                                        id(temperature_target).state,
+                                        id(temperature_hysteresis).has_state() ? id(temperature_hysteresis).state : 0.0f);
+        lv_label_set_text(id(grow_temp_target), t_tgt.c_str());
+        show(id(grow_temp_band), id(grow_temp_band_bad), t_band, 6 + 6 * (int) t_tgt.size() + 12);
+
+        const bool h_has_t = id(target_humidity).has_state();
+        const std::string h_tgt = h_has_t ? fmt_target(id(target_humidity).state) : std::string("");
+        const std::string h_band = band(id(humidity).has_state(), id(humidity).state, h_has_t,
+                                        id(target_humidity).state,
+                                        id(humidity_hysteresis).has_state() ? id(humidity_hysteresis).state : 0.0f);
+        // Right-align the humidity line to x 290, same edge as the hero.
+        const int h_band_x = 290 - 6 * (int) h_band.size();
+        lv_label_set_text(id(grow_rh_target), h_tgt.c_str());
+        lv_obj_set_x(id(grow_rh_target), h_band_x - 12 - 6 * (int) h_tgt.size());
+        show(id(grow_rh_band), id(grow_rh_band_bad), h_band, h_band_x);
+
+    - lambda: |-
+        // Thin progress bar: day / total. Display-only.
+        const std::string phase = id(grow_phase).current_option();
+        const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
+        const int day = id(grow_day).has_state() ? (int) id(grow_day).state : 0;
+        if (phase.empty() || phase == "Idle" || total <= 0) {
+          lv_obj_add_flag(id(grow_progress), LV_OBJ_FLAG_HIDDEN);
+        } else {
+          int pct = (100 * day) / total;
+          if (pct < 0) pct = 0;
+          if (pct > 100) pct = 100;
+          lv_bar_set_value(id(grow_progress), pct, LV_ANIM_OFF);
+          lv_obj_clear_flag(id(grow_progress), LV_OBJ_FLAG_HIDDEN);
+        }
 
     - lvgl.label.update:
         id: grow_next_event
@@ -128,7 +190,8 @@
           }
 
           if (best.empty()) {
-            return std::string(id(lights_status).state.c_str());
+            // lights_status carries an em dash the 6x12 subset lacks; use plain words.
+            return std::string(id(lights_on_flag) ? "Lights on" : "Lights off");
           }
           return best;
 

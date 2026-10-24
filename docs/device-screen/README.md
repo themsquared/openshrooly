@@ -10,10 +10,10 @@ python3 scripts/render_epaper_previews.py
 
 | File | State |
 | --- | --- |
-| `growing-in-range.png` | Fruiting, day 6 of 10, 48px temp/RH |
-| `growing-alert.png` | Same grow, water-low banner |
+| `growing-in-range.png` | Fruiting, day 6 of 10, progress bar, 48px temp/RH, `target 24  OK` lines |
+| `growing-alert.png` | Same grow, LOW shown inverted, water-low banner |
 | `idle.png` | No grow; climate numbers still shown |
-| `boot-splash.png` | 1-bit logo + OpenShrooly wordmark |
+| `boot-splash.png` | 64px filled mushroom mark, OpenShrooly wordmark, by Shroom Labs |
 
 Each has a `@4x.png` sibling.
 
@@ -35,9 +35,9 @@ Display-only caption (does **not** change climate, lights, fan, or humidifier):
 - `grow_days_total`
 - `grow_day` is derived from `grow_started_ts` and the RTC/SNTP clock (`1 + elapsed 86400s`). It is display-only; climate scripts do not read it.
 
-Idle is the default. Starting a non-Idle phase with a total day count stamps `grow_started_ts`. A later device web UI can set the caption when a profile is applied.
+Idle is the default. Starting a non-Idle phase with a total day count stamps `grow_started_ts`, and the day then advances by itself every 24h. Setting Grow Day by hand back-dates `grow_started_ts` so counting continues from that day. A later device web UI can set the caption when a profile is applied.
 
-Type hierarchy: **24×48** temperature and humidity (two side by side), **12×24** clock, **6×12** stage + day and the Wi-Fi / AP line. The splash screen still shows the 1-bit logo.
+Type hierarchy: **24×48** temperature and humidity (two side by side), **12×24** clock, **6×12** stage + day, the `target N  OK` lines (LOW / HIGH inverted, from target ± hysteresis), and the Wi-Fi / AP line. A 4px bar under the header shows day / total. The header carries a 15×16 mark; the splash shows the 63×64 mark, the wordmark, and `by Shroom Labs`.
 
 The bottom-left line is Wi-Fi state plus IP, or `Join OpenShrooly, then 192.168.4.1` in AP mode, so first-time setup stays readable from the panel.
 

@@ -45,6 +45,20 @@ def main() -> None:
     assert "id: main_status_message" in main_yaml
     assert "hidden: true" not in main_yaml.split("id: main_status_message", 1)[1][:240]
 
+    for wid in ("header_mark", "grow_progress", "grow_temp_target", "grow_temp_band_bad",
+                "grow_rh_target", "grow_rh_band_bad"):
+        assert f"id: {wid}" in main_yaml, f"main screen is missing {wid}"
+    assert "id: mark_16" in display, "mark_16 must live in display.yaml so << merge keeps it"
+    splash_yaml = (ROOT / "esphome" / "lvgl_screens" / "00_splash.yaml").read_text(encoding="utf-8")
+    assert "by Shroom Labs" in splash_yaml
+    script = (ROOT / "esphome" / "scripts" / "update_growing_screen.yaml").read_text(encoding="utf-8")
+    for path_text in (main_yaml, splash_yaml, script):
+        assert "\u2014" not in path_text and "\u2013" not in path_text, "no em or en dashes in screen text"
+    assert "grow_started_ts" in script, "grow day must auto-advance from grow_started_ts"
+    logo = Image.open(ROOT / "esphome" / "images" / "splash_logo.png")
+    assert logo.mode == "1" and 60 <= logo.size[1] <= 68, logo.size
+    assert logo.transpose(Image.Transpose.FLIP_LEFT_RIGHT).tobytes() == logo.tobytes(), "logo must be symmetric"
+
     render = RENDER.read_text(encoding="utf-8")
     assert '"-:%%/?!,+=-"' in render or "+=-" in render
     assert "RH_RIGHT - hero.text_width" in render

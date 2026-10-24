@@ -1,6 +1,7 @@
 # ========================================================================
-# BOOT SPLASH - 1-bit logo, then the growing screen
+# BOOT SPLASH - 1-bit mushroom mark, wordmark, then the growing screen
 # Display only. Shown for 2s after LVGL is ready; SWD timing is unchanged.
+# Positions match scripts/render_epaper_previews.py (SPLASH_*_Y).
 # ========================================================================
 
 - id: splash
@@ -10,10 +11,16 @@
         id: splash_logo_widget
         src: splash_logo
         align: TOP_MID
-        y: 12
+        y: 4
 
     - label:
         text: "OpenShrooly"
-        align: BOTTOM_MID
-        y: -20
+        align: TOP_MID
+        y: 70
         text_font: font_ui
+
+    - label:
+        text: "by Shroom Labs"
+        align: TOP_MID
+        y: 100
+        text_font: font1

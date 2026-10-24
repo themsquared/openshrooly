@@ -26,6 +26,10 @@ image:
     file: "images/splash_logo.png"
     id: splash_logo
     type: BINARY
+  - platform: file
+    file: "images/mark_16.png"
+    id: mark_16
+    type: BINARY
 
 # E-paper Display Configuration
 display:

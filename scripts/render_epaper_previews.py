@@ -35,15 +35,18 @@ GLYPHS = (
 )
 GLYPH_ORDINALS = {ord(ch) for ch in GLYPHS} | {0x00B0}  # degree
 
-# Growing-screen layout — keep in sync with 00_main_screen.yaml.
-TIME_X, TIME_Y = 5, 2
-PHASE_Y = 8
-HERO_Y = 28
+# Growing-screen layout, keep in sync with 00_main_screen.yaml.
+MARK_X, MARK_Y = 5, 3
+TIME_X, TIME_Y = 25, 0
+PHASE_Y = 6
+BAR = (5, 21, 290, 24)  # x0, y0, x1, y1 inclusive, 4px tall
+HERO_Y = 20
 TEMP_X = 6
 RH_RIGHT = 290
-NEXT_Y = 80
+META_Y = 62
+NEXT_Y = 84
 ALERT_Y, ALERT_H = 78, 24
-STATUS_Y = 110
+STATUS_Y = 112
 SELECT = (224, 107, 294, 126)
 
 
@@ -247,35 +250,67 @@ def new_paper() -> Image.Image:
     return Image.new("1", (WIDTH, HEIGHT), 1)
 
 
-def _poly(draw: ImageDraw.ImageDraw, pts: list[tuple[int, int]], fill: int = 0, width: int = 1) -> None:
-    closed = pts + [pts[0]]
-    draw.line(closed, fill=fill, width=width)
-    for pt in pts:
-        draw.point(pt, fill=fill)
+MARK_W, MARK_H = 63, 64  # odd width so the mark has a true center column (31)
+
+# 15x16 header icon, hand-placed pixels so it stays crisp at 1 bit.
+MARK_16 = (
+    ".......#.......",
+    ".....#####.....",
+    "...####.####...",
+    ".#####.#.#####.",
+    "######.#.######",
+    "#####.###.#####",
+    "#####.###.#####",
+    ".###.#####.###.",
+    "..##.#####.##..",
+    "...............",
+    ".....#####.....",
+    ".....#####.....",
+    "....#######....",
+    "....#######....",
+    "...#########...",
+    "...#########...",
+)
 
 
-def draw_mark(draw: ImageDraw.ImageDraw, cx: int, cy: int, scale: int, fill: int = 0) -> None:
-    """1-bit geometric mushroom: pentagon cap, three ridges, hex stem."""
-    s = max(2, scale)
+def _mirror_left(img: Image.Image) -> None:
+    """Copy columns left of center onto the right so the mark is exactly symmetric."""
+    w, h = img.size
+    c = w // 2
+    for y in range(h):
+        for x in range(c):
+            img.putpixel((w - 1 - x, y), img.getpixel((x, y)))
 
-    def p(dx: float, dy: float) -> tuple[int, int]:
-        return (cx + int(round(dx * s)), cy + int(round(dy * s)))
 
-    stroke = 2 if s >= 6 else 1
-    cap = [p(0, -3.2), p(3.1, -1.0), p(2.2, 1.3), p(-2.2, 1.3), p(-3.1, -1.0)]
-    _poly(draw, cap, fill, stroke)
-    draw.line([p(0, -3.2), p(0, 1.3)], fill=fill, width=stroke)
-    draw.line([p(0, -3.2), p(2.2, 1.3)], fill=fill, width=stroke)
-    draw.line([p(0, -3.2), p(-2.2, 1.3)], fill=fill, width=stroke)
-    stem = [p(-1.0, 1.3), p(1.0, 1.3), p(1.3, 3.0), p(0.8, 4.0), p(-0.8, 4.0), p(-1.3, 3.0)]
-    _poly(draw, stem, fill=fill, width=stroke)
+def draw_mark_64() -> Image.Image:
+    """Bold filled mushroom: solid pentagon cap with two facet cutouts, tapered stem."""
+    img = Image.new("1", (MARK_W, MARK_H), 1)
+    d = ImageDraw.Draw(img)
+    c = MARK_W // 2
+    # Cap: apex, wide shoulders, narrower base (pentagon), 41px tall.
+    d.polygon([(c, 0), (MARK_W - 1, 22), (MARK_W - 10, 40), (9, 40), (0, 22)], fill=0)
+    # Two facet cutouts from just under the apex to the cap base, mirrored.
+    d.line([(c, 7), (19, 40)], fill=1, width=3)
+    d.line([(c, 7), (MARK_W - 20, 40)], fill=1, width=3)
+    # Solid tapered stem below a 2px gap; wider at the foot.
+    d.polygon([(c - 6, 43), (c + 6, 43), (c + 10, MARK_H - 1), (c - 10, MARK_H - 1)], fill=0)
+    _mirror_left(img)
+    return img
+
+
+def draw_mark_16() -> Image.Image:
+    img = Image.new("1", (len(MARK_16[0]), len(MARK_16)), 1)
+    for y, row in enumerate(MARK_16):
+        for x, ch in enumerate(row):
+            if ch == "#":
+                img.putpixel((x, y), 0)
+    return img
 
 
 def save_logo_assets() -> None:
     IMAGES.mkdir(parents=True, exist_ok=True)
-    logo = Image.new("1", (80, 72), 1)
-    draw_mark(ImageDraw.Draw(logo), 40, 28, 8)
-    logo.save(IMAGES / "splash_logo.png")
+    draw_mark_64().save(IMAGES / "splash_logo.png")
+    draw_mark_16().save(IMAGES / "mark_16.png")
 
 
 def draw_select(img: Image.Image, font: BitmapFont) -> None:
@@ -290,8 +325,38 @@ def draw_heroes(img: Image.Image, fonts: dict[str, BitmapFont], temp: str, rh: s
     hero.draw(img, RH_RIGHT - hero.text_width(rh), HERO_Y, rh)
 
 
+def _band(img: Image.Image, small: BitmapFont, x: int, band: str) -> None:
+    if band in ("LOW", "HIGH"):
+        ImageDraw.Draw(img).rectangle([x - 1, META_Y, x + small.text_width(band), META_Y + 11], fill=0)
+        small.draw(img, x, META_Y, band, color=1)
+    else:
+        small.draw(img, x, META_Y, band)
+
+
+def draw_meta(img: Image.Image, small: BitmapFont, t_target: str, t_band: str, h_target: str, h_band: str) -> None:
+    """Mirror of the in-range lambda: 'target 24  OK', LOW / HIGH inverted."""
+    t_text = f"target {t_target}"
+    small.draw(img, TEMP_X, META_Y, t_text)
+    _band(img, small, TEMP_X + small.text_width(t_text) + 12, t_band)
+    h_text = f"target {h_target}"
+    band_x = RH_RIGHT - small.text_width(h_band)
+    small.draw(img, band_x - 12 - small.text_width(h_text), META_Y, h_text)
+    _band(img, small, band_x, h_band)
+
+
+def draw_progress(img: Image.Image, day: int, total: int) -> None:
+    draw = ImageDraw.Draw(img)
+    x0, y0, x1, y1 = BAR
+    draw.rectangle([x0, y0, x1, y1], outline=0, fill=1)
+    pct = max(0, min(100, (100 * day) // total)) if total > 0 else 0
+    inner = (x1 - x0 - 1) * pct // 100
+    if inner > 0:
+        draw.rectangle([x0 + 1, y0 + 1, x0 + inner, y1 - 1], fill=0)
+
+
 def draw_header(img: Image.Image, fonts: dict[str, BitmapFont], time: str, phase: str) -> None:
     ui, small = fonts["12x24"], fonts["6x12"]
+    img.paste(Image.open(IMAGES / "mark_16.png").convert("1"), (MARK_X, MARK_Y))
     ui.draw(img, TIME_X, TIME_Y, time)
     small.draw(img, WIDTH - 5 - small.text_width(phase), PHASE_Y, phase)
 
@@ -302,7 +367,9 @@ def draw_growing(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
     small, ui = fonts["6x12"], fonts["12x24"]
     alert = state.get("alert")
     draw_header(img, fonts, state["time"], state["phase_line"])
+    draw_progress(img, state["day"], state["total"])
     draw_heroes(img, fonts, state["temp"], state["rh"])
+    draw_meta(img, small, *state["meta"])
     if alert:
         draw.rectangle([0, ALERT_Y, WIDTH - 1, ALERT_Y + ALERT_H - 1], fill=0)
         ui.draw(img, (WIDTH - ui.text_width(alert)) // 2, ALERT_Y, alert, color=1)
@@ -318,18 +385,25 @@ def draw_idle(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
     small = fonts["6x12"]
     draw_header(img, fonts, state["time"], "Idle")
     draw_heroes(img, fonts, state["temp"], state["rh"])
+    draw_meta(img, small, *state["meta"])
     small.draw(img, 5, NEXT_Y, "No grow running")
     small.draw(img, 5, STATUS_Y, state.get("status", "Join OpenShrooly, then 192.168.4.1"))
     draw_select(img, small)
     return img
 
 
+SPLASH_LOGO_Y = 4
+SPLASH_WORD_Y = 70
+SPLASH_BY_Y = 100
+
+
 def draw_splash(fonts: dict[str, BitmapFont]) -> Image.Image:
     img = new_paper()
     logo = Image.open(IMAGES / "splash_logo.png").convert("1")
-    img.paste(logo, ((WIDTH - logo.size[0]) // 2, 12))
-    word = "OpenShrooly"
-    fonts["12x24"].draw(img, (WIDTH - fonts["12x24"].text_width(word)) // 2, 92, word)
+    img.paste(logo, ((WIDTH - logo.size[0]) // 2, SPLASH_LOGO_Y))
+    word, by = "OpenShrooly", "by Shroom Labs"
+    fonts["12x24"].draw(img, (WIDTH - fonts["12x24"].text_width(word)) // 2, SPLASH_WORD_Y, word)
+    fonts["6x12"].draw(img, (WIDTH - fonts["6x12"].text_width(by)) // 2, SPLASH_BY_Y, by)
     return img
 
 
@@ -356,8 +430,11 @@ def main() -> None:
             {
                 "time": "14:32",
                 "phase_line": "Fruiting, day 6 of 10",
+                "day": 6,
+                "total": 10,
                 "temp": "24.5C",
                 "rh": "91%",
+                "meta": ("24", "OK", "90", "OK"),
                 "next_event": "Lights off 19:00",
                 "status": "Wi-Fi 192.168.1.20",
             },
@@ -370,8 +447,11 @@ def main() -> None:
             {
                 "time": "14:32",
                 "phase_line": "Fruiting, day 6 of 10",
+                "day": 6,
+                "total": 10,
                 "temp": "22.1C",
                 "rh": "78%",
+                "meta": ("24", "LOW", "90", "LOW"),
                 "next_event": "FAE in 12m",
                 "alert": "WATER LOW",
                 "status": "Wi-Fi 192.168.1.20",
@@ -386,6 +466,7 @@ def main() -> None:
                 "time": "08:05",
                 "temp": "21.4C",
                 "rh": "55%",
+                "meta": ("22", "OK", "70", "LOW"),
                 "status": "Join OpenShrooly, then 192.168.4.1",
             },
             fonts,

@@ -464,6 +464,14 @@ number:
     entity_category: diagnostic
     web_server:
       sorting_group_id: grp_hidden
+    # Setting the day by hand back-dates the grow start so the auto-advance
+    # in update_growing_screen keeps counting from here. Display-only.
+    set_action:
+      - lambda: |-
+          auto now = id(sntp_time).now();
+          if (now.is_valid() && x >= 1) {
+            id(grow_started_ts) = now.timestamp - ((int) x - 1) * 86400;
+          }
 
   - platform: template
     id: grow_days_total
