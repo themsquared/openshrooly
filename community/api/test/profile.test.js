@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { affiliateLinksFor, isPsilocybin, validateProfile, ValidationError } from "../src/profile.js";
-import { detectsRestrictedTaxon } from "../src/profile-schema.js";
+import { classifyTaxon, detectsRestrictedTaxon, needsOffmenuFlag } from "../src/profile-schema.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -77,93 +77,49 @@ test("light recipe validation rejects bad ranges and missing sources", () => {
   }
 });
 
-const OFFMENU_CASES = [
+const FORCE_CASES = [
+  { field: "species", value: "Psilocybe cubensis" },
   { field: "species", value: "P. cubensis" },
-  { field: "species", value: "cubensis" },
+  { field: "species", value: "P. tampanensis" },
   { field: "species", value: "Stropharia cubensis" },
   { field: "species", value: "Panaeolus cinctulus" },
-  { field: "species", value: "Panaeolus subbalteatus" },
   { field: "species", value: "Panaeolus cyanescens" },
   { field: "species", value: "Copelandia tropicalis" },
-  { field: "species", value: "Copelandia cyanescens" },
   { field: "species", value: "Gymnopilus junonius" },
-  { field: "species", value: "Gymnopilus spectabilis" },
   { field: "species", value: "Pluteus salicinus" },
   { field: "species", value: "Inocybe aeruginascens" },
   { field: "species", value: "Conocybe cyanopus" },
-  { field: "species", value: "Pluteus" },
-  { field: "species", value: "Inocybe" },
-  { field: "species", value: "Psilocybe cubensis".replace("c", "\u0441") },
-  { field: "species", value: "Psilo\u200dcybe cubensis" },
-  { field: "species", value: "Psilo\u00adcybe cubensis" },
   { field: "species", value: "Psilocybecubensis" },
   { field: "species", value: "Psílocybe cubénsis" },
   { field: "species", value: "Psi\u0301locybe cubensis" },
+  { field: "species", value: "Psilo\u00adcybe cubensis" },
+];
+
+const HOLD_CASES = [
+  { field: "species", value: "Psiłocybe cubɛnsis" },
+  { field: "species", value: "Псилоцибе кубенсис" },
+  { field: "species", value: "Agaricus sp." },
+  { field: "species", value: "Unknown garden mushroom" },
+  { field: "species", value: "Pluteus" },
+  { field: "species", value: "cubensis" },
   { field: "species", value: "Psilocybé" },
-  { field: "species", value: "Psilocÿbe" },
-  { field: "name", value: "Golden Teächer" },
-  { field: "species", value: "Psılocybe" },
-  { field: "species", value: "cubensıs" },
-  { field: "species", value: "Psil\u0585cybe" },
-  { field: "species", value: "cuben\u057dis" },
-  { field: "species", value: "Ps\u04cflocybe" },
-  { field: "species", value: "p\ua731ilocybe" },
-  { field: "species", value: "psiloc\u028fbe" },
-  { field: "species", value: "\u13e2silocybe" },
-  { field: "name", value: "Golden Te\u0251cher" },
-  { field: "species", value: "Psil0cybe" },
-  { field: "species", value: "Ps1locybe" },
-  { field: "species", value: "cubenzis" },
-  { field: "species", value: "cubensys" },
-  { field: "species", value: "cubensus" },
-  { field: "species", value: "psilocibe" },
-  { field: "species", value: "psylocybe" },
-  { field: "species", value: "psilocyb" },
-  { field: "species", value: "psilocibin" },
-  { field: "name", value: "Psilocybin cubes" },
-  { field: "summary", value: "Notes about Golden Teacher only" },
-  { field: "notes", value: "This grow used APE" },
-  { field: "notes", value: "Penis Envy clone" },
-  { field: "summary", value: "B+ spore print" },
-  { field: "summary", value: "B Plus isolate" },
-  { field: "tags", value: ["Psilocybin"] },
-  { field: "notes", value: "shroom" },
-  { field: "notes", value: "shrooms" },
-  { field: "notes", value: "magic shrooms" },
-  { field: "notes", value: "mushies" },
-  { field: "notes", value: "cubes" },
-  { field: "strain", value: "PE" },
-  { field: "strain", value: "PE6" },
-  { field: "strain", value: "Mazatapec" },
-  { field: "strain", value: "Treasure Coast" },
-  { field: "strain", value: "Jack Frost" },
-  { field: "strain", value: "Avery's Albino" },
-  { field: "strain", value: "Tidal Wave" },
-  { field: "strain", value: "Enigma" },
-  { field: "strain", value: "Thrasher" },
-  { field: "strain", value: "McKennaii" },
-  { field: "strain", value: "Cambodian" },
-  { field: "strain", value: "Ecuador" },
-  { field: "strain", value: "Hillbilly" },
-  { field: "strain", value: "Z-strain" },
-  { field: "strain", value: "Lizard King" },
-  { field: "strain", value: "Huautla" },
-  { field: "strain", value: "Pink Buffalo" },
-  { field: "strain", value: "Koh Samui" },
-  { field: "strain", value: "Amazonian" },
-  { field: "strain", value: "Texas Yellow" },
-  { field: "strain", value: "Melmac" },
-  { field: "stageName", value: "Psilocybe pins" },
-  { field: "lightNotes", value: "Golden Teacher lighting" },
-  { field: "affiliateLabel", value: "APE syringes" },
+];
+
+const FLAG_ONLY_CASES = [
+  { field: "summary", value: "Grown with the Shroom Labs kit." },
+  { field: "tags", value: ["shroom"] },
+  { field: "notes", value: "Wild lookalikes include Inocybe and Galerina" },
+  { field: "notes", value: "Cut into cubes before cooking." },
+  { field: "summary", value: "Add vitamin B+ to the soak" },
+  { field: "name", value: "Psilo" },
 ];
 
 const CULINARY_CASES = [
   { field: "species", value: "Gyroporus cyanescens" },
   { field: "species", value: "Lentinus tropicalis" },
   { field: "species", value: "Pleurotus ostreatus" },
-  { field: "summary", value: "Add vitamin B+ to the soak" },
-  { field: "name", value: "Psilo" },
+  { field: "species", value: "Auricularia auricula-judae" },
+  { field: "species", value: "Cordyceps militaris" },
 ];
 
 test("a culinary label cannot hide a restricted species", () => {
@@ -216,27 +172,79 @@ function applyTaxonCase(base, row) {
   return labeled;
 }
 
-test("off-menu classifier catches short names, synonyms, hidden characters, and other fields", () => {
+function paidCulinary(base, row) {
+  const labeled = applyTaxonCase(base, row);
+  labeled.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  labeled.allowed_payment_providers = ["stripe"];
+  labeled.affiliates_allowed = true;
+  return labeled;
+}
+
+test("off-menu classifier uses a culinary allowlist and only forces high-confidence taxa", () => {
   const pearl = load("data/profiles/culinary/pearl-oyster.json");
-  for (const [i, row] of OFFMENU_CASES.entries()) {
+  for (const [i, row] of FORCE_CASES.entries()) {
     const labeled = applyTaxonCase(pearl, row);
-    labeled.id = `taxon-${i}`;
-    assert.equal(detectsRestrictedTaxon(labeled), true, `${row.field}=${row.value}`);
+    labeled.id = `force-${i}`;
+    const classified = classifyTaxon(labeled);
+    assert.equal(classified.force, true, `${row.field}=${row.value}`);
     assert.equal(validateProfile(labeled).pack, "psilocybin", `${row.field}=${row.value}`);
   }
+  for (const [i, row] of HOLD_CASES.entries()) {
+    const labeled = applyTaxonCase(pearl, row);
+    labeled.id = `hold-${i}`;
+    const classified = classifyTaxon(labeled);
+    assert.equal(classified.force, false, `${row.field}=${row.value}`);
+    assert.equal(classified.hold, true, `${row.field}=${row.value}`);
+    assert.equal(validateProfile(labeled).pack, "psilocybin", `${row.field}=${row.value}`);
+  }
+  const albino = applyTaxonCase(pearl, { field: "species", value: "Agaricus sp." });
+  albino.strain = "Albino A+";
+  albino.id = "hold-albino";
+  assert.equal(classifyTaxon(albino).hold, true);
+  assert.equal(validateProfile(albino).pack, "psilocybin");
+  const tamp = applyTaxonCase(pearl, { field: "species", value: "P. tampanensis" });
+  tamp.strain = "philosopher stone";
+  tamp.id = "force-tamp";
+  assert.equal(classifyTaxon(tamp).force, true);
+  assert.equal(validateProfile(tamp).pack, "psilocybin");
+  const monster = applyTaxonCase(pearl, { field: "species", value: "Agaricus sp." });
+  monster.strain = "Great White Monster";
+  monster.id = "hold-gwm";
+  assert.equal(classifyTaxon(monster).hold, true);
+  assert.equal(validateProfile(monster).pack, "psilocybin");
+
+  for (const row of FLAG_ONLY_CASES) {
+    const labeled = paidCulinary(pearl, row);
+    const classified = classifyTaxon(labeled);
+    assert.equal(classified.force, false, `${row.field}=${row.value}`);
+    assert.equal(classified.hold, false, `${row.field}=${row.value}`);
+    const out = validateProfile(labeled);
+    assert.equal(out.pack, "culinary", `${row.field}=${row.value}`);
+    assert.equal(out.pricing.kind, "paid", `${row.field}=${row.value}`);
+    assert.equal(out.pricing.amount_cents, 199, `${row.field}=${row.value}`);
+    assert.equal(out.affiliates_allowed, true, `${row.field}=${row.value}`);
+  }
+  const labs = paidCulinary(pearl, { field: "summary", value: "Grown with the Shroom Labs kit." });
+  labs.tags = ["shroom"];
+  assert.equal(needsOffmenuFlag(labs), true);
+  assert.equal(validateProfile(labs).pack, "culinary");
+  assert.equal(validateProfile(labs).pricing.kind, "paid");
+
   for (const row of CULINARY_CASES) {
     const labeled = applyTaxonCase(pearl, row);
-    assert.equal(detectsRestrictedTaxon(labeled), false, `${row.field}=${row.value}`);
+    assert.equal(classifyTaxon(labeled).culinary, true, `${row.field}=${row.value}`);
     assert.equal(validateProfile(labeled).pack, "culinary", `${row.field}=${row.value}`);
   }
   const split = applyTaxonCase(pearl, { field: "name", value: "Psilo" });
   split.species = "cybe";
-  assert.equal(detectsRestrictedTaxon(split), false, "does not join across fields");
+  assert.equal(classifyTaxon(split).force, false, "does not join across fields");
+  assert.equal(classifyTaxon(split).hold, true, "unknown genus is held");
   const oyster = structuredClone(pearl);
+  assert.equal(classifyTaxon(oyster).culinary, true);
   assert.equal(detectsRestrictedTaxon(oyster), false);
   assert.equal(validateProfile(oyster).pack, "culinary");
   const wine = structuredClone(load("data/profiles/culinary/wine-cap.json"));
-  assert.equal(detectsRestrictedTaxon(wine), false);
+  assert.equal(classifyTaxon(wine).culinary, true);
 });
 
 test("affiliate ids and urls must be safe https slugs", () => {

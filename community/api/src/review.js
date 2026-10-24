@@ -3,7 +3,7 @@
 import { nowIso, randomToken } from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { layout, button, escapeHtml } from "./email-layout.js";
-import { isPsilocybin, ValidationError } from "./profile-schema.js";
+import { applyPackRules, needsOffmenuFlag, ValidationError } from "./profile-schema.js";
 import { PHOTO_MAX_COUNT, extForContentType, photoObjectKey, prescreenImage, processPhoto } from "./photos.js";
 import { rateLimit, rateLimitClient } from "./security.js";
 
@@ -116,18 +116,23 @@ export async function listPublicProfiles(db) {
   return out;
 }
 
-export async function saveDraftReview(db, profile, { title = "", description = "" } = {}) {
+export async function saveDraftReview(db, profile, { title = "", description = "", priorRow = null } = {}) {
   const existing = await getReview(db, profile.id);
+  const legacyLive = !existing && priorRow && Number(priorRow.published) === 1;
   await upsertReview(db, {
     profile_id: profile.id,
-    status: existing?.status && existing.status !== REVIEW_PUBLISHED ? existing.status : REVIEW_DRAFT,
-    reason: existing?.reason || "",
+    status: legacyLive
+      ? REVIEW_PENDING
+      : existing?.status && existing.status !== REVIEW_PUBLISHED
+        ? existing.status
+        : REVIEW_DRAFT,
+    reason: legacyLive ? "Waiting for review of an edit." : existing?.reason || "",
     title: title || existing?.title || profile.name || "",
     description: description || existing?.description || profile.summary || "",
-    live_document: existing?.live_document || null,
+    live_document: existing?.live_document || (legacyLive ? priorRow.document : null),
     blocklist_hit: Boolean(Number(existing?.blocklist_hit)),
-    offmenu_flag: isPsilocybin(profile),
-    published_live: Number(existing?.published_live) === 1,
+    offmenu_flag: needsOffmenuFlag(profile, { title, description }),
+    published_live: Number(existing?.published_live) === 1 || legacyLive,
     created_at: existing?.created_at,
   });
 }
@@ -139,6 +144,13 @@ export async function submitForReview(db, env, request, { profile, user, title, 
   if (photos.length < 1) throw new ValidationError("Add at least one photo before you send this to the library.");
   const hits = [...blocklistHits(title), ...blocklistHits(description)];
   const existing = await getReview(db, profile.id);
+  const extra = { title, description };
+  const normalized = applyPackRules(profile, extra);
+  await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [
+    JSON.stringify(normalized),
+    nowIso(),
+    profile.id,
+  ]);
   await upsertReview(db, {
     profile_id: profile.id,
     status: REVIEW_PENDING,
@@ -147,7 +159,7 @@ export async function submitForReview(db, env, request, { profile, user, title, 
     description: String(description).trim(),
     live_document: existing?.live_document || null,
     blocklist_hit: hits.length > 0,
-    offmenu_flag: isPsilocybin(profile, { title, description }),
+    offmenu_flag: needsOffmenuFlag(normalized, extra),
     published_live: Number(existing?.published_live) === 1,
     created_at: existing?.created_at,
   });
@@ -160,15 +172,21 @@ export async function submitForReview(db, env, request, { profile, user, title, 
   return getReview(db, profile.id);
 }
 
-export async function approveReview(db, env, request, { profile, user, row }) {
+export async function approveReview(db, env, request, { profile, user, row, pack } = {}) {
   const review = await getReview(db, profile.id);
   if (!review || review.status !== REVIEW_PENDING) throw new ValidationError("This profile is not waiting for review.");
-  await db.run("UPDATE profiles SET published=1, updated_at=? WHERE id=?", [nowIso(), profile.id]);
+  const extra = { title: review.title, description: review.description };
+  if (pack === "culinary" || pack === "psilocybin") extra.moderatorPack = pack;
+  const normalized = applyPackRules(profile, extra);
+  const ts = nowIso();
+  await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), ts, profile.id]);
+  await db.run("UPDATE profiles SET published=1, updated_at=? WHERE id=?", [ts, profile.id]);
   await upsertReview(db, {
     ...review,
     status: REVIEW_PUBLISHED,
     reason: "",
-    live_document: JSON.stringify(profile),
+    live_document: JSON.stringify(normalized),
+    offmenu_flag: needsOffmenuFlag(normalized, extra),
     published_live: 1,
   });
   await db.run("UPDATE profile_photos SET status='approved', updated_at=? WHERE profile_id=? AND withdrawn=0", [
@@ -210,7 +228,7 @@ export async function takedownReview(db, env, request, { profile, user, row, rea
     description: profile.summary || "",
     live_document: JSON.stringify(profile),
     blocklist_hit: 0,
-    offmenu_flag: isPsilocybin(profile) ? 1 : 0,
+    offmenu_flag: needsOffmenuFlag(profile) ? 1 : 0,
     published_live: 1,
   };
   const ts = nowIso();
@@ -225,6 +243,12 @@ export async function takedownReview(db, env, request, { profile, user, row, rea
     ts,
     profile.id,
   ]);
+  const reports = await db.all("SELECT * FROM grow_reports WHERE profile_id=?", [profile.id]);
+  for (const report of reports) {
+    if (!report.photo_key || report.photo_status === "rejected") continue;
+    if (env?.storage?.delete) await env.storage.delete(report.photo_key);
+    await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["rejected", report.id]);
+  }
   await logModeration(db, {
     profileId: profile.id,
     actorId: user.id,
@@ -255,7 +279,7 @@ export async function maybeResetOnPublicEdit(db, profile, { title, description }
     status: REVIEW_PENDING,
     title: title != null ? String(title) : review.title,
     description: description != null ? String(description) : review.description,
-    offmenu_flag: isPsilocybin(profile, { title, description }),
+    offmenu_flag: needsOffmenuFlag(profile, { title, description }),
     reason: "Waiting for review of an edit.",
   });
   await logModeration(db, { profileId: profile.id, actorId: null, action: "edit_resubmit", reason: "body" });
@@ -272,9 +296,19 @@ export function canSeePendingReportPhoto(user, report) {
   return Number(user.id) === Number(report.author_id);
 }
 
+export async function canServeReportPhoto(db, user, report) {
+  if (!report?.photo_key) return false;
+  if (report.photo_status === "rejected") return false;
+  const row = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
+  if (!row) return false;
+  const publicOk = await isPublicProfile(db, row);
+  if (report.photo_status === "approved" && publicOk) return true;
+  return canSeePendingReportPhoto(user, report);
+}
+
 export async function storeReportPhoto(db, env, request, { profileId, user, raw }) {
   if (!raw || !raw.byteLength) throw new ValidationError("Add a photo file.");
-  const limited = await rateLimit(db, `photo:${user.id}:${rateLimitClient(request)}`, 10, 3600);
+  const limited = await rateLimit(db, `report-photo:${user.id}:${rateLimitClient(request)}`, 10, 3600);
   if (!limited.ok) throw new ValidationError("Too many photo uploads this hour.", 429);
   const processed = processPhoto(raw);
   const pendingKey = `reports/${profileId}/${randomToken()}.${extForContentType(processed.contentType)}`;
@@ -284,7 +318,16 @@ export async function storeReportPhoto(db, env, request, { profileId, user, raw 
 }
 
 export async function listPendingReportPhotos(db) {
-  return db.all("SELECT * FROM grow_reports WHERE photo_status=? ORDER BY id DESC", ["pending"]);
+  const rows = await db.all("SELECT * FROM grow_reports WHERE photo_status=? ORDER BY id DESC", ["pending"]);
+  const out = [];
+  for (const report of rows) {
+    const profile = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
+    if (!profile) continue;
+    const review = await getReview(db, profile.id);
+    if (review && review.status === REVIEW_REJECTED && Number(review.published_live) !== 1) continue;
+    out.push(report);
+  }
+  return out;
 }
 
 export async function approveReportPhoto(db, { report, user }) {
@@ -299,8 +342,11 @@ export async function approveReportPhoto(db, { report, user }) {
   return { ...report, photo_status: "approved" };
 }
 
-export async function rejectReportPhoto(db, { report, user, reason }) {
-  if (!report || report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
+export async function rejectReportPhoto(db, env, { report, user, reason }) {
+  if (!report || (report.photo_status !== "pending" && report.photo_status !== "approved")) {
+    throw new ValidationError("This report photo cannot be removed.");
+  }
+  if (report.photo_key && env?.storage?.delete) await env.storage.delete(report.photo_key);
   await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["rejected", report.id]);
   await logModeration(db, {
     profileId: report.profile_id,

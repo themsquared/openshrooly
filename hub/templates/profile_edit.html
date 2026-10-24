@@ -13,6 +13,7 @@
   <input type="hidden" name="document" id="document">
   <p><button type="submit">Validate and save</button></p>
 </form>
+<script type="application/json" id="hub-flags">{"enable_psilocybin": {{ enable_psilocybin | tojson }}}</script>
 <script type="application/json" id="profile-catalog">{{ catalog_json | safe }}</script>
 <script type="application/json" id="profile-preset">{{ profile_json | safe }}</script>
 {% endblock %}

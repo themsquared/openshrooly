@@ -203,7 +203,7 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const next =
       reportPhotoMatch[2] === "approve"
         ? await approveReportPhoto(db, { report, user })
-        : await rejectReportPhoto(db, { report, user, reason: body.reason });
+        : await rejectReportPhoto(db, env, { report, user, reason: body.reason });
     return json({ report: { id: next.id, photo_status: next.photo_status, profile_id: next.profile_id } });
   }
 
@@ -213,7 +213,8 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     requireModerator(user);
     const profile = await requireProfile(db, decodeURIComponent(approveMatch[1]));
     const row = await db.one("SELECT * FROM users WHERE id=?", [(await db.one("SELECT * FROM profiles WHERE id=?", [profile.id])).author_id]);
-    const review = await approveReview(db, env, request, { profile, user, row });
+    const body = await readJson(request);
+    const review = await approveReview(db, env, request, { profile, user, row, pack: body.pack });
     return json({ review: reviewView(review) });
   }
 
@@ -271,7 +272,7 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const bodyTitle = profile.name;
     const bodyDesc = profile.summary;
     await maybeResetOnPublicEdit(db, profile, { title: bodyTitle, description: bodyDesc });
-    await saveDraftReview(db, profile);
+    await saveDraftReview(db, profile, { priorRow: existing });
     const review = await getReview(db, id);
     const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [id]);
     return json({ profile, review: reviewView(review, photos) });

@@ -58,7 +58,13 @@ export class ProfileBuilder extends HTMLElement {
     this.locked = false;
     this.profile = blankProfile();
     this.activeStage = "colonization";
+    this.showPsilocybin = true;
     this._onChange = null;
+  }
+
+  setShowPsilocybin(on) {
+    this.showPsilocybin = Boolean(on);
+    this.render();
   }
 
   connectedCallback() {
@@ -175,9 +181,11 @@ export class ProfileBuilder extends HTMLElement {
   }
 
   renderState(state) {
-    return h("section", { class: "pb-panel pb-state", dataset: { state: this.publish.status }, "aria-live": "polite" },
-      h("span", { class: "pb-state-label" }, state.label),
-      h("p", { class: "muted", style: { margin: "0" } }, state.hint),
+    const liveEdit = this.publish.status === "pending" && this.publish.published_live;
+    const shown = liveEdit ? PUBLISH_STATES.pending_live : state;
+    return h("section", { class: "pb-panel pb-state", dataset: { state: liveEdit ? "pending_live" : this.publish.status }, "aria-live": "polite" },
+      h("span", { class: "pb-state-label" }, shown.label),
+      h("p", { class: "muted", style: { margin: "0" } }, shown.hint),
       this.publish.reason ? h("p", { class: "notice" }, this.publish.reason) : null
     );
   }
@@ -203,12 +211,15 @@ export class ProfileBuilder extends HTMLElement {
   }
 
   renderPack(off) {
+    const toggle = this.showPsilocybin
+      ? h("div", { class: "pb-unit-toggle", role: "group", "aria-label": "Pack" },
+          h("button", { type: "button", dataset: { pack: "culinary" }, "aria-pressed": off ? "false" : "true" }, "Culinary"),
+          h("button", { type: "button", dataset: { pack: "psilocybin" }, "aria-pressed": off ? "true" : "false" }, "Off-menu")
+        )
+      : h("p", { class: "muted" }, "Culinary");
     return h("fieldset", {},
       h("legend", {}, "Pack"),
-      h("div", { class: "pb-unit-toggle", role: "group", "aria-label": "Pack" },
-        h("button", { type: "button", dataset: { pack: "culinary" }, "aria-pressed": off ? "false" : "true" }, "Culinary"),
-        h("button", { type: "button", dataset: { pack: "psilocybin" }, "aria-pressed": off ? "true" : "false" }, "Off-menu")
-      ),
+      toggle,
       off
         ? h("aside", { class: "legal legal-prominent", role: "note" },
             h("p", {}, PSILOCYBIN_LEGAL_NOTICE),

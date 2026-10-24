@@ -108,6 +108,45 @@ function isAdobeApp14(bytes, start, end) {
   );
 }
 
+function rewriteTableSegment(bytes, start, end, nextTable) {
+  const body = bytes.subarray(start + 4, end);
+  let offset = 0;
+  const tables = [];
+  while (offset < body.length) {
+    const size = nextTable(body, offset);
+    if (size == null || offset + size > body.length) break;
+    tables.push(body.subarray(offset, offset + size));
+    offset += size;
+  }
+  if (!tables.length) return bytes.slice(start, end);
+  const payload = concat(tables);
+  const len = payload.length + 2;
+  const out = new Uint8Array(4 + payload.length);
+  out[0] = 0xff;
+  out[1] = bytes[start + 1];
+  out[2] = (len >> 8) & 255;
+  out[3] = len & 255;
+  out.set(payload, 4);
+  return out;
+}
+
+function rewriteDqt(bytes, start, end) {
+  return rewriteTableSegment(bytes, start, end, (body, offset) => {
+    if (offset >= body.length) return null;
+    const tableBytes = (body[offset] >> 4) === 1 ? 128 : 64;
+    return 1 + tableBytes;
+  });
+}
+
+function rewriteDht(bytes, start, end) {
+  return rewriteTableSegment(bytes, start, end, (body, offset) => {
+    if (offset + 17 > body.length) return null;
+    let values = 0;
+    for (let i = 0; i < 16; i += 1) values += body[offset + 1 + i];
+    return 17 + values;
+  });
+}
+
 export function stripJpeg(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new ValidationError("That JPEG is damaged.");
   const out = [new Uint8Array([0xff, 0xd8])];
@@ -156,13 +195,19 @@ export function stripJpeg(bytes) {
     const len = readU16(bytes, i + 2);
     const end = i + 2 + len;
     if (end > bytes.length) throw new ValidationError("That JPEG is damaged.");
-    const adobe = marker === 0xee && isAdobeApp14(bytes, i + 4, end);
+    const adobe = marker === 0xee && len === 14 && isAdobeApp14(bytes, i + 4, end);
     if (jpegAllowMarker(marker) || adobe) {
       if (isSofMarker(marker)) {
+        if (width || height) throw new ValidationError("That JPEG is damaged.");
         height = readU16(bytes, i + 5);
         width = readU16(bytes, i + 7);
+        if (width > PHOTO_MAX_EDGE || height > PHOTO_MAX_EDGE) {
+          throw new ValidationError(`Photos must be ${PHOTO_MAX_EDGE} pixels or smaller on each side.`);
+        }
       }
-      out.push(bytes.slice(i, end));
+      if (marker === 0xdb) out.push(rewriteDqt(bytes, i, end));
+      else if (marker === 0xc4) out.push(rewriteDht(bytes, i, end));
+      else out.push(bytes.slice(i, end));
     }
     i = end;
   }

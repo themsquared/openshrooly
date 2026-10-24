@@ -670,20 +670,188 @@ test("official profile report photos reach the queue and can be rejected", async
   assert.equal(live.status, 200);
 });
 
-test("report photo uploads share the photo rate limit", async () => {
+test("report photo uploads have their own rate limit and text reports are limited", async () => {
   const ctx = testEnv();
   const user = await register(ctx, "rate-rep@example.com");
-  let last = null;
   for (let i = 0; i < 10; i += 1) {
-    last = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+    const last = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
       token: user.token,
       body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
     });
     assert.equal(last.status, 201, JSON.stringify(last.data));
   }
-  const blocked = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+  const blockedPhoto = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
     token: user.token,
     body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
   });
-  assert.equal(blocked.status, 429);
+  assert.equal(blockedPhoto.status, 429);
+  const textUser = await register(ctx, "rate-text@example.com");
+  for (let i = 0; i < 20; i += 1) {
+    const last = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+      token: textUser.token,
+      body: { outcome: "success", notes: "text only" },
+    });
+    assert.equal(last.status, 201, JSON.stringify(last.data));
+  }
+  const blockedText = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+    token: textUser.token,
+    body: { outcome: "success", notes: "one more" },
+  });
+  assert.equal(blockedText.status, 429);
+});
+
+test("moderators can remove an approved report photo and media 404s after takedown", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "take-alice@example.com");
+  const mod = await makeModerator(ctx, "take-mod@example.com");
+  const doc = draftFrom(pearl, "take-oyster");
+  await call(ctx, "POST", "/api/profiles", { token: alice.token, body: doc });
+  await call(ctx, "POST", "/api/profiles/take-oyster/photos", {
+    token: alice.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/take-oyster/publish", {
+    token: alice.token,
+    body: { title: "Take oyster", description: "Live" },
+  });
+  await call(ctx, "POST", "/api/moderation/take-oyster/approve", { token: mod.token, body: {} });
+  const report = await call(ctx, "POST", "/api/profiles/take-oyster/reports", {
+    token: alice.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === report.data.photo_key);
+  await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, { token: mod.token, body: {} });
+  const live = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(live.status, 200);
+  const rejected = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/reject`, {
+    token: mod.token,
+    body: { reason: "Take down this photo" },
+  });
+  assert.equal(rejected.status, 200, JSON.stringify(rejected.data));
+  const gone = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(gone.status, 404);
+  assert.equal(await ctx.storage.get(report.data.photo_key), null);
+
+  const report2 = await call(ctx, "POST", "/api/profiles/take-oyster/reports", {
+    token: alice.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  const queue2 = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item2 = queue2.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === report2.data.photo_key);
+  await call(ctx, "POST", `/api/moderation/report-photos/${item2.report_id}/approve`, { token: mod.token, body: {} });
+  const down = await call(ctx, "POST", "/api/moderation/take-oyster/takedown", {
+    token: mod.token,
+    body: { reason: "Whole profile is down" },
+  });
+  assert.equal(down.status, 200, JSON.stringify(down.data));
+  const afterDown = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report2.data.photo_key)}`);
+  assert.equal(afterDown.status, 404);
+});
+
+test("legacy published community profiles stay live while an edit is in review", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "legacy-alice@example.com");
+  const doc = draftFrom(pearl, "legacy-alice");
+  doc.summary = "Original live copy";
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ["legacy-alice", JSON.stringify(doc), alice.user.id, 1, "2024-01-01T00:00:00.000Z", "2024-01-01T00:00:00.000Z"]
+  );
+  const anonBefore = await call(ctx, "GET", "/api/profiles/legacy-alice");
+  assert.equal(anonBefore.status, 200);
+  assert.equal(anonBefore.data.profile.summary, "Original live copy");
+  const edited = structuredClone(doc);
+  edited.summary = "Typo fix waiting for review";
+  const put = await call(ctx, "PUT", "/api/profiles/legacy-alice", { token: alice.token, body: edited });
+  assert.equal(put.status, 200, JSON.stringify(put.data));
+  assert.equal(put.data.review.status, "pending");
+  assert.equal(put.data.review.published_live, true);
+  const anonAfter = await call(ctx, "GET", "/api/profiles/legacy-alice");
+  assert.equal(anonAfter.status, 200);
+  assert.equal(anonAfter.data.profile.summary, "Original live copy");
+  const owner = await call(ctx, "GET", "/api/profiles/legacy-alice", { token: alice.token });
+  assert.equal(owner.data.profile.summary, "Typo fix waiting for review");
+  assert.equal(owner.data.review.status, "pending");
+});
+
+test("fork and official seed ids cannot be squatted", async () => {
+  const ctx = testEnv();
+  const mallory = await register(ctx, "squat@example.com");
+  const alice = await register(ctx, "fork-alice@example.com");
+  const forkId = draftFrom(pearl, "blue-oyster-fork-alice");
+  const squat = await call(ctx, "POST", "/api/profiles", { token: mallory.token, body: forkId });
+  assert.equal(squat.status, 409);
+  const seedSquat = await call(ctx, "POST", "/api/profiles", { token: mallory.token, body: draftFrom(pearl, "pearl-oyster") });
+  assert.equal(seedSquat.status, 409);
+  const forked = await call(ctx, "POST", "/api/profiles/blue-oyster/fork", { token: alice.token, body: {} });
+  assert.equal(forked.status, 201, JSON.stringify(forked.data));
+  assert.equal(forked.data.id, "blue-oyster-fork-alice");
+});
+
+test("an approved report photo on an unpublished draft stays private", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "draft-rep@example.com");
+  const mod = await makeModerator(ctx, "draft-rep-mod@example.com");
+  const doc = draftFrom(pearl, "draft-report");
+  await call(ctx, "POST", "/api/profiles", { token: alice.token, body: doc });
+  const report = await call(ctx, "POST", "/api/profiles/draft-report/reports", {
+    token: alice.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === report.data.photo_key);
+  assert.ok(item);
+  await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, { token: mod.token, body: {} });
+  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(anon.status, 404);
+});
+
+test("held taxa stay off the culinary list and flagged culinary keeps pricing", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "class-alice@example.com");
+  const mod = await makeModerator(ctx, "class-mod@example.com");
+  const held = draftFrom(pearl, "held-cyrillic");
+  held.species = "Псилоцибе кубенсис";
+  held.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  held.allowed_payment_providers = ["stripe"];
+  const created = await call(ctx, "POST", "/api/profiles", { token: alice.token, body: held });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  assert.equal(created.data.pack, "psilocybin");
+  await call(ctx, "POST", "/api/profiles/held-cyrillic/photos", {
+    token: alice.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/held-cyrillic/publish", {
+    token: alice.token,
+    body: { title: "Held", description: "Cyrillic taxon" },
+  });
+  await call(ctx, "POST", "/api/moderation/held-cyrillic/approve", { token: mod.token, body: {} });
+  const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(culinary.data.some((p) => p.id === "held-cyrillic"), false);
+  const flagged = draftFrom(pearl, "flag-labs");
+  flagged.summary = "Grown with the Shroom Labs kit.";
+  flagged.tags = ["culinary", "shroom"];
+  flagged.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  flagged.allowed_payment_providers = ["stripe"];
+  const made = await call(ctx, "POST", "/api/profiles", { token: alice.token, body: flagged });
+  assert.equal(made.status, 201, JSON.stringify(made.data));
+  assert.equal(made.data.pack, "culinary");
+  assert.equal(made.data.pricing.kind, "paid");
+  await call(ctx, "POST", "/api/profiles/flag-labs/photos", {
+    token: alice.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/flag-labs/publish", {
+    token: alice.token,
+    body: { title: "Labs", description: "Culinary kit note" },
+  });
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.id === "flag-labs");
+  assert.equal(item.review.offmenu_flag, true);
+  await call(ctx, "POST", "/api/moderation/flag-labs/approve", { token: mod.token, body: {} });
+  const live = await call(ctx, "GET", "/api/profiles/flag-labs");
+  assert.equal(live.data.profile.pack, "culinary");
+  assert.equal(live.data.profile.pricing.kind, "paid");
 });

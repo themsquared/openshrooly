@@ -492,11 +492,13 @@ async function ownerPhotoUrl(profileId, photoId) {
 }
 
 async function loadBuilderSources(builder) {
+  const caps = await capabilities().catch(() => ({ show_psilocybin: true }));
+  builder.setShowPsilocybin(caps.show_psilocybin !== false);
   const [library, mine] = await Promise.all([
     api("/api/profiles?pack=culinary").catch(() => []),
     api("/api/me/profiles").catch(() => ({ profiles: [] })),
   ]);
-  const off = await api("/api/profiles?pack=psilocybin").catch(() => []);
+  const off = caps.show_psilocybin === false ? [] : await api("/api/profiles?pack=psilocybin").catch(() => []);
   const summaries = [...(library || []), ...(off || [])];
   builder.resolveSource = async (id) => {
     const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
@@ -540,6 +542,7 @@ async function renderPublish() {
           reason: data.review.reason || "",
           title: data.review.title || data.profile.name,
           description: data.review.description || data.profile.summary || "",
+          published_live: Boolean(data.review.published_live),
           photos,
         });
       }

@@ -324,6 +324,24 @@ CREATE TABLE IF NOT EXISTS moderation_log (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_moderation_log_profile ON moderation_log(profile_id, id);
+INSERT OR IGNORE INTO profile_review (
+    profile_id, status, reason, title, description, live_document,
+    blocklist_hit, offmenu_flag, published_live, created_at, updated_at
+)
+SELECT
+    id,
+    'published',
+    '',
+    COALESCE(json_extract(document, '$.name'), ''),
+    COALESCE(json_extract(document, '$.summary'), ''),
+    document,
+    0,
+    0,
+    1,
+    created_at,
+    updated_at
+FROM profiles
+WHERE published = 1 AND author_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS profile_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

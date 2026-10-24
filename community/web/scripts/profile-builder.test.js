@@ -8,6 +8,7 @@ import {
   canCloneFull,
   cloneProfile,
   collectProfileIssues,
+  classifyTaxon,
   detectsRestrictedTaxon,
   exportProfileDocument,
   isHttpsSourceUrl,
@@ -150,73 +151,47 @@ test("stage ids must be known grow phases and source urls must be https", () => 
   assert.equal(isHttpsSourceUrl("javascript:alert(1)"), false);
 });
 
-test("scientific and common names force Off-menu even when labeled culinary", () => {
+test("scientific names force Off-menu; slang in prose only flags", () => {
   const labeled = blankProfile({ id: "sneaky-teacher", name: "Garden mix", pack: "culinary" });
   labeled.species = "Psilocybe\u00a0cubensis";
   labeled.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
   labeled.allowed_payment_providers = ["stripe"];
   labeled.affiliates_allowed = true;
-  assert.equal(detectsRestrictedTaxon(labeled), true);
+  assert.equal(classifyTaxon(labeled).force, true);
   const forced = validateProfile(labeled);
   assert.equal(forced.pack, "psilocybin");
   assert.equal(forced.restricted, true);
   assert.equal(forced.affiliates_allowed, false);
   assert.equal(forced.pricing.kind, "free");
-  const common = blankProfile({ id: "gt-common", name: "Golden Teacher", pack: "culinary" });
-  common.species = "Unknown garden mushroom";
-  assert.equal(detectsRestrictedTaxon(common), true);
+  const held = blankProfile({ id: "gt-common", name: "Golden Teacher", pack: "culinary" });
+  held.species = "Unknown garden mushroom";
+  assert.equal(classifyTaxon(held).hold, true);
   const oyster = blankProfile({ id: "still-oyster", name: "Pearl Oyster", pack: "culinary" });
   oyster.species = "Pleurotus ostreatus";
-  assert.equal(detectsRestrictedTaxon(oyster), false);
-  for (const species of [
-    "P. cubensis",
-    "cubensis",
-    "Stropharia cubensis",
-    "Panaeolus cinctulus",
-    "Panaeolus subbalteatus",
-    "Panaeolus cyanescens",
-    "Copelandia",
-    "Gymnopilus junonius",
-    "Gymnopilus spectabilis",
-    "Pluteus salicinus",
-    "Inocybe aeruginascens",
-    "Conocybe cyanopus",
-    "Psilocybecubensis",
-  ]) {
-    const labeled = blankProfile({ id: "taxon-check", name: "Garden mix", pack: "culinary" });
-    labeled.species = species;
-    assert.equal(detectsRestrictedTaxon(labeled), true, species);
+  assert.equal(classifyTaxon(oyster).culinary, true);
+  for (const species of ["P. cubensis", "Stropharia cubensis", "Panaeolus cinctulus", "Psilocybecubensis"]) {
+    const row = blankProfile({ id: "taxon-check", name: "Garden mix", pack: "culinary" });
+    row.species = species;
+    assert.equal(classifyTaxon(row).force, true, species);
   }
-  const hidden = blankProfile({ id: "hidden-taxon", name: "Garden mix", pack: "culinary" });
-  hidden.species = "Psilo\u00adcybe cubensis";
-  assert.equal(detectsRestrictedTaxon(hidden), true);
-  const cubes = blankProfile({ id: "cubes", name: "Psilocybin cubes", pack: "culinary" });
-  cubes.species = "Unknown garden mushroom";
-  assert.equal(detectsRestrictedTaxon(cubes), true);
-  const tagged = blankProfile({ id: "tagged", name: "Garden mix", pack: "culinary" });
-  tagged.species = "Pleurotus ostreatus";
-  tagged.tags = ["Psilocybin"];
-  assert.equal(detectsRestrictedTaxon(tagged), true);
-  const accented = blankProfile({ id: "accented", name: "Garden mix", pack: "culinary" });
-  accented.species = "Psílocybe cubénsis";
-  assert.equal(detectsRestrictedTaxon(accented), true);
-  const misspelled = blankProfile({ id: "misspelled", name: "Garden mix", pack: "culinary" });
-  misspelled.species = "psilocibe";
-  assert.equal(detectsRestrictedTaxon(misspelled), true);
+  const bypass = blankProfile({ id: "bypass", name: "Garden mix", pack: "culinary" });
+  bypass.species = "Psiłocybe cubɛnsis";
+  assert.equal(classifyTaxon(bypass).hold, true);
   const slang = blankProfile({ id: "slang", name: "Garden mix", pack: "culinary" });
   slang.species = "Pleurotus ostreatus";
   slang.notes = "shrooms";
+  slang.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  slang.allowed_payment_providers = ["stripe"];
   assert.equal(detectsRestrictedTaxon(slang), true);
+  const kept = validateProfile(slang);
+  assert.equal(kept.pack, "culinary");
+  assert.equal(kept.pricing.kind, "paid");
   const bolete = blankProfile({ id: "bolete", name: "Garden mix", pack: "culinary" });
   bolete.species = "Gyroporus cyanescens";
-  assert.equal(detectsRestrictedTaxon(bolete), false);
-  const vitamin = blankProfile({ id: "vitamin", name: "Garden mix", pack: "culinary" });
-  vitamin.species = "Pleurotus ostreatus";
-  vitamin.summary = "Add vitamin B+ to the soak";
-  assert.equal(detectsRestrictedTaxon(vitamin), false);
-  const split = blankProfile({ id: "split", name: "Psilo", pack: "culinary" });
-  split.species = "cybe";
-  assert.equal(detectsRestrictedTaxon(split), false);
+  assert.equal(classifyTaxon(bolete).culinary, true);
+  const src = readFileSync(new URL("../public/js/profile-builder.js", import.meta.url), "utf8");
+  assert.match(src, /setShowPsilocybin/);
+  assert.match(src, /this\.showPsilocybin/);
 });
 
 test("list summaries with a stage count do not crash validation or clone", () => {

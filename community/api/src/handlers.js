@@ -17,7 +17,7 @@ import { handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
-import { corsAllowlist, originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
+import { corsAllowlist, originAllowed, rateLimit, rateLimitClient, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
@@ -28,8 +28,8 @@ import {
   getReview,
   isModerator,
   isPublicProfile,
-  canSeePendingReportPhoto,
   canSeePhoto,
+  canServeReportPhoto,
   photoIsPublic,
   publicDocument,
   reportPhotoApproved,
@@ -333,6 +333,8 @@ async function route(method, path, url, request, env) {
     requireVerified(user);
     const profile = validateProfile(stripCommunityAffiliates(await readJson(request)));
     profile.author = user.username;
+    const reserved = reservedProfileIdReason(profile.id);
+    if (reserved) throw new ValidationError(reserved, 409);
     const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
     if (existing) throw new ValidationError("That profile id is already used.", 409);
     await upsertProfile(db, profile, user, { published: 0 });
@@ -374,7 +376,7 @@ async function route(method, path, url, request, env) {
     if (!source) throw new ValidationError("not found", 404);
     if (!(await canRead(db, user, source))) return json({ error: "purchase required" }, 402);
     const forked = structuredClone(source);
-    forked.id = `${source.id}-fork-${user.username}`;
+    forked.id = await nextForkId(db, source.id, user.username);
     forked.name = `${source.name} (fork)`;
     forked.fork_of = source.id;
     forked.author = user.username;
@@ -400,6 +402,8 @@ async function route(method, path, url, request, env) {
     await requireVisibleRow(db, user, profileId);
     const body = await readJson(request);
     if (!["success", "partial", "fail"].includes(body.outcome)) throw new ValidationError("bad outcome");
+    const reportLimit = await rateLimit(db, `report:${user.id}:${rateLimitClient(request)}`, 20, 3600);
+    if (!reportLimit.ok) throw new ValidationError("Too many grow reports this hour.", 429);
     let photoKey = null;
     let photoStatus = "approved";
     if (body.photo_base64) {
@@ -515,9 +519,9 @@ async function route(method, path, url, request, env) {
       if (!canSeePhoto(gallery, viewer, ownerRow?.author_id)) return json({ error: "not found" }, 404);
     }
     const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
-    if (report && !reportPhotoApproved(report)) {
+    if (report) {
       const viewer = await userFromAuth(request, db);
-      if (!canSeePendingReportPhoto(viewer, report)) return json({ error: "not found" }, 404);
+      if (!(await canServeReportPhoto(db, viewer, report))) return json({ error: "not found" }, 404);
     }
     const headers = {
       "content-type": PHOTO_TYPES[kind],
@@ -611,9 +615,28 @@ async function mintToken(db, userId, name) {
   return token;
 }
 
+function reservedProfileIdReason(id) {
+  if (typeof id !== "string" || !id) return "Give this profile an id, like pearl-oyster.";
+  if (id.includes("-fork-")) return "That id is reserved for profile forks.";
+  if (SEED_DOCS.has(id)) return "That profile id is reserved for the official catalog.";
+  return null;
+}
+
+async function nextForkId(db, sourceId, username) {
+  let id = `${sourceId}-fork-${username}`;
+  let n = 2;
+  while (await db.one("SELECT * FROM profiles WHERE id=?", [id])) {
+    id = `${sourceId}-fork-${username}-${n}`;
+    n += 1;
+  }
+  return id;
+}
+
 async function pushOneProfile(db, item, user) {
   const id = item?.id || "";
   try {
+    const reserved = reservedProfileIdReason(id);
+    if (reserved) return { id, status: "skipped", reason: SEED_DOCS.has(id) ? "official" : "reserved_fork_id" };
     const profile = validateProfile(stripCommunityAffiliates(item));
     if (isPsilocybin(profile)) {
       profile.affiliates_allowed = false;
@@ -629,7 +652,7 @@ async function pushOneProfile(db, item, user) {
       return { id: profile.id, status: "skipped", reason: "owned_by_other" };
     }
     await upsertProfile(db, profile, user, { published: 0 });
-    await saveDraftReview(db, profile);
+    await saveDraftReview(db, profile, { priorRow: existing });
     return { id: profile.id, status: existing ? "updated" : "created" };
   } catch (err) {
     return { id, status: "skipped", reason: err?.message || "invalid" };
@@ -698,7 +721,7 @@ async function showProfile(request, db, env, profileId) {
     let photoKey = report.photo_key || null;
     const photoStatus = report.photo_status || (report.photo_key ? "approved" : null);
     if (report.photo_key) {
-      const visible = reportPhotoApproved(report) || canSeePendingReportPhoto(user, report);
+      const visible = await canServeReportPhoto(db, user, report);
       if (visible) photoUrl = mediaUrl(env, report.photo_key);
       else photoKey = null;
     }

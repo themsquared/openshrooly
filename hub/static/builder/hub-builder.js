@@ -13,8 +13,17 @@ function catalogFromPage() {
   }
 }
 
+function flagsFromPage() {
+  try {
+    return JSON.parse(document.getElementById("hub-flags")?.textContent || "{}");
+  } catch {
+    return {};
+  }
+}
+
 if (builder) {
   customElements.whenDefined("profile-builder").then(() => {
+    builder.setShowPsilocybin(Boolean(flagsFromPage().enable_psilocybin));
     const catalog = catalogFromPage();
     builder.setCatalog(catalog);
     const preset = document.getElementById("profile-preset");

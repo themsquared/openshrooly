@@ -481,7 +481,16 @@ def sync_pull(request: Request):
             continue
         if profile.is_psilocybin and not config.ENABLE_PSILOCYBIN:
             continue
-        db.upsert_profile(conn, profile.id, profile.to_dict(), "community")
+        existing = conn.execute("SELECT source FROM profiles WHERE id=?", (profile.id,)).fetchone()
+        hub_user = payload.get("hub_user")
+        existing_source = existing["source"] if existing else None
+        if existing_source and existing_source not in ("seed", "community"):
+            source = existing_source
+        elif hub_user and profile.author == hub_user:
+            source = "import"
+        else:
+            source = "community"
+        db.upsert_profile(conn, profile.id, profile.to_dict(), source)
         imported += 1
     db.log_event(conn, "sync_pull", f"imported {imported}")
     return RedirectResponse("/profiles", status_code=303)

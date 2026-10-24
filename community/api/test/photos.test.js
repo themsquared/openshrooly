@@ -238,6 +238,70 @@ function jpegWithUnknownMarker({ progressive = false } = {}) {
   return out;
 }
 
+function jpegWithApp14({ len = 14, extra = "" } = {}) {
+  const body = new TextEncoder().encode(`Adobe${"\0".repeat(7)}${extra}`);
+  const segmentLen = len;
+  const dqt = u8(0xff, 0xdb, 0x00, 0x04, 0x00, 0x00);
+  const sof = u8(0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00);
+  const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00, 0xff, 0xd9);
+  const app = new Uint8Array(4 + body.length);
+  app[0] = 0xff;
+  app[1] = 0xee;
+  app[2] = (segmentLen >> 8) & 255;
+  app[3] = segmentLen & 255;
+  app.set(body, 4);
+  const parts = [u8(0xff, 0xd8), app, dqt, sof, sos];
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+
+test("keeps Adobe APP14 only when the segment length is 14", () => {
+  const clean = processPhoto(jpegWithApp14({ len: 14 }));
+  assert.match(new TextDecoder("latin1").decode(clean.bytes), /Adobe/);
+  const stuffed = jpegWithApp14({ len: 14 + "<html><script>".length, extra: "<html><script>" });
+  const out = processPhoto(stuffed);
+  assert.doesNotMatch(new TextDecoder("latin1").decode(out.bytes), /<html>|<script>/);
+});
+
+test("strips DQT padding, rejects a second SOF, and checks the first SOF size", () => {
+  const table = new Uint8Array(65);
+  const pad = new TextEncoder().encode("<html>dqt</html>");
+  const dqt = new Uint8Array(4 + 65 + pad.length);
+  dqt[0] = 0xff;
+  dqt[1] = 0xdb;
+  const dqtLen = 2 + 65 + pad.length;
+  dqt[2] = (dqtLen >> 8) & 255;
+  dqt[3] = dqtLen & 255;
+  dqt.set(table, 4);
+  dqt.set(pad, 69);
+  const sof = u8(0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00);
+  const huge = u8(0xff, 0xc0, 0x00, 0x0b, 0x08, 0xea, 0x60, 0xea, 0x60, 0x01, 0x01, 0x11, 0x00);
+  const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00, 0xff, 0xd9);
+  const stuffed = new Uint8Array(2 + dqt.length + sof.length + sos.length);
+  stuffed.set([0xff, 0xd8]);
+  stuffed.set(dqt, 2);
+  stuffed.set(sof, 2 + dqt.length);
+  stuffed.set(sos, 2 + dqt.length + sof.length);
+  const out = processPhoto(stuffed);
+  assert.doesNotMatch(new TextDecoder("latin1").decode(out.bytes), /<html>|dqt/);
+  const double = new Uint8Array(2 + sof.length + huge.length + sos.length);
+  double.set([0xff, 0xd8]);
+  double.set(sof, 2);
+  double.set(huge, 2 + sof.length);
+  double.set(sos, 2 + sof.length + huge.length);
+  assert.throws(() => processPhoto(double), /damaged/);
+  const oversizedFirst = new Uint8Array(2 + huge.length + sos.length);
+  oversizedFirst.set([0xff, 0xd8]);
+  oversizedFirst.set(huge, 2);
+  oversizedFirst.set(sos, 2 + huge.length);
+  assert.throws(() => processPhoto(oversizedFirst), /4096/);
+});
+
 test("jpeg rewrite drops unknown markers including JPGn", () => {
   for (const dirty of [jpegWithUnknownMarker(), jpegWithUnknownMarker({ progressive: true })]) {
     assert.match(new TextDecoder("latin1").decode(dirty), /<html>|jpgn/);
