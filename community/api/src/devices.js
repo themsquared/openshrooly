@@ -404,7 +404,7 @@ export async function handleDevices(method, path, url, request, env) {
     const enrollHash = await sha256Hex(enrollToken);
     const expires = laterIso(CLAIM_MS);
     if (existing && existing.status !== "revoked" && existing.owner_id) {
-      throw new ValidationError("device already claimed — revoke or use reclaim", 409);
+      throw new ValidationError("device already claimed. Revoke it or use reclaim", 409);
     }
     const id = existing?.id || `sldev_${randomToken().slice(0, 16)}`;
     const name = String(body.name || "OpenShrooly").slice(0, 80);
@@ -441,8 +441,8 @@ export async function handleDevices(method, path, url, request, env) {
     if (code.length !== 6) throw new ValidationError("enter the 6-character code from the device");
     const row = await db.one("SELECT * FROM cloud_devices WHERE claim_code_hash=?", [await sha256Hex(code)]);
     if (!row) throw new ValidationError("code not found", 404);
-    if (row.claim_expires_at < nowIso()) throw new ValidationError("code expired — refresh it on the device", 410);
-    if (row.status === "revoked") throw new ValidationError("device revoked — start a re-claim on the chamber", 409);
+    if (row.claim_expires_at < nowIso()) throw new ValidationError("code expired. Refresh it on the device", 410);
+    if (row.status === "revoked") throw new ValidationError("device revoked. Start a re-claim on the chamber", 409);
     await db.run("UPDATE cloud_devices SET owner_id=?, status=?, claim_code_hash=? WHERE id=?", [
       user.id,
       "claimed",

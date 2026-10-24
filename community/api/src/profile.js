@@ -1,4 +1,4 @@
-/** Profile validation — same rules as shared/openshrooly_lib/schema.py */
+/** Profile validation: same rules as shared/openshrooly_lib/schema.py */
 
 export const PROFILE_SCHEMA_VERSION = 1;
 

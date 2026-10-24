@@ -145,3 +145,55 @@ test("unverified email cannot publish (blocked when email_verified=0)", async ()
   assert.equal(done.data.user.email_verified, true);
 });
 
+
+test("internal errors return a generic message and request id, and the log is scrubbed", async () => {
+  const ctx = env();
+  await call(ctx, "GET", "/health");
+  const secret = ["unit", "test", "credential", "a1b2c3d4e5f6a7b8c9d0e1f2a3b4"].join("_");
+  const leak = `D1_ERROR: no such column: users.secret_col; token=${secret}`;
+  const realAll = ctx.db.all.bind(ctx.db);
+  ctx.db.all = async () => {
+    throw new Error(leak);
+  };
+  const logged = [];
+  const realError = console.error;
+  console.error = (...args) => logged.push(args.join(" "));
+  let res;
+  try {
+    res = await call(ctx, "GET", "/api/profiles?pack=culinary", { headers: { authorization: `Bearer ${secret}` } });
+  } finally {
+    console.error = realError;
+    ctx.db.all = realAll;
+  }
+  assert.equal(res.status, 500);
+  assert.deepEqual(Object.keys(res.data).sort(), ["error", "request_id"]);
+  assert.equal(res.data.error, "Something went wrong on our side. Please try again.");
+  assert.match(res.data.request_id, /^[0-9a-f]{24}$/);
+  assert.equal(res.headers.get("x-request-id"), res.data.request_id);
+  const body = JSON.stringify(res.data);
+  for (const fragment of ["D1_ERROR", "no such column", "secret_col", secret]) assert.ok(!body.includes(fragment), fragment);
+  assert.equal(logged.length, 1);
+  const entry = JSON.parse(logged[0]);
+  assert.equal(entry.request_id, res.data.request_id);
+  assert.match(entry.message, /no such column/);
+  assert.ok(!logged[0].includes(secret), "secret must not reach the log");
+  assert.ok(!logged[0].toLowerCase().includes("bearer"), "headers are never logged");
+});
+
+test("non-Error throws also get the generic 500", async () => {
+  const ctx = env();
+  await call(ctx, "GET", "/health");
+  ctx.db.all = async () => {
+    throw "raw string detail";
+  };
+  const realError = console.error;
+  console.error = () => {};
+  let res;
+  try {
+    res = await call(ctx, "GET", "/api/profiles");
+  } finally {
+    console.error = realError;
+  }
+  assert.equal(res.status, 500);
+  assert.ok(!JSON.stringify(res.data).includes("raw string detail"));
+});
