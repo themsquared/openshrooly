@@ -132,6 +132,10 @@ test("happy path: first Apple sign-in stores the name, treats Hide My Email as v
   assert.equal(r.done.data.user.email_verified, true);
   const row = await ctx.db.one("SELECT * FROM users WHERE email=?", [RELAY_EMAIL]);
   assert.equal(row.display_name, "Jane Appleseed");
+  assert.match(row.username, /^grower_[0-9a-f]{10}$/);
+  assert.doesNotMatch(row.username, /jane|appleseed|grower@/i);
+  assert.notEqual(row.username, "grower");
+  assert.equal(r.done.data.user.username, row.username);
   const session = r.done.headers.get("set-cookie");
   assert.match(session, /^__Host-sl_session=/);
   assert.match(session, /; HttpOnly/);
@@ -139,6 +143,21 @@ test("happy path: first Apple sign-in stores the name, treats Hide My Email as v
   assert.match(session, /; SameSite=Lax/);
   const again = await call(ctx, "POST", "/api/auth/oidc/complete", { body: { token: r.handoff } });
   assert.equal(again.status, 401);
+});
+
+test("Hide My Email does not put the real name or email local part in the public username", async () => {
+  const ctx = liveEnv();
+  apple.claims = { email: "hidden-xyz@privaterelay.appleid.com" };
+  const r = await signIn(ctx, {
+    user: JSON.stringify({ name: { firstName: "Mike", lastName: "Moore" }, email: "hidden-xyz@privaterelay.appleid.com" }),
+  });
+  assert.equal(r.done.status, 200);
+  const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["hidden-xyz@privaterelay.appleid.com"]);
+  assert.match(row.username, /^grower_[0-9a-f]{10}$/);
+  assert.doesNotMatch(row.username, /mike|moore|hidden-xyz/i);
+  assert.notEqual(row.username, "hidden-xyz");
+  assert.equal(r.done.data.user.username, row.username);
+  assert.equal(row.display_name, "Mike Moore");
 });
 
 test("a later Apple sign-in works without the name field and reuses the account", async () => {

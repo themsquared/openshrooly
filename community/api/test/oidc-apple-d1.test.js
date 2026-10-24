@@ -73,9 +73,12 @@ test("D1: Apple sign-up creates a verified Hide My Email account, stores the fir
     assert.equal(first.done.status, 200, JSON.stringify(first.done.data));
     assert.equal(first.done.data.user.email, RELAY_EMAIL);
     assert.equal(first.done.data.user.email_verified, true);
-    const row = await d1.prepare("SELECT password_hash, display_name FROM users WHERE email=?").bind(RELAY_EMAIL).first();
+    const row = await d1.prepare("SELECT password_hash, display_name, username FROM users WHERE email=?").bind(RELAY_EMAIL).first();
     assert.equal(row.password_hash, "!no-password");
     assert.equal(row.display_name, "Jane Appleseed");
+    assert.match(row.username, /^grower_[0-9a-f]{10}$/);
+    assert.doesNotMatch(row.username, /jane|appleseed/i);
+    assert.equal(first.done.data.user.username, row.username);
     const login = await call(ctx, "POST", "/api/auth/login", { body: { email: RELAY_EMAIL, password: "!no-password" } });
     assert.equal(login.status, 401);
     const again = await signIn(d1, ctx);
