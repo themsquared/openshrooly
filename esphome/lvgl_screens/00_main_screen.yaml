@@ -1,151 +1,135 @@
 # ========================================================================
-# MAIN SCREEN - Primary status display
-# Shows all critical information with single Settings button
+# MAIN SCREEN - Across-the-room growing status
+# Display-only layout on top of upstream climate / light / FAE / water
+# entities. Select (button 4) still opens the settings menu.
+# Canvas is 296x128 after LVGL rotation 90 (Waveshare 2.90inv2-r2).
+# Keep content in y=0..104 so apply_display_layout's 20px flip still fits.
 # ========================================================================
 
 - id: aaaa
   bg_color: paper_white
   widgets:
-    # Title and Version (y: 0-12)
-    - label:
-        text: "OpenShrooly v${device_version}"
-        align: TOP_LEFT
-        x: 5
+    - image:
+        id: grow_mark
+        src: mark_16
+        x: 4
         y: 2
-        text_font: font1
 
     - label:
         id: main_time_label
-        text: "00:00"
+        text: "--:--"
+        align: TOP_LEFT
+        x: 22
+        y: 2
+        text_font: font_ui
+
+    - label:
+        id: grow_phase_label
+        text: "Idle"
         align: TOP_RIGHT
         x: -5
         y: 2
-        text_font: font1
+        text_font: font_ui
 
-    # Status Grid - Left Column Labels (fixed width for alignment)
-    - label:
-        text: "Temp:"
-        align: TOP_LEFT
+    - obj:
+        id: grow_progress_track
         x: 5
-        y: 18
-        text_font: font1
+        y: 20
+        width: 286
+        height: 6
+        bg_color: paper_white
+        border_color: paper_black
+        border_width: 1
+        radius: 0
+        pad_all: 0
+        hidden: true
+        widgets:
+          - obj:
+              id: grow_progress_fill
+              x: 0
+              y: 0
+              width: 1
+              height: 6
+              bg_color: paper_black
+              border_width: 0
+              radius: 0
+              pad_all: 0
 
-    - label:
-        text: "Humidity:"
-        align: TOP_LEFT
-        x: 5
-        y: 30
-        text_font: font1
-
-    - label:
-        text: "Water:"
-        align: TOP_LEFT
-        x: 5
-        y: 42
-        text_font: font1
-
-    - label:
-        text: "Fan:"
-        align: TOP_LEFT
-        x: 5
-        y: 54
-        text_font: font1
-
-    - label:
-        text: "Light:"
-        align: TOP_LEFT
-        x: 5
-        y: 66
-        text_font: font1
-
-    - label:
-        text: "WiFi:"
-        align: TOP_LEFT
-        x: 5
-        y: 78
-        text_font: font1
-
-    # Status Grid - Left Column Values (aligned at x: 65)
     - label:
         id: main_temp_value
-        text: "--.-°C"
+        text: "--.-"
         align: TOP_LEFT
-        x: 65
-        y: 18
-        text_font: font1
+        x: 8
+        y: 30
+        text_font: font_hero
+
+    - label:
+        id: grow_temp_unit
+        text: "C"
+        align: TOP_LEFT
+        x: 76
+        y: 46
+        text_font: font_ui
 
     - label:
         id: main_humidity_value
-        text: "--.-%"
+        text: "--"
         align: TOP_LEFT
-        x: 65
+        x: 160
         y: 30
-        text_font: font1
+        text_font: font_hero
 
     - label:
-        id: main_water_value
-        text: "---%"
+        id: grow_rh_unit
+        text: "%"
         align: TOP_LEFT
-        x: 65
-        y: 42
-        text_font: font1
+        x: 212
+        y: 46
+        text_font: font_ui
 
     - label:
-        id: main_fan_value
-        text: "OFF"
+        id: grow_temp_meta
+        text: "tgt --"
         align: TOP_LEFT
-        x: 65
-        y: 54
-        text_font: font1
-
-    - label:
-        id: main_light_value
-        text: "---- lux"
-        align: TOP_LEFT
-        x: 65
+        x: 8
         y: 66
         text_font: font1
 
     - label:
-        id: main_wifi_value
-        text: "---"
+        id: grow_humidity_meta
+        text: "tgt --"
         align: TOP_LEFT
-        x: 65
+        x: 160
+        y: 66
+        text_font: font1
+
+    - label:
+        id: grow_next_event
+        text: ""
+        align: TOP_LEFT
+        x: 5
         y: 78
         text_font: font1
 
-    # Right Column Labels
-    - label:
-        text: "IP:"
-        align: TOP_LEFT
-        x: 150
-        y: 18
-        text_font: font1
+    - obj:
+        id: grow_alert_bar
+        x: 0
+        y: 90
+        width: 296
+        height: 14
+        bg_color: paper_black
+        radius: 0
+        pad_all: 0
+        hidden: true
+        widgets:
+          - label:
+              id: grow_alert_text
+              text: ""
+              align: CENTER
+              text_color: paper_white
+              text_font: font_ui
 
-    - label:
-        text: "Uptime:"
-        align: TOP_LEFT
-        x: 150
-        y: 30
-        text_font: font1
-
-    # Right Column Values
-    - label:
-        id: main_ip_value
-        text: "---"
-        align: TOP_LEFT
-        x: 185
-        y: 18
-        text_font: font1
-
-    - label:
-        id: main_uptime_value
-        text: "--h --m"
-        align: TOP_LEFT
-        x: 200
-        y: 30
-        text_font: font1
-
+    # Kept so apply_display_layout can skip it when flipping the panel.
     - label:
         id: main_status_message
         text: ""
@@ -153,9 +137,9 @@
         x: 5
         y: -5
         text_font: font1
+        hidden: true
 
-    # Button Bar - Settings button aligned with button 4 position
-    # Single button on the right (20px tall, at bottom)
+    # Button 4: same size and place as upstream so navigation stays identical.
     - obj:
         x: 224
         y: 107

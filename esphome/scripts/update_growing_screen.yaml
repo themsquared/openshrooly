@@ -1,0 +1,184 @@
+# Display-only refresh of the main growing screen.
+# Interval stays 10s (upstream). waveshare full_update_every: 300 is unchanged.
+# Does not call climate, humidifier, fan, or light managers.
+
+- id: update_growing_screen
+  mode: single
+  then:
+    - lvgl.label.update:
+        id: main_time_label
+        text: !lambda |-
+          auto time = id(sntp_time).now();
+          if (time.is_valid()) {
+            return str_sprintf("%02d:%02d", time.hour, time.minute);
+          }
+          return std::string("--:--");
+
+    - lvgl.label.update:
+        id: grow_phase_label
+        text: !lambda |-
+          const std::string phase = id(grow_phase).current_option();
+          const int day = id(grow_day).has_state() ? (int) id(grow_day).state : 0;
+          const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
+          if (phase.empty() || phase == "Idle" || total <= 0) {
+            return std::string("Idle");
+          }
+          return str_sprintf("%s, day %d of %d", phase.c_str(), day, total);
+
+    - lvgl.label.update:
+        id: main_temp_value
+        text: !lambda |-
+          if (id(temperature).has_state()) {
+            return str_sprintf("%.1f", id(temperature).state);
+          }
+          return std::string("--.-");
+
+    - lvgl.label.update:
+        id: main_humidity_value
+        text: !lambda |-
+          if (id(humidity).has_state()) {
+            return str_sprintf("%.0f", id(humidity).state);
+          }
+          return std::string("--");
+
+    - lvgl.label.update:
+        id: grow_temp_meta
+        text: !lambda |-
+          if (!id(temperature).has_state() || !id(temperature_target).has_state()) {
+            return std::string("tgt --");
+          }
+          const float value = id(temperature).state;
+          const float target = id(temperature_target).state;
+          const float hyst = id(temperature_hysteresis).has_state() ? id(temperature_hysteresis).state : 1.0f;
+          const char *band = "OK";
+          if (id(temperature_warning_minimum).has_state() && value < id(temperature_warning_minimum).state) {
+            band = "LOW";
+          } else if (id(temperature_warning_maximum).has_state() && value > id(temperature_warning_maximum).state) {
+            band = "HIGH";
+          } else if (fabsf(value - target) > hyst) {
+            band = "DRIFT";
+          }
+          return str_sprintf("tgt %.0f  %s", target, band);
+
+    - lvgl.label.update:
+        id: grow_humidity_meta
+        text: !lambda |-
+          if (!id(humidity).has_state() || !id(target_humidity).has_state()) {
+            return std::string("tgt --");
+          }
+          const float value = id(humidity).state;
+          const float target = id(target_humidity).state;
+          const float hyst = id(humidity_hysteresis).has_state() ? id(humidity_hysteresis).state : 2.0f;
+          const char *band = "OK";
+          if (fabsf(value - target) > 10.0f) {
+            band = value < target ? "LOW" : "HIGH";
+          } else if (fabsf(value - target) > hyst) {
+            band = "DRIFT";
+          }
+          return str_sprintf("tgt %.0f  %s", target, band);
+
+    - lvgl.label.update:
+        id: grow_next_event
+        text: !lambda |-
+          const std::string phase = id(grow_phase).current_option();
+          const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
+          if (phase.empty() || phase == "Idle" || total <= 0) {
+            return std::string("No grow running");
+          }
+          if (id(humidifier_on_flag)) {
+            return std::string("Misting");
+          }
+
+          auto now = id(sntp_time).now();
+          int best_sec = 24 * 3600;
+          std::string best;
+
+          if (now.is_valid() && id(sunrise_hour).has_state() && id(light_hours).has_state()) {
+            const int local_min = now.hour * 60 + now.minute;
+            const int start_min = (int) id(sunrise_hour).state * 60;
+            const int duration_min = (int) (id(light_hours).state * 60.0f);
+            const int end_min = start_min + duration_min;
+            bool in_win;
+            if (end_min <= 1440) {
+              in_win = (local_min >= start_min) && (local_min < end_min);
+            } else {
+              in_win = (local_min >= start_min) || (local_min < (end_min % 1440));
+            }
+            int next_min;
+            if (in_win) {
+              next_min = end_min;
+              best = str_sprintf("Lights off %02d:%02d", (end_min / 60) % 24, end_min % 60);
+            } else if (local_min < start_min) {
+              next_min = start_min;
+              best = str_sprintf("Lights on %02d:%02d", start_min / 60, start_min % 60);
+            } else {
+              next_min = start_min + 1440;
+              best = str_sprintf("Lights on %02d:%02d", start_min / 60, start_min % 60);
+            }
+            best_sec = (next_min - local_min) * 60;
+            if (best_sec < 0) best_sec += 24 * 3600;
+          }
+
+          if (now.is_valid()) {
+            const int ts = now.timestamp;
+            int fae_sec = -1;
+            const bool fae_on = id(air_exchange_on_flag) && id(air_exchange_next_off_ts) > 0;
+            if (fae_on) {
+              fae_sec = id(air_exchange_next_off_ts) - ts;
+            } else if (id(air_exchange_next_on_ts) > 0) {
+              fae_sec = id(air_exchange_next_on_ts) - ts;
+            }
+            if (fae_sec >= 0 && fae_sec < best_sec) {
+              int minutes = (fae_sec + 59) / 60;
+              if (minutes < 1) minutes = 1;
+              best = fae_on ? str_sprintf("FAE on %dm", minutes)
+                            : str_sprintf("FAE in %dm", minutes);
+            }
+          }
+
+          if (best.empty()) {
+            return std::string(id(lights_status).state.c_str());
+          }
+          return best;
+
+    - lvgl.label.update:
+        id: grow_alert_text
+        text: !lambda |-
+          std::string alert;
+          if (id(water_level_percent).has_state() && id(water_level_percent).state < 15.0f) {
+            alert = "WATER LOW";
+          }
+          if (id(alert_temp_too_low).state) {
+            alert = alert.empty() ? "TEMP LOW" : alert + "  TEMP LOW";
+          } else if (id(alert_temp_too_high).state) {
+            alert = alert.empty() ? "TEMP HIGH" : alert + "  TEMP HIGH";
+          }
+          if (id(alert_humidity_failure).state) {
+            alert = alert.empty() ? "HUMIDITY" : alert + "  HUMIDITY";
+          }
+          return alert;
+
+    - lambda: |-
+        const std::string phase = id(grow_phase).current_option();
+        const int day = id(grow_day).has_state() ? (int) id(grow_day).state : 0;
+        const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
+        const bool growing = !phase.empty() && phase != "Idle" && total > 0;
+
+        if (growing) {
+          lv_obj_clear_flag(id(grow_progress_track), LV_OBJ_FLAG_HIDDEN);
+          int width = (284 * day) / total;
+          if (width < 1) width = 1;
+          if (width > 284) width = 284;
+          lv_obj_set_width(id(grow_progress_fill), width);
+        } else {
+          lv_obj_add_flag(id(grow_progress_track), LV_OBJ_FLAG_HIDDEN);
+        }
+
+        const bool water_low = id(water_level_percent).has_state() && id(water_level_percent).state < 15.0f;
+        const bool alerting = water_low || id(alert_temp_too_low).state || id(alert_temp_too_high).state ||
+                              id(alert_humidity_failure).state;
+        if (alerting) {
+          lv_obj_clear_flag(id(grow_alert_bar), LV_OBJ_FLAG_HIDDEN);
+        } else {
+          lv_obj_add_flag(id(grow_alert_bar), LV_OBJ_FLAG_HIDDEN);
+        }
