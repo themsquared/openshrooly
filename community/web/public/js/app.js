@@ -628,6 +628,11 @@ async function renderModerate() {
       }
       items.push(`<article class="card" style="padding:1.1rem">
               <p><span class="chip">${escapeHtml(p.pack === "psilocybin" ? "Off-menu" : "Culinary")}</span>${r.offmenu_flag ? `<span class="chip">Off-menu flag</span>` : ""}${r.blocklist_hit ? `<span class="chip">Text flag</span>` : ""}</p>
+              ${
+                (r.offmenu_reasons || []).length
+                  ? `<p class="notice">${(r.offmenu_reasons || []).map((reason) => escapeHtml(reason)).join(" ")}</p>`
+                  : ""
+              }
               <h2>${escapeHtml(r.title || p.name)}</h2>
               <p>${escapeHtml(r.description || p.summary || "")}</p>
               <p class="muted">${escapeHtml(p.species || "")}</p>
@@ -642,6 +647,7 @@ async function renderModerate() {
               <label>Reason <input id="reason-${escapeHtml(p.id)}" placeholder="Required to reject or ask for changes"></label>
               <p class="pb-actions">
                 <button type="button" data-mod="approve" data-id="${escapeHtml(p.id)}">Approve</button>
+                <button type="button" class="secondary" data-mod="confirm-culinary" data-id="${escapeHtml(p.id)}">Confirm culinary</button>
                 <button type="button" class="secondary" data-mod="request-changes" data-id="${escapeHtml(p.id)}">Ask for changes</button>
                 <button type="button" class="secondary" data-mod="reject" data-id="${escapeHtml(p.id)}">Reject</button>
                 <button type="button" class="secondary" data-mod="takedown" data-id="${escapeHtml(p.id)}">Take down</button>
@@ -657,7 +663,9 @@ async function renderModerate() {
       const reason = document.getElementById(`reason-${id}`)?.value || "";
       try {
         if (action === "approve") await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: {} });
-        else await api(`/api/moderation/${encodeURIComponent(id)}/${action}`, { method: "POST", jsonBody: { reason } });
+        else if (action === "confirm-culinary") {
+          await api(`/api/moderation/${encodeURIComponent(id)}/approve`, { method: "POST", jsonBody: { pack: "culinary" } });
+        } else await api(`/api/moderation/${encodeURIComponent(id)}/${action}`, { method: "POST", jsonBody: { reason } });
         location.reload();
       } catch (err) {
         $("#error").textContent = err.message;

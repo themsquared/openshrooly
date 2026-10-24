@@ -4,6 +4,7 @@ export {
   PROFILE_SCHEMA_VERSION,
   ValidationError,
   isPsilocybin,
+  serveProfileDocument,
   isFree,
   isPaid,
   isHttpsSourceUrl,

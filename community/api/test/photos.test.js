@@ -6,6 +6,18 @@ function u8(...bytes) {
   return new Uint8Array(bytes);
 }
 
+function dqtSegment() {
+  const table = new Uint8Array(65);
+  table.fill(1, 1);
+  const out = new Uint8Array(4 + 65);
+  out[0] = 0xff;
+  out[1] = 0xdb;
+  out[2] = 0x00;
+  out[3] = 67;
+  out.set(table, 4);
+  return out;
+}
+
 function jpeg({ width = 8, height = 8, exif = false, gps = "GPS" } = {}) {
   const sof = u8(
     0xff, 0xc0, 0x00, 0x0b, 0x08,
@@ -13,7 +25,7 @@ function jpeg({ width = 8, height = 8, exif = false, gps = "GPS" } = {}) {
     (width >> 8) & 255, width & 255,
     0x01, 0x01, 0x11, 0x00
   );
-  const dqt = u8(0xff, 0xdb, 0x00, 0x04, 0x00, 0x00);
+  const dqt = dqtSegment();
   const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00, 0xff, 0xd9);
   const parts = [u8(0xff, 0xd8)];
   if (exif) {
@@ -124,7 +136,7 @@ test("strips JPEG EXIF and GPS on rewrite", () => {
 
 function progressiveJpegWithPayload() {
   const sof = u8(0xff, 0xc2, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00);
-  const dqt = u8(0xff, 0xdb, 0x00, 0x04, 0x00, 0x00);
+  const dqt = dqtSegment();
   const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00);
   const ent = u8(0x00, 0x7f);
   const html = new TextEncoder().encode("<html><script>alert(1)</script>");
@@ -220,7 +232,7 @@ test("rewrites PNG without ancillary text chunks", () => {
 function jpegWithUnknownMarker({ progressive = false } = {}) {
   const sofMarker = progressive ? 0xc2 : 0xc0;
   const sof = u8(0xff, sofMarker, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00);
-  const dqt = u8(0xff, 0xdb, 0x00, 0x04, 0x00, 0x00);
+  const dqt = dqtSegment();
   const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00);
   const scan = u8(0x00, 0x7f);
   const html = new TextEncoder().encode("<html>jpgn</html>");
@@ -241,7 +253,7 @@ function jpegWithUnknownMarker({ progressive = false } = {}) {
 function jpegWithApp14({ len = 14, extra = "" } = {}) {
   const body = new TextEncoder().encode(`Adobe${"\0".repeat(7)}${extra}`);
   const segmentLen = len;
-  const dqt = u8(0xff, 0xdb, 0x00, 0x04, 0x00, 0x00);
+  const dqt = dqtSegment();
   const sof = u8(0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00);
   const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00, 0xff, 0xd9);
   const app = new Uint8Array(4 + body.length);
@@ -287,8 +299,7 @@ test("strips DQT padding, rejects a second SOF, and checks the first SOF size", 
   stuffed.set(dqt, 2);
   stuffed.set(sof, 2 + dqt.length);
   stuffed.set(sos, 2 + dqt.length + sof.length);
-  const out = processPhoto(stuffed);
-  assert.doesNotMatch(new TextDecoder("latin1").decode(out.bytes), /<html>|dqt/);
+  assert.throws(() => processPhoto(stuffed), /damaged/);
   const double = new Uint8Array(2 + sof.length + huge.length + sos.length);
   double.set([0xff, 0xd8]);
   double.set(sof, 2);
@@ -300,6 +311,63 @@ test("strips DQT padding, rejects a second SOF, and checks the first SOF size", 
   oversizedFirst.set(huge, 2);
   oversizedFirst.set(sos, 2 + huge.length);
   assert.throws(() => processPhoto(oversizedFirst), /4096/);
+});
+
+test("rejects short DQT, overrun DHT, oversized DRI, and padded SOF or SOS", () => {
+  const sof = u8(0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00);
+  const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00, 0xff, 0xd9);
+  const shortDqt = u8(0xff, 0xdb, 0x00, 0x04, 0x00, 0x00);
+  const short = new Uint8Array(2 + shortDqt.length + sof.length + sos.length);
+  short.set([0xff, 0xd8]);
+  short.set(shortDqt, 2);
+  short.set(sof, 2 + shortDqt.length);
+  short.set(sos, 2 + shortDqt.length + sof.length);
+  assert.throws(() => processPhoto(short), /damaged/);
+
+  const counts = new Uint8Array(16);
+  counts.fill(20);
+  const dht = new Uint8Array(4 + 17);
+  dht[0] = 0xff;
+  dht[1] = 0xc4;
+  dht[2] = 0x00;
+  dht[3] = 19;
+  dht.set(counts, 5);
+  const overrun = new Uint8Array(2 + dht.length + sof.length + sos.length);
+  overrun.set([0xff, 0xd8]);
+  overrun.set(dht, 2);
+  overrun.set(sof, 2 + dht.length);
+  overrun.set(sos, 2 + dht.length + sof.length);
+  assert.throws(() => processPhoto(overrun), /damaged/);
+
+  const dri = u8(0xff, 0xdd, 0x00, 0x06, 0x00, 0x10, 0x3c, 0x3c);
+  const driJpeg = new Uint8Array(2 + dri.length + sof.length + sos.length);
+  driJpeg.set([0xff, 0xd8]);
+  driJpeg.set(dri, 2);
+  driJpeg.set(sof, 2 + dri.length);
+  driJpeg.set(sos, 2 + dri.length + sof.length);
+  assert.throws(() => processPhoto(driJpeg), /damaged/);
+
+  const paddedSof = u8(0xff, 0xc0, 0x00, 0x0d, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00, 0x3c, 0x3c);
+  const sofPad = new Uint8Array(2 + paddedSof.length + sos.length);
+  sofPad.set([0xff, 0xd8]);
+  sofPad.set(paddedSof, 2);
+  sofPad.set(sos, 2 + paddedSof.length);
+  assert.throws(() => processPhoto(sofPad), /damaged/);
+
+  const paddedSos = u8(0xff, 0xda, 0x00, 0x0a, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x3c, 0x3c, 0x00, 0xff, 0xd9);
+  const sosPad = new Uint8Array(2 + sof.length + paddedSos.length);
+  sosPad.set([0xff, 0xd8]);
+  sosPad.set(sof, 2);
+  sosPad.set(paddedSos, 2 + sof.length);
+  assert.throws(() => processPhoto(sosPad), /damaged/);
+
+  const zeroSof = u8(0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x11, 0x00);
+  const zeroThenReal = new Uint8Array(2 + zeroSof.length + sof.length + sos.length);
+  zeroThenReal.set([0xff, 0xd8]);
+  zeroThenReal.set(zeroSof, 2);
+  zeroThenReal.set(sof, 2 + zeroSof.length);
+  zeroThenReal.set(sos, 2 + zeroSof.length + sof.length);
+  assert.throws(() => processPhoto(zeroThenReal), /damaged/);
 });
 
 test("jpeg rewrite drops unknown markers including JPGn", () => {

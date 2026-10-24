@@ -5,7 +5,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { affiliateLinksFor, isPsilocybin, validateProfile, ValidationError } from "../src/profile.js";
-import { classifyTaxon, detectsRestrictedTaxon, needsOffmenuFlag } from "../src/profile-schema.js";
+import {
+  applyPackRules,
+  classifyTaxon,
+  detectsRestrictedTaxon,
+  needsOffmenuFlag,
+  PSILOCYBIN_LEGAL_NOTICE,
+  serveProfileDocument,
+} from "../src/profile-schema.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -103,6 +110,14 @@ const HOLD_CASES = [
   { field: "species", value: "Pluteus" },
   { field: "species", value: "cubensis" },
   { field: "species", value: "Psilocybé" },
+  { field: "species", value: "Agaricus cubensis" },
+  { field: "species", value: "Pleurotus cyanescens" },
+  { field: "species", value: "Lentinula tampanensis" },
+  { field: "species", value: "Agaricus semilanceata" },
+  { field: "species", value: "Hypsizygus tropicalis" },
+  { field: "species", value: "Lentinus cyanescens" },
+  { field: "species", value: "Lentinus tropicalis" },
+  { field: "species", value: "Agaricus bisporus var. cubensis" },
 ];
 
 const FLAG_ONLY_CASES = [
@@ -116,10 +131,10 @@ const FLAG_ONLY_CASES = [
 
 const CULINARY_CASES = [
   { field: "species", value: "Gyroporus cyanescens" },
-  { field: "species", value: "Lentinus tropicalis" },
   { field: "species", value: "Pleurotus ostreatus" },
   { field: "species", value: "Auricularia auricula-judae" },
   { field: "species", value: "Cordyceps militaris" },
+  { field: "name", value: "Shiitake (椎茸)" },
 ];
 
 test("a culinary label cannot hide a restricted species", () => {
@@ -245,6 +260,66 @@ test("off-menu classifier uses a culinary allowlist and only forces high-confide
   assert.equal(validateProfile(oyster).pack, "culinary");
   const wine = structuredClone(load("data/profiles/culinary/wine-cap.json"));
   assert.equal(classifyTaxon(wine).culinary, true);
+  const shiitake = applyTaxonCase(pearl, { field: "species", value: "Lentinula edodes" });
+  shiitake.name = "Shiitake (椎茸)";
+  assert.equal(classifyTaxon(shiitake).culinary, true);
+  assert.equal(validateProfile(shiitake).pack, "culinary");
+  const prose = paidCulinary(pearl, { field: "summary", value: "Psilocybe cubensis" });
+  prose.notes = "Panaeolus cyanescens";
+  prose.tags = ["culinary", "psilocybe", "cubensis"];
+  assert.equal(classifyTaxon(prose).culinary, true);
+  assert.equal(classifyTaxon(prose).proseFlag, true);
+  assert.equal(needsOffmenuFlag(prose), true);
+  assert.equal(validateProfile(prose).pack, "culinary");
+  for (const strain of ["GT", "PE6", "JMF", "ＧＴ"]) {
+    const cube = paidCulinary(pearl, { field: "strain", value: strain });
+    assert.equal(classifyTaxon(cube).proseFlag, true, strain);
+    assert.equal(validateProfile(cube).pack, "culinary", strain);
+  }
+});
+
+test("unknown genus plus a restricted epithet is forced off-menu", () => {
+  const pearl = load("data/profiles/culinary/pearl-oyster.json");
+  for (const species of ["Foo cubensis", "Mystery cyanescens", "Psilocibe cubensis"]) {
+    const labeled = applyTaxonCase(pearl, { field: "species", value: species });
+    assert.equal(classifyTaxon(labeled).force, true, species);
+    assert.equal(validateProfile(labeled).pack, "psilocybin", species);
+    assert.equal(validateProfile(labeled).legal_notice, PSILOCYBIN_LEGAL_NOTICE, species);
+  }
+});
+
+test("moderator culinary confirm rewrites pack fields and is refused on force-match taxa", () => {
+  const pearl = load("data/profiles/culinary/pearl-oyster.json");
+  const morel = applyTaxonCase(pearl, { field: "species", value: "Morchella esculenta" });
+  morel.pack = "psilocybin";
+  morel.restricted = true;
+  morel.tags = ["psilocybin"];
+  morel.legal_notice = PSILOCYBIN_LEGAL_NOTICE;
+  const confirmed = applyPackRules(morel, { moderatorPack: "culinary" });
+  assert.equal(confirmed.pack, "culinary");
+  assert.equal(confirmed.restricted, false);
+  assert.equal(confirmed.tags.includes("psilocybin"), false);
+  assert.equal(confirmed.tags.includes("culinary"), true);
+  assert.equal(confirmed.legal_notice, null);
+  assert.equal(isPsilocybin(confirmed), false);
+  const served = serveProfileDocument(confirmed);
+  assert.equal(served.pack, "culinary");
+  assert.equal(served.legal_notice, null);
+
+  const cube = applyTaxonCase(pearl, { field: "species", value: "Psilocybe cubensis" });
+  cube.pack = "psilocybin";
+  cube.restricted = true;
+  assert.throws(() => applyPackRules(cube, { moderatorPack: "culinary" }), /cannot be confirmed as culinary/);
+  const heldOff = applyPackRules(morel);
+  assert.equal(heldOff.pack, "psilocybin");
+  assert.equal(heldOff.legal_notice, PSILOCYBIN_LEGAL_NOTICE);
+  const sneak = applyTaxonCase(pearl, { field: "species", value: "Agaricus cubensis" });
+  sneak.pack = "culinary";
+  sneak.restricted = false;
+  sneak.legal_notice = null;
+  const servedSneak = serveProfileDocument(applyPackRules(sneak));
+  assert.equal(servedSneak.pack, "psilocybin");
+  assert.equal(servedSneak.legal_notice, PSILOCYBIN_LEGAL_NOTICE);
 });
 
 test("affiliate ids and urls must be safe https slugs", () => {

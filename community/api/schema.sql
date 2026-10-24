@@ -341,7 +341,7 @@ SELECT
     created_at,
     updated_at
 FROM profiles
-WHERE published = 1 AND author_id IS NOT NULL;
+WHERE published = 1 AND author_id IS NOT NULL AND json_valid(document);
 CREATE TABLE IF NOT EXISTS profile_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

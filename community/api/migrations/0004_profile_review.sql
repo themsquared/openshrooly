@@ -1,5 +1,6 @@
--- Ship 9: community profile review. Additive only: new tables and indexes, no ALTER, no data rewrites.
--- Existing seed rows stay public (published=1 and no profile_review row).
+-- Ship 9: community profile review. Additive tables plus a one-time live-document backfill
+-- for published community profiles that predate this table. Official seed rows (author_id IS NULL)
+-- stay public without a review row. json_valid skips malformed documents so the migration can finish.
 -- Deploy note: enable the PHOTOS R2 binding before photo uploads work in production.
 --   npx wrangler r2 bucket create shroomlabs-media
 -- Then uncomment [[r2_buckets]] binding PHOTOS in wrangler.toml.
@@ -57,7 +58,7 @@ SELECT
     created_at,
     updated_at
 FROM profiles
-WHERE published = 1 AND author_id IS NOT NULL;
+WHERE published = 1 AND author_id IS NOT NULL AND json_valid(document);
 CREATE TABLE IF NOT EXISTS profile_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

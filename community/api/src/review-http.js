@@ -2,6 +2,7 @@
 
 import { requireVerified, userFromRequest } from "./auth.js";
 import { stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
+import { classifyTaxon } from "./profile-schema.js";
 import {
   approveReportPhoto,
   approveReview,
@@ -82,11 +83,12 @@ export async function handleReview(method, path, url, request, env, { seeds, par
       if (!row) continue;
       const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [review.profile_id]);
       const queued = parseProfileRow(row);
+      const classified = classifyTaxon(queued, { title: review.title, description: review.description });
       items.push({
         kind: "profile",
         id: review.profile_id,
         profile: queued,
-        review: reviewView(review, photos),
+        review: { ...reviewView(review, photos), offmenu_reasons: classified.reasons },
         affiliate_links: (queued.affiliate_links || []).map((link) => ({
           id: link.id,
           label: link.label,

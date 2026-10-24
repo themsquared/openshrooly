@@ -24,7 +24,14 @@ function jpeg({ width = 8, height = 8, exif = false, gps = "GPSLatitude" } = {})
     (width >> 8) & 255, width & 255,
     0x01, 0x01, 0x11, 0x00,
   ]);
-  const dqt = Uint8Array.from([0xff, 0xdb, 0x00, 0x04, 0x00, 0x00]);
+  const table = new Uint8Array(65);
+  table.fill(1, 1);
+  const dqt = new Uint8Array(4 + 65);
+  dqt[0] = 0xff;
+  dqt[1] = 0xdb;
+  dqt[2] = 0x00;
+  dqt[3] = 67;
+  dqt.set(table, 4);
   const sos = Uint8Array.from([0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00, 0xff, 0xd9]);
   const parts = [Uint8Array.from([0xff, 0xd8])];
   if (exif) {
@@ -854,4 +861,223 @@ test("held taxa stay off the culinary list and flagged culinary keeps pricing", 
   const live = await call(ctx, "GET", "/api/profiles/flag-labs");
   assert.equal(live.data.profile.pack, "culinary");
   assert.equal(live.data.profile.pricing.kind, "paid");
+});
+
+async function publishForReview(ctx, { token, modToken, doc, title, body = {} }) {
+  const created = await call(ctx, "POST", "/api/profiles", { token, body: doc });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  await call(ctx, "POST", `/api/profiles/${doc.id}/photos`, {
+    token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", `/api/profiles/${doc.id}/publish`, {
+    token,
+    body: { title: title || doc.name, description: "Review copy" },
+  });
+  return call(ctx, "POST", `/api/moderation/${doc.id}/approve`, { token: modToken, body });
+}
+
+test("culinary genus plus a restricted epithet publishes as Off-menu, never culinary", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "a1-alice@example.com");
+  const mod = await makeModerator(ctx, "a1-mod@example.com");
+  for (const [id, species] of [
+    ["a1-agaricus-cubensis", "Agaricus cubensis"],
+    ["a1-pleurotus-cyanescens", "Pleurotus cyanescens"],
+    ["a1-lentinula-tamp", "Lentinula tampanensis"],
+    ["a1-agaricus-semi", "Agaricus semilanceata"],
+  ]) {
+    const doc = draftFrom(pearl, id);
+    doc.species = species;
+    doc.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+    doc.allowed_payment_providers = ["stripe"];
+    const approved = await publishForReview(ctx, { token: alice.token, modToken: mod.token, doc, title: species });
+    assert.equal(approved.status, 200, `${species} ${JSON.stringify(approved.data)}`);
+    const live = await call(ctx, "GET", `/api/profiles/${id}`);
+    assert.equal(live.data.profile.pack, "psilocybin", species);
+    assert.ok(live.data.profile.legal_notice, species);
+    assert.equal(live.data.profile.pricing.kind, "free", species);
+    const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+    assert.equal(culinary.data.some((p) => p.id === id), false, species);
+    const off = await call(ctx, "GET", "/api/profiles?pack=psilocybin");
+    assert.equal(off.data.some((p) => p.id === id), true, species);
+    const exported = await call(ctx, "GET", `/api/profiles/${id}.json`);
+    assert.equal(exported.data.pack, "psilocybin", species);
+    assert.ok(exported.data.legal_notice, species);
+  }
+});
+
+test("editing a live Psilocybe profile to Agaricus cubensis stays Off-menu", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "edit-alice@example.com");
+  const mod = await makeModerator(ctx, "edit-mod@example.com");
+  const doc = draftFrom(pearl, "e-oyster");
+  doc.species = "Psilocybe cubensis";
+  await publishForReview(ctx, { token: alice.token, modToken: mod.token, doc, title: "Cube" });
+  const live = await call(ctx, "GET", "/api/profiles/e-oyster");
+  assert.equal(live.data.profile.pack, "psilocybin");
+  const edited = structuredClone(doc);
+  edited.species = "Agaricus cubensis";
+  edited.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  edited.allowed_payment_providers = ["stripe"];
+  const put = await call(ctx, "PUT", "/api/profiles/e-oyster", { token: alice.token, body: edited });
+  assert.equal(put.status, 200, JSON.stringify(put.data));
+  await call(ctx, "POST", "/api/profiles/e-oyster/publish", {
+    token: alice.token,
+    body: { title: "Agaricus cubensis", description: "Edited taxon" },
+  });
+  await call(ctx, "POST", "/api/moderation/e-oyster/approve", { token: mod.token, body: {} });
+  const after = await call(ctx, "GET", "/api/profiles/e-oyster");
+  assert.equal(after.data.profile.pack, "psilocybin");
+  assert.ok(after.data.profile.legal_notice);
+  assert.equal(after.data.profile.pricing.kind, "free");
+  const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(culinary.data.some((p) => p.id === "e-oyster"), false);
+});
+
+test("moderator culinary confirm rewrites held edibles and refuses force-match taxa", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "a4-alice@example.com");
+  const mod = await makeModerator(ctx, "a4-mod@example.com");
+  const morel = draftFrom(pearl, "m-morel");
+  morel.species = "Morchella esculenta";
+  await publishForReview(ctx, { token: alice.token, modToken: mod.token, doc: morel, title: "Morel", body: { pack: "culinary" } });
+  const live = await call(ctx, "GET", "/api/profiles/m-morel");
+  assert.equal(live.data.profile.pack, "culinary");
+  assert.equal(live.data.profile.restricted, false);
+  assert.equal((live.data.profile.tags || []).includes("psilocybin"), false);
+  assert.equal(live.data.profile.legal_notice, null);
+  const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(culinary.data.some((p) => p.id === "m-morel"), true);
+  const off = await call(ctx, "GET", "/api/profiles?pack=psilocybin");
+  assert.equal(off.data.some((p) => p.id === "m-morel"), false);
+
+  const cube = draftFrom(pearl, "m-pcub");
+  cube.species = "Psilocybe cubensis";
+  await call(ctx, "POST", "/api/profiles", { token: alice.token, body: cube });
+  await call(ctx, "POST", "/api/profiles/m-pcub/photos", {
+    token: alice.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/m-pcub/publish", {
+    token: alice.token,
+    body: { title: "Cube", description: "Force match" },
+  });
+  const refused = await call(ctx, "POST", "/api/moderation/m-pcub/approve", {
+    token: mod.token,
+    body: { pack: "culinary" },
+  });
+  assert.equal(refused.status, 400);
+  const still = await call(ctx, "GET", "/api/profiles/m-pcub", { token: alice.token });
+  assert.equal(still.data.profile.pack, "psilocybin");
+  assert.ok(still.data.profile.legal_notice);
+
+  const held = draftFrom(pearl, "m-tremella");
+  held.species = "Tremella fuciformis";
+  const approved = await publishForReview(ctx, {
+    token: alice.token,
+    modToken: mod.token,
+    doc: held,
+    title: "Snow fungus",
+    body: {},
+  });
+  assert.equal(approved.status, 200, JSON.stringify(approved.data));
+  const heldLive = await call(ctx, "GET", "/api/profiles/m-tremella");
+  assert.equal(heldLive.data.profile.pack, "psilocybin");
+  assert.ok(heldLive.data.profile.legal_notice);
+});
+
+test("legacy culinary-labeled psilocybin JSON is reclassified on backfill", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "legacy-psi@example.com");
+  const doc = draftFrom(pearl, "legacy-psi");
+  doc.species = "Psilocybe cubensis";
+  doc.pack = "culinary";
+  doc.restricted = false;
+  doc.affiliates_allowed = true;
+  doc.affiliate_links = [{ id: "bags", label: "Bags", merchant: "x", url: "https://evil.example/bags" }];
+  doc.legal_notice = null;
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ["legacy-psi", JSON.stringify(doc), alice.user.id, 1, "2024-01-01T00:00:00.000Z", "2024-01-01T00:00:00.000Z"]
+  );
+  const exported = await call(ctx, "GET", "/api/profiles/legacy-psi.json");
+  assert.equal(exported.status, 200, JSON.stringify(exported.data));
+  assert.equal(exported.data.pack, "psilocybin");
+  assert.equal(exported.data.affiliates_allowed, false);
+  assert.deepEqual(exported.data.affiliate_links, []);
+  assert.ok(exported.data.legal_notice);
+  const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(culinary.data.some((p) => p.id === "legacy-psi"), false);
+  const off = await call(ctx, "GET", "/api/profiles?pack=psilocybin");
+  assert.equal(off.data.some((p) => p.id === "legacy-psi"), true);
+});
+
+test("moderator queue shows flag reasons and the UI can confirm culinary", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "a6-alice@example.com");
+  const mod = await makeModerator(ctx, "a6-mod@example.com");
+  const doc = draftFrom(pearl, "a6-morel");
+  doc.species = "Morchella esculenta";
+  await call(ctx, "POST", "/api/profiles", { token: alice.token, body: doc });
+  await call(ctx, "POST", "/api/profiles/a6-morel/photos", {
+    token: alice.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/a6-morel/publish", {
+    token: alice.token,
+    body: { title: "Morel", description: "Held edible" },
+  });
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.id === "a6-morel");
+  assert.ok(item);
+  assert.equal(item.review.offmenu_flag, true);
+  assert.ok(Array.isArray(item.review.offmenu_reasons));
+  assert.ok(item.review.offmenu_reasons.some((reason) => /allowlist|restricted|genus/i.test(reason)));
+  const app = readFileSync(join(root, "community/web/public/js/app.js"), "utf8");
+  assert.match(app, /Confirm culinary/);
+  assert.match(app, /pack:\s*["']culinary["']/);
+});
+
+test("owners can read their own paid profile JSON", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "paid-owner@example.com");
+  const stranger = await register(ctx, "paid-stranger@example.com");
+  const mod = await makeModerator(ctx, "paid-mod@example.com");
+  const doc = draftFrom(pearl, "paid-oyster");
+  doc.pricing = { kind: "paid", amount_cents: 199, currency: "USD", creator_share_percent: 70 };
+  doc.allowed_payment_providers = ["stripe"];
+  await publishForReview(ctx, { token: alice.token, modToken: mod.token, doc, title: "Paid oyster" });
+  const anon = await call(ctx, "GET", "/api/profiles/paid-oyster.json");
+  assert.equal(anon.status, 402);
+  const other = await call(ctx, "GET", "/api/profiles/paid-oyster.json", { token: stranger.token });
+  assert.equal(other.status, 402);
+  const owner = await call(ctx, "GET", "/api/profiles/paid-oyster.json", { token: alice.token });
+  assert.equal(owner.status, 200);
+  assert.equal(owner.data.id, "paid-oyster");
+  assert.ok(owner.data.stages);
+});
+
+test("takedown leaves unreviewed report photos pending for moderation", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "td-alice@example.com");
+  const mod = await makeModerator(ctx, "td-mod@example.com");
+  const doc = draftFrom(pearl, "td-pending");
+  await publishForReview(ctx, { token: alice.token, modToken: mod.token, doc, title: "Pending photos" });
+  const report = await call(ctx, "POST", "/api/profiles/td-pending/reports", {
+    token: alice.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  assert.equal(report.data.photo_status, "pending");
+  const down = await call(ctx, "POST", "/api/moderation/td-pending/takedown", {
+    token: mod.token,
+    body: { reason: "Take the profile down" },
+  });
+  assert.equal(down.status, 200, JSON.stringify(down.data));
+  const row = await ctx.db.one("SELECT * FROM grow_reports WHERE photo_key=?", [report.data.photo_key]);
+  assert.equal(row.photo_status, "pending");
+  assert.ok(await ctx.storage.get(report.data.photo_key));
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  assert.ok(queue.data.items.some((entry) => entry.kind === "report-photo" && entry.photo_key === report.data.photo_key));
 });

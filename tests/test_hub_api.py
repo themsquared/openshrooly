@@ -70,21 +70,40 @@ def test_push_sends_only_authored_profiles(client):
     hubdb.upsert_profile(conn, "pulled-oyster", pearl, "community")
     assert "pulled-oyster" not in {profile.id for profile in authored_profiles(conn)}
 
-    authored_doc = authored[0].to_dict()
-    authored_doc["author"] = "hub-user"
-    existing = conn.execute("SELECT source FROM profiles WHERE id=?", ("pearl-oyster-authored",)).fetchone()
-    assert existing["source"] == "import"
-    source = existing["source"]
-    hub_user = "hub-user"
-    if source and source not in ("seed", "community"):
-        kept = source
-    elif hub_user and authored_doc.get("author") == hub_user:
-        kept = "import"
-    else:
-        kept = "community"
-    hubdb.upsert_profile(conn, "pearl-oyster-authored", authored_doc, kept)
+
+def test_pull_keeps_authored_source(client, monkeypatch):
+    import json
+    import urllib.request
+
+    from hub import config
+
+    pearl = client.get("/api/profiles/pearl-oyster").json()
+    pearl["id"] = "pearl-oyster-authored"
+    pearl["name"] = "Pearl authored"
+    imported = client.post("/profiles/import", data={"document": json.dumps(pearl)}, follow_redirects=False)
+    assert imported.status_code == 303
+    conn = client.app.state.conn
     assert conn.execute("SELECT source FROM profiles WHERE id=?", ("pearl-oyster-authored",)).fetchone()["source"] == "import"
-    assert "pearl-oyster-authored" in {profile.id for profile in authored_profiles(conn)}
+
+    pulled = dict(pearl)
+    pulled["author"] = "hub-user"
+    body = json.dumps({"hub_user": "hub-user", "profiles": [pulled]}).encode()
+
+    class FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return body
+
+    monkeypatch.setattr(config, "COMMUNITY_TOKEN", "test-token")
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *args, **kwargs: FakeResp())
+    pull = client.post("/sync/pull", follow_redirects=False)
+    assert pull.status_code == 303
+    assert conn.execute("SELECT source FROM profiles WHERE id=?", ("pearl-oyster-authored",)).fetchone()["source"] == "import"
 
 
 def test_species_photo_picks_specific_harvest_shots():

@@ -118,7 +118,7 @@ function rewriteTableSegment(bytes, start, end, nextTable) {
     tables.push(body.subarray(offset, offset + size));
     offset += size;
   }
-  if (!tables.length) return bytes.slice(start, end);
+  if (!tables.length || offset !== body.length) throw new ValidationError("That JPEG is damaged.");
   const payload = concat(tables);
   const len = payload.length + 2;
   const out = new Uint8Array(4 + payload.length);
@@ -141,8 +141,11 @@ function rewriteDqt(bytes, start, end) {
 function rewriteDht(bytes, start, end) {
   return rewriteTableSegment(bytes, start, end, (body, offset) => {
     if (offset + 17 > body.length) return null;
+    const tableClass = body[offset] >> 4;
+    if (tableClass > 1) return null;
     let values = 0;
     for (let i = 0; i < 16; i += 1) values += body[offset + 1 + i];
+    if (values > 256) return null;
     return 17 + values;
   });
 }
@@ -164,7 +167,10 @@ export function stripJpeg(bytes) {
     }
     if (marker === 0xda) {
       if (i + 4 > bytes.length) throw new ValidationError("That JPEG is damaged.");
-      const headerLen = 2 + readU16(bytes, i + 2);
+      const len = readU16(bytes, i + 2);
+      const ns = bytes[i + 4];
+      if (len !== 6 + 2 * ns) throw new ValidationError("That JPEG is damaged.");
+      const headerLen = 2 + len;
       if (headerLen < 8 || i + headerLen > bytes.length) throw new ValidationError("That JPEG is damaged.");
       out.push(bytes.slice(i, i + headerLen));
       i += headerLen;
@@ -197,10 +203,14 @@ export function stripJpeg(bytes) {
     if (end > bytes.length) throw new ValidationError("That JPEG is damaged.");
     const adobe = marker === 0xee && len === 14 && isAdobeApp14(bytes, i + 4, end);
     if (jpegAllowMarker(marker) || adobe) {
+      if (marker === 0xdd && len !== 4) throw new ValidationError("That JPEG is damaged.");
       if (isSofMarker(marker)) {
         if (width || height) throw new ValidationError("That JPEG is damaged.");
+        const nf = bytes[i + 9];
+        if (len !== 8 + 3 * nf) throw new ValidationError("That JPEG is damaged.");
         height = readU16(bytes, i + 5);
         width = readU16(bytes, i + 7);
+        if (!width || !height) throw new ValidationError("That JPEG is damaged.");
         if (width > PHOTO_MAX_EDGE || height > PHOTO_MAX_EDGE) {
           throw new ValidationError(`Photos must be ${PHOTO_MAX_EDGE} pixels or smaller on each side.`);
         }

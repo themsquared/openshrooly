@@ -189,6 +189,13 @@ test("scientific names force Off-menu; slang in prose only flags", () => {
   const bolete = blankProfile({ id: "bolete", name: "Garden mix", pack: "culinary" });
   bolete.species = "Gyroporus cyanescens";
   assert.equal(classifyTaxon(bolete).culinary, true);
+  const sneak = blankProfile({ id: "sneak", name: "Garden mix", pack: "culinary" });
+  sneak.species = "Agaricus cubensis";
+  assert.equal(classifyTaxon(sneak).hold, true);
+  assert.equal(classifyTaxon(sneak).culinary, false);
+  const shiitake = blankProfile({ id: "shiitake", name: "Shiitake (椎茸)", pack: "culinary" });
+  shiitake.species = "Lentinula edodes";
+  assert.equal(classifyTaxon(shiitake).culinary, true);
   const src = readFileSync(new URL("../public/js/profile-builder.js", import.meta.url), "utf8");
   assert.match(src, /setShowPsilocybin/);
   assert.match(src, /this\.showPsilocybin/);

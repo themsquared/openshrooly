@@ -5,6 +5,7 @@ import {
   assertAffiliateAllowed,
   isFree,
   isPsilocybin,
+  serveProfileDocument,
   stripCommunityAffiliates,
   validateProfile,
   ValidationError,
@@ -36,6 +37,7 @@ import {
   requireVisibleRow,
   reviewView,
   saveDraftReview,
+  backfillLegacyReviews,
   storeReportPhoto,
 } from "./review.js";
 
@@ -142,7 +144,7 @@ async function listProfiles(db, env, pack, q) {
     if (!(await isPublicProfile(db, row))) continue;
     const review = await getReview(db, row.id);
     const working = parseProfile(row);
-    const profile = publicDocument(row, review, working);
+    const profile = serveProfileDocument(publicDocument(row, review, working));
     if (!profile) continue;
     if (pack === "culinary" && isPsilocybin(profile)) continue;
     if (pack === "psilocybin" && !isPsilocybin(profile)) continue;
@@ -167,6 +169,7 @@ export async function handleRequest(request, env) {
       // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
       // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
       await seedMissing(env.db, seeds);
+      await backfillLegacyReviews(env.db);
       env._seeded = true;
     }
     return await route(method, path, url, request, env);
@@ -706,7 +709,8 @@ async function showProfile(request, db, env, profileId) {
   if (!publicDoc && !owner && !(user && (user.role === "moderator" || user.role === "admin"))) {
     return json({ error: "not found" }, 404);
   }
-  const profile = owner || (user && (user.role === "moderator" || user.role === "admin")) ? working : publicDoc;
+  const raw = owner || (user && (user.role === "moderator" || user.role === "admin")) ? working : publicDoc;
+  const profile = serveProfileDocument(raw);
   if (isPsilocybin(profile) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
   const unlocked = await canRead(db, user, profile);
   const ratings = await db.all(
@@ -768,10 +772,11 @@ async function exportProfile(request, db, env, profileId) {
   const review = await getReview(db, profileId);
   const working = parseProfile(row);
   const staff = owner || isModerator(user);
-  const profile = staff ? working : publicDocument(row, review, working);
-  if (!profile) return json({ error: "not found" }, 404);
+  const raw = staff ? working : publicDocument(row, review, working);
+  if (!raw) return json({ error: "not found" }, 404);
+  const profile = serveProfileDocument(raw);
   if (isPsilocybin(profile) && !showPsi(env) && !owner) return json({ error: "not found" }, 404);
-  if (!(await canRead(db, user, profile))) return json({ error: "purchase required" }, 402);
+  if (!staff && !(await canRead(db, user, profile))) return json({ error: "purchase required" }, 402);
   await db.run("UPDATE profiles SET downloads=downloads+1 WHERE id=?", [profileId]);
   return json(profile);
 }

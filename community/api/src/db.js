@@ -539,7 +539,9 @@ function dispatch(mode, tables, ids, sql, params) {
     return tables.profiles;
   }
   if (q.startsWith("SELECT document FROM profiles") || q.startsWith("SELECT * FROM profiles WHERE published")) {
-    return tables.profiles.filter((p) => p.published);
+    const rows = tables.profiles.filter((p) => p.published);
+    if (q.includes("author_id IS NOT NULL")) return rows.filter((p) => p.author_id != null);
+    return rows;
   }
   if (q.startsWith("UPDATE profiles SET published=?, document=?")) {
     const row = tables.profiles.find((p) => p.id === params[3]);

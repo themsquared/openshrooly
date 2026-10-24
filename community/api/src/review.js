@@ -3,7 +3,7 @@
 import { nowIso, randomToken } from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { layout, button, escapeHtml } from "./email-layout.js";
-import { applyPackRules, needsOffmenuFlag, ValidationError } from "./profile-schema.js";
+import { applyPackRules, classifyTaxon, needsOffmenuFlag, ValidationError } from "./profile-schema.js";
 import { PHOTO_MAX_COUNT, extForContentType, photoObjectKey, prescreenImage, processPhoto } from "./photos.js";
 import { rateLimit, rateLimitClient } from "./security.js";
 
@@ -177,6 +177,10 @@ export async function approveReview(db, env, request, { profile, user, row, pack
   if (!review || review.status !== REVIEW_PENDING) throw new ValidationError("This profile is not waiting for review.");
   const extra = { title: review.title, description: review.description };
   if (pack === "culinary" || pack === "psilocybin") extra.moderatorPack = pack;
+  const classified = classifyTaxon(profile, extra);
+  if (extra.moderatorPack === "culinary" && classified.force) {
+    throw new ValidationError("This taxon cannot be confirmed as culinary.", 400);
+  }
   const normalized = applyPackRules(profile, extra);
   const ts = nowIso();
   await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), ts, profile.id]);
@@ -186,7 +190,7 @@ export async function approveReview(db, env, request, { profile, user, row, pack
     status: REVIEW_PUBLISHED,
     reason: "",
     live_document: JSON.stringify(normalized),
-    offmenu_flag: needsOffmenuFlag(normalized, extra),
+    offmenu_flag: extra.moderatorPack === "culinary" ? false : needsOffmenuFlag(normalized, extra),
     published_live: 1,
   });
   await db.run("UPDATE profile_photos SET status='approved', updated_at=? WHERE profile_id=? AND withdrawn=0", [
@@ -245,7 +249,7 @@ export async function takedownReview(db, env, request, { profile, user, row, rea
   ]);
   const reports = await db.all("SELECT * FROM grow_reports WHERE profile_id=?", [profile.id]);
   for (const report of reports) {
-    if (!report.photo_key || report.photo_status === "rejected") continue;
+    if (!report.photo_key || report.photo_status !== "approved") continue;
     if (env?.storage?.delete) await env.storage.delete(report.photo_key);
     await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["rejected", report.id]);
   }
@@ -323,11 +327,66 @@ export async function listPendingReportPhotos(db) {
   for (const report of rows) {
     const profile = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
     if (!profile) continue;
-    const review = await getReview(db, profile.id);
-    if (review && review.status === REVIEW_REJECTED && Number(review.published_live) !== 1) continue;
     out.push(report);
   }
   return out;
+}
+
+function shouldReclassifyLive(profile) {
+  const classified = classifyTaxon(profile);
+  if (classified.force) return true;
+  const confirmed = profile?.pack === "culinary" && !profile?.restricted;
+  return classified.hold && !confirmed;
+}
+
+export async function backfillLegacyReviews(db) {
+  const rows = await db.all("SELECT * FROM profiles WHERE published = 1 AND author_id IS NOT NULL");
+  for (const row of rows) {
+    let doc;
+    try {
+      doc = JSON.parse(row.document);
+    } catch {
+      continue;
+    }
+    const existing = await getReview(db, row.id);
+    if (!existing) {
+      const normalized = applyPackRules(doc);
+      if (JSON.stringify(normalized) !== row.document) {
+        await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), nowIso(), row.id]);
+      }
+      await upsertReview(db, {
+        profile_id: row.id,
+        status: REVIEW_PUBLISHED,
+        reason: "",
+        title: normalized.name || "",
+        description: normalized.summary || "",
+        live_document: JSON.stringify(normalized),
+        offmenu_flag: needsOffmenuFlag(normalized),
+        published_live: 1,
+        created_at: row.created_at,
+      });
+      continue;
+    }
+    if (!shouldReclassifyLive(doc)) continue;
+    const normalized = applyPackRules(doc);
+    if (JSON.stringify(normalized) !== row.document) {
+      await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), nowIso(), row.id]);
+    }
+    let live = normalized;
+    if (existing.live_document) {
+      try {
+        live = JSON.parse(existing.live_document);
+      } catch {
+        live = normalized;
+      }
+    }
+    if (shouldReclassifyLive(live)) live = applyPackRules(live);
+    await upsertReview(db, {
+      ...existing,
+      live_document: JSON.stringify(live),
+      offmenu_flag: needsOffmenuFlag(live),
+    });
+  }
 }
 
 export async function approveReportPhoto(db, { report, user }) {

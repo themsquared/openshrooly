@@ -17,21 +17,6 @@ async function envContext(env) {
     } catch {
       // Column already exists on newer D1 / memory schemas.
     }
-    try {
-      await db.exec(`INSERT OR IGNORE INTO profile_review (
-          profile_id, status, reason, title, description, live_document,
-          blocklist_hit, offmenu_flag, published_live, created_at, updated_at
-        )
-        SELECT
-          id, 'published', '',
-          COALESCE(json_extract(document, '$.name'), ''),
-          COALESCE(json_extract(document, '$.summary'), ''),
-          document, 0, 0, 1, created_at, updated_at
-        FROM profiles
-        WHERE published = 1 AND author_id IS NOT NULL`);
-    } catch {
-      // profile_review is missing on older D1 until migration 0004 runs.
-    }
     env._ctx = {
       db,
       storage: createOptionalStorage(env.PHOTOS, { allowMemory: String(env.DEV_STUBS || "") === "1" }),

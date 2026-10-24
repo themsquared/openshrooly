@@ -120,6 +120,7 @@ const OFFMENU_BINOMIALS = [
   "pholiotina cyanopus",
 ];
 const PLACEHOLDER_EPITHETS = new Set(["sp", "spp", "species", "unknown", "cf", "aff"]);
+const VETTED_CULINARY_PAIRS = new Set(["gyroporus cyanescens"]);
 const CUBE_STRAINS = [
   "albino a",
   "great white monster",
@@ -162,7 +163,7 @@ const PROSE_PHRASES = [
   "magic truffles",
   ...CUBE_STRAINS,
 ];
-const PROSE_WORDS = new Set(["shroom", "shrooms", "mushies", "cubes", "ape", "pe", "pe6", "b+"]);
+const PROSE_WORDS = new Set(["shroom", "shrooms", "mushies", "cubes", "ape", "pe", "pe6", "gt", "jmf", "b+"]);
 const LOOKALIKE_GENERA = new Set(["inocybe", "galerina"]);
 
 export function stripAccents(value) {
@@ -179,6 +180,7 @@ export function isLatinLetterSafe(value) {
 
 export function normalizeTaxonText(value) {
   return stripAccents(value)
+    .normalize("NFKC")
     .replace(/\p{Cf}/gu, "")
     .toLowerCase()
     .replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000]/g, " ")
@@ -244,7 +246,9 @@ function proseFields(profile, extra = {}) {
 function looksLikeCubeStrain(value) {
   const text = normalizeTaxonText(value);
   if (!text) return false;
-  return CUBE_STRAINS.some((name) => text === name || text.includes(name));
+  if (CUBE_STRAINS.some((name) => text === name || text.includes(name))) return true;
+  const words = new Set(text.split(" "));
+  return ["gt", "pe6", "jmf", "pe"].some((word) => words.has(word));
 }
 
 function hasForceMatch(values) {
@@ -282,24 +286,50 @@ function hasProseFlag(values) {
     if (PROSE_PHRASES.some((name) => text.includes(name))) return true;
     if ([...PROSE_WORDS].some((word) => wordSet.has(word))) return true;
     if ([...LOOKALIKE_GENERA].some((genus) => wordSet.has(genus))) return true;
+    if ([...PSYCHOACTIVE_GENERA].some((genus) => wordSet.has(genus) || text.includes(genus))) return true;
+    if ([...OFFMENU_EPITHETS].some((epithet) => wordSet.has(epithet))) return true;
+    if (OFFMENU_BINOMIALS.some((name) => text.includes(name))) return true;
     if (looksLikeCubeStrain(raw)) return true;
   }
   return false;
 }
 
+function offmenuEpithetsIn(parsed) {
+  return parsed.words.filter((word) => OFFMENU_EPITHETS.has(word));
+}
+
+function isVettedCulinaryPair(parsed) {
+  return offmenuEpithetsIn(parsed).every((epithet) => VETTED_CULINARY_PAIRS.has(`${parsed.genus} ${epithet}`));
+}
+
 export function classifyTaxon(profile, extra = {}) {
   const identity = identityFields(profile);
-  const force = hasForceMatch(identity);
   const parsed = parseSpeciesParts(profile?.species);
-  const latinOk =
-    isLatinLetterSafe(profile?.name) && isLatinLetterSafe(profile?.species) && isLatinLetterSafe(profile?.strain);
-  const realEpithet = Boolean(parsed.epithet) && !PLACEHOLDER_EPITHETS.has(parsed.epithet);
-  const culinary = !force && CULINARY_GENERA.has(parsed.genus) && realEpithet && latinOk;
   const hasSpecies = Boolean(String(profile?.species || "").trim());
+  const culinaryGenus = CULINARY_GENERA.has(parsed.genus);
+  const restrictedEpithets = offmenuEpithetsIn(parsed);
+  const hasRestrictedEpithet = restrictedEpithets.length > 0;
+  const vettedPair = hasRestrictedEpithet && culinaryGenus && isVettedCulinaryPair(parsed);
+  const identityForce = hasForceMatch(identity);
+  const force = identityForce || (hasRestrictedEpithet && !culinaryGenus && hasSpecies);
+  const latinOk = isLatinLetterSafe(profile?.species) && isLatinLetterSafe(profile?.strain);
+  const realEpithet = Boolean(parsed.epithet) && !PLACEHOLDER_EPITHETS.has(parsed.epithet);
+  const culinary = !force && culinaryGenus && realEpithet && latinOk && (!hasRestrictedEpithet || vettedPair);
   const hold = !force && !culinary && hasSpecies;
   const identityStrainFlag = looksLikeCubeStrain(profile?.strain) || looksLikeCubeStrain(profile?.name);
   const proseFlag = hasProseFlag(proseFields(profile, extra)) || (culinary && identityStrainFlag);
-  return { force, hold, culinary, proseFlag };
+  const reasons = [];
+  if (identityForce || (force && !culinaryGenus)) reasons.push("High-confidence restricted taxon.");
+  if (hold && culinaryGenus && hasRestrictedEpithet) {
+    reasons.push("Culinary genus with a restricted epithet. Confirm only if this is a known edible pair.");
+  }
+  if (hold && !latinOk) reasons.push("Species or strain is not plain Latin letters.");
+  if (hold && hasSpecies && !culinaryGenus && !hasRestrictedEpithet) {
+    reasons.push("Genus is not on the culinary allowlist.");
+  }
+  if (hold && culinaryGenus && !realEpithet) reasons.push("Species uses a placeholder epithet such as sp.");
+  if (proseFlag) reasons.push("Summary, notes, or tags mention a restricted name.");
+  return { force, hold, culinary, proseFlag, reasons };
 }
 
 export function needsOffmenuFlag(profile, extra = {}) {
@@ -347,9 +377,12 @@ function require(condition, message) {
 }
 
 export function isPsilocybin(profile, extra = {}) {
-  if (profile?.pack === "psilocybin" || Boolean(profile?.restricted)) return true;
   const classified = classifyTaxon(profile, extra);
-  return classified.force || classified.hold;
+  if (classified.force) return true;
+  if (extra.moderatorPack === "culinary") return false;
+  if (classified.culinary) return false;
+  if (profile?.pack === "culinary" && !profile?.restricted) return false;
+  return classified.hold || profile?.pack === "psilocybin" || Boolean(profile?.restricted);
 }
 
 export function isFree(profile) {
@@ -463,6 +496,9 @@ export function applyPackRules(profile, extra = {}) {
   if (!Array.isArray(next.tags)) next.tags = [];
   if (!Array.isArray(next.stages)) next.stages = blankProfile().stages;
   const classified = classifyTaxon(next, extra);
+  if (extra.moderatorPack === "culinary" && classified.force) {
+    throw new ValidationError("This taxon cannot be confirmed as culinary.", 400);
+  }
   const confirmedCulinary = extra.moderatorPack === "culinary" && !classified.force;
   const offMenu =
     extra.moderatorPack === "psilocybin" ||
@@ -476,6 +512,12 @@ export function applyPackRules(profile, extra = {}) {
     next.affiliates_allowed = false;
     next.affiliate_links = [];
     next.legal_notice = PSILOCYBIN_LEGAL_NOTICE;
+  } else if (confirmedCulinary) {
+    next.pack = "culinary";
+    next.restricted = false;
+    next.tags = next.tags.filter((tag) => tag !== "psilocybin");
+    if (!next.tags.includes("culinary")) next.tags = [...next.tags, "culinary"];
+    next.legal_notice = null;
   } else {
     next.legal_notice = null;
   }
@@ -485,6 +527,19 @@ export function applyPackRules(profile, extra = {}) {
     }
   }
   return next;
+}
+
+/** Serve-time pack/notice. Force-match taxa are rewritten; every Off-menu copy carries the legal notice. */
+export function serveProfileDocument(profile, extra = {}) {
+  if (!profile || typeof profile !== "object") return profile;
+  const classified = classifyTaxon(profile, extra);
+  if (classified.force) return applyPackRules(profile, extra);
+  if (isPsilocybin(profile, extra)) {
+    const next = applyPackRules(profile, extra);
+    next.legal_notice = PSILOCYBIN_LEGAL_NOTICE;
+    return next;
+  }
+  return structuredClone(profile);
 }
 
 /** Public card for a paid profile the reader has not unlocked. No recipe numbers. */
