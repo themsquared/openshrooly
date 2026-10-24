@@ -2,7 +2,7 @@ name: Hub and community tests
 
 on:
   pull_request:
-    branches: [main, cursor/community-platform-fa9c]
+    branches: [main, cursor/community-platform-fa9c, cursor/google-oidc-fa9c]
   push:
     branches: [main]
   workflow_dispatch:
