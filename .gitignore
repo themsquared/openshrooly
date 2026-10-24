@@ -22,3 +22,6 @@ hub/data/*.sqlite-*
 community/api/node_modules/
 community/web/node_modules/
 community/api/src/seeds.json
+
+# Netlify CLI local state
+.netlify/
