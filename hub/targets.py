@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+from urllib.parse import unquote
 
 BLOCKED_HOSTNAMES = frozenset(
     {
@@ -71,8 +72,8 @@ def _hostname_blocked(host: str) -> bool:
 
 
 def normalize_device_host(host: str) -> str | None:
-    raw = (host or "").strip()
-    if not raw:
+    raw = host or ""
+    if not raw or any(ch.isspace() for ch in raw) or any(ch.isspace() for ch in unquote(raw)):
         return None
     lowered = raw.lower()
     if lowered.startswith("http://") or lowered.startswith("https://") or "://" in raw:

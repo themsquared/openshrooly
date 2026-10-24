@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ device.name }} · Hub{% endblock %}
 {% block content %}
-<p class="{% if status.online %}ok live{% else %}bad{% endif %}">{% if status.online %}Reachable{% else %}Not reachable on this poll{% endif %}</p>
+<p class="{% if status.online %}ok live{% else %}bad{% endif %}">{% if status.online %}Reachable{% elif status.blocked %}Blocked{% if status.reason %}: {{ status.reason }}{% endif %}{% else %}Not reachable on this poll{% endif %}</p>
 <h1>{{ device.name }}</h1>
 <p class="muted">{{ device.host }}:{{ device.port }} · last seen {{ device.last_seen or "never" }}</p>
 <div class="gauge-row">

@@ -270,7 +270,7 @@ def basic_ok(request: Request) -> bool:
     parsed = parse_basic(request.headers.get("authorization"))
     if not parsed:
         return False
-    if login_retry_after(client_ip(request)):
+    if login_retry_after(client_ip(request)) or login_global_backoff():
         return False
     user, password = parsed
     return user == ADMIN_USER and passwords_match(password, admin_password())
@@ -282,7 +282,7 @@ def evaluate_basic(request: Request) -> tuple[str, int]:
     if not parsed:
         return "none", 0
     ip = client_ip(request)
-    wait = login_retry_after(ip)
+    wait = login_retry_after(ip) or login_global_backoff()
     if wait:
         return "locked", wait
     user, password = parsed

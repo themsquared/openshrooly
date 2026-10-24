@@ -6,12 +6,23 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .mapping import DeviceCommand, stage_to_commands
 from .models import ProfileStage
 
 DEFAULT_TIMEOUT_S = 5.0
+
+
+class RefuseRedirects(HTTPRedirectHandler):
+    """Chambers must not send the hub to another host (including loopback)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise HTTPError(req.full_url, code, "redirect refused", headers, fp)
+
+
+def no_redirect_opener():
+    return build_opener(RefuseRedirects)
 
 # Read paths used for the hub status dashboard. Each logical sensor lists
 # name-slug and yaml-id fallbacks because ESPHome matches both.
@@ -66,7 +77,7 @@ class ESPHomeDeviceClient:
         request = Request(url, method=method, headers=headers)
         if self._opener:
             return self._opener(request, timeout=self.timeout_s)
-        with urlopen(request, timeout=self.timeout_s) as response:
+        with no_redirect_opener().open(request, timeout=self.timeout_s) as response:
             body = response.read()
             if not body:
                 return {"ok": True, "status": response.status}

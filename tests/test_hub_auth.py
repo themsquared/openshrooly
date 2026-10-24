@@ -205,8 +205,9 @@ def test_per_ip_login_lockout(client):
 
 
 def test_global_failures_do_not_lock_other_ips(client):
+    past = time.time() - auth.LOGIN_GLOBAL_BACKOFF_S - 1
     for index in range(auth.LOGIN_GLOBAL_SOFT_MAX + 5):
-        auth.record_login_failure(f"203.0.113.{index}")
+        auth.LOGIN_GUARD.record_failure(f"203.0.113.{index}", now=past)
     allowed = _login(client, password=PASSWORD)
     assert allowed.status_code == 303
 
@@ -269,6 +270,20 @@ def test_device_add_stores_cleaned_host(client):
     assert response.status_code == 303
     saved = client.get("/api/devices").json()
     assert saved[0]["host"] == "192.168.1.50"
+
+
+def test_device_add_rejects_whitespace_hosts(client):
+    assert _login(client).status_code == 303
+    token = client.cookies.get("hub_csrf")
+    for host in ("127.0.0.1%20", "127.0.0.1 ", " 192.168.1.50"):
+        response = client.post(
+            "/devices/add",
+            data={"name": "Nope", "host": host, "port": "80", "csrf": token},
+            headers={"Origin": "http://testserver"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 400, host
+    assert client.get("/api/devices").json() == []
 
 
 def test_unknown_host_header_is_rejected(client):

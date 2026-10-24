@@ -69,6 +69,18 @@ def get_profile(conn, profile_id: str) -> MushroomProfile:
     return validate_profile(json.loads(row["document"]))
 
 
+PUBLIC_DEVICE_FIELDS = (
+    "id",
+    "name",
+    "host",
+    "port",
+    "added_at",
+    "last_seen",
+    "current_profile_id",
+    "current_stage_id",
+)
+
+
 def device_client(row) -> ESPHomeDeviceClient:
     host = row["host"]
     port = int(row["port"])
@@ -84,6 +96,25 @@ def device_client(row) -> ESPHomeDeviceClient:
     if targets.parse_ip(host) is None:
         headers["Host"] = f"{host}:{port}" if port not in (80, 443) else host
     return ESPHomeDeviceClient(base, extra_headers=headers)
+
+
+def unavailable_status(reason: str, *, blocked: bool) -> dict:
+    return {"online": False, "blocked": blocked, "reason": reason, "entities": {}}
+
+
+def fetch_device_status(row) -> dict:
+    """Poll one chamber. Blocked or offline hosts never abort the rest of the fleet."""
+    try:
+        return device_client(row).fetch_status()
+    except HTTPException as exc:
+        return unavailable_status(str(exc.detail), blocked=True)
+    except (OSError, TimeoutError) as exc:
+        return unavailable_status(str(exc) or "unreachable", blocked=False)
+
+
+def public_device(row) -> dict:
+    data = dict(row)
+    return {key: data.get(key) for key in PUBLIC_DEVICE_FIELDS}
 
 
 def record_sample(conn, device_row, status: dict) -> None:
@@ -115,9 +146,10 @@ def record_sample(conn, device_row, status: dict) -> None:
 
 def poll_once(conn) -> None:
     for row in conn.execute("SELECT * FROM devices").fetchall():
-        client = device_client(row)
-        status = client.fetch_status()
-        record_sample(conn, row, status)
+        try:
+            record_sample(conn, row, fetch_device_status(row))
+        except Exception:
+            continue
 
 
 def poll_loop(conn) -> None:
@@ -150,7 +182,10 @@ def maybe_advance_grow(conn, device_id: int) -> None:
     stage = profile.stage_at_day(elapsed)
     if stage.id != grow["current_stage_id"]:
         device = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
-        result = device_client(device).apply_stage(stage)
+        try:
+            result = device_client(device).apply_stage(stage)
+        except HTTPException:
+            return
         conn.execute("UPDATE grows SET current_stage_id=? WHERE id=?", (stage.id, grow["id"]))
         conn.execute(
             "UPDATE devices SET current_profile_id=?, current_stage_id=? WHERE id=?",
@@ -227,7 +262,7 @@ def page(request: Request, name: str, **context):
 
 
 def saved_devices(conn):
-    return [dict(row) for row in conn.execute("SELECT * FROM devices ORDER BY name")]
+    return [public_device(row) for row in conn.execute("SELECT * FROM devices ORDER BY name")]
 
 
 def device_host_rejected(request: Request, host: str) -> Response | None:
@@ -245,14 +280,15 @@ def home(request: Request):
     devices = []
     for row in conn.execute("SELECT * FROM devices ORDER BY name").fetchall():
         status = json.loads(row["last_status"] or "{}")
-        devices.append(
+        item = public_device(row)
+        item.update(
             {
-                **dict(row),
-                "status": status,
+                "status": {"online": status.get("online", False), "blocked": bool(status.get("blocked"))},
                 "online": status.get("online", False),
                 "reading": entity_reading(status),
             }
         )
+        devices.append(item)
     grows = conn.execute(
         """
         SELECT grows.*, devices.name AS device_name
@@ -335,10 +371,10 @@ def device_detail(request: Request, device_id: int):
     row = conn.execute("SELECT * FROM devices WHERE id=?", (device_id,)).fetchone()
     if not row:
         raise HTTPException(404)
-    client = device_client(row)
-    status = client.fetch_status()
+    status = fetch_device_status(row)
     record_sample(conn, row, status)
-    maybe_advance_grow(conn, device_id)
+    if not status.get("blocked"):
+        maybe_advance_grow(conn, device_id)
     samples = conn.execute(
         "SELECT * FROM samples WHERE device_id=? ORDER BY id DESC LIMIT 48",
         (device_id,),
@@ -381,7 +417,10 @@ def apply_profile(
         raise HTTPException(404, "device not found")
     profile = get_profile(conn, profile_id)
     stage = profile.stage_by_id(stage_id) if stage_id else profile.stages[0]
-    result = device_client(device).apply_stage(stage)
+    try:
+        result = device_client(device).apply_stage(stage)
+    except HTTPException:
+        return RedirectResponse(f"/devices/{device_id}", status_code=303)
     if start_grow == "1":
         conn.execute("UPDATE grows SET ended_at=? WHERE device_id=? AND ended_at IS NULL", (db.now(), device_id))
         conn.execute(
@@ -539,7 +578,7 @@ def sync_pull(request: Request, csrf: str = Form("")):
 
 @app.get("/api/devices")
 def api_devices(request: Request):
-    return [dict(row) for row in request.app.state.conn.execute("SELECT * FROM devices")]
+    return [public_device(row) for row in request.app.state.conn.execute("SELECT * FROM devices")]
 
 
 def _status_from_payload(payload) -> dict:
@@ -597,7 +636,7 @@ def login_submit(
     if blocked:
         return blocked
     ip = auth.client_ip(request)
-    retry_after = auth.login_retry_after(ip)
+    retry_after = auth.login_retry_after(ip) or auth.login_global_backoff()
     if retry_after:
         return auth.login_locked_response(retry_after)
     if username != auth.ADMIN_USER or not auth.passwords_match(password, auth.admin_password()):

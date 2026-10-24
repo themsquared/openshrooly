@@ -18,6 +18,13 @@ def test_unresolvable_hostname_can_be_stored():
     assert device_host_error("offline-chamber.local") is None
 
 
+def test_whitespace_hosts_are_rejected_at_add():
+    assert device_host_error("127.0.0.1%20")
+    assert device_host_error("127.0.0.1 ")
+    assert device_host_error(" 192.168.1.50")
+    assert device_host_error("192.168.1.50%09")
+
+
 def test_loopback_link_local_and_metadata_are_blocked():
     blocked = [
         "127.0.0.1",
