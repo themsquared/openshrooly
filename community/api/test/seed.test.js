@@ -69,6 +69,15 @@ test("first request still exposes the full culinary catalog from memory", async 
   assert.ok(guide);
 });
 
+test("seed profile text has no en or em dashes", () => {
+  const dash = /[\u2013\u2014]/;
+  const hits = [];
+  for (const profile of seeds) {
+    if (dash.test(JSON.stringify(profile))) hits.push(profile.id);
+  }
+  assert.deepEqual(hits, []);
+});
+
 test("optional storage survives a missing or throwing R2 binding", async () => {
   const none = createOptionalStorage(null);
   assert.equal(none.driver, "disabled");

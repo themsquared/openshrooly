@@ -15,25 +15,21 @@ import { handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
-import { originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
+import { corsAllowlist, originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
 
-export const DEFAULT_CORS_ORIGINS =
-  "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888";
+export const DEFAULT_CORS_ORIGINS = "https://shroomlabs.io,https://www.shroomlabs.io";
 
-export function allowedOrigins(env) {
-  return String(env.CORS_ORIGIN || DEFAULT_CORS_ORIGINS)
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+export function allowedOrigins(env, request) {
+  return corsAllowlist(env, request);
 }
 
 export function pickCorsOrigin(env, request) {
-  const allowed = allowedOrigins(env);
+  const allowed = allowedOrigins(env, request);
   const requestOrigin = request?.headers?.get?.("origin") || "";
   if (requestOrigin && allowed.includes(requestOrigin)) return requestOrigin;
   return allowed[0] || "*";
