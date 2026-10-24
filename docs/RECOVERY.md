@@ -41,9 +41,19 @@ esptool.py --port $P --before default_reset --after hard_reset \
 shasum -a 256 ~/openshrooly-backups/shrooly_backup_*.bin
 ```
 
-Keep the SHA next to the file. A second read should give the same SHA for the app
-partitions; the NVS and OTA data areas can differ between reads because the device writes
-settings while it runs.
+A full read takes about 3.5 minutes. Keep the SHA next to the file, and read twice to
+prove the read is good. The two whole-file SHAs will usually differ, because each read
+restarts the Shrooly and it saves settings to its NVS area (0x3A0000 to 0x400000) as it
+boots. Everything outside NVS must match. To compare without NVS:
+
+```bash
+python3 -c "import hashlib,sys; d=open(sys.argv[1],'rb').read(); print(hashlib.sha256(d[:0x3a0000]+d[0x400000:]).hexdigest())" <backup.bin>
+```
+
+Confirmed on 2026-10-24 for this unit: two reads,
+`shrooly_backup_20261024.bin` (SHA-256 `4c442ceb6e68fd188eefb13335a731617c9adfa2f02553bdfdcd4bb7439e2f8d`)
+and a second read that differed in 77 bytes, all inside NVS. Outside NVS both reads give
+`e841c52783db8e2cabad32ec407a4ba723ebdf80584e5af659e6400a3348af06`.
 
 ## If esptool says "No serial data received"
 
@@ -52,10 +62,10 @@ the reset never reached the chip and the problem is the USB link, not the firmwa
 
 1. **Replug the USB cable** at the Shrooly end, wait 5 seconds, and run step 2 again. This
    fixes a USB link the Mac has stopped talking to. The chamber keeps running on its own
-   power. This is the expected fix for what we saw on 2026-10-24: the port still enumerated on the Mac, but
-   no bytes came through, even the ROM boot banner during an OTA restart. The firmware was
-   ruled out because its only change from the last good build was the embedded dashboard
-   files.
+   power. Confirmed on 2026-10-24: the port still showed up on the Mac, but no bytes came
+   through, not even the boot messages during a Wi-Fi update restart. After a replug,
+   `read_mac`, `chip_id` and two full backups worked first time. The firmware was not the
+   cause; its only change from the last good build was the embedded dashboard files.
 2. **Try another cable or Mac port** (a data cable, not charge only; avoid hubs).
 3. **Force download mode with the BOOT button** (only if 1 and 2 fail). We have not yet
    confirmed where this board's BOOT (GPIO0) and RESET (EN) buttons or pads are; check
@@ -66,8 +76,8 @@ the reset never reached the chip and the problem is the USB link, not the firmwa
 
 ## Restore
 
-Write only a backup made from this unit (its MAC is in the file name), and only after
-checking its SHA:
+Write only a backup made from this unit (check the MAC with `read_mac` and note it next
+to the file), and only after checking its SHA:
 
 ```bash
 esptool.py --port $P --before default_reset --after hard_reset write_flash 0 <backup.bin>
