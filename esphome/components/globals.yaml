@@ -152,6 +152,13 @@ globals:
     restore_value: no
     initial_value: '""'
 
+  # Unix time when a non-Idle grow phase began. Display-only; climate scripts
+  # never read this. Restored so grow day keeps advancing across reboots.
+  - id: grow_started_ts
+    type: int
+    restore_value: yes
+    initial_value: '0'
+
   # UI globals
   - id: current_ui_page
     type: int

@@ -235,6 +235,7 @@
           lambda: 'return id(page_just_changed) && id(current_ui_page) == 0;'
         then:
           - lvgl.page.show: aaaa
+          - script.execute: update_growing_screen
     - if:
         condition:
           lambda: 'return id(page_just_changed) && id(current_ui_page) == 1;'
