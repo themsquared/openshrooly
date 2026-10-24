@@ -136,8 +136,8 @@ def build_profiles() -> list[MushroomProfile]:
             notes="Clusters fruit quickly. Prioritize fresh air over extra humidity once pins form.",
             chamber_notes="Shrooly-sized chamber works well. Keep surfaces just barely glistening, not dripping.",
             source_notes=[
-                src("Stamets", f"{STAMETS} P. ostreatus spawn run ~24 °C; fruiting often 10–21 °C at 85–90% RH."),
-                src("Vendor cards", f"{VENDOR} Pearl/grey oysters typically 12–12 light and strong FAE."),
+                src("Stamets", f"{STAMETS} P. ostreatus spawn run ~24 °C; fruiting often 10 to 21 °C at 85 to 90% RH."),
+                src("Vendor cards", f"{VENDOR} Pearl/grey oysters typically 12 to 12 light and strong FAE."),
                 src("Stock firmware", "Original Shrooly oyster LUA used ~10 h photoperiod and a ramped fan cycle."),
             ],
             stages=[
@@ -181,7 +181,7 @@ def build_profiles() -> list[MushroomProfile]:
             chamber_notes="If the chamber runs warm, blues fade toward grey and stems elongate.",
             source_notes=[
                 src("Stamets", f"{STAMETS} Blue/columbinus types fruit best in the mid-teens °C with aggressive FAE."),
-                src("Vendor cards", f"{VENDOR} Blue oyster cards usually list 12–18 °C fruiting and high air exchange."),
+                src("Vendor cards", f"{VENDOR} Blue oyster cards usually list 12 to 18 °C fruiting and high air exchange."),
             ],
             stages=[
                 stage("colonization", "Colonization", 12, 90, 22),
@@ -224,7 +224,7 @@ def build_profiles() -> list[MushroomProfile]:
             summary="Tropical oyster. Wants warmth; stalls and fades in a cold room.",
             chamber_notes="Do not cold-shock. Harvest early; shelf life is short.",
             source_notes=[
-                src("Stamets", f"{STAMETS} P. djamor is a warm-weather species, often fruited 20–30 °C."),
+                src("Stamets", f"{STAMETS} P. djamor is a warm-weather species, often fruited 20 to 30 °C."),
                 src("Vendor cards", f"{VENDOR} Pink oyster cards warn against refrigeration and list high FAE."),
             ],
             stages=[
@@ -269,7 +269,7 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "oyster", "warm"],
             summary="Warm oyster with dense golden clusters. Needs strong FAE to keep stems short.",
             source_notes=[
-                src("Stamets", f"{STAMETS} P. citrinopileatus fruits in a wide warm band, often 18–30 °C."),
+                src("Stamets", f"{STAMETS} P. citrinopileatus fruits in a wide warm band, often 18 to 30 °C."),
                 src("Vendor cards", f"{VENDOR} Golden oyster cards emphasize light and air for color."),
             ],
             stages=[
@@ -311,8 +311,8 @@ def build_profiles() -> list[MushroomProfile]:
             summary="Thick-stem oyster. Cooler, slightly drier, and less FAE than cluster oysters.",
             chamber_notes="High humidity + high FAE makes skinny kings. Keep RH a bit lower once pins set.",
             source_notes=[
-                src("Stamets", f"{STAMETS} P. eryngii prefers cooler fruiting (often 12–18 °C) and modest air."),
-                src("Vendor cards", f"{VENDOR} King oyster cards commonly list 80–85% RH to thicken stems."),
+                src("Stamets", f"{STAMETS} P. eryngii prefers cooler fruiting (often 12 to 18 °C) and modest air."),
+                src("Vendor cards", f"{VENDOR} King oyster cards commonly list 80 to 85% RH to thicken stems."),
             ],
             stages=[
                 stage("colonization", "Colonization", 18, 88, 22),
@@ -347,7 +347,7 @@ def build_profiles() -> list[MushroomProfile]:
         ),
         culinary(
             id="king-oyster-thick-stem",
-            name="King Oyster — thick-stem method",
+            name="King Oyster: thick-stem method",
             species="Pleurotus eryngii",
             strain="King",
             variety_group="oyster",
@@ -399,11 +399,11 @@ def build_profiles() -> list[MushroomProfile]:
             strain="Standard",
             variety_group="hericium",
             tags=["culinary", "beginner", "medicinal"],
-            summary="Tooth fungus. Moderate FAE — too much air yellows spines.",
+            summary="Tooth fungus. Moderate FAE: too much air yellows spines.",
             chamber_notes="If spines brown or yellow, cut FAE and raise RH slightly. Original Shrooly lion's mane recipe used a gentle fan ramp.",
             source_notes=[
-                src("Stamets", f"{STAMETS} H. erinaceus colonizes ~21–24 °C and fruits cooler, often 16–20 °C."),
-                src("Vendor cards", f"{VENDOR} Lion's mane cards usually 85–95% RH and 8–12 h light."),
+                src("Stamets", f"{STAMETS} H. erinaceus colonizes ~21 to 24 °C and fruits cooler, often 16 to 20 °C."),
+                src("Vendor cards", f"{VENDOR} Lion's mane cards usually 85 to 95% RH and 8 to 12 h light."),
                 src("Stock firmware", "Shipped lion's mane LUA: 10 h photoperiod, 5% white LED, ramped fan over ~161 s."),
             ],
             stages=[
@@ -446,11 +446,11 @@ def build_profiles() -> list[MushroomProfile]:
             summary="Needs a full colonize + browning rest, then a cold shock before fruiting.",
             chamber_notes="OpenShrooly cannot refrigerate a block. Cold-shock in a fridge, then return the block to the device.",
             source_notes=[
-                src("Stamets", f"{STAMETS} L. edodes: long spawn run, bark-like browning, then 5–10 °C shock and 13–18 °C fruiting."),
-                src("Vendor cards", f"{VENDOR} Block shiitake cards commonly list 80–90% RH and high FAE after shock."),
+                src("Stamets", f"{STAMETS} L. edodes: long spawn run, bark-like browning, then 5 to 10 °C shock and 13 to 18 °C fruiting."),
+                src("Vendor cards", f"{VENDOR} Block shiitake cards commonly list 80 to 90% RH and high FAE after shock."),
             ],
             stages=[
-                stage("colonization", "Colonization", 42, 88, 24, notes="Wait for full white, then browning — do not fruit early."),
+                stage("colonization", "Colonization", 42, 88, 24, notes="Wait for full white, then browning: do not fruit early."),
                 stage(
                     "browning",
                     "Browning / skin",
@@ -468,7 +468,7 @@ def build_profiles() -> list[MushroomProfile]:
                     1,
                     90,
                     16,
-                    notes="Firmware cannot reach fridge temps. Shock 12–24 h at 5–10 °C, then apply fruiting.",
+                    notes="Firmware cannot reach fridge temps. Shock 12 to 24 h at 5 to 10 °C, then apply fruiting.",
                     warn_min=13,
                     warn_max=20,
                 ),
@@ -498,7 +498,7 @@ def build_profiles() -> list[MushroomProfile]:
             summary="Antlers under high CO2, then consoles when FAE increases.",
             chamber_notes="Original Shrooly reishi LUA used a very long quiet fan period. Match that for antlers; raise FAE for kidney-shaped consoles.",
             source_notes=[
-                src("Stamets", f"{STAMETS} G. lucidum colonizes warm (24–30 °C). Antlers form in still, humid air; consoles need more FAE and light."),
+                src("Stamets", f"{STAMETS} G. lucidum colonizes warm (24 to 30 °C). Antlers form in still, humid air; consoles need more FAE and light."),
                 src("Stock firmware", "Shipped reishi LUA: ~10 h light and a long (~1 h) low-duty fan cycle."),
             ],
             stages=[
@@ -540,7 +540,7 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "intermediate"],
             summary="Clustered woodlover. Cool fruiting and high RH keep caps glossy.",
             source_notes=[
-                src("Vendor cards", f"{VENDOR} Chestnut / Pholiota adiposa cards typically 13–18 °C and 90–95% RH."),
+                src("Vendor cards", f"{VENDOR} Chestnut / Pholiota adiposa cards typically 13 to 18 °C and 90 to 95% RH."),
                 src("Stamets", f"{STAMETS} Related Pholiota spp. like cool, wet fruiting conditions."),
             ],
             stages=[
@@ -582,8 +582,8 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "intermediate"],
             summary="Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.",
             source_notes=[
-                src("Vendor cards", f"{VENDOR} Pioppino / Agrocybe aegerita cards: colonize warm, fruit 13–21 °C, 85–95% RH."),
-                src("Stock firmware", "Original Shrooly tree includes a pioppino recipe — treated here as a cool-cluster woodlover."),
+                src("Vendor cards", f"{VENDOR} Pioppino / Agrocybe aegerita cards: colonize warm, fruit 13 to 21 °C, 85 to 95% RH."),
+                src("Stock firmware", "Original Shrooly tree includes a pioppino recipe: treated here as a cool-cluster woodlover."),
             ],
             stages=[
                 stage("colonization", "Colonization", 16, 88, 25),
@@ -622,10 +622,10 @@ def build_profiles() -> list[MushroomProfile]:
             variety_group="enoki",
             tags=["culinary", "advanced", "cool"],
             summary="Needs cold fruiting and low FAE for supermarket-long stems.",
-            chamber_notes="A Shrooly cannot reach true 4–10 °C enoki rooms. This profile uses the coolest firmware target (15 °C) and very low FAE as a chamber approximation.",
+            chamber_notes="A Shrooly cannot reach true 4 to 10 °C enoki rooms. This profile uses the coolest firmware target (15 °C) and very low FAE as a chamber approximation.",
             source_notes=[
-                src("Stamets", f"{STAMETS} Commercial enoki: ~10–16 °C, high CO2, low light, 90–95% RH."),
-                src("Vendor cards", "Home growers who lack a cold room get shorter, darker, more petaled fruits — still edible."),
+                src("Stamets", f"{STAMETS} Commercial enoki: ~10 to 16 °C, high CO2, low light, 90 to 95% RH."),
+                src("Vendor cards", "Home growers who lack a cold room get shorter, darker, more petaled fruits: still edible."),
             ],
             stages=[
                 stage("colonization", "Colonization", 18, 90, 22),
@@ -670,7 +670,7 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "advanced", "woodlover"],
             summary="Slow woodlover. Primordia look like brains; do not dry them out.",
             source_notes=[
-                src("Stamets", f"{STAMETS} G. frondosa colonizes 21–24 °C; fruiting often 13–18 °C at 85–90% RH."),
+                src("Stamets", f"{STAMETS} G. frondosa colonizes 21 to 24 °C; fruiting often 13 to 18 °C at 85 to 90% RH."),
                 src("Vendor cards", f"{VENDOR} Maitake is slower than oysters and sensitive to FAE swings."),
             ],
             stages=[
@@ -713,8 +713,8 @@ def build_profiles() -> list[MushroomProfile]:
             summary="Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.",
             chamber_notes="This profile only sets climate. Media (brown rice + silkworm-pupa or vegan analog) is on you. Keep jars or trays in the chamber.",
             source_notes=[
-                src("Published cultivation", "Peer-reviewed and grower protocols commonly use 18–22 °C dark spawn, then 16–20 °C and 12/12 light for stroma."),
-                src("Practice", "RH 80–90% is enough; pooling water on rice drowns primordia."),
+                src("Published cultivation", "Peer-reviewed and grower protocols commonly use 18 to 22 °C dark spawn, then 16 to 20 °C and 12/12 light for stroma."),
+                src("Practice", "RH 80 to 90% is enough; pooling water on rice drowns primordia."),
             ],
             stages=[
                 stage("colonization", "Colonization", 12, 82, 20, notes="Dark. Do not start light until the surface is colonized."),
@@ -798,7 +798,7 @@ def build_profiles() -> list[MushroomProfile]:
             summary="Compost + casing species. Low light, cool fruiting, casing required.",
             chamber_notes="The device does not mix compost or apply casing. Use a cased tray in the chamber. Portobello is the same species allowed to mature.",
             source_notes=[
-                src("Stamets", f"{STAMETS} A. bisporus: spawn run ~24 °C, then case, then 14–18 °C fruiting at 85–90% RH."),
+                src("Stamets", f"{STAMETS} A. bisporus: spawn run ~24 °C, then case, then 14 to 18 °C fruiting at 85 to 90% RH."),
                 src("Commercial", "Button rooms use low light and managed CO2; pinset quality depends on the casing microclimate."),
             ],
             stages=[
@@ -841,7 +841,7 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "intermediate", "cool"],
             summary="Cool, very wet fruiting. The slime coat is normal.",
             source_notes=[
-                src("Stamets", f"{STAMETS} Nameko fruits cool and wet, often 10–18 °C at 90–95% RH."),
+                src("Stamets", f"{STAMETS} Nameko fruits cool and wet, often 10 to 18 °C at 90 to 95% RH."),
                 src("Vendor cards", f"{VENDOR} Nameko cards warn that dry air cracks the gelatinous cap skin."),
             ],
             stages=[
@@ -923,7 +923,7 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "intermediate"],
             summary="Clustered beech mushroom. Cool, humid, and a little less FAE than oysters.",
             source_notes=[
-                src("Vendor cards", f"{VENDOR} Buna shimeji / brown beech cards commonly 13–18 °C and 90–95% RH."),
+                src("Vendor cards", f"{VENDOR} Buna shimeji / brown beech cards commonly 13 to 18 °C and 90 to 95% RH."),
                 src("Commercial", "Bottle culture uses a rest after colonization, then a cool fruiting room."),
             ],
             stages=[
@@ -965,7 +965,7 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "beginner"],
             summary="Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.",
             source_notes=[
-                src("Stamets", f"{STAMETS} H. ulmarius fruits cooler than tropical oysters, often 10–18 °C."),
+                src("Stamets", f"{STAMETS} H. ulmarius fruits cooler than tropical oysters, often 10 to 18 °C."),
                 src("Vendor cards", "Sometimes sold as elm oyster or blue-white oyster; treat as a cool Hypsizygus."),
             ],
             stages=[
@@ -1007,7 +1007,7 @@ def build_profiles() -> list[MushroomProfile]:
             tags=["culinary", "warm", "woodlover"],
             summary="Warm, wet jelly fungus. High RH matters more than light intensity.",
             source_notes=[
-                src("Stamets", f"{STAMETS} Auricularia spp. fruit warm (often 20–30 °C) at 85–95% RH."),
+                src("Stamets", f"{STAMETS} Auricularia spp. fruit warm (often 20 to 30 °C) at 85 to 95% RH."),
                 src("Vendor cards", "Asian vendor cards list short, frequent misting-equivalent humidity rather than cold FAE."),
             ],
             stages=[
@@ -1053,7 +1053,7 @@ def build_profiles() -> list[MushroomProfile]:
             notes="Informational climate only. Not a cultivation guide for illegal activity.",
             chamber_notes="Cubensis typically uses a tub/casing workflow the Shrooly does not replace. This only applies RH, temp, light, and FAE.",
             source_notes=[
-                src("Chamber consensus", f"{RR} P. cubensis colonizes ~24–27 °C; pins and fruits ~21–24 °C at high RH with 12/12 light."),
+                src("Chamber consensus", f"{RR} P. cubensis colonizes ~24 to 27 °C; pins and fruits ~21 to 24 °C at high RH with 12/12 light."),
                 src("Practice", "FAE is increased at pinning. Surface should be fine droplets, not standing water."),
             ],
             stages=[
@@ -1174,7 +1174,7 @@ def build_profiles() -> list[MushroomProfile]:
             summary="Cool-weather woodlover. Indoor chambers are a poor substitute for outdoor beds.",
             chamber_notes="Cyanescens is typically an outdoor chip-bed species. This profile only approximates a cool, humid woodlover climate. Firmware cannot reach true winter nights.",
             source_notes=[
-                src("Field / grower notes", "P. cyanescens fruits in cool, wet weather, often 10–18 °C, on lignin-rich mulch. Indoor success is inconsistent."),
+                src("Field / grower notes", "P. cyanescens fruits in cool, wet weather, often 10 to 18 °C, on lignin-rich mulch. Indoor success is inconsistent."),
             ],
             stages=[
                 stage("colonization", "Colonization", 28, 88, 20, warn_min=14, warn_max=24),

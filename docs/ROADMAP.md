@@ -314,6 +314,16 @@ Threat model, ESP32-S3 heap/flash (~22–42 KB heap TLS, ~155 KB flash if mbedTL
 - Bulk apply + profile name text sensor
 - Only after Phase 1 shows the REST chat is the bottleneck
 
+### Future — device-security ship (no code in this pass)
+
+Upstream OpenShrooly ships these **open**. A later device-security ship should add them without touching climate / humidity / FAE / light control:
+
+- **OTA password or signed OTA** — ESPHome `ota.password` and/or signed firmware, so a neighbor cannot push a binary
+- **Encrypted native API** — `api.encryption` so the ESPHome native API is not plaintext on the LAN
+- **Non-open setup AP** — SoftAP with a PSK or a setup window that closes, instead of an open `OpenShrooly` network
+
+Until that ship, the chamber stays as upstream: open AP, unencrypted API, open OTA.
+
 ### Phase 4 — maybe BTCPay
 
 - After legal review; pack stays free until then

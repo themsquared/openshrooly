@@ -201,26 +201,97 @@ export async function buildCsr(privateKey, publicKey, cn) {
   return derToPem(csr, "CERTIFICATE REQUEST");
 }
 
-export function parseCsr(pem) {
-  const der = pemToDer(pem);
-  const csr = walk(der)[0];
-  const [info, alg, sig] = walk(csr.body);
-  const infoKids = walk(info.body);
-  const spki = infoKids[2].raw;
-  const spkiKids = walk(infoKids[2].body);
-  const bit = spkiKids[1];
-  const xy = bit.body.subarray(1);
-  const sigDer = bitStringPayload(sig);
-  return { info: info.raw, xy, spki, signatureDer: sigDer };
+export const MAX_CSR_PEM = 4096;
+const CSR_LABELS = new Set(["CERTIFICATE REQUEST", "NEW CERTIFICATE REQUEST"]);
+
+/** Strict DER reader: definite lengths only, no trailing bytes, every node inside its parent. */
+function derNodes(view) {
+  const out = [];
+  let i = 0;
+  while (i < view.length) {
+    if (i + 2 > view.length) throw new Error("CSR is truncated");
+    const tag = view[i];
+    let len = view[i + 1];
+    let header = 2;
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      if (n < 1 || n > 2) throw new Error("CSR length encoding not allowed");
+      if (i + 2 + n > view.length) throw new Error("CSR is truncated");
+      len = 0;
+      for (let k = 0; k < n; k += 1) len = (len << 8) | view[i + 2 + k];
+      if (len < 128 || (n === 2 && len < 256)) throw new Error("CSR length is not minimal DER");
+      header = 2 + n;
+    }
+    const start = i + header;
+    const end = start + len;
+    if (end > view.length) throw new Error("CSR is truncated");
+    out.push({ tag, body: view.subarray(start, end), raw: view.subarray(i, end) });
+    i = end;
+  }
+  return out;
 }
 
-function bitStringPayload(node) {
-  return node.body.subarray(1);
+function expectNodes(view, tags, what) {
+  const nodes = derNodes(view);
+  if (nodes.length !== tags.length || nodes.some((n, k) => n.tag !== tags[k])) throw new Error(`CSR ${what} is malformed`);
+  return nodes;
+}
+
+function sameBytes(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+export function pemBody(pem, labels) {
+  const text = String(pem || "").trim();
+  const m = text.match(/^-----BEGIN ([A-Z ]+)-----\r?\n([A-Za-z0-9+/=\r\n]+)\r?\n-----END ([A-Z ]+)-----$/);
+  if (!m || m[1] !== m[3] || !labels.has(m[1])) throw new Error("expected a PEM certificate request");
+  return pemToDer(text);
+}
+
+const SPKI_P256_ALG = seq(oid(OID_EC), oid(OID_P256));
+
+/** Parse a PKCS#10 CSR, accepting only ECDSA P-256 keys signed with ecdsa-with-SHA256. */
+export function parseCsr(pem) {
+  if (typeof pem !== "string" || !pem) throw new Error("csr required");
+  if (pem.length > MAX_CSR_PEM) throw new Error("CSR is too large");
+  const der = pemBody(pem, CSR_LABELS);
+  const [csr] = expectNodes(der, [0x30], "envelope");
+  const [info, alg, sig] = expectNodes(csr.body, [0x30, 0x30, 0x03], "structure");
+  const kids = derNodes(info.body);
+  if (kids.length !== 4 || kids[0].tag !== 0x02 || kids[1].tag !== 0x30 || kids[2].tag !== 0x30 || kids[3].tag !== 0xa0) {
+    throw new Error("CSR info is malformed");
+  }
+  if (kids[0].body.length !== 1 || kids[0].body[0] !== 0) throw new Error("CSR version must be 1");
+  derNodes(kids[1].body);
+  derNodes(kids[3].body);
+  const [spkiAlg, spkiBits] = expectNodes(kids[2].body, [0x30, 0x03], "public key");
+  if (!sameBytes(spkiAlg.raw, SPKI_P256_ALG)) throw new Error("CSR must be ECDSA P-256");
+  if (spkiBits.body.length !== 66 || spkiBits.body[0] !== 0 || spkiBits.body[1] !== 0x04) {
+    throw new Error("CSR must be an uncompressed P-256 key");
+  }
+  if (!sameBytes(alg.raw, algId())) throw new Error("CSR must be signed with ecdsa-with-SHA256");
+  if (sig.body.length < 2 || sig.body[0] !== 0) throw new Error("CSR signature is malformed");
+  return { info: info.raw, xy: spkiBits.body.subarray(1), signatureDer: sig.body.subarray(1) };
+}
+
+/** Strict DER ECDSA signature to raw r||s (64 bytes). */
+export function ecdsaSigToRaw(sigDer) {
+  const [s] = expectNodes(sigDer, [0x30], "signature");
+  const parts = expectNodes(s.body, [0x02, 0x02], "signature");
+  const to32 = (body) => {
+    if (body.length < 1 || body.length > 33 || (body.length === 33 && body[0] !== 0)) throw new Error("signature integer out of range");
+    const v = body.length === 33 ? body.subarray(1) : body;
+    const p = new Uint8Array(32);
+    p.set(v, 32 - v.length);
+    return p;
+  };
+  return concat(to32(parts[0].body), to32(parts[1].body));
 }
 
 export async function verifyCsr(pem) {
   const parsed = parseCsr(pem);
-  if (parsed.xy[0] !== 0x04 || parsed.xy.length !== 65) throw new Error("CSR must be ECDSA P-256");
   const jwk = {
     kty: "EC",
     crv: "P-256",
@@ -228,13 +299,12 @@ export async function verifyCsr(pem) {
     y: bytesToB64url(parsed.xy.subarray(33, 65)),
   };
   const pub = await keyFromJwk(jwk, ["verify"]);
-  const raw = ecdsaDerToRaw(parsed.signatureDer);
-  const ok = await crypto.subtle.verify(ECDSA_SHA256, pub, raw, parsed.info);
+  const ok = await crypto.subtle.verify(ECDSA_SHA256, pub, ecdsaSigToRaw(parsed.signatureDer), parsed.info);
   if (!ok) throw new Error("CSR signature invalid");
-  return { jwk, xy: parsed.xy, spki: parsed.spki };
+  return { jwk, xy: parsed.xy, spki: spkiFromRaw(parsed.xy) };
 }
 
-function bytesToB64url(bytes) {
+export function bytesToB64url(bytes) {
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
@@ -254,11 +324,14 @@ export function serialHex(bytes) {
 function extensions(isCa) {
   const basic = seq(oid(OID_BASIC), tlv(0x01, Uint8Array.of(0xff)), tlv(0x04, seq(tlv(0x01, Uint8Array.of(isCa ? 0xff : 0x00)))));
   const eku = seq(oid(OID_EXT_KU), tlv(0x04, seq(oid(OID_CLIENT_AUTH))));
+  // KeyUsage bits count from the MSB: digitalSignature = bit 0 (0x80), keyCertSign = bit 5 (0x04),
+  // cRLSign = bit 6 (0x02). DER drops trailing zero bits, so the unused-bit count depends on the value.
   const usage = seq(
     oid(OID_KEY_USAGE),
-    tlv(0x04, bitString(Uint8Array.of(isCa ? 0x06 : 0x80), 7))
+    tlv(0x01, Uint8Array.of(0xff)),
+    tlv(0x04, isCa ? bitString(Uint8Array.of(0x06), 1) : bitString(Uint8Array.of(0x80), 7))
   );
-  return tlv(0xa3, seq(basic, isCa ? usage : eku));
+  return tlv(0xa3, seq(basic, usage, ...(isCa ? [] : [eku])));
 }
 
 async function signTbs(key, tbs) {
@@ -266,12 +339,12 @@ async function signTbs(key, tbs) {
   return seq(tbs, algId(), bitString(ecdsaRawToDer(raw)));
 }
 
-export async function issueCertificate({ issuerKey, issuerCn, subjectCn, subjectSpki, serial, notBefore, notAfter, isCa = false }) {
+export async function issueCertificate({ issuerKey, issuerCn, issuerName, subjectCn, subjectSpki, serial, notBefore, notAfter, isCa = false }) {
   const tbs = seq(
     tlv(0xa0, integerFromNumber(2)),
     integerFromBytes(serial),
     algId(),
-    nameCn(issuerCn),
+    issuerName || nameCn(issuerCn),
     seq(utcTime(notBefore), utcTime(notAfter)),
     nameCn(subjectCn),
     subjectSpki[0] === 0x30 ? subjectSpki : spkiFromRaw(subjectSpki),
@@ -297,19 +370,36 @@ export async function createWorkerCa(cn = "Shroom Labs Device CA") {
     notAfter: later,
     isCa: true,
   });
-  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
-  return {
-    cn,
-    privateKey: pair.privateKey,
-    publicKey: pair.publicKey,
-    certPem: issued.pem,
-    keyPem: derToPem(pkcs8, "PRIVATE KEY"),
-  };
+  // Ephemeral dev-only CA: the private key is never exported.
+  return { cn, privateKey: pair.privateKey, publicKey: pair.publicKey, certPem: issued.pem };
 }
 
-export async function importCaKey(pkcs8Pem) {
+/** Subject Name DER and raw public point of a CA certificate (used as the issuer of device certs). */
+export function caCertInfo(certPem) {
+  const der = pemToDer(certPem);
+  const [cert] = derNodes(der);
+  const [tbs] = derNodes(cert.body);
+  const kids = derNodes(tbs.body);
+  const k = kids[0].tag === 0xa0 ? 1 : 0;
+  const subject = kids[k + 4];
+  const [, bits] = derNodes(kids[k + 5].body);
+  return { subjectDer: subject.raw, xy: bits.body.subarray(1) };
+}
+
+/**
+ * Import the CA private key as a non-extractable signing key.
+ * When a CA certificate is given, the key must match the certificate's public key.
+ */
+export async function importCaKey(pkcs8Pem, certPem) {
   const der = pemToDer(pkcs8Pem);
-  return crypto.subtle.importKey("pkcs8", der, P256, true, ["sign"]);
+  if (certPem) {
+    const probe = await crypto.subtle.importKey("pkcs8", der, P256, true, ["sign"]);
+    const jwk = await crypto.subtle.exportKey("jwk", probe);
+    const { xy } = caCertInfo(certPem);
+    const match = jwk.x === bytesToB64url(xy.subarray(1, 33)) && jwk.y === bytesToB64url(xy.subarray(33, 65));
+    if (!match) throw new Error("DEVICE_CA_KEY does not match DEVICE_CA_CERT");
+  }
+  return crypto.subtle.importKey("pkcs8", der, P256, false, ["sign"]);
 }
 
 export async function issueDeviceCertificate(ca, csrPem, { cn, days = 7 } = {}) {
@@ -320,6 +410,7 @@ export async function issueDeviceCertificate(ca, csrPem, { cn, days = 7 } = {}) 
   const issued = await issueCertificate({
     issuerKey: ca.privateKey,
     issuerCn: ca.cn,
+    issuerName: ca.certPem ? caCertInfo(ca.certPem).subjectDer : undefined,
     subjectCn: cn,
     subjectSpki: verified.spki,
     serial,

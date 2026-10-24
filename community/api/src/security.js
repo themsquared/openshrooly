@@ -3,6 +3,10 @@
 import { hex, hmacSha256Hex, timingSafeEqual } from "./crypto.js";
 import { devStubsEnabled } from "./providers.js";
 
+export const PROD_SITE_ORIGINS = ["https://shroomlabs.io", "https://www.shroomlabs.io"];
+const NETLIFY_PREVIEW = /^https:\/\/deploy-preview-\d+--[a-z0-9-]+\.netlify\.app$/i;
+const LOCAL_DEV = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i;
+
 const te = new TextEncoder();
 
 export function securityHeaders() {
@@ -173,14 +177,28 @@ export async function rateLimit(db, key, limit, windowSec) {
 }
 
 export function clientIp(request) {
-  return request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "";
+  return request.headers.get("cf-connecting-ip") || "";
+}
+
+export function corsAllowlist(env = {}, request) {
+  const origins = [...PROD_SITE_ORIGINS];
+  if (!devStubsEnabled(env, request)) return origins;
+  const listed = String(env.CORS_ORIGIN || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  for (const origin of listed) {
+    if (LOCAL_DEV.test(origin) && !origins.includes(origin)) origins.push(origin);
+  }
+  const requestOrigin = request?.headers?.get?.("origin") || "";
+  if (NETLIFY_PREVIEW.test(requestOrigin) && !origins.includes(requestOrigin)) {
+    origins.push(requestOrigin);
+  }
+  return origins;
 }
 
 export function originAllowed(env, request) {
   const origin = request.headers.get("origin") || "";
   if (!origin) return true;
-  const allowed = String(env.CORS_ORIGIN || "")
-    .split(",")
-    .map((s) => s.trim());
-  return allowed.includes(origin);
+  return corsAllowlist(env, request).includes(origin);
 }
