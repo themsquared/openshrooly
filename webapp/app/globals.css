@@ -1,5 +1,28 @@
 @import './tokens.css';
 
+/* Shroom Labs type, served from the chamber itself so it works without internet. */
+@font-face {
+  font-family: "Fraunces";
+  src: url("/fonts/fraunces-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson";
+  src: url("/fonts/atkinson-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson";
+  src: url("/fonts/atkinson-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -161,6 +184,154 @@ input[type="number"]:focus,
   border: 1px solid var(--sl-mycelium);
   border-radius: 999px;
   padding: 3px 8px;
+}
+
+.live-dot.is-setup {
+  background: var(--sl-mycelium);
+  box-shadow: 0 0 12px var(--sl-mycelium);
+}
+
+.connection-banner,
+.first-run {
+  max-width: var(--sl-max);
+  margin: 0 auto 14px;
+  width: calc(100% - 32px);
+  background: var(--sl-bg-glass);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--sl-line);
+  border-radius: var(--sl-radius);
+  padding: 18px 20px;
+  box-shadow: var(--sl-shadow);
+}
+
+.connection-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.connection-banner.is-alert {
+  border-color: rgba(212, 90, 44, 0.45);
+  background: linear-gradient(135deg, rgba(122, 42, 34, 0.55), var(--sl-bg-glass));
+}
+
+.connection-banner.is-setup {
+  border-color: rgba(201, 164, 92, 0.4);
+}
+
+.connection-banner p,
+.first-run p,
+.connection-meta {
+  color: var(--sl-muted);
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.first-run h2 {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  margin-top: 4px;
+}
+
+.first-run-steps {
+  margin: 12px 0 0 18px;
+  color: var(--sl-ink-dim);
+  font-size: 14px;
+}
+
+.first-run-steps li {
+  margin: 6px 0;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.preset-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.preset-card {
+  background: var(--sl-bg-2);
+  border: 1px solid var(--sl-line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.preset-card.is-picked {
+  border-color: var(--sl-line-strong);
+  box-shadow: 0 0 0 1px var(--sl-spore-deep);
+}
+
+.preset-pick {
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 14px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  flex: 1;
+}
+
+.preset-pick strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.preset-pick span {
+  display: block;
+  color: var(--sl-muted);
+  font-size: 13px;
+}
+
+.preset-confirm {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 14px 14px;
+}
+
+.preset-cancel {
+  background: none;
+  border: none;
+  color: var(--sl-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.preset-card button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ota-file {
+  padding: 8px;
+  border: 1px solid var(--sl-line);
+  border-radius: 8px;
+  margin-top: 8px;
+  color: var(--sl-ink-dim);
+  background: var(--sl-bg-2);
+}
+
+.ota-meta { margin-top: 10px; font-size: 14px; color: var(--sl-muted); }
+.ota-button { margin-top: 12px; }
+.ota-button:disabled { opacity: 0.6; cursor: not-allowed; }
+.ota-track { width: 100%; background: var(--sl-bg-2); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 12px; }
+.ota-fill { background: var(--sl-spore); height: 100%; transition: width 0.3s ease; }
+.ota-message { margin-top: 8px; font-size: 14px; color: var(--sl-muted); }
+.ota-message.is-success { color: var(--sl-ok); }
+.ota-message.is-error { color: var(--sl-bad); }
+
+@media (max-width: 600px) {
+  .connection-banner { flex-direction: column; align-items: stretch; }
+  .preset-grid { grid-template-columns: 1fr; }
 }
 
 .alerts-banner {
@@ -910,3 +1081,24 @@ input[type="range"]::-moz-range-thumb {
   .modal { padding: 22px; }
   .card-value { font-size: 30px; }
 }
+
+/* Shroom Labs type: Atkinson for reading, Fraunces for headings. */
+body,
+button,
+input,
+select {
+  font-family: "Atkinson", var(--sl-font);
+}
+
+.header-bar h1,
+.first-run h2,
+.modal h2,
+.profile-name {
+  font-family: "Fraunces", "Iowan Old Style", Palatino, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-name { font-weight: 600; }
+
+.first-run p.first-run-error { color: var(--sl-bad); }

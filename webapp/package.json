@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "export": "next build"
+    "export": "next build",
+    "test": "node --test lib/setup-state.test.js lib/ui-copy.test.js"
   },
   "keywords": [],
   "author": "",

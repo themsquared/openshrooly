@@ -102,12 +102,61 @@ class ESPHomeAPI {
     }
   }
 
+  async getTextSensor(sensorId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/text_sensor/${sensorId}`)
+      if (!response.ok) return null
+      return await response.json()
+    } catch (error) {
+      console.error(`Failed to fetch text sensor ${sensorId}:`, error)
+      return null
+    }
+  }
+
+  async getWifiStatus(): Promise<{ mode?: string; ssid?: string; ip?: string }> {
+    const [mode, ssid, ip] = await Promise.all([
+      this.getTextSensor('wifi_mode'),
+      this.getTextSensor('wifi_ssid'),
+      this.getTextSensor('ip_address'),
+    ])
+    return {
+      mode: mode?.state || mode?.value,
+      ssid: ssid?.state || ssid?.value,
+      ip: ip?.state || ip?.value,
+    }
+  }
+
+  async getGrowCaption(): Promise<{ phase?: string; day?: number; total?: number }> {
+    const [phase, day, total] = await Promise.all([
+      this.getSelect('grow_phase'),
+      this.getNumber('grow_day'),
+      this.getNumber('grow_days_total'),
+    ])
+    return {
+      phase: phase?.state || phase?.value,
+      day: day?.value != null ? Number(day.value) : undefined,
+      total: total?.value != null ? Number(total.value) : undefined,
+    }
+  }
+
+  async applyWrites(writes: { kind: string; id: string; value: string | number }[]): Promise<boolean> {
+    for (const write of writes) {
+      const ok =
+        write.kind === 'select'
+          ? await this.setSelect(write.id, String(write.value))
+          : await this.setNumber(write.id, Number(write.value))
+      if (!ok) return false
+    }
+    return true
+  }
+
   async getAllNumbers(): Promise<{ [key: string]: any }> {
     const numberIds = [
       'target_humidity',
       'humidifier__speed',
       'temperature__minimum',
       'temperature__maximum',
+      'temperature__target',
       'air_exchange__period__min_',
       'air_exchange__run_duration__s_',
       'air_exchange__speed',
@@ -117,6 +166,8 @@ class ESPHomeAPI {
       'red_led_intensity',
       'green_led_intensity',
       'blue_led_intensity',
+      'grow_day',
+      'grow_days_total',
     ]
 
     try {
@@ -172,7 +223,7 @@ class ESPHomeAPI {
     }
   }
 
-  subscribeToEvents(onEvent: (event: any) => void): EventSource | null {
+  subscribeToEvents(onEvent: (event: any) => void, onError?: () => void): EventSource | null {
     try {
       const eventSource = new EventSource(`${this.baseUrl}/events`)
 
@@ -190,6 +241,7 @@ class ESPHomeAPI {
 
       eventSource.onerror = (error) => {
         console.error('EventSource error:', error)
+        onError?.()
       }
 
       return eventSource
