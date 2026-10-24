@@ -9,7 +9,7 @@ import {
   validateProfile,
   ValidationError,
 } from "./profile.js";
-import { decodeBase64Photo, processPhoto } from "./photos.js";
+import { decodeBase64Photo, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES } from "./photos.js";
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
@@ -28,12 +28,15 @@ import {
   getReview,
   isModerator,
   isPublicProfile,
+  canSeePendingReportPhoto,
+  canSeePhoto,
   photoIsPublic,
   publicDocument,
+  reportPhotoApproved,
   requireVisibleRow,
   reviewView,
   saveDraftReview,
-  stashReportPhoto,
+  storeReportPhoto,
 } from "./review.js";
 
 const DISCLOSURE =
@@ -330,6 +333,8 @@ async function route(method, path, url, request, env) {
     requireVerified(user);
     const profile = validateProfile(stripCommunityAffiliates(await readJson(request)));
     profile.author = user.username;
+    const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
+    if (existing) throw new ValidationError("That profile id is already used.", 409);
     await upsertProfile(db, profile, user, { published: 0 });
     await saveDraftReview(db, profile);
     const review = await getReview(db, profile.id);
@@ -396,17 +401,20 @@ async function route(method, path, url, request, env) {
     const body = await readJson(request);
     if (!["success", "partial", "fail"].includes(body.outcome)) throw new ValidationError("bad outcome");
     let photoKey = null;
+    let photoStatus = "approved";
     if (body.photo_base64) {
       const raw = decodeBase64Photo(body.photo_base64);
       const caps = capabilities(env, request);
       if (caps.photos) {
-        photoKey = await stashReportPhoto(db, env, { profileId, raw });
+        const stored = await storeReportPhoto(db, env, request, { profileId, user, raw });
+        photoKey = stored.photoKey;
+        photoStatus = stored.photoStatus;
       } else {
         processPhoto(raw);
       }
     }
     await db.run(
-      "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, photo_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         profileId,
         user.id,
@@ -416,10 +424,11 @@ async function route(method, path, url, request, env) {
         body.flushes ? Number(body.flushes) : null,
         body.device_name || null,
         photoKey,
+        photoKey ? photoStatus : "approved",
         nowIso(),
       ]
     );
-    return json({ ok: true, photo_key: photoKey }, 201);
+    return json({ ok: true, photo_key: photoKey, photo_status: photoKey ? photoStatus : null }, 201);
   }
 
   const checkoutMatch = path.match(/^\/api\/profiles\/([^/]+)\/checkout$/);
@@ -491,12 +500,35 @@ async function route(method, path, url, request, env) {
   const mediaMatch = path.match(/^\/api\/media\/(.+)$/);
   if (mediaMatch && method === "GET") {
     const key = decodeURIComponent(mediaMatch[1]);
-    const photo = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [key]);
-    if (photo && !photoIsPublic(photo)) return json({ error: "not found" }, 404);
-    if (!photo && String(key).startsWith("reports/")) return json({ error: "not found" }, 404);
+    if (!key || key.includes("..") || key.includes("\\") || key.includes("\0")) {
+      return json({ error: "not found" }, 404);
+    }
     const file = await storage.get(key);
     if (!file) return json({ error: "not found" }, 404);
-    return new Response(file.bytes, { headers: { "content-type": file.contentType } });
+    const bytes = file.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file.bytes);
+    const kind = sniffImage(bytes);
+    if (!kind) return json({ error: "not found" }, 404);
+    const gallery = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [key]);
+    if (gallery && !photoIsPublic(gallery)) {
+      const viewer = await userFromAuth(request, db);
+      const ownerRow = await db.one("SELECT * FROM profiles WHERE id=?", [gallery.profile_id]);
+      if (!canSeePhoto(gallery, viewer, ownerRow?.author_id)) return json({ error: "not found" }, 404);
+    }
+    const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
+    if (report && !reportPhotoApproved(report)) {
+      const viewer = await userFromAuth(request, db);
+      if (!canSeePendingReportPhoto(viewer, report)) return json({ error: "not found" }, 404);
+    }
+    const headers = {
+      "content-type": PHOTO_TYPES[kind],
+      "x-content-type-options": "nosniff",
+      "content-disposition": `inline; filename="${mediaFilename(kind)}"`,
+      "content-security-policy": "default-src 'none'",
+    };
+    if ((report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery))) {
+      headers["cache-control"] = "private, no-store";
+    }
+    return new Response(bytes, { headers });
   }
 
   if (method === "GET" && path === "/api/hub/pull") {
@@ -520,24 +552,15 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "hub token required" }, 401);
     const payload = await readJson(request);
-    let imported = 0;
+    const results = [];
     for (const item of payload.profiles || []) {
-      const profile = validateProfile(stripCommunityAffiliates(item));
-      if (isPsilocybin(profile)) {
-        profile.affiliates_allowed = false;
-        profile.affiliate_links = [];
-        profile.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
-        profile.allowed_payment_providers = [];
-      }
-      await upsertProfile(db, profile, user, { published: 0 });
-      await saveDraftReview(db, profile);
-      imported += 1;
+      results.push(await pushOneProfile(db, item, user));
     }
     for (const report of payload.grow_reports || []) {
       const exists = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
       if (!exists || !(await canSeeProfile(db, user, exists))) continue;
       await db.run(
-        "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO grow_reports (profile_id, author_id, outcome, notes, days, flushes, device_name, photo_key, photo_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           report.profile_id,
           user.id,
@@ -547,11 +570,13 @@ async function route(method, path, url, request, env) {
           report.flushes ?? null,
           report.device_name || null,
           null,
+          "approved",
           nowIso(),
         ]
       );
     }
-    return json({ imported, reports: (payload.grow_reports || []).length });
+    const imported = results.filter((row) => row.status === "created" || row.status === "updated").length;
+    return json({ imported, results, reports: (payload.grow_reports || []).length });
   }
 
   if (method === "GET" && path === "/api/supplies") {
@@ -586,15 +611,40 @@ async function mintToken(db, userId, name) {
   return token;
 }
 
+async function pushOneProfile(db, item, user) {
+  const id = item?.id || "";
+  try {
+    const profile = validateProfile(stripCommunityAffiliates(item));
+    if (isPsilocybin(profile)) {
+      profile.affiliates_allowed = false;
+      profile.affiliate_links = [];
+      profile.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
+      profile.allowed_payment_providers = [];
+    }
+    const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
+    if (existing?.author_id == null) {
+      return { id: profile.id, status: "skipped", reason: "official" };
+    }
+    if (existing && Number(existing.author_id) !== Number(user.id)) {
+      return { id: profile.id, status: "skipped", reason: "owned_by_other" };
+    }
+    await upsertProfile(db, profile, user, { published: 0 });
+    await saveDraftReview(db, profile);
+    return { id: profile.id, status: existing ? "updated" : "created" };
+  } catch (err) {
+    return { id, status: "skipped", reason: err?.message || "invalid" };
+  }
+}
+
 async function upsertProfile(db, profile, user, { published = 0 } = {}) {
   const ts = nowIso();
   const authorId = user?.id ?? user;
   const existing = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
   if (existing) {
-    const official = existing.author_id == null;
-    const owner = Number(existing.author_id) === Number(authorId);
-    const staff = isModerator(user);
-    if ((official && !staff) || (!official && !owner && !staff)) {
+    if (existing.author_id == null) {
+      throw new ValidationError("That profile id is already used.", 409);
+    }
+    if (Number(existing.author_id) !== Number(authorId)) {
       throw new ValidationError("That profile id is already used.", 409);
     }
     await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(profile), ts, profile.id]);
@@ -645,11 +695,14 @@ async function showProfile(request, db, env, profileId) {
   const reports = [];
   for (const report of reportRows) {
     let photoUrl = null;
+    let photoKey = report.photo_key || null;
+    const photoStatus = report.photo_status || (report.photo_key ? "approved" : null);
     if (report.photo_key) {
-      const photo = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [report.photo_key]);
-      if (photoIsPublic(photo) || staff) photoUrl = mediaUrl(env, report.photo_key);
+      const visible = reportPhotoApproved(report) || canSeePendingReportPhoto(user, report);
+      if (visible) photoUrl = mediaUrl(env, report.photo_key);
+      else photoKey = null;
     }
-    reports.push({ ...report, photo_url: photoUrl });
+    reports.push({ ...report, photo_key: photoKey, photo_url: photoUrl, photo_status: photoStatus });
   }
   const lockedDoc = unlocked
     ? profile

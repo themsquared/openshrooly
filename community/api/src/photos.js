@@ -12,6 +12,17 @@ export const PHOTO_TYPES = {
   png: "image/png",
   webp: "image/webp",
 };
+export const PHOTO_EXTS = { jpeg: "jpg", png: "png", webp: "webp" };
+
+export function mediaFilename(kind) {
+  return `photo.${PHOTO_EXTS[kind] || "bin"}`;
+}
+
+export function extForContentType(contentType) {
+  if (contentType === PHOTO_TYPES.png) return "png";
+  if (contentType === PHOTO_TYPES.webp) return "webp";
+  return "jpg";
+}
 
 const JPEG = [0xff, 0xd8, 0xff];
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -76,6 +87,27 @@ function isRestartMarker(marker) {
   return marker >= 0xd0 && marker <= 0xd7;
 }
 
+function isSofMarker(marker) {
+  return marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+}
+
+function jpegAllowMarker(marker) {
+  if (marker === 0xda || marker === 0xd9 || marker === 0xdd || marker === 0xc4 || marker === 0xdb) return true;
+  if (isRestartMarker(marker)) return true;
+  return isSofMarker(marker);
+}
+
+function isAdobeApp14(bytes, start, end) {
+  if (end - start < 5) return false;
+  return (
+    bytes[start] === 0x41 &&
+    bytes[start + 1] === 0x64 &&
+    bytes[start + 2] === 0x6f &&
+    bytes[start + 3] === 0x62 &&
+    bytes[start + 4] === 0x65
+  );
+}
+
 export function stripJpeg(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new ValidationError("That JPEG is damaged.");
   const out = [new Uint8Array([0xff, 0xd8])];
@@ -115,7 +147,7 @@ export function stripJpeg(bytes) {
       if (i >= bytes.length) out.push(bytes.slice(entropyStart, i));
       continue;
     }
-    if (isRestartMarker(marker) || marker === 0x01) {
+    if (isRestartMarker(marker)) {
       out.push(bytes.slice(i, i + 2));
       i += 2;
       continue;
@@ -124,10 +156,9 @@ export function stripJpeg(bytes) {
     const len = readU16(bytes, i + 2);
     const end = i + 2 + len;
     if (end > bytes.length) throw new ValidationError("That JPEG is damaged.");
-    const isApp = marker >= 0xe0 && marker <= 0xef;
-    const isCom = marker === 0xfe;
-    if (!isApp && !isCom) {
-      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+    const adobe = marker === 0xee && isAdobeApp14(bytes, i + 4, end);
+    if (jpegAllowMarker(marker) || adobe) {
+      if (isSofMarker(marker)) {
         height = readU16(bytes, i + 5);
         width = readU16(bytes, i + 7);
       }

@@ -216,3 +216,35 @@ test("rewrites PNG without ancillary text chunks", () => {
   assert.equal(clean.width, 1);
   assert.equal(clean.height, 1);
 });
+
+function jpegWithUnknownMarker({ progressive = false } = {}) {
+  const sofMarker = progressive ? 0xc2 : 0xc0;
+  const sof = u8(0xff, sofMarker, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00);
+  const dqt = u8(0xff, 0xdb, 0x00, 0x04, 0x00, 0x00);
+  const sos = u8(0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00);
+  const scan = u8(0x00, 0x7f);
+  const html = new TextEncoder().encode("<html>jpgn</html>");
+  const jpgn = u8(0xff, 0xf7, 0x00, html.length + 2);
+  const parts = [u8(0xff, 0xd8), dqt, sof];
+  if (progressive) parts.push(sos, scan, jpgn, html, sos, scan);
+  else parts.push(jpgn, html, sos, scan);
+  parts.push(u8(0xff, 0xd9));
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+
+test("jpeg rewrite drops unknown markers including JPGn", () => {
+  for (const dirty of [jpegWithUnknownMarker(), jpegWithUnknownMarker({ progressive: true })]) {
+    assert.match(new TextDecoder("latin1").decode(dirty), /<html>|jpgn/);
+    const out = processPhoto(dirty);
+    const text = new TextDecoder("latin1").decode(out.bytes);
+    assert.doesNotMatch(text, /<html>|jpgn/);
+    assert.equal(out.width, 8);
+    assert.equal(out.height, 8);
+  }
+});

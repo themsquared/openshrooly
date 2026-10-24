@@ -59,6 +59,13 @@ def all_profiles(conn) -> list[MushroomProfile]:
     return [validate_profile(json.loads(row["document"])) for row in rows]
 
 
+def authored_profiles(conn) -> list[MushroomProfile]:
+    rows = conn.execute(
+        "SELECT document FROM profiles WHERE source NOT IN ('seed', 'community') ORDER BY id"
+    ).fetchall()
+    return [validate_profile(json.loads(row["document"])) for row in rows]
+
+
 def get_profile(conn, profile_id: str) -> MushroomProfile:
     row = conn.execute("SELECT document FROM profiles WHERE id=?", (profile_id,)).fetchone()
     if not row:
@@ -414,7 +421,7 @@ def sync_push(request: Request):
 
     envelope = build_push(
         hub_id="local-hub",
-        profiles=all_profiles(conn),
+        profiles=authored_profiles(conn),
         reports=[
             GrowReport(
                 profile_id=row["profile_id"],

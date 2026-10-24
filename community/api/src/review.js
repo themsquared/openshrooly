@@ -1,10 +1,10 @@
 /** Profile review, photos, reports, and moderator actions. Additive tables only. */
 
-import { nowIso } from "./crypto.js";
+import { nowIso, randomToken } from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { layout, button, escapeHtml } from "./email-layout.js";
 import { isPsilocybin, ValidationError } from "./profile-schema.js";
-import { PHOTO_MAX_COUNT, photoObjectKey, prescreenImage, processPhoto } from "./photos.js";
+import { PHOTO_MAX_COUNT, extForContentType, photoObjectKey, prescreenImage, processPhoto } from "./photos.js";
 import { rateLimit, rateLimitClient } from "./security.js";
 
 export const REVIEW_DRAFT = "draft";
@@ -262,37 +262,53 @@ export async function maybeResetOnPublicEdit(db, profile, { title, description }
   return getReview(db, profile.id);
 }
 
-export async function stashReportPhoto(db, env, { profileId, raw }) {
+export function reportPhotoApproved(report) {
+  return (report?.photo_status || "approved") === "approved";
+}
+
+export function canSeePendingReportPhoto(user, report) {
+  if (!user || !report) return false;
+  if (isModerator(user)) return true;
+  return Number(user.id) === Number(report.author_id);
+}
+
+export async function storeReportPhoto(db, env, request, { profileId, user, raw }) {
   if (!raw || !raw.byteLength) throw new ValidationError("Add a photo file.");
+  const limited = await rateLimit(db, `photo:${user.id}:${rateLimitClient(request)}`, 10, 3600);
+  if (!limited.ok) throw new ValidationError("Too many photo uploads this hour.", 429);
   const processed = processPhoto(raw);
-  const pendingKey = photoObjectKey("pending");
+  const pendingKey = `reports/${profileId}/${randomToken()}.${extForContentType(processed.contentType)}`;
   const stored = await env.storage.put(pendingKey, processed.bytes, processed.contentType);
   if (!stored) throw new ValidationError("Photo storage is not enabled yet. See the deploy note for the media bucket.", 503);
-  const ts = nowIso();
-  await db.run(
-    "INSERT INTO profile_photos (profile_id, object_key, content_type, width, height, status, prescreen, withdrawn, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
-    [
-      profileId,
-      pendingKey,
-      processed.contentType,
-      processed.width,
-      processed.height,
-      "pending",
-      JSON.stringify({ provider: "stub", flagged: false, labels: [], kind: "grow_report" }),
-      ts,
-      ts,
-    ]
-  );
-  const review = await getReview(db, profileId);
-  if (review && Number(review.published_live) === 1) {
-    await upsertReview(db, {
-      ...review,
-      status: REVIEW_PENDING,
-      reason: "Waiting for review of a grow report photo.",
-    });
-    await logModeration(db, { profileId, actorId: null, action: "edit_resubmit", reason: "grow_report_photo" });
-  }
-  return pendingKey;
+  return { photoKey: pendingKey, photoStatus: "pending" };
+}
+
+export async function listPendingReportPhotos(db) {
+  return db.all("SELECT * FROM grow_reports WHERE photo_status=? ORDER BY id DESC", ["pending"]);
+}
+
+export async function approveReportPhoto(db, { report, user }) {
+  if (!report || report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
+  await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["approved", report.id]);
+  await logModeration(db, {
+    profileId: report.profile_id,
+    actorId: user.id,
+    action: "report_photo_approve",
+    reason: `uploader:${report.author_id}`,
+  });
+  return { ...report, photo_status: "approved" };
+}
+
+export async function rejectReportPhoto(db, { report, user, reason }) {
+  if (!report || report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
+  await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["rejected", report.id]);
+  await logModeration(db, {
+    profileId: report.profile_id,
+    actorId: user.id,
+    action: "report_photo_reject",
+    reason: String(reason || `uploader:${report.author_id}`),
+  });
+  return { ...report, photo_status: "rejected" };
 }
 
 export async function storePhoto(db, env, request, { profile, user, raw, contentType }) {

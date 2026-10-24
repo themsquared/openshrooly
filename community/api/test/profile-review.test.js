@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Miniflare } from "miniflare";
 import { handleRequest } from "../src/handlers.js";
-import { call, register, testEnv } from "./helpers.js";
+import { call, callRaw, register, testEnv } from "./helpers.js";
 import { renderLlms, renderSitemap, isIndexableProfile } from "../../web/scripts/generate-seo.js";
 import { processPhoto } from "../src/photos.js";
 
@@ -407,12 +407,73 @@ test("a signed-in user cannot overwrite official or another user's profile", asy
     token: mallory.token,
     body: { profiles: [draftFrom(pearl, "button-cremini")] },
   });
-  assert.equal(hubOfficial.status, 409);
+  assert.equal(hubOfficial.status, 200, JSON.stringify(hubOfficial.data));
+  assert.equal(hubOfficial.data.results[0].status, "skipped");
+  assert.equal(hubOfficial.data.results[0].reason, "official");
   const hubAlice = await call(ctx, "POST", "/api/hub/push", {
     token: mallory.token,
     body: { profiles: [draftFrom(pearl, "alice-live")] },
   });
-  assert.equal(hubAlice.status, 409);
+  assert.equal(hubAlice.status, 200, JSON.stringify(hubAlice.data));
+  assert.equal(hubAlice.data.results[0].status, "skipped");
+  assert.equal(hubAlice.data.results[0].reason, "owned_by_other");
+});
+
+test("hub push processes each profile and never writes official ids", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "hub-alice@example.com");
+  const mod = await makeModerator(ctx, "hub-mod@example.com");
+  const own = draftFrom(pearl, "alice-hub-oyster");
+  const mixed = await call(ctx, "POST", "/api/hub/push", {
+    token: alice.token,
+    body: { profiles: [draftFrom(pearl, "beech-shimeji"), draftFrom(pearl, "button-cremini"), own] },
+  });
+  assert.equal(mixed.status, 200, JSON.stringify(mixed.data));
+  assert.deepEqual(
+    mixed.data.results.map((row) => row.status),
+    ["skipped", "skipped", "created"]
+  );
+  assert.equal(mixed.data.imported, 1);
+  const created = await call(ctx, "GET", "/api/profiles/alice-hub-oyster", { token: alice.token });
+  assert.equal(created.status, 200);
+  const official = await call(ctx, "GET", "/api/profiles/beech-shimeji");
+  assert.equal(official.status, 200);
+  assert.notEqual(official.data.profile.name, own.name);
+  const before = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  const beforeCount = before.data.length;
+  const staffPush = await call(ctx, "POST", "/api/hub/push", {
+    token: mod.token,
+    body: { profiles: [draftFrom(pearl, "beech-shimeji"), draftFrom(pearl, "blue-oyster"), draftFrom(pearl, "button-cremini")] },
+  });
+  assert.equal(staffPush.status, 200, JSON.stringify(staffPush.data));
+  assert.ok(staffPush.data.results.every((row) => row.status === "skipped" && row.reason === "official"));
+  const after = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(after.data.length, beforeCount);
+  const stillBeech = await call(ctx, "GET", "/api/profiles/beech-shimeji");
+  assert.equal(stillBeech.status, 200);
+});
+
+test("POST /api/profiles is create-only even for moderators", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "post-alice@example.com");
+  const mod = await makeModerator(ctx, "post-mod@example.com");
+  const official = draftFrom(pearl, "beech-shimeji");
+  official.name = "Mod overwrote official";
+  const stealOfficial = await call(ctx, "POST", "/api/profiles", { token: mod.token, body: official });
+  assert.equal(stealOfficial.status, 409);
+  const stillOfficial = await call(ctx, "GET", "/api/profiles/beech-shimeji");
+  assert.equal(stillOfficial.status, 200);
+  assert.notEqual(stillOfficial.data.profile.name, "Mod overwrote official");
+  const aliceDoc = draftFrom(pearl, "alice-post-live");
+  await call(ctx, "POST", "/api/profiles", { token: alice.token, body: aliceDoc });
+  const overwrite = draftFrom(pearl, "alice-post-live");
+  overwrite.name = "Mod overwrote alice";
+  const stealAlice = await call(ctx, "POST", "/api/profiles", { token: mod.token, body: overwrite });
+  assert.equal(stealAlice.status, 409);
+  const mine = await call(ctx, "GET", "/api/profiles/alice-post-live", { token: alice.token });
+  assert.equal(mine.data.profile.name, aliceDoc.name);
+  const again = await call(ctx, "POST", "/api/profiles", { token: alice.token, body: aliceDoc });
+  assert.equal(again.status, 409);
 });
 
 test("go and checkout use the approved snapshot for strangers", async () => {
@@ -465,7 +526,8 @@ test("grow report photos are sanitized and stay private until approved", async (
     body: { outcome: "success", photo_base64: b64(poly), photo_type: "text/html", photo_ext: "html" },
   });
   assert.equal(report.status, 201, JSON.stringify(report.data));
-  assert.match(report.data.photo_key, /^profile-photos\/pending\//);
+  assert.match(report.data.photo_key, /^reports\/pearl-oyster\//);
+  assert.equal(report.data.photo_status, "pending");
   const media = await call(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
   assert.equal(media.status, 404);
   const stored = await ctx.storage.get(report.data.photo_key);
@@ -532,4 +594,101 @@ test("miniflare R2 stores processed photos", async () => {
   } finally {
     await mf.dispose();
   }
+});
+
+test("grow report photos stay off the profile gallery and are queued for the uploader", async () => {
+  const ctx = testEnv();
+  const alice = await register(ctx, "gallery-alice@example.com");
+  const mallory = await register(ctx, "gallery-mallory@example.com");
+  const mod = await makeModerator(ctx, "gallery-mod@example.com");
+  const doc = draftFrom(pearl, "alice-gallery");
+  await call(ctx, "POST", "/api/profiles", { token: alice.token, body: doc });
+  await call(ctx, "POST", "/api/profiles/alice-gallery/photos", {
+    token: alice.token,
+    body: { photo_base64: b64(PNG_1x1), photo_type: "image/png" },
+  });
+  await call(ctx, "POST", "/api/profiles/alice-gallery/publish", {
+    token: alice.token,
+    body: { title: "Alice gallery", description: "Live" },
+  });
+  await call(ctx, "POST", "/api/moderation/alice-gallery/approve", { token: mod.token, body: {} });
+  const photosBefore = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", ["alice-gallery"]);
+  const report = await call(ctx, "POST", "/api/profiles/alice-gallery/reports", {
+    token: mallory.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  assert.match(report.data.photo_key, /^reports\/alice-gallery\//);
+  const photosAfter = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", ["alice-gallery"]);
+  assert.equal(photosAfter.length, photosBefore.length);
+  assert.equal(
+    photosAfter.some((photo) => photo.object_key === report.data.photo_key),
+    false
+  );
+  const publicPhotos = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=?", ["alice-gallery"]);
+  for (const photo of publicPhotos) {
+    const listed = await call(ctx, "GET", `/api/public-photos/${photo.id}`);
+    if (photo.status === "approved") assert.equal(listed.status, 200);
+  }
+  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(anon.status, 404);
+  const ownerView = await call(ctx, "GET", "/api/profiles/alice-gallery", { token: alice.token });
+  assert.equal(ownerView.data.reports[0].photo_url, null);
+  const uploaderView = await call(ctx, "GET", "/api/profiles/alice-gallery", { token: mallory.token });
+  assert.match(uploaderView.data.reports[0].photo_url, /\/api\/media\//);
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === report.data.photo_key);
+  assert.ok(item);
+  assert.equal(Number(item.uploader.id), Number(mallory.user.id));
+  assert.ok(item.uploader.username);
+  assert.equal(item.profile_id, "alice-gallery");
+  const approved = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, { token: mod.token, body: {} });
+  assert.equal(approved.status, 200, JSON.stringify(approved.data));
+  const publicAfter = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(publicAfter.status, 200);
+  assert.equal(publicAfter.headers.get("x-content-type-options"), "nosniff");
+  const stillGallery = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", ["alice-gallery"]);
+  assert.equal(stillGallery.length, photosBefore.length);
+});
+
+test("official profile report photos reach the queue and can be rejected", async () => {
+  const ctx = testEnv();
+  const mallory = await register(ctx, "official-rep@example.com");
+  const mod = await makeModerator(ctx, "official-rep-mod@example.com");
+  const report = await call(ctx, "POST", "/api/profiles/chestnut/reports", {
+    token: mallory.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.profile_id === "chestnut");
+  assert.ok(item);
+  assert.equal(Number(item.uploader.id), Number(mallory.user.id));
+  const rejected = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/reject`, {
+    token: mod.token,
+    body: { reason: "Not a grow photo" },
+  });
+  assert.equal(rejected.status, 200, JSON.stringify(rejected.data));
+  const media = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(media.status, 404);
+  const live = await call(ctx, "GET", "/api/profiles/chestnut");
+  assert.equal(live.status, 200);
+});
+
+test("report photo uploads share the photo rate limit", async () => {
+  const ctx = testEnv();
+  const user = await register(ctx, "rate-rep@example.com");
+  let last = null;
+  for (let i = 0; i < 10; i += 1) {
+    last = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+      token: user.token,
+      body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+    });
+    assert.equal(last.status, 201, JSON.stringify(last.data));
+  }
+  const blocked = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+    token: user.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(blocked.status, 429);
 });

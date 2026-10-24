@@ -3,15 +3,18 @@
 import { requireVerified, userFromRequest } from "./auth.js";
 import { stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
 import {
+  approveReportPhoto,
   approveReview,
   canSeePhoto,
   getReview,
   isModerator,
+  listPendingReportPhotos,
   listPublicProfiles,
   logModeration,
   maybeResetOnPublicEdit,
   photoIsPublic,
   publicDocument,
+  rejectReportPhoto,
   rejectReview,
   reportProfile,
   requireModerator,
@@ -80,6 +83,7 @@ export async function handleReview(method, path, url, request, env, { seeds, par
       const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [review.profile_id]);
       const queued = parseProfileRow(row);
       items.push({
+        kind: "profile",
         id: review.profile_id,
         profile: queued,
         review: reviewView(review, photos),
@@ -88,6 +92,20 @@ export async function handleReview(method, path, url, request, env, { seeds, par
           label: link.label,
           url: link.url,
         })),
+      });
+    }
+    for (const report of await listPendingReportPhotos(db)) {
+      const uploader = report.author_id ? await db.one("SELECT * FROM users WHERE id=?", [report.author_id]) : null;
+      items.push({
+        kind: "report-photo",
+        id: `report-photo:${report.id}`,
+        report_id: report.id,
+        profile_id: report.profile_id,
+        uploader: { id: report.author_id, username: uploader?.username || "unknown" },
+        photo_key: report.photo_key,
+        outcome: report.outcome,
+        notes: report.notes,
+        created_at: report.created_at,
       });
     }
     return json({ items });
@@ -173,6 +191,20 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const body = await readJson(request);
     const review = await reportProfile(db, { profileId, user, reason: body.reason || "reported" });
     return json({ review: reviewView(review) }, 201);
+  }
+
+  const reportPhotoMatch = path.match(/^\/api\/moderation\/report-photos\/([^/]+)\/(approve|reject)$/);
+  if (reportPhotoMatch && method === "POST") {
+    const user = await userOf(request, db);
+    requireModerator(user);
+    const report = await db.one("SELECT * FROM grow_reports WHERE id=?", [Number(reportPhotoMatch[1])]);
+    if (!report) return json({ error: "not found" }, 404);
+    const body = await readJson(request);
+    const next =
+      reportPhotoMatch[2] === "approve"
+        ? await approveReportPhoto(db, { report, user })
+        : await rejectReportPhoto(db, { report, user, reason: body.reason });
+    return json({ report: { id: next.id, photo_status: next.photo_status, profile_id: next.profile_id } });
   }
 
   const approveMatch = path.match(/^\/api\/moderation\/([^/]+)\/approve$/);

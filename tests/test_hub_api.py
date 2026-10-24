@@ -49,6 +49,28 @@ def test_rejects_psilocybin_when_disabled(client):
     assert b"disabled" in page.content
 
 
+def test_push_sends_only_authored_profiles(client):
+    from hub.app import all_profiles, authored_profiles
+    from hub import db as hubdb
+
+    conn = client.app.state.conn
+    seed_ids = {profile.id for profile in all_profiles(conn)}
+    assert "pearl-oyster" in seed_ids
+    assert authored_profiles(conn) == []
+
+    pearl = client.get("/api/profiles/pearl-oyster").json()
+    pearl["id"] = "pearl-oyster-authored"
+    pearl["name"] = "Pearl authored"
+    res = client.post("/profiles/import", data={"document": __import__("json").dumps(pearl)}, follow_redirects=False)
+    assert res.status_code == 303
+    authored = authored_profiles(conn)
+    assert {profile.id for profile in authored} == {"pearl-oyster-authored"}
+    assert "pearl-oyster" not in {profile.id for profile in authored}
+
+    hubdb.upsert_profile(conn, "pulled-oyster", pearl, "community")
+    assert "pulled-oyster" not in {profile.id for profile in authored_profiles(conn)}
+
+
 def test_species_photo_picks_specific_harvest_shots():
     from hub.species_art import species_photo
 

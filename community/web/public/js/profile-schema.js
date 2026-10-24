@@ -60,7 +60,32 @@ export function stripCommunityAffiliates(profile) {
   return next;
 }
 
-const OFFMENU_GENERA = ["psilocybe", "panaeolus", "copelandia", "gymnopilus", "pholiotina", "conocybe"];
+const PSYCHOACTIVE_GENERA = [
+  "psilocybe",
+  "panaeolus",
+  "copelandia",
+  "gymnopilus",
+  "pholiotina",
+  "conocybe",
+  "pluteus",
+  "inocybe",
+];
+const CULINARY_GENERA = [
+  "gyroporus",
+  "lentinus",
+  "pleurotus",
+  "agaricus",
+  "lentinula",
+  "hypsizygus",
+  "flammulina",
+  "grifola",
+  "hericium",
+  "ganoderma",
+  "trametes",
+  "stropharia",
+  "cyclocybe",
+  "pholiota",
+];
 const OFFMENU_EPITHETS = [
   "cubensis",
   "cyanescens",
@@ -77,6 +102,7 @@ const OFFMENU_EPITHETS = [
   "junonius",
   "spectabilis",
 ];
+const PAIRED_EPITHETS = new Set(["cubensis", "cyanescens", "tropicalis"]);
 const OFFMENU_BINOMIALS = [
   "stropharia cubensis",
   "pluteus salicinus",
@@ -89,6 +115,8 @@ const OFFMENU_PHRASES = [
   "psilocin",
   "magic mushroom",
   "magic mushrooms",
+  "magic shroom",
+  "magic shrooms",
   "golden teacher",
   "penis envy",
   "albino penis envy",
@@ -96,8 +124,39 @@ const OFFMENU_PHRASES = [
   "liberty cap",
   "wavy cap",
   "flying saucer",
+  "treasure coast",
+  "jack frost",
+  "tidal wave",
+  "avery s albino",
+  "averys albino",
+  "lizard king",
+  "pink buffalo",
+  "koh samui",
+  "texas yellow",
+  "z strain",
+  "b plus",
 ];
-const OFFMENU_WORDS = ["ape", "b+"];
+const OFFMENU_WORDS = [
+  "ape",
+  "pe",
+  "pe6",
+  "b+",
+  "shroom",
+  "shrooms",
+  "mushies",
+  "cubes",
+  "mazatapec",
+  "enigma",
+  "thrasher",
+  "mckennaii",
+  "cambodian",
+  "ecuador",
+  "hillbilly",
+  "huautla",
+  "amazonian",
+  "melmac",
+];
+const FUZZY_TARGETS = ["psilocybe", "psilocybin", "cubensis"];
 
 const CONFUSABLES = {
   а: "a",
@@ -139,13 +198,44 @@ const CONFUSABLES = {
   Τ: "t",
   Υ: "y",
   Χ: "x",
+  ı: "i",
+  օ: "o",
+  Օ: "o",
+  ս: "s",
+  ӏ: "i",
+  Ӏ: "i",
+  ꜱ: "s",
+  ʏ: "y",
+  Ꮲ: "p",
+  ɑ: "a",
+  "0": "o",
+  "1": "l",
+  "3": "e",
 };
 
+function editDistance(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const dp = new Array(rows * cols);
+  for (let i = 0; i < rows; i += 1) dp[i * cols] = i;
+  for (let j = 0; j < cols; j += 1) dp[j] = j;
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i * cols + j] = Math.min(dp[(i - 1) * cols + j] + 1, dp[i * cols + j - 1] + 1, dp[(i - 1) * cols + j - 1] + cost);
+    }
+  }
+  return dp[(rows - 1) * cols + (cols - 1)];
+}
+
 export function normalizeTaxonText(value) {
-  const mapped = [...String(value || "").normalize("NFKC")].map((ch) => CONFUSABLES[ch] || ch).join("");
+  const strippedMarks = String(value || "")
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "");
+  const mapped = [...strippedMarks.normalize("NFKC")].map((ch) => CONFUSABLES[ch] || ch).join("");
   return mapped
     .replace(/\p{Cf}/gu, "")
-    .replace(/\p{Mn}/gu, "")
     .toLowerCase()
     .replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000]/g, " ")
     .replace(/[^a-z0-9+]+/g, " ")
@@ -153,30 +243,72 @@ export function normalizeTaxonText(value) {
     .trim();
 }
 
-export function detectsRestrictedTaxon(profile, extra = {}) {
-  const hay = normalizeTaxonText(
-    [
-      profile?.name,
-      profile?.species,
-      profile?.strain,
-      profile?.variety_group,
-      profile?.summary,
-      profile?.notes,
-      profile?.chamber_notes,
-      extra.title,
-      extra.description,
-      ...(Array.isArray(profile?.tags) ? profile.tags : []),
-    ].join(" ")
-  );
-  if (!hay) return false;
-  const words = hay.split(" ");
-  const compact = hay.replace(/ /g, "");
-  if (OFFMENU_GENERA.some((genus) => words.includes(genus) || compact.includes(genus))) return true;
-  if (OFFMENU_EPITHETS.some((name) => words.includes(name) || compact.includes(name))) return true;
-  if (OFFMENU_BINOMIALS.some((name) => hay.includes(name) || compact.includes(name.replace(/ /g, "")))) return true;
-  if (OFFMENU_PHRASES.some((name) => hay.includes(name) || compact.includes(name.replace(/ /g, "")))) return true;
-  if (OFFMENU_WORDS.some((name) => words.includes(name))) return true;
+export function collectTaxonFields(profile, extra = {}) {
+  const fields = [
+    extra.title,
+    extra.description,
+    profile?.name,
+    profile?.species,
+    profile?.strain,
+    profile?.variety_group,
+    profile?.summary,
+    profile?.notes,
+    profile?.chamber_notes,
+    ...(Array.isArray(profile?.tags) ? profile.tags : []),
+  ];
+  for (const stage of Array.isArray(profile?.stages) ? profile.stages : []) {
+    if (stage && typeof stage === "object") fields.push(stage.name, stage.notes);
+  }
+  const recipe = profile?.light_recipe;
+  if (recipe && typeof recipe === "object") {
+    fields.push(recipe.why, recipe.notes);
+    for (const note of Array.isArray(recipe.sources) ? recipe.sources : []) {
+      fields.push(note?.title, note?.detail, note?.notes);
+    }
+    for (const phase of Object.values(recipe.phases || {})) {
+      if (phase && typeof phase === "object") fields.push(phase.notes);
+    }
+  }
+  for (const note of Array.isArray(profile?.source_notes) ? profile.source_notes : []) {
+    fields.push(note?.title, note?.detail);
+  }
+  for (const link of Array.isArray(profile?.affiliate_links) ? profile.affiliate_links : []) {
+    fields.push(link?.label, link?.merchant);
+  }
+  return fields.filter((value) => value != null && String(value).trim() !== "").map((value) => String(value));
+}
+
+function fieldLooksRestricted(raw) {
+  let text = normalizeTaxonText(raw);
+  if (!text) return false;
+  text = text.replace(/\bvitamin b\+/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return false;
+  const words = text.split(" ");
+  const compact = text.replace(/ /g, "");
+  const wordSet = new Set(words);
+  if (PSYCHOACTIVE_GENERA.some((genus) => wordSet.has(genus) || compact.includes(genus))) return true;
+  if (OFFMENU_BINOMIALS.some((name) => text.includes(name) || compact.includes(name.replace(/ /g, "")))) return true;
+  if (OFFMENU_PHRASES.some((name) => text.includes(name) || compact.includes(name.replace(/ /g, "")))) return true;
+  if (OFFMENU_WORDS.some((name) => wordSet.has(name))) return true;
+  const culinaryGenus = CULINARY_GENERA.some((genus) => wordSet.has(genus) || compact.includes(genus));
+  for (const epithet of OFFMENU_EPITHETS) {
+    const present = wordSet.has(epithet) || compact.includes(epithet);
+    if (!present) continue;
+    if (PAIRED_EPITHETS.has(epithet) && culinaryGenus) continue;
+    return true;
+  }
+  for (const token of words) {
+    if (token.length < 6) continue;
+    for (const target of FUZZY_TARGETS) {
+      const max = Math.min(2, Math.max(1, target.length - 7));
+      if (editDistance(token, target) <= max) return true;
+    }
+  }
   return false;
+}
+
+export function detectsRestrictedTaxon(profile, extra = {}) {
+  return collectTaxonFields(profile, extra).some((field) => fieldLooksRestricted(field));
 }
 
 export const RANGES = {

@@ -40,6 +40,15 @@ export async function call(ctx, method, path, { token, body, headers: extra = {}
   return { status: res.status, data: text ? JSON.parse(text) : null, headers: res.headers };
 }
 
+export async function callRaw(ctx, method, path, { token, headers: extra = {}, host } = {}) {
+  const headers = { ...extra };
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (host) headers.host = host;
+  const request = new Request(`${host ? `https://${host}` : "http://test"}${path}`, { method, headers });
+  const res = await handleRequest(request, ctx);
+  return { status: res.status, bytes: new Uint8Array(await res.arrayBuffer()), headers: res.headers };
+}
+
 export async function register(ctx, email = "grower@example.com") {
   const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email, turnstile: "ok" } });
   const res = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });

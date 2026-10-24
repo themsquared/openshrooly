@@ -197,6 +197,26 @@ test("scientific and common names force Off-menu even when labeled culinary", ()
   tagged.species = "Pleurotus ostreatus";
   tagged.tags = ["Psilocybin"];
   assert.equal(detectsRestrictedTaxon(tagged), true);
+  const accented = blankProfile({ id: "accented", name: "Garden mix", pack: "culinary" });
+  accented.species = "Psílocybe cubénsis";
+  assert.equal(detectsRestrictedTaxon(accented), true);
+  const misspelled = blankProfile({ id: "misspelled", name: "Garden mix", pack: "culinary" });
+  misspelled.species = "psilocibe";
+  assert.equal(detectsRestrictedTaxon(misspelled), true);
+  const slang = blankProfile({ id: "slang", name: "Garden mix", pack: "culinary" });
+  slang.species = "Pleurotus ostreatus";
+  slang.notes = "shrooms";
+  assert.equal(detectsRestrictedTaxon(slang), true);
+  const bolete = blankProfile({ id: "bolete", name: "Garden mix", pack: "culinary" });
+  bolete.species = "Gyroporus cyanescens";
+  assert.equal(detectsRestrictedTaxon(bolete), false);
+  const vitamin = blankProfile({ id: "vitamin", name: "Garden mix", pack: "culinary" });
+  vitamin.species = "Pleurotus ostreatus";
+  vitamin.summary = "Add vitamin B+ to the soak";
+  assert.equal(detectsRestrictedTaxon(vitamin), false);
+  const split = blankProfile({ id: "split", name: "Psilo", pack: "culinary" });
+  split.species = "cybe";
+  assert.equal(detectsRestrictedTaxon(split), false);
 });
 
 test("list summaries with a stage count do not crash validation or clone", () => {
