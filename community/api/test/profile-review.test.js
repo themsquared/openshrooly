@@ -698,7 +698,7 @@ test("report-photo reject requires a non-empty reason", async () => {
     body: {},
   });
   assert.equal(missing.status, 400);
-  const still = await ctx.db.one("SELECT photo_status FROM grow_reports WHERE id=?", [item.report_id]);
+  const still = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item.report_id]);
   assert.equal(still.photo_status, "pending");
 });
 
