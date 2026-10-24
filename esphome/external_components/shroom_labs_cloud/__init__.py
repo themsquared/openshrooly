@@ -21,7 +21,7 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(ShroomLabsCloud),
         cv.GenerateID(CONF_WEB_SERVER_BASE_ID): cv.use_id(web_server_base.WebServerBase),
-        cv.Optional(CONF_API_HOST, default="api.shroomlabs.io"): cv.hostname,
+        cv.Optional(CONF_API_HOST, default="api.shroomlabs.io"): cv.domain,
         cv.Optional(CONF_SITE_ORIGIN, default="https://shroomlabs.io"): cv.url,
     }
 ).extend(cv.COMPONENT_SCHEMA)
