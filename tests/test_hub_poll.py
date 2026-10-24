@@ -149,6 +149,15 @@ def test_poll_once_continues_after_blocked_and_unresolvable(client, monkeypatch)
             return {"online": True, "entities": {"temperature": {"value": 21.5}}}
 
     from hub import app as hub_app
+    from hub import targets
+    import ipaddress
+
+    def fake_resolved(host):
+        if host == "192.168.1.50":
+            return [ipaddress.ip_address("192.168.1.50")]
+        if host == "127.0.0.1":
+            return [ipaddress.ip_address("127.0.0.1")]
+        return None
 
     real = hub_app.device_client
 
@@ -157,6 +166,7 @@ def test_poll_once_continues_after_blocked_and_unresolvable(client, monkeypatch)
             return _Good()
         return real(row)
 
+    monkeypatch.setattr(targets, "resolved_ips", fake_resolved)
     monkeypatch.setattr(hub_app, "device_client", fake_client)
     poll_once(conn)
     rows = {row["name"]: json.loads(row["last_status"] or "{}") for row in conn.execute("SELECT * FROM devices")}
@@ -165,7 +175,7 @@ def test_poll_once_continues_after_blocked_and_unresolvable(client, monkeypatch)
     assert rows["Blocked"]["online"] is False
     assert rows["Blocked"]["blocked"] is True
     assert rows["Ghost"]["online"] is False
-    assert rows["Ghost"]["blocked"] is True
+    assert rows["Ghost"]["blocked"] is False
     assert "resolved" in rows["Ghost"]["reason"]
 
 
@@ -181,3 +191,51 @@ def test_device_detail_shows_blocked_state(client):
     assert page.status_code == 200
     assert b"Blocked" in page.content
     assert b"not allowed" in page.content
+
+
+def test_device_detail_shows_offline_when_unresolved(client, monkeypatch):
+    from hub import targets
+
+    monkeypatch.setattr(targets, "resolved_ips", lambda host: None)
+    conn = client.app.state.conn
+    conn.execute(
+        "INSERT INTO devices (name, host, port, added_at) VALUES (?, ?, ?, ?)",
+        ("Ghost", "offline-chamber.local", 80, "2026-01-01T00:00:00+00:00"),
+    )
+    conn.commit()
+    device_id = conn.execute("SELECT id FROM devices WHERE name='Ghost'").fetchone()["id"]
+    page = client.get(f"/devices/{device_id}")
+    assert page.status_code == 200
+    assert b"Offline" in page.content
+    assert b"Blocked" not in page.content
+
+
+def test_refused_apply_redirects_with_message(client):
+    conn = client.app.state.conn
+    conn.execute(
+        "INSERT INTO devices (name, host, port, added_at) VALUES (?, ?, ?, ?)",
+        ("Loop", "127.0.0.1", 80, "2026-01-01T00:00:00+00:00"),
+    )
+    conn.commit()
+    device_id = conn.execute("SELECT id FROM devices WHERE name='Loop'").fetchone()["id"]
+    client.get("/login")
+    token = client.cookies.get("hub_csrf")
+    client.post(
+        "/login",
+        data={"username": "admin", "password": "test-admin-9x", "csrf": token, "next": "/smart-home"},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    token = client.cookies.get("hub_csrf")
+    response = client.post(
+        f"/devices/{device_id}/apply",
+        data={"profile_id": "pearl-oyster", "csrf": token},
+        headers={"Origin": "http://testserver"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/devices/{device_id}?apply=blocked"
+    page = client.get(response.headers["location"])
+    assert page.status_code == 200
+    assert b"The profile was not applied. That address is not allowed." in page.content
+    assert b"Blocked" in page.content

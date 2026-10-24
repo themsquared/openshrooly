@@ -46,8 +46,9 @@ def test_loopback_link_local_and_metadata_are_blocked():
 
 def test_unresolvable_name_is_blocked_at_connect(monkeypatch):
     monkeypatch.setattr("hub.targets.resolved_ips", lambda host: None)
-    with pytest.raises(UnsafeDeviceHost, match="resolved"):
+    with pytest.raises(UnsafeDeviceHost, match="resolved") as caught:
         resolve_connect_ip("offline-chamber.local")
+    assert caught.value.blocked is False
 
 
 def test_connect_rejects_rebinding_to_loopback(monkeypatch):

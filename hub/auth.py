@@ -270,7 +270,7 @@ def basic_ok(request: Request) -> bool:
     parsed = parse_basic(request.headers.get("authorization"))
     if not parsed:
         return False
-    if login_retry_after(client_ip(request)) or login_global_backoff():
+    if login_retry_after(client_ip(request)) or login_global_backoff(client_ip(request)):
         return False
     user, password = parsed
     return user == ADMIN_USER and passwords_match(password, admin_password())
@@ -282,7 +282,7 @@ def evaluate_basic(request: Request) -> tuple[str, int]:
     if not parsed:
         return "none", 0
     ip = client_ip(request)
-    wait = login_retry_after(ip) or login_global_backoff()
+    wait = login_retry_after(ip) or login_global_backoff(ip)
     if wait:
         return "locked", wait
     user, password = parsed
@@ -290,7 +290,7 @@ def evaluate_basic(request: Request) -> tuple[str, int]:
         record_login_success(ip)
         return "ok", 0
     record_login_failure(ip)
-    wait = login_retry_after(ip) or login_global_backoff()
+    wait = login_retry_after(ip) or login_global_backoff(ip)
     if wait:
         return "locked", wait
     return "fail", 0
@@ -408,10 +408,12 @@ class LoginGuard:
         with self._lock:
             return self._locked(self._ip.get(ip, []), stamp, LOGIN_IP_MAX_FAILURES)
 
-    def global_backoff(self, now: float | None = None) -> int:
-        """Short pause after a lot of failures, not a hub-wide lockout."""
+    def global_backoff(self, ip: str, now: float | None = None) -> int:
+        """Slow an IP that already failed. A clean IP can still sign in."""
         stamp = time.time() if now is None else now
         with self._lock:
+            if not self._prune(self._ip.get(ip, []), stamp):
+                return 0
             recent = self._prune(self._global, stamp)
             if len(recent) < LOGIN_GLOBAL_SOFT_MAX:
                 return 0
@@ -440,8 +442,8 @@ def login_retry_after(ip: str) -> int:
     return LOGIN_GUARD.retry_after(ip)
 
 
-def login_global_backoff() -> int:
-    return LOGIN_GUARD.global_backoff()
+def login_global_backoff(ip: str) -> int:
+    return LOGIN_GUARD.global_backoff(ip)
 
 
 def record_login_failure(ip: str) -> None:

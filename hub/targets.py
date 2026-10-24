@@ -31,6 +31,10 @@ BLOCKED_IPS = frozenset(
 class UnsafeDeviceHost(ValueError):
     """Resolved device address is missing or not a safe LAN target."""
 
+    def __init__(self, message: str, *, blocked: bool = True):
+        super().__init__(message)
+        self.blocked = blocked
+
 
 def parse_ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     try:
@@ -114,7 +118,7 @@ def resolve_connect_ip(host: str) -> str:
         raise UnsafeDeviceHost("That address is not allowed. Use the chamber's LAN hostname or IP.")
     addrs = resolved_ips(normalized)
     if not addrs:
-        raise UnsafeDeviceHost("Device host could not be resolved.")
+        raise UnsafeDeviceHost("Device host could not be resolved.", blocked=False)
     safe = [addr for addr in addrs if not ip_is_blocked(addr)]
     if not safe:
         raise UnsafeDeviceHost("That address is not allowed. Use the chamber's LAN hostname or IP.")

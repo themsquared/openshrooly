@@ -107,7 +107,8 @@ def fetch_device_status(row) -> dict:
     try:
         return device_client(row).fetch_status()
     except HTTPException as exc:
-        return unavailable_status(str(exc.detail), blocked=True)
+        blocked = getattr(exc.__cause__, "blocked", True)
+        return unavailable_status(str(exc.detail), blocked=blocked)
     except (OSError, TimeoutError) as exc:
         return unavailable_status(str(exc) or "unreachable", blocked=False)
 
@@ -379,6 +380,10 @@ def device_detail(request: Request, device_id: int):
         "SELECT * FROM samples WHERE device_id=? ORDER BY id DESC LIMIT 48",
         (device_id,),
     ).fetchall()
+    apply_notices = {
+        "blocked": "The profile was not applied. That address is not allowed.",
+        "offline": "The profile was not applied. The chamber is offline.",
+    }
     return page(
         request,
         "device.html",
@@ -388,6 +393,7 @@ def device_detail(request: Request, device_id: int):
         samples=samples,
         preview=None,
         reading=entity_reading(status),
+        apply_error=apply_notices.get(request.query_params.get("apply", "")),
     )
 
 
@@ -419,8 +425,9 @@ def apply_profile(
     stage = profile.stage_by_id(stage_id) if stage_id else profile.stages[0]
     try:
         result = device_client(device).apply_stage(stage)
-    except HTTPException:
-        return RedirectResponse(f"/devices/{device_id}", status_code=303)
+    except HTTPException as exc:
+        kind = "blocked" if getattr(exc.__cause__, "blocked", True) else "offline"
+        return RedirectResponse(f"/devices/{device_id}?apply={kind}", status_code=303)
     if start_grow == "1":
         conn.execute("UPDATE grows SET ended_at=? WHERE device_id=? AND ended_at IS NULL", (db.now(), device_id))
         conn.execute(
@@ -636,12 +643,12 @@ def login_submit(
     if blocked:
         return blocked
     ip = auth.client_ip(request)
-    retry_after = auth.login_retry_after(ip) or auth.login_global_backoff()
+    retry_after = auth.login_retry_after(ip) or auth.login_global_backoff(ip)
     if retry_after:
         return auth.login_locked_response(retry_after)
     if username != auth.ADMIN_USER or not auth.passwords_match(password, auth.admin_password()):
         auth.record_login_failure(ip)
-        retry_after = auth.login_retry_after(ip) or auth.login_global_backoff()
+        retry_after = auth.login_retry_after(ip) or auth.login_global_backoff(ip)
         if retry_after:
             return auth.login_locked_response(retry_after)
         return page(

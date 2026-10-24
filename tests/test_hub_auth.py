@@ -205,9 +205,9 @@ def test_per_ip_login_lockout(client):
 
 
 def test_global_failures_do_not_lock_other_ips(client):
-    past = time.time() - auth.LOGIN_GLOBAL_BACKOFF_S - 1
-    for index in range(auth.LOGIN_GLOBAL_SOFT_MAX + 5):
-        auth.LOGIN_GUARD.record_failure(f"203.0.113.{index}", now=past)
+    now = time.time()
+    for index in range(auth.LOGIN_GLOBAL_SOFT_MAX + 10):
+        auth.LOGIN_GUARD.record_failure(f"203.0.113.{index}", now=now)
     allowed = _login(client, password=PASSWORD)
     assert allowed.status_code == 303
 
