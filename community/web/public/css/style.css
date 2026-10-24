@@ -532,6 +532,20 @@ button.nav-toggle {
 .button.google:hover { background: #1f1f20; border-color: #c4c7c5; }
 .button.google:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
 .button.google .g-logo { flex: none; }
+.button.apple {
+  background: #000;
+  border: 1px solid #000;
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: none;
+  gap: 12px;
+  min-height: 44px;
+  font-family: var(--sans);
+  font-weight: 700;
+}
+.button.apple:hover { background: #1a1a1a; border-color: #1a1a1a; }
+.button.apple:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
+.button.apple .a-logo { flex: none; }
 .site-footer {
   padding: 1.4rem;
   color: var(--sl-muted);

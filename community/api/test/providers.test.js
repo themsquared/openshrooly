@@ -12,7 +12,10 @@ function prodLike() {
     GROW_COACH_STUB: "1",
     RESEND_API_KEY: "",
     GOOGLE_CLIENT_ID: "",
-    APPLE_CLIENT_ID: "",
+    APPLE_TEAM_ID: "",
+    APPLE_KEY_ID: "",
+    APPLE_SERVICES_ID: "",
+    APPLE_PRIVATE_KEY: "",
     PAYMENTS_WEBHOOK_SECRET: "",
     STRIPE_WEBHOOK_SECRET: "",
     STRIPE_SECRET_KEY: "",
@@ -45,6 +48,7 @@ test("stubs are inert in a prod-like config even when leftover stub flags are se
   assert.equal(caps.data.stubs, false);
   assert.equal(caps.data.email, false);
   assert.equal(caps.data.google, false);
+  assert.equal(caps.data.apple, false);
   assert.equal(caps.data.payments, false);
   assert.equal(caps.data.coach, false);
 

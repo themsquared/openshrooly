@@ -32,7 +32,12 @@ export function googleConfigured(env = {}) {
 }
 
 export function appleConfigured(env = {}) {
-  return Boolean(String(env.APPLE_CLIENT_ID || "").trim());
+  return Boolean(
+    String(env.APPLE_TEAM_ID || "").trim() &&
+      String(env.APPLE_KEY_ID || "").trim() &&
+      String(env.APPLE_SERVICES_ID || "").trim() &&
+      String(env.APPLE_PRIVATE_KEY || "").trim()
+  );
 }
 
 export function paymentsConfigured(env = {}) {

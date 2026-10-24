@@ -28,14 +28,18 @@ export function testEnv(extra = {}) {
   };
 }
 
-export async function call(ctx, method, path, { token, body, headers: extra = {}, rawBody, host } = {}) {
-  const headers = { "content-type": "application/json", ...extra };
+export async function call(ctx, method, path, { token, body, form, headers: extra = {}, rawBody, host } = {}) {
+  const headers = { "content-type": form ? "application/x-www-form-urlencoded" : "application/json", ...extra };
   if (token) headers.authorization = `Bearer ${token}`;
   if (host) headers.host = host;
+  let payload;
+  if (rawBody !== undefined) payload = rawBody;
+  else if (form) payload = new URLSearchParams(form).toString();
+  else if (body) payload = JSON.stringify(body);
   const request = new Request(`${host ? `https://${host}` : "http://test"}${path}`, {
     method,
     headers,
-    body: rawBody !== undefined ? rawBody : body ? JSON.stringify(body) : undefined,
+    body: payload,
   });
   const res = await handleRequest(request, ctx);
   const text = await res.text();
