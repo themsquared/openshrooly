@@ -229,3 +229,57 @@ test("claim-status, grace refuse, and self-revoke against Miniflare D1", async (
     assert.equal(row.status, "revoked");
   });
 });
+
+test("b2 b3 b4: anonymous enroll cannot take an owned D1 row", async () => {
+  await withDeviceD1(async (d1, ctx) => {
+    const device = await firmwareDevice();
+    const attacker = await firmwareDevice();
+    const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+      body: enrollBody({ hardware_id: "aabbccddeeffd102", public_jwk: device.public_jwk }),
+    });
+    assert.equal(enrolled.status, 200);
+    const deviceId = enrolled.data.device_id;
+    await d1.prepare("UPDATE cloud_devices SET status=?, owner_id=? WHERE id=?").bind("claimed", 1, deviceId).run();
+    const b3 = await call(ctx, "POST", "/api/devices/enroll", {
+      body: enrollBody({ hardware_id: "aabbccddeeffd102", public_jwk: attacker.public_jwk }),
+    });
+    assert.equal(b3.status, 409);
+    assert.equal(b3.data.code, "already_claimed");
+
+    const ninety = new Date(Date.now() - 90 * 86400000).toISOString().replace(/\.\d+Z$/, "Z");
+    await d1.prepare("UPDATE cloud_devices SET status=? WHERE id=?").bind("active", deviceId).run();
+    await d1
+      .prepare(
+        "INSERT INTO device_certs (device_id, serial, fingerprint, pem, issuer, status, cf_id, not_before, not_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(deviceId, "d1b2", "ee".repeat(32), "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n", "worker-ca", "active", null, ninety, ninety, ninety)
+      .run();
+    await d1
+      .prepare("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)")
+      .bind(deviceId, JSON.stringify({ temp: 19 }), ninety)
+      .run();
+    const b2 = await call(ctx, "POST", "/api/devices/enroll", {
+      body: enrollBody({ hardware_id: "aabbccddeeffd102", public_jwk: attacker.public_jwk }),
+    });
+    assert.equal(b2.status, 409);
+    const owner = await d1.prepare("SELECT owner_id, status FROM cloud_devices WHERE id=?").bind(deviceId).first();
+    assert.equal(Number(owner.owner_id), 1);
+    const csr = await makeCsr(attacker.keys, deviceId);
+    const csrRaw = JSON.stringify(csrBody({ csr, enroll_token: "nope" }));
+    const nonce = await call(ctx, "POST", `/api/devices/${deviceId}/nonce`, { body: {} });
+    const b4 = await call(ctx, "POST", `/api/devices/${deviceId}/csr`, {
+      headers: await firmwareHeaders({
+        deviceId,
+        key: attacker.keys.privateKey,
+        method: "POST",
+        path: `/api/devices/${deviceId}/csr`,
+        body: csrRaw,
+        nonce: nonce.data.nonce,
+      }),
+      body: csrRaw,
+    });
+    assert.notEqual(b4.status, 200);
+    const tel = await d1.prepare("SELECT COUNT(*) AS n FROM device_telemetry WHERE device_id=?").bind(deviceId).first();
+    assert.equal(Number(tel.n), 1);
+  });
+});

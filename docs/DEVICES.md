@@ -101,10 +101,10 @@ Trust boundaries:
 2. Owner signs in (verified email) → `POST /api/devices/claim` `{ code }`.
 3. Device polls `POST /api/devices/:id/claim-status` `{ enroll_token }` (no nonce) every ~5 s. The reply is only `{ claimed }`. After `claimed: true` it gets a nonce and `POST /api/devices/:id/csr` `{ csr, enroll_token }` with PoP → 7-day client cert (`issuer` is `worker-ca` or `cloudflare-managed`). Optional `GET /api/devices/ca` pins the Worker CA.
 4. Device calls `GET /api/devices/:id/inbox` and `POST /api/devices/:id/telemetry` with `x-device-cert-serial` plus a fresh nonce and proof on every request.
-5. Silent rotate at ~3.5 days: new CSR + current serial + PoP → new cert, then the predecessor is superseded. Renewal needs that device's current serial, issued to it, not revoked, and either still valid or expired less than 30 days ago (superseded is allowed in that same window). Otherwise `relink_required`.
-6. Account `POST /api/devices/:id/revoke` (session). Device Disconnect calls `POST /api/devices/:id/self-revoke` with the same nonce + key proof as other device routes. Both set status=revoked, revoke certs, and audit. The chamber then wipes its key. A later Connect enrolls a new key (allowed once the row is revoked).
-7. Auth errors are distinguishable JSON `code` values: `revoked` (403, wipe the key), `cert_expired` (401, keep the key and renew by proof for 30 days), `relink_required` (401, wipe the key and show Link again), `proof_invalid` (401, back off and retry). Do not treat every 401 as a revoke.
-8. Claim-status polls do not use a nonce and do not count against the CSR issue limit. A leftover CSR poll while unclaimed is still capped at 240 / 15 min (`device-csr-poll`). The chamber polls about every 5 s until the code expires.
+5. Silent rotate at ~3.5 days: new CSR + a serial of that device (the active serial, or a superseded serial still inside its 30-day `not_after` grace) plus PoP → new cert, then every other active serial is superseded. Otherwise `relink_required`. Watch `relink_required` volume: a bad serial table could ask every chamber to link again. The chamber confirms that code twice, an hour apart, and keeps its key.
+6. Account `POST /api/devices/:id/revoke` (session). Device Disconnect calls `POST /api/devices/:id/self-revoke` with the same nonce + key proof as other device routes. Both set status=revoked, revoke certs, and audit. The chamber then wipes its key. A later Connect enrolls a new key on a new device id (old telemetry is dropped). An unauthenticated enroll never resets an owned row: hardware id alone is not enough. Relink after grace proves the registered key and keeps the owner until that owner claims the new code or removes the chamber on the site.
+7. Auth errors are distinguishable JSON `code` values: `revoked` (403, wipe the key), `cert_expired` (401, keep the key and renew by proof for 30 days), `relink_required` (401, confirm then show Link again, keep the key), `proof_invalid` (401, back off and retry). Do not treat every 401 as a revoke.
+8. Claim-status polls do not use a nonce and do not count against the CSR issue limit. The enroll token expires with the 15-minute claim window while unclaimed and is cleared after the first cert. A leftover CSR poll while unclaimed is still capped at 240 / 15 min (`device-csr-poll`). Claim-status IP limits apply only to 404/401, and `Retry-After` is capped at 60 s so several chambers behind one router can still pair.
 
 Commands the SaaS may queue: `apply_profile`, `setpoints`, `schedule`, `firmware_notice`. The device decides whether to apply.
 
@@ -123,7 +123,7 @@ The component is in the default 1.0.x-sl build (`esphome/components/cloud.yaml`)
 
 ### Flash layout (proposal, not applied)
 
-The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 97.2% full (~51 KB free). OTA still fits. The next feature of this size will not.
+The chamber has 16 MB of flash (`docs/RECOVERY.md`). The image still uses ESPHome's 4 MB dual-OTA table: two 1,835,008-byte app slots. After pairing, one slot is about 97.2% full (~50 KB free). OTA still fits. The next feature of this size will not.
 
 Do not flash a new table from this pairing ship. A later layout change needs its own design. Rewriting the table from the running app and writing both slots cannot survive a power cut: a bad table cannot be undone by OTA rollback, and a 6 MB ota_0 would overlap the running image and today's NVS at 0x3A0000.
 

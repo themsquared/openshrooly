@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <mbedtls/sha256.h>
 #include <openssl/sha.h>
 #include <string>
 #include <vector>
@@ -421,8 +422,15 @@ int main() {
     bool status_claimed = true;
     int nonce_limit = 60;
     int nonce_count = 0;
+    int enroll_with_proof = 0;
     HttpResponse execute(const HttpRequest &req) override {
       urls.push_back(req.url);
+      if (req.url.find("/enroll") != std::string::npos) {
+        for (const auto &h : req.headers) {
+          if (h.first == "x-device-proof" && !h.second.empty())
+            enroll_with_proof++;
+        }
+      }
       if (auto_status && req.url.find("/claim-status") != std::string::npos) {
         HttpResponse s;
         s.ok = true;
@@ -730,22 +738,35 @@ int main() {
   tr18.steps = {{"/enroll", ok_body(200, enroll_ok)},
                 {"/csr", ok_body(200, cert_ok)},
                 {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
+                {"/rotate", ok_body(401, "{\"code\":\"relink_required\"}")},
                 {"/enroll", ok_body(200, enroll_ok)}};
   CloudEngine eng18(&tr18, &clk, &store18, &crypto);
+  clk.wall = 2000000000000;
   eng18.connect();
   eng18.csr_now();
   expect(eng18.state() == CloudState::Linked, "relink start linked");
   eng18.rotate_now();
-  expect(eng18.state() == CloudState::Relink, "relink_required is Relink");
-  expect(!eng18.has_key(), "relink wipes key");
+  expect(eng18.state() == CloudState::Linked, "first relink_required keeps Linked");
+  expect(eng18.has_key(), "first relink_required keeps key");
+  clk.wall = 2000000000000 + RELINK_CONFIRM_MS;
+  eng18.rotate_now();
+  expect(eng18.state() == CloudState::Relink, "second relink_required is Relink");
+  expect(eng18.has_key(), "relink keeps key");
+  expect(!eng18.device_id().empty(), "relink keeps device id");
   expect(!eng18.has_cert(), "relink wipes cert");
-  expect(!eng18.cloud_enabled(), "relink is unlinked");
+  expect(eng18.cloud_enabled(), "relink stays enabled");
   expect(eng18.display_title() == "Unlinked", "relink title");
   expect(eng18.display_code().empty(), "relink hides code");
   expect(std::strstr(eng18.display_hint().c_str(), "offline too long") != nullptr, "relink copy");
   expect(std::strstr(eng18.status_json().c_str(), "Press Connect") != nullptr, "relink json copy");
+  CloudEngine eng18b(&tr18, &clk, &store18, &crypto);
+  eng18b.load();
+  expect(eng18b.state() == CloudState::Relink, "relink persists across reboot");
+  expect(std::strstr(eng18b.display_hint().c_str(), "offline too long") != nullptr, "relink copy after reboot");
+  int proofs_before = tr18.enroll_with_proof;
   eng18.connect();
   expect(eng18.state() == CloudState::PendingClaim, "relink connect enrolls");
+  expect(tr18.enroll_with_proof > proofs_before, "relink enroll proves key");
 
   HostStore store19;
   ScriptTransport tr19;
@@ -771,6 +792,47 @@ int main() {
   expect(saw_busy_revoke, "busy disconnect still revokes");
   eng19.finish();
   eng19.drain_queued();
+
+  HostStore store19b;
+  ScriptTransport tr19b;
+  tr19b.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/inbox", ok_body(200, "{\"commands\":[]}")},
+                 {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine eng19b(&tr19b, &clk, &store19b, &crypto);
+  eng19b.connect();
+  eng19b.csr_now();
+  expect(eng19b.try_begin(CloudJob::PROBE), "tail race begin");
+  eng19b.run_job(CloudJob::PROBE);
+  expect(eng19b.has_key(), "tail race job done still linked");
+  eng19b.disconnect();
+  expect(eng19b.has_key(), "tail race disconnect waits");
+  expect(eng19b.state() != CloudState::Off, "tail race not wiped yet");
+  eng19b.finish();
+  eng19b.drain_queued();
+  expect(eng19b.state() == CloudState::Off, "tail race drain wipes");
+  expect(!eng19b.has_key(), "tail race zeros key");
+  bool saw_tail_revoke = false;
+  for (const auto &u : tr19b.urls)
+    saw_tail_revoke = saw_tail_revoke || u.find("/self-revoke") != std::string::npos;
+  expect(saw_tail_revoke, "tail race still revokes");
+
+  HostStore store19c;
+  ScriptTransport tr19c;
+  tr19c.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                 {"/csr", ok_body(200, cert_ok)},
+                 {"/rotate", ok_body(200, cert_ok)},
+                 {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine eng19c(&tr19c, &clk, &store19c, &crypto);
+  eng19c.connect();
+  eng19c.csr_now();
+  expect(eng19c.try_begin(CloudJob::ROTATE), "rotate discard begin");
+  eng19c.disconnect();
+  eng19c.run_job(CloudJob::ROTATE);
+  expect(eng19c.state() == CloudState::Off, "rotate discard then wipe");
+  expect(!eng19c.has_cert(), "rotate discard drops cert write-back");
+  eng19c.finish();
+  eng19c.drain_queued();
 
   HostStore store20;
   ScriptTransport tr20;
@@ -843,10 +905,10 @@ int main() {
   const char *abc_sha = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
   uint8_t digest[32];
   char hex[65];
-  expect(crypto.sha256(nullptr, 0, digest), "sha empty call");
+  expect(mbedtls_sha256_ret(nullptr, 0, digest, 0) == 0, "sha empty call");
   hex_encode_to(digest, 32, hex);
   expect(std::strcmp(hex, empty_sha) == 0, "sha empty FIPS");
-  expect(crypto.sha256(reinterpret_cast<const uint8_t *>("abc"), 3, digest), "sha abc call");
+  expect(mbedtls_sha256_ret(reinterpret_cast<const uint8_t *>("abc"), 3, digest, 0) == 0, "sha abc call");
   hex_encode_to(digest, 32, hex);
   expect(std::strcmp(hex, abc_sha) == 0, "sha abc FIPS");
   int sha_bad = 0;
@@ -856,15 +918,16 @@ int main() {
       buf[static_cast<size_t>(i)] = static_cast<uint8_t>(i & 0xff);
     uint8_t got[32];
     uint8_t exp[32];
-    if (!crypto.sha256(n ? buf.data() : nullptr, static_cast<size_t>(n), got)) {
+    const uint8_t *p = n ? buf.data() : nullptr;
+    if (mbedtls_sha256_ret(p, static_cast<size_t>(n), got, 0) != 0) {
       sha_bad++;
       continue;
     }
-    SHA256(n ? buf.data() : nullptr, static_cast<size_t>(n), exp);
+    SHA256(p, static_cast<size_t>(n), exp);
     if (std::memcmp(got, exp, 32) != 0)
       sha_bad++;
   }
-  expect(sha_bad == 0, "sha known-answer 0-300");
+  expect(sha_bad == 0, "sha mbedtls known-answer 0-300");
 
   return fails ? 1 : 0;
 }

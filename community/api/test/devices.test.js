@@ -247,8 +247,14 @@ test("only one active cert per device: a second CSR supersedes the first", async
   const ctx = env();
   const { token } = await register(ctx);
   const d = await enrollClaimIssue(ctx, token);
-  const second = await requestCert(ctx, d);
-  assert.equal(second.status, 200);
+  const csr2 = await buildCsr(d.pair.keys.privateKey, d.pair.keys.publicKey, d.deviceId);
+  const second = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/rotate`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { csr: csr2 },
+  });
+  assert.equal(second.status, 200, JSON.stringify(second.data));
   const rows = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
   assert.equal(rows.filter((r) => r.status === "active").length, 1);
   assert.equal(new Set(rows.map((r) => r.serial)).size, rows.length);
@@ -367,7 +373,8 @@ test("garbage, oversized, and non-P-256 CSRs are refused with 4xx", async () => 
   }
   // Nine refusals plus this one make ten CSR attempts, the hourly cap per device.
   assert.equal((await send(good)).status, 200);
-  assert.equal((await send(good)).status, 429);
+  // First cert clears the enroll token, so a later CSR cannot reuse it.
+  assert.equal((await send(good)).status, 401);
 });
 
 test("oversized CSR and oversized device bodies are refused with 413", async () => {
@@ -863,25 +870,97 @@ test("anonymous rotate and self-revoke do not consume the device rate limit", as
   assert.equal(revoked.status, 200, JSON.stringify(revoked.data));
 });
 
-test("enroll after grace reset lets the chamber link again", async () => {
+test("b2: anonymous enroll cannot take a chamber past cert grace", async () => {
   const ctx = env();
-  const { token } = await register(ctx);
-  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffaa09");
-  const other = await devicePair();
-  const stillLinked = await call(ctx, "POST", "/api/devices/enroll", {
-    body: { hardware_id: "aabbccddeeffaa09", public_jwk: other.public_jwk, name: "Kitchen" },
-  });
-  assert.equal(stillLinked.status, 409);
-  assert.equal(stillLinked.data.code, "already_claimed");
-
+  const { token } = await register(ctx, "owner-b2@example.com");
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffbb02");
+  await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+    d.deviceId,
+    JSON.stringify({ temp: 20 }),
+    "2026-01-01T00:00:00Z",
+  ]);
   const rows = await ctx.db.all("SELECT * FROM device_certs WHERE device_id=?", [d.deviceId]);
   for (const row of rows) row.not_after = new Date(Date.now() - 90 * 86400000).toISOString();
-  const again = await call(ctx, "POST", "/api/devices/enroll", {
-    body: { hardware_id: "aabbccddeeffaa09", public_jwk: other.public_jwk, name: "Kitchen" },
+  const attacker = await devicePair();
+  const hijack = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb02", public_jwk: attacker.public_jwk, name: "Stolen" },
   });
-  assert.equal(again.status, 200, JSON.stringify(again.data));
-  assert.equal(again.data.device_id, d.deviceId);
+  assert.equal(hijack.status, 409, JSON.stringify(hijack.data));
+  assert.equal(hijack.data.code, "already_claimed");
+  const kept = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(Number(kept.owner_id) > 0, true);
+  assert.notEqual(kept.status, "unclaimed");
+  const listed = await call(ctx, "GET", "/api/devices", { token });
+  assert.equal(listed.data.devices[0].id, d.deviceId);
+
+  const proven = await deviceCall(ctx, "POST", "/api/devices/enroll", {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    body: { hardware_id: "aabbccddeeffbb02", public_jwk: d.pair.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(proven.status, 200, JSON.stringify(proven.data));
+  assert.equal(proven.data.device_id, d.deviceId);
+  const after = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(Number(after.owner_id), Number(kept.owner_id));
+  const tel = await ctx.db.all("SELECT * FROM device_telemetry WHERE device_id=?", [d.deviceId]);
+  assert.equal(tel.length, 1);
+});
+
+test("b3: anonymous enroll cannot take a claimed chamber before the first cert", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b3@example.com");
+  const d = await enrollClaim(ctx, token, "aabbccddeeffbb03");
+  const attacker = await devicePair();
+  const hijack = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb03", public_jwk: attacker.public_jwk, name: "Stolen" },
+  });
+  assert.equal(hijack.status, 409);
+  assert.equal(hijack.data.code, "already_claimed");
+  const issued = await requestCert(ctx, d);
+  assert.equal(issued.status, 200, JSON.stringify(issued.data));
+});
+
+test("b4: attacker cannot complete CSR after a failed takeover", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b4@example.com");
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffbb04");
+  const attacker = await devicePair();
+  const hijack = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb04", public_jwk: attacker.public_jwk, name: "Stolen" },
+  });
+  assert.equal(hijack.status, 409);
+  const csr = await buildCsr(attacker.keys.privateKey, attacker.keys.publicKey, d.deviceId);
+  const stolen = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/csr`, {
+    deviceId: d.deviceId,
+    key: attacker.keys.privateKey,
+    body: { csr, enroll_token: "nope" },
+  });
+  assert.notEqual(stolen.status, 200);
   const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
-  assert.equal(row.status, "unclaimed");
-  assert.equal(row.owner_id, null);
+  assert.equal(row.status, "active");
+  const listed = await call(ctx, "GET", "/api/devices", { token });
+  assert.equal(listed.data.devices[0].status, "active");
+});
+
+test("revoked re-enroll issues a new device id and drops old telemetry", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b5@example.com");
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffbb05");
+  await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+    d.deviceId,
+    JSON.stringify({ temp: 21 }),
+    "2026-01-01T00:00:00Z",
+  ]);
+  const revoked = await call(ctx, "POST", `/api/devices/${d.deviceId}/revoke`, { token, body: {} });
+  assert.equal(revoked.status, 200);
+  const next = await devicePair();
+  const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb05", public_jwk: next.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(enrolled.status, 200, JSON.stringify(enrolled.data));
+  assert.notEqual(enrolled.data.device_id, d.deviceId);
+  const oldTel = await ctx.db.all("SELECT * FROM device_telemetry WHERE device_id=?", [d.deviceId]);
+  assert.equal(oldTel.length, 0);
+  const oldRow = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(oldRow, null);
 });

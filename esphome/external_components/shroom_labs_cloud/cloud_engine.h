@@ -89,6 +89,7 @@ class CloudEngine {
   void clear_cert_();
   void wipe_();
   void relink_();
+  bool confirm_relink_();
   void zero_key_();
   bool discard_job_() const { return pending_wipe_; }
   void drain_queued_();
@@ -153,6 +154,7 @@ class CloudEngine {
   std::atomic<bool> revoke_failed_{false};
   CloudJob job_{CloudJob::NONE};
   CloudJob queued_{CloudJob::NONE};
+  int64_t relink_seen_ms_{0};
   mutable std::mutex lock_;
 };
 

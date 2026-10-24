@@ -43,7 +43,7 @@ void CloudEngine::load() {
   has_cert_ = s.has_cert && !cert_pem_.empty() && !serial_.empty();
   cloud_enabled_ = s.enabled != 0;
   state_ = persist_state(static_cast<CloudState>(s.state));
-  if (!cloud_enabled_)
+  if (!cloud_enabled_ && state_ != CloudState::Relink)
     state_ = CloudState::Off;
   if (state_ == CloudState::PendingClaim) {
     const int64_t exp = parse_iso8601_ms(claim_expires_.c_str());
@@ -114,7 +114,6 @@ void CloudEngine::zero_key_() {
 }
 
 void CloudEngine::relink_() {
-  zero_key_();
   if (!enroll_token_.empty())
     secure_clear(&enroll_token_[0], enroll_token_.size());
   enroll_token_.clear();
@@ -128,8 +127,7 @@ void CloudEngine::relink_() {
   not_after_.clear();
   has_cert_ = false;
   issued_ms_ = 0;
-  device_id_.clear();
-  cloud_enabled_ = false;
+  cloud_enabled_ = true;
   state_ = CloudState::Relink;
   if (store_)
     store_->save_cert("");
@@ -218,9 +216,17 @@ void CloudEngine::finish() {
 }
 
 void CloudEngine::drain_queued_() {
+  if (pending_wipe_) {
+    queued_ = CloudJob::NONE;
+    if (!try_begin(CloudJob::REVOKE))
+      return;
+    handle_revoke_();
+    finish();
+    return;
+  }
   CloudJob next = queued_;
   queued_ = CloudJob::NONE;
-  if (next != CloudJob::NONE && !pending_wipe_)
+  if (next != CloudJob::NONE)
     queue_(next);
 }
 
@@ -302,20 +308,15 @@ void CloudEngine::connect() {
 }
 
 void CloudEngine::disconnect() {
-  bool had_id = false;
   {
     std::lock_guard<std::mutex> g(lock_);
-    had_id = !device_id_.empty() && has_key_;
     pending_wipe_ = true;
     queued_ = CloudJob::NONE;
   }
-  if (had_id && queue_(CloudJob::REVOKE))
+  if (!try_begin(CloudJob::REVOKE))
     return;
-  if (!busy_) {
-    std::lock_guard<std::mutex> g(lock_);
-    wipe_();
-    pending_wipe_ = false;
-  }
+  handle_revoke_();
+  finish();
 }
 
 void CloudEngine::refresh() {
@@ -648,7 +649,8 @@ bool CloudEngine::handle_enroll_() {
   }
   std::string jwk = jwk_json(snap.pub_x, snap.pub_y);
   std::string body = enroll_body_json(crypto_->hardware_id().c_str(), jwk.c_str(), "Chamber");
-  HttpResponse r = http_("POST", "/api/devices/enroll", body, false, false);
+  const bool pop = snap.has_key && !snap.device_id.empty();
+  HttpResponse r = http_("POST", "/api/devices/enroll", body, pop, false);
   std::lock_guard<std::mutex> g(lock_);
   if (discard_job_())
     return false;
@@ -781,6 +783,8 @@ bool CloudEngine::handle_rotate_() {
   std::string body = rotate_body_json(csr.c_str());
   HttpResponse r = http_("POST", path.c_str(), body, true, true);
   std::lock_guard<std::mutex> g(lock_);
+  if (discard_job_())
+    return false;
   const HttpOutcome o = rotate_outcome(response_usable(r), r.status, r.body.c_str());
   if (o == HttpOutcome::Success) {
     if (!store_cert_(r.body)) {
@@ -792,8 +796,8 @@ bool CloudEngine::handle_rotate_() {
     apply_(CloudEvent::RotateOk);
     return true;
   }
-  apply_(event_for_rotate(o));
   if (o == HttpOutcome::AuthFail) {
+    apply_(event_for_rotate(o));
     wipe_();
     state_ = CloudState::Revoked;
     cloud_enabled_ = true;
@@ -801,9 +805,16 @@ bool CloudEngine::handle_rotate_() {
     return false;
   }
   if (o == HttpOutcome::RelinkRequired) {
+    if (!confirm_relink_()) {
+      apply_(CloudEvent::CertExpired);
+      bump_backoff_(r.retry_after_s);
+      return false;
+    }
+    apply_(CloudEvent::RelinkRequired);
     relink_();
     return false;
   }
+  apply_(event_for_rotate(o));
   bump_backoff_(r.retry_after_s);
   return false;
 }
@@ -844,6 +855,11 @@ bool CloudEngine::handle_probe_() {
     return false;
   }
   if (o == HttpOutcome::RelinkRequired) {
+    if (!confirm_relink_()) {
+      apply_(CloudEvent::CertExpired);
+      bump_backoff_(r.retry_after_s);
+      return false;
+    }
     apply_(CloudEvent::RelinkRequired);
     relink_();
     return false;
@@ -871,7 +887,18 @@ bool CloudEngine::handle_revoke_() {
   std::lock_guard<std::mutex> g(lock_);
   revoke_failed_ = !ok;
   wipe_();
+  pending_wipe_ = false;
   return ok;
+}
+
+bool CloudEngine::confirm_relink_() {
+  const int64_t wall = wall_();
+  const int64_t now = wall > 0 ? wall : static_cast<int64_t>(now_());
+  if (relink_seen_ms_ == 0) {
+    relink_seen_ms_ = now == 0 ? 1 : now;
+    return false;
+  }
+  return now - relink_seen_ms_ >= RELINK_CONFIRM_MS;
 }
 
 void CloudEngine::maybe_fill_issued_() {

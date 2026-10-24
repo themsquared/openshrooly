@@ -40,6 +40,8 @@ def main():
             str(COMP / "cloud_engine.cpp"),
             str(COMP / "cloud_qr.cpp"),
             "-lcrypto",
+            "-lmbedtls",
+            "-lmbedcrypto",
             "-o",
             str(exe),
         )

@@ -704,6 +704,16 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.public_jwk = params[0];
     return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
   }
+  if (q.startsWith("UPDATE cloud_devices SET enroll_hash=?, claim_code_hash=?, claim_expires_at=?, status=?")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[4]);
+    if (row) {
+      row.enroll_hash = params[0];
+      row.claim_code_hash = params[1];
+      row.claim_expires_at = params[2];
+      row.status = params[3];
+    }
+    return {};
+  }
   if (q.startsWith("UPDATE cloud_devices SET public_jwk=")) {
     const row = tables.cloud_devices.find((d) => d.id === params[7]);
     if (row) {
@@ -746,6 +756,15 @@ function dispatch(mode, tables, ids, sql, params) {
       row.enroll_hash = params[4];
       row.claim_code_hash = params[5];
       row.claim_expires_at = params[6];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE cloud_devices SET status=?, cloud_enabled=?, enroll_hash=?")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[3]);
+    if (row) {
+      row.status = params[0];
+      row.cloud_enabled = params[1];
+      row.enroll_hash = params[2];
     }
     return {};
   }
@@ -837,6 +856,31 @@ function dispatch(mode, tables, ids, sql, params) {
     if (idx < 0) return { changes: 0, meta: { changes: 0 } };
     tables.device_nonces.splice(idx, 1);
     return { changes: 1, meta: { changes: 1 } };
+  }
+  if (q.startsWith("DELETE FROM device_telemetry WHERE device_id=")) {
+    const before = tables.device_telemetry.length;
+    tables.device_telemetry = tables.device_telemetry.filter((t) => t.device_id !== params[0]);
+    return { changes: before - tables.device_telemetry.length };
+  }
+  if (q.startsWith("DELETE FROM device_commands WHERE device_id=")) {
+    const before = tables.device_commands.length;
+    tables.device_commands = tables.device_commands.filter((c) => c.device_id !== params[0]);
+    return { changes: before - tables.device_commands.length };
+  }
+  if (q.startsWith("DELETE FROM device_nonces WHERE device_id=")) {
+    const before = tables.device_nonces.length;
+    tables.device_nonces = tables.device_nonces.filter((n) => n.device_id !== params[0]);
+    return { changes: before - tables.device_nonces.length };
+  }
+  if (q.startsWith("DELETE FROM device_certs WHERE device_id=")) {
+    const before = tables.device_certs.length;
+    tables.device_certs = tables.device_certs.filter((c) => c.device_id !== params[0]);
+    return { changes: before - tables.device_certs.length };
+  }
+  if (q.startsWith("DELETE FROM cloud_devices WHERE id=")) {
+    const before = tables.cloud_devices.length;
+    tables.cloud_devices = tables.cloud_devices.filter((d) => d.id !== params[0]);
+    return { changes: before - tables.cloud_devices.length };
   }
   if (q.startsWith("SELECT * FROM device_telemetry WHERE device_id=")) {
     return tables.device_telemetry.filter((t) => t.device_id === params[0]);
