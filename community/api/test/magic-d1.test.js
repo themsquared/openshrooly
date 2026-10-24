@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Miniflare } from "miniflare";
 import { createD1Db } from "../src/db.js";
-import { call, testEnv } from "./helpers.js";
+import {
+  SAMPLE_CULINARY_PROFILE,
+  assertNoPublicPii,
+  assertPublicHandle,
+  call,
+  testEnv,
+} from "./helpers.js";
+import { renderLlms, renderProfilePage, renderSitemap } from "../../web/scripts/generate-seo.js";
 import { sha256Hex } from "../src/crypto.js";
 
 // schema.sql must match production, where users.password_hash is NOT NULL.
@@ -39,6 +46,8 @@ test("magic link creates a new account on the production schema, once", async ()
     const done = await complete(ctx, tok);
     assert.equal(done.status, 200, JSON.stringify(done.data));
     assert.equal(done.data.user.email, "new@example.com");
+    const created = await d1.prepare("SELECT username, display_name FROM users WHERE email=?").bind("new@example.com").first();
+    assertPublicHandle(created, done.data.user);
     assert.equal((await complete(ctx, tok)).status, 401);
     const login = await call(ctx, "POST", "/api/auth/login", { body: { email: "new@example.com", password: "!no-password" } });
     assert.equal(login.status, 401, "the no-password marker must never work as a password");
@@ -50,6 +59,32 @@ test("concurrent use of one magic link signs in exactly once", async () => {
     const tok = await start(d1, "race@example.com");
     const results = await Promise.all([1, 2, 3].map(() => complete(ctx, tok)));
     assert.deepEqual(results.map((r) => r.status).sort(), [200, 401, 401]);
+  });
+});
+
+test("magic link sign-up with grower@gmail.com gets a random public handle", async () => {
+  await withProdD1(async (d1, ctx) => {
+    const tok = await start(d1, "grower@gmail.com");
+    const done = await complete(ctx, tok);
+    assert.equal(done.status, 200, JSON.stringify(done.data));
+    const row = await d1.prepare("SELECT username, display_name FROM users WHERE email=?").bind("grower@gmail.com").first();
+    assertPublicHandle(row, done.data.user);
+    assert.doesNotMatch(row.username, /grower@/i);
+
+    const created = await call(ctx, "POST", "/api/profiles", {
+      token: done.data.access_token,
+      body: { ...SAMPLE_CULINARY_PROFILE, id: "magic-privacy-oyster" },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.data));
+    assert.equal(created.data.author, row.username);
+    const leak = (value, label) => assertNoPublicPii(value, "grower@gmail.com", [], label);
+    leak(created.data, "publish");
+    leak((await call(ctx, "GET", "/api/profiles/magic-privacy-oyster")).data, "profile GET");
+    leak((await call(ctx, "GET", "/api/profiles?pack=culinary")).data, "profile list");
+    leak((await call(ctx, "GET", "/api/search?pack=culinary&q=Privacy")).data, "search");
+    leak(renderSitemap([created.data]), "sitemap");
+    leak(renderLlms([created.data]), "llms.txt");
+    leak(renderProfilePage(created.data), "profile page");
   });
 });
 

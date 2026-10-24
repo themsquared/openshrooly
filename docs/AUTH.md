@@ -48,7 +48,7 @@ Code: `community/api/src/auth.js` (routes) and `community/api/src/oidc.js` (toke
 - A Google account (`sub`) that is already linked signs in to its linked Shroom Labs account.
 - Otherwise, if a Shroom Labs account has the same email **and that email is verified** (magic link or an earlier provider), the Google identity is linked to it. An account already linked to a different Google `sub` is never re-linked by email.
 - An account whose email is **not** verified is never linked or signed in by Google. The sign-in fails, so nobody can pre-register a victim's address and wait.
-- Otherwise a new account is created with the email marked verified.
+- Otherwise a new account is created with the email marked verified. The public username and `display_name` are a random `grower_<hex>` handle, not the email local part or a provider name. Existing accounts are not renamed.
 
 ### Apple Services ID + key (required once the Expo app offers Google)
 
