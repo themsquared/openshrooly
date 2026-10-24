@@ -506,6 +506,21 @@ button.nav-toggle {
   font-weight: 700;
 }
 .auth-actions { display: grid; gap: 10px; margin: 1rem 0; }
+/* Google brand button, dark theme (Google Identity branding: #131314 fill, #8E918F stroke, #E3E3E3 label). */
+.button.google {
+  background: #131314;
+  border: 1px solid #8e918f;
+  color: #e3e3e3;
+  border-radius: 12px;
+  box-shadow: none;
+  gap: 12px;
+  min-height: 44px;
+  font-family: var(--sans);
+  font-weight: 700;
+}
+.button.google:hover { background: #1f1f20; border-color: #c4c7c5; }
+.button.google:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
+.button.google .g-logo { flex: none; }
 .site-footer {
   padding: 1.4rem;
   color: var(--sl-muted);

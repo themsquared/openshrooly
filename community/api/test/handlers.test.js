@@ -117,7 +117,11 @@ test("OIDC Google stub and passkey challenge", async () => {
   const start = await call(ctx, "GET", "/api/auth/oidc/google/start");
   assert.equal(start.status, 200);
   assert.ok(start.data.authorize_url.includes("accounts.google.com"));
-  const cb = await call(ctx, "GET", `/api/auth/oidc/google/callback?state=${start.data.state}&code=stub`);
+  const binding = String(start.headers.get("set-cookie")).split(";")[0];
+  assert.match(binding, /^__Host-sl_oidc=/);
+  const cb = await call(ctx, "GET", `/api/auth/oidc/google/callback?state=${start.data.state}&code=stub`, {
+    headers: { cookie: binding },
+  });
   assert.equal(cb.status, 200);
   assert.equal(cb.data.user.email, "google.user@example.com");
   const { token } = await register(ctx, "passkey@example.com");

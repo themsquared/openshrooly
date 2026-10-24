@@ -18,6 +18,7 @@ import { sendEmail } from "./email.js";
 import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } from "./providers.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, rateLimitClient, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
+import { safeEqual, safeNextPath, sha256B64url, verifyIdToken } from "./oidc.js";
 import {
   allowedOrigins,
   clientDataOk,
@@ -35,6 +36,9 @@ const SESSION_MS = 30 * 60 * 1000;
 const REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
 const MAGIC_MS = 15 * 60 * 1000;
 const COOKIE = "__Host-sl_session";
+const OIDC_COOKIE = "__Host-sl_oidc";
+const OIDC_STATE_MS = 10 * 60 * 1000;
+const OIDC_HANDOFF_MS = 2 * 60 * 1000;
 
 function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -49,10 +53,15 @@ function cookie(value, maxAge) {
     "Path=/",
     "HttpOnly",
     "Secure",
-    "SameSite=None",
+    "SameSite=Lax",
     `Max-Age=${Math.max(0, Math.floor(maxAge / 1000))}`,
   ];
   return parts.join("; ");
+}
+
+/** Browser-binding cookie for an OIDC round trip. Lax so it rides the top-level redirect back from the provider. */
+function oidcCookie(value, maxAgeMs) {
+  return `${OIDC_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`;
 }
 
 export function readCookie(request, name = COOKIE) {
@@ -196,7 +205,9 @@ export async function handleAuth(method, path, url, request, env) {
     const body = await request.json().catch(() => ({}));
     const token = String(body.token || url.searchParams.get("token") || "");
     const row = await db.one("SELECT * FROM magic_links WHERE token_hash=?", [await sha256Hex(token)]);
-    if (!row || row.used_at || row.expires_at < nowIso()) return json({ error: "Link expired or already used." }, 401);
+    if (!row || row.purpose !== "login" || row.used_at || row.expires_at < nowIso()) {
+      return json({ error: "Link expired or already used." }, 401);
+    }
     await db.run("UPDATE magic_links SET used_at=? WHERE token_hash=?", [nowIso(), await sha256Hex(token)]);
     const user = await findOrCreateByEmail(db, row.email);
     await db.run("UPDATE users SET email_verified=1 WHERE id=?", [user.id]);
@@ -237,13 +248,16 @@ export async function handleAuth(method, path, url, request, env) {
   }
 
   if (method === "GET" && path === "/api/auth/oidc/google/start") {
-    return startOidc(env, request, "google");
+    return startOidc(env, request, url, "google");
   }
   if (method === "GET" && path === "/api/auth/oidc/apple/start") {
-    return startOidc(env, request, "apple");
+    return startOidc(env, request, url, "apple");
   }
   if (method === "GET" && path === "/api/auth/oidc/google/callback") {
     return finishOidc(env, request, url, "google");
+  }
+  if (method === "POST" && path === "/api/auth/oidc/complete") {
+    return completeOidcHandoff(env, request);
   }
   if (method === "GET" && path === "/api/auth/oidc/apple/callback") {
     return finishOidc(env, request, url, "apple");
@@ -442,27 +456,44 @@ export async function handleAuth(method, path, url, request, env) {
   return null;
 }
 
-async function startOidc(env, request, provider) {
+function siteOrigin(env) {
+  return String(env.SITE_ORIGIN || "https://shroomlabs.io").replace(/\/$/, "");
+}
+
+function redirect(location, setCookie) {
+  const headers = new Headers({ location, "cache-control": "no-store", "referrer-policy": "no-referrer" });
+  if (setCookie) headers.append("set-cookie", setCookie);
+  return new Response(null, { status: 302, headers });
+}
+
+async function startOidc(env, request, url, provider) {
   const limited = await rateLimit(env.db, `oidc-${provider}:${rateLimitClient(request)}`, 10, 900);
   if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
   const cfg = providerConfig(env, provider);
   const ready = provider === "google" ? googleConfigured(env) : appleConfigured(env);
-  if (!ready && !devStubsEnabled(env, request)) {
+  const stubs = devStubsEnabled(env, request);
+  if (!ready && !stubs) {
     return json(comingSoonBody(`${provider} sign-in`), 503);
   }
   if (!originAllowed(env, request) && request.headers.get("origin")) {
     return json({ error: "origin not allowed" }, 403);
   }
-  const state = randomBase64Url(24);
+  const next = safeNextPath(url.searchParams.get("next"));
+  if (next === null) return json({ error: "Invalid sign-in request." }, 400);
+  await env.db.run("DELETE FROM oauth_states WHERE expires_at < ?", [nowIso()]);
+  // The state is the hash of a random value held only in an HttpOnly cookie, so a state is useless
+  // in any browser except the one that started the flow (login CSRF / session fixation defense).
+  const binding = randomBase64Url(32);
+  const state = await sha256B64url(binding);
   const nonce = randomBase64Url(24);
   const verifier = randomBase64Url(32);
-  const challenge = base64urlSha256 ? await sha256b64(verifier) : await sha256Hex(verifier);
+  const challenge = await sha256B64url(verifier);
   await env.db.run(
     "INSERT INTO oauth_states (state, nonce, code_verifier, provider, redirect_to, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [state, nonce, verifier, provider, "/", laterIso(10 * 60 * 1000)]
+    [state, nonce, verifier, provider, next || "/account.html", laterIso(OIDC_STATE_MS)]
   );
   const auth = new URL(cfg.authorize);
-  auth.searchParams.set("client_id", cfg.clientId);
+  auth.searchParams.set("client_id", cfg.clientId || "stub-client");
   auth.searchParams.set("redirect_uri", cfg.redirectUri);
   auth.searchParams.set("response_type", "code");
   auth.searchParams.set("scope", cfg.scope);
@@ -470,56 +501,148 @@ async function startOidc(env, request, provider) {
   auth.searchParams.set("nonce", nonce);
   auth.searchParams.set("code_challenge", challenge);
   auth.searchParams.set("code_challenge_method", "S256");
-  if (devStubsEnabled(env, request)) {
-    return json({ authorize_url: auth.toString(), state, debug_code: `stub-${state}` });
+  if (provider === "google") auth.searchParams.set("prompt", "select_account");
+  const setCookie = oidcCookie(binding, OIDC_STATE_MS);
+  if (stubs) {
+    return json({ authorize_url: auth.toString(), state, debug_code: `stub-${state}` }, 200, { "set-cookie": setCookie });
   }
-  return new Response(null, { status: 302, headers: { location: auth.toString() } });
+  return redirect(auth.toString(), setCookie);
 }
 
 async function finishOidc(env, request, url, provider) {
-  const cfg = providerConfig(env, provider);
+  const stubs = devStubsEnabled(env, request);
+  const clear = oidcCookie("", 0);
+  const fail = async (reason, userId) => {
+    // Specific reasons go to the audit log only; the browser always gets the same generic outcome.
+    await audit(env.db, userId || null, `oidc_${provider}_fail`, reason, request);
+    return redirect(`${siteOrigin(env)}/login.html?error=oidc`, clear);
+  };
+  const limited = await rateLimit(env.db, `oidc-cb-${provider}:${rateLimitClient(request)}`, 20, 900);
+  if (!limited.ok) return fail("rate limited");
   const state = url.searchParams.get("state") || "";
-  const code = url.searchParams.get("code") || "";
+  const binding = readCookie(request, OIDC_COOKIE);
+  if (!state) return fail("missing state");
+  if (!binding) return fail("missing browser binding");
+  if (!safeEqual(await sha256B64url(binding), state)) return fail("state not bound to this browser");
   const row = await env.db.one("SELECT * FROM oauth_states WHERE state=?", [state]);
-  if (!row || row.expires_at < nowIso() || row.provider !== provider) return json({ error: "invalid OIDC state" }, 401);
+  if (!row) return fail("unknown or used state");
+  // Single use: whoever deletes the row owns this state. A replayed callback finds nothing.
+  const consumed = await env.db.run("DELETE FROM oauth_states WHERE state=?", [state]);
+  if (Number(consumed?.meta?.changes ?? consumed?.changes ?? 0) !== 1) return fail("state replay");
+  if (row.expires_at < nowIso() || row.provider !== provider) return fail("expired or wrong provider");
+  if (url.searchParams.get("error")) return fail(`provider error ${String(url.searchParams.get("error")).slice(0, 40)}`);
+  const code = url.searchParams.get("code") || "";
+  if (!code) return fail("missing code");
+
   let email = "";
   let subject = "";
-  if (devStubsEnabled(env, request)) {
+  if (stubs) {
     email = `${provider}.user@example.com`;
     subject = `stub-${provider}`;
   } else {
-    if (!cfg.clientId || !cfg.secret) return json({ error: `${provider} OAuth is not configured.` }, 503);
-    const tokenRes = await fetch(cfg.token, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        client_id: cfg.clientId,
-        client_secret: cfg.secret,
-        redirect_uri: cfg.redirectUri,
-        code_verifier: row.code_verifier,
-      }),
-    });
-    const tokens = await tokenRes.json().catch(() => ({}));
-    const payload = decodeJwt(tokens.id_token || "");
-    if (!payload || payload.nonce !== row.nonce) return json({ error: "OIDC nonce mismatch" }, 401);
-    email = String(payload.email || "").toLowerCase();
-    subject = String(payload.sub || "");
-    if (payload.email_verified === false) return json({ error: "OIDC email is not verified at the provider" }, 403);
+    const cfg = providerConfig(env, provider);
+    if (!cfg.clientId || !cfg.secret) return fail("not configured");
+    let tokens = {};
+    try {
+      const tokenRes = await fetch(cfg.token, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          client_id: cfg.clientId,
+          client_secret: cfg.secret,
+          redirect_uri: cfg.redirectUri,
+          code_verifier: row.code_verifier,
+        }),
+      });
+      if (!tokenRes.ok) return fail(`token endpoint ${tokenRes.status}`);
+      tokens = await tokenRes.json();
+    } catch {
+      return fail("token endpoint unreachable");
+    }
+    // Verified even though it came straight from the token endpoint over TLS (defense in depth).
+    const verified = await verifyIdToken(tokens.id_token, { provider, clientId: cfg.clientId, nonce: row.nonce });
+    if (!verified.ok) return fail(verified.reason);
+    email = String(verified.claims.email).trim().toLowerCase();
+    subject = String(verified.claims.sub);
   }
-  if (!email) return json({ error: "provider did not return an email" }, 400);
-  const user = await findOrCreateByEmail(env.db, email, subject.slice(0, 12));
-  await env.db.run(
-    "INSERT INTO auth_identities (user_id, provider, subject, created_at) VALUES (?, ?, ?, ?)",
-    [user.id, provider, subject || email, nowIso()]
-  );
+  const resolved = await resolveOidcUser(env.db, provider, subject, email, request);
+  if (!resolved.user) return fail(resolved.reason, resolved.userId);
+  const user = resolved.user;
   await audit(env.db, user.id, `oidc_${provider}`, email, request);
-  const completed = await completeSignIn(env.db, user, request, env, {});
-  if (devStubsEnabled(env, request)) return completed;
-  if (completed.status !== 200) return completed;
-  const dest = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/account.html`;
-  return new Response(null, { status: 302, headers: { location: dest, "set-cookie": completed.headers.get("set-cookie") } });
+  if (stubs) {
+    const completed = await completeSignIn(env.db, user, request, env, {});
+    const headers = new Headers(completed.headers);
+    headers.append("set-cookie", clear);
+    return new Response(completed.body, { status: completed.status, headers });
+  }
+  // Hand the session to the site with a one-time, two-minute token in the URL fragment (never sent to servers
+  // or in Referer). The site trades it at POST /api/auth/oidc/complete, which runs the normal sign-in (incl. TOTP).
+  const handoff = randomToken() + randomToken();
+  await env.db.run(
+    "INSERT INTO magic_links (email, token_hash, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    [user.email, await sha256Hex(handoff), "oidc_handoff", laterIso(OIDC_HANDOFF_MS), nowIso()]
+  );
+  const next = safeNextPath(row.redirect_to) || "/account.html";
+  const dest = `${siteOrigin(env)}/auth/callback.html#oidc=${handoff}&next=${encodeURIComponent(next)}`;
+  return redirect(dest, clear);
+}
+
+/**
+ * Account linking policy (docs/AUTH.md):
+ * 1. A known (provider, subject) signs in its linked account.
+ * 2. Otherwise, an existing account with the same email is linked only if that account's email is verified
+ *    and it has no other identity from this provider. Unverified accounts are never taken over.
+ * 3. Otherwise a new account is created with the provider-verified email.
+ */
+async function resolveOidcUser(db, provider, subject, email, request) {
+  if (!subject || !email) return { reason: "missing subject or email" };
+  const identity = await db.one("SELECT * FROM auth_identities WHERE provider=? AND subject=?", [provider, subject]);
+  if (identity) {
+    const linked = await db.one("SELECT * FROM users WHERE id=?", [identity.user_id]);
+    return linked ? { user: linked } : { reason: "identity without user" };
+  }
+  const existing = await db.one("SELECT * FROM users WHERE email=?", [email]);
+  if (existing) {
+    if (!Number(existing.email_verified)) return { reason: "existing account email unverified; not linking", userId: existing.id };
+    const other = await db.one("SELECT * FROM auth_identities WHERE user_id=? AND provider=?", [existing.id, provider]);
+    if (other) return { reason: "account already linked to another identity from this provider", userId: existing.id };
+    await db.run("INSERT INTO auth_identities (user_id, provider, subject, created_at) VALUES (?, ?, ?, ?)", [
+      existing.id,
+      provider,
+      subject,
+      nowIso(),
+    ]);
+    await audit(db, existing.id, `oidc_${provider}_link`, "linked to existing verified account", request);
+    return { user: existing };
+  }
+  const created = await findOrCreateByEmail(db, email);
+  await db.run("INSERT INTO auth_identities (user_id, provider, subject, created_at) VALUES (?, ?, ?, ?)", [
+    created.id,
+    provider,
+    subject,
+    nowIso(),
+  ]);
+  return { user: created };
+}
+
+async function completeOidcHandoff(env, request) {
+  const limited = await rateLimit(env.db, `oidc-complete:${rateLimitClient(request)}`, 20, 900);
+  if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
+  const body = await request.json().catch(() => ({}));
+  const hash = await sha256Hex(String(body.token || ""));
+  const row = await env.db.one("SELECT * FROM magic_links WHERE token_hash=?", [hash]);
+  const expired = { error: "This sign-in expired. Start again." };
+  if (!row || row.purpose !== "oidc_handoff" || row.used_at || row.expires_at < nowIso()) return json(expired, 401);
+  const used = await env.db.run(
+    "UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL AND purpose=?",
+    [nowIso(), hash, "oidc_handoff"]
+  );
+  if (Number(used?.meta?.changes ?? used?.changes ?? 0) !== 1) return json(expired, 401);
+  const user = await env.db.one("SELECT * FROM users WHERE email=?", [row.email]);
+  if (!user) return json(expired, 401);
+  return completeSignIn(env.db, user, request, env, body);
 }
 
 function providerConfig(env, provider) {
@@ -543,26 +666,6 @@ function providerConfig(env, provider) {
     redirectUri: env.APPLE_REDIRECT_URI || `${api}/api/auth/oidc/apple/callback`,
   };
 }
-
-function decodeJwt(token) {
-  const parts = String(token).split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = atob(parts[1].replaceAll("-", "+").replaceAll("_", "/"));
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-async function sha256b64(value) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  let bin = "";
-  for (const b of new Uint8Array(digest)) bin += String.fromCharCode(b);
-  return btoa(bin).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-const base64urlSha256 = true;
 
 async function completeSignIn(db, user, request, env, body = {}) {
   if (Number(user.totp_enabled)) {
