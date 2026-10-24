@@ -398,6 +398,26 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM rate_limits WHERE key=")) {
     return tables.rate_limits.filter((s) => s.key === params[0]);
   }
+  if (q.startsWith("INSERT INTO rate_limits") && q.includes("ON CONFLICT")) {
+    const key = params[0];
+    const now = Number(params[2]);
+    const windowMs = Number(params[3]);
+    const limit = Number(params[7]);
+    const row = tables.rate_limits.find((s) => s.key === key);
+    if (!row) {
+      tables.rate_limits.push({ key, count: 1, window_start: String(now) });
+      return { changes: 1, meta: { changes: 1 } };
+    }
+    const expired = now - Number(row.window_start) > windowMs;
+    if (expired) {
+      row.count = 1;
+      row.window_start = String(now);
+      return { changes: 1, meta: { changes: 1 } };
+    }
+    if (Number(row.count) >= limit) return { changes: 0, meta: { changes: 0 } };
+    row.count = Number(row.count) + 1;
+    return { changes: 1, meta: { changes: 1 } };
+  }
   if (q.startsWith("INSERT INTO rate_limits")) {
     tables.rate_limits.push({ key: params[0], count: params[1], window_start: params[2] });
     return {};

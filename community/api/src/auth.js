@@ -16,7 +16,7 @@ import {
 } from "./crypto.js";
 import { sendEmail } from "./email.js";
 import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } from "./providers.js";
-import { clientIp, originAllowed, passwordPwned, rateLimit, verifyTurnstile } from "./security.js";
+import { clientIp, originAllowed, passwordPwned, rateLimit, rateLimitClient, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
 import {
   allowedOrigins,
@@ -166,7 +166,7 @@ export async function handleAuth(method, path, url, request, env) {
     const email = String(body.email || body.username || "").trim().toLowerCase();
     if (!email.includes("@")) throw new ValidationError("Use a real email address.");
     const ip = clientIp(request);
-    const limited = await rateLimit(db, `magic:${ip}:${email}`, 5, 900);
+    const limited = await rateLimit(db, `magic:${rateLimitClient(request)}:${email}`, 5, 900);
     if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
     const turnstile = await verifyTurnstile(env, body.turnstile, ip, request);
     if (!turnstile.ok) return json({ error: "Turnstile check failed." }, 400);
@@ -207,7 +207,7 @@ export async function handleAuth(method, path, url, request, env) {
 
   if (method === "POST" && path === "/api/auth/login") {
     const body = await request.json().catch(() => ({}));
-    const limited = await rateLimit(db, `pwd:${clientIp(request)}`, 8, 900);
+    const limited = await rateLimit(db, `pwd:${rateLimitClient(request)}`, 8, 900);
     if (!limited.ok) return json({ error: "Too many attempts." }, 429);
     const user =
       (await db.one("SELECT * FROM users WHERE email=?", [String(body.email || "").trim().toLowerCase()])) ||
@@ -252,7 +252,7 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/webauthn/register/begin") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
-    const limited = await rateLimit(db, `webauthn-reg:${clientIp(request)}:${user.id}`, 10, 900);
+    const limited = await rateLimit(db, `webauthn-reg:${rateLimitClient(request)}:${user.id}`, 10, 900);
     if (!limited.ok) return json({ error: "Too many passkey attempts." }, 429);
     await cleanupChallenges(db);
     const challenge = randomBase64Url(32);
@@ -302,7 +302,7 @@ export async function handleAuth(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/auth/webauthn/login/begin") {
-    const limited = await rateLimit(db, `webauthn-login:${clientIp(request)}`, 10, 900);
+    const limited = await rateLimit(db, `webauthn-login:${rateLimitClient(request)}`, 10, 900);
     if (!limited.ok) return json({ error: "Too many passkey attempts." }, 429);
     await cleanupChallenges(db);
     const challenge = randomBase64Url(32);
@@ -364,7 +364,7 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/totp/confirm") {
     const { user } = await userFromRequest(request, db);
     requireVerified(user);
-    const limited = await rateLimit(db, `totp-confirm:${clientIp(request)}:${user.id}`, 8, 900);
+    const limited = await rateLimit(db, `totp-confirm:${rateLimitClient(request)}:${user.id}`, 8, 900);
     if (!limited.ok) return json({ error: "Too many TOTP attempts." }, 429);
     const body = await request.json().catch(() => ({}));
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
@@ -391,7 +391,7 @@ export async function handleAuth(method, path, url, request, env) {
 
   if (method === "POST" && path === "/api/auth/totp/verify") {
     const body = await request.json().catch(() => ({}));
-    const limited = await rateLimit(db, `totp-verify:${clientIp(request)}`, 8, 900);
+    const limited = await rateLimit(db, `totp-verify:${rateLimitClient(request)}`, 8, 900);
     if (!limited.ok) return json({ error: "Too many TOTP attempts." }, 429);
     const hash = await sha256Hex(String(body.totp_token || ""));
     const pending = await db.one("SELECT * FROM totp_pending WHERE token_hash=?", [hash]);
@@ -443,7 +443,7 @@ export async function handleAuth(method, path, url, request, env) {
 }
 
 async function startOidc(env, request, provider) {
-  const limited = await rateLimit(env.db, `oidc-${provider}:${clientIp(request)}`, 10, 900);
+  const limited = await rateLimit(env.db, `oidc-${provider}:${rateLimitClient(request)}`, 10, 900);
   if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
   const cfg = providerConfig(env, provider);
   const ready = provider === "google" ? googleConfigured(env) : appleConfigured(env);

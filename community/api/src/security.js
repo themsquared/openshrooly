@@ -84,21 +84,92 @@ export async function verifyPaymentWebhook(env, rawBody, signatureHeader) {
   return { ok: true };
 }
 
+export function rateLimitIp(ip) {
+  const raw = String(ip || "")
+    .split(",")[0]
+    .trim()
+    .replace(/^\[([^\]]+)\](?::\d+)?$/, "$1")
+    .split("%")[0];
+  if (!raw) return "";
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(raw)) return raw;
+  const hextets = expandIpv6(raw);
+  if (!hextets) return raw;
+  if (isIpv4Mapped(hextets)) return ipv4FromMapped(hextets);
+  return `${hextets.slice(0, 4).map((part) => part.toString(16)).join(":")}::/64`;
+}
+
+export function rateLimitClient(request) {
+  return rateLimitIp(clientIp(request));
+}
+
+function expandIpv6(ip) {
+  let value = String(ip || "");
+  let mapped = null;
+  const dotted = value.match(/:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (dotted) {
+    const octets = dotted[1].split(".").map(Number);
+    if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+    mapped = [(octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]];
+    value = value.slice(0, -dotted[1].length);
+    if (value.endsWith("::")) {
+      /* keep the compression marker */
+    } else if (value.endsWith(":")) {
+      value = value.slice(0, -1);
+    } else {
+      return null;
+    }
+    if (!value || value === ":") value = "::";
+  }
+  if (!value.includes(":")) return null;
+  const halves = value.split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(":").filter(Boolean) : [];
+  const right = halves.length > 1 && halves[1] ? halves[1].split(":").filter(Boolean) : [];
+  const extra = mapped ? 2 : 0;
+  const have = left.length + right.length + extra;
+  if (have > 8) return null;
+  if (halves.length === 1 && have !== 8) return null;
+  const fill = halves.length === 1 ? [] : Array(8 - have).fill("0");
+  const hextets = [...left, ...fill, ...right].map((part) => {
+    if (!/^[0-9a-fA-F]{1,4}$/.test(part)) return NaN;
+    return parseInt(part, 16);
+  });
+  if (mapped) hextets.push(...mapped);
+  if (hextets.length !== 8 || hextets.some((n) => !Number.isFinite(n))) return null;
+  return hextets;
+}
+
+function isIpv4Mapped(hextets) {
+  return hextets[0] === 0 && hextets[1] === 0 && hextets[2] === 0 && hextets[3] === 0 && hextets[4] === 0 && hextets[5] === 0xffff;
+}
+
+function ipv4FromMapped(hextets) {
+  return `${hextets[6] >> 8}.${hextets[6] & 0xff}.${hextets[7] >> 8}.${hextets[7] & 0xff}`;
+}
+
+const RATE_LIMIT_UPSERT = `INSERT INTO rate_limits (key, count, window_start) VALUES (?, 1, ?)
+ON CONFLICT(key) DO UPDATE SET
+  count = CASE WHEN CAST(? AS INTEGER) - CAST(window_start AS INTEGER) > CAST(? AS INTEGER) THEN 1 ELSE count + 1 END,
+  window_start = CASE WHEN CAST(? AS INTEGER) - CAST(window_start AS INTEGER) > CAST(? AS INTEGER) THEN ? ELSE window_start END
+WHERE count < CAST(? AS INTEGER) OR CAST(? AS INTEGER) - CAST(window_start AS INTEGER) > CAST(? AS INTEGER)`;
+
 export async function rateLimit(db, key, limit, windowSec) {
   const now = Date.now();
-  const row = await db.one("SELECT * FROM rate_limits WHERE key=?", [key]);
-  if (!row) {
-    await db.run("INSERT INTO rate_limits (key, count, window_start) VALUES (?, ?, ?)", [key, 1, String(now)]);
-    return { ok: true };
-  }
-  const start = Number(row.window_start);
-  if (now - start > windowSec * 1000) {
-    await db.run("UPDATE rate_limits SET count=?, window_start=? WHERE key=?", [1, String(now), key]);
-    return { ok: true };
-  }
-  if (Number(row.count) >= limit) return { ok: false };
-  await db.run("UPDATE rate_limits SET count=? WHERE key=?", [Number(row.count) + 1, key]);
-  return { ok: true };
+  const windowMs = windowSec * 1000;
+  const result = await db.run(RATE_LIMIT_UPSERT, [
+    key,
+    String(now),
+    now,
+    windowMs,
+    now,
+    windowMs,
+    String(now),
+    limit,
+    now,
+    windowMs,
+  ]);
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+  return { ok: changes > 0 };
 }
 
 export function clientIp(request) {

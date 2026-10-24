@@ -1,7 +1,7 @@
 /** Device identity, claim, cert issuance/rotation/revocation, cloud commands. */
 
 import { laterIso, nowIso, randomToken, sha256Hex, timingSafeEqual } from "./crypto.js";
-import { clientIp, rateLimit } from "./security.js";
+import { rateLimit, rateLimitClient } from "./security.js";
 import { ValidationError } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
 import { buildCsr, createWorkerCa, generateP256, importCaKey, issueDeviceCertificate, jwkOf } from "./pki.js";
@@ -175,7 +175,7 @@ export async function handleDevices(method, path, url, request, env) {
   const site = String(env.SITE_ORIGIN || "https://shroomlabs.io").replace(/\/$/, "");
 
   if (method === "POST" && path === "/api/devices/enroll") {
-    const limited = await rateLimit(db, `enroll:${clientIp(request)}`, 20, 3600);
+    const limited = await rateLimit(db, `enroll:${rateLimitClient(request)}`, 20, 3600);
     if (!limited.ok) return json({ error: "rate limited" }, 429);
     const body = await request.json().catch(() => ({}));
     const hardwareId = String(body.hardware_id || "").slice(0, 64);
