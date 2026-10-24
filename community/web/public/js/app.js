@@ -1,6 +1,7 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { startHero } from "./hero.js";
+import { bindMobileNav } from "./shell.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -26,7 +27,14 @@ function renderNav() {
   const nav = $("#session-nav");
   if (!nav) return;
   if (isSignedIn()) {
-    nav.innerHTML = `<a href="/account.html">Account</a> <button class="link" id="logout" type="button">Log out</button>`;
+    nav.innerHTML = `<details class="account-menu">
+      <summary>Account</summary>
+      <div class="account-menu-links">
+        <a href="/account.html">Account</a>
+        <a href="/publish.html">Publish</a>
+        <button class="link" id="logout" type="button">Log out</button>
+      </div>
+    </details>`;
     $("#logout")?.addEventListener("click", async () => {
       try {
         await api("/api/auth/logout", { method: "POST", jsonBody: {} });
@@ -37,7 +45,7 @@ function renderNav() {
       location.href = "/";
     });
   } else {
-    nav.innerHTML = `<a href="/login.html">Sign in</a>`;
+    nav.innerHTML = `<a class="nav-signin button" href="/login.html">Sign in</a>`;
   }
 }
 
@@ -48,26 +56,42 @@ function stageDots(stages = []) {
     .join("")}</ol>`;
 }
 
+function selectPack(pack) {
+  const url = new URL(location.href);
+  url.searchParams.set("pack", pack);
+  url.hash = "library";
+  history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  document.getElementById("library")?.scrollIntoView();
+  return renderHome();
+}
+
 async function renderHome() {
   const canvas = $("#mycelium");
-  if (canvas) startHero(canvas);
+  if (canvas && !canvas.dataset.hero) {
+    canvas.dataset.hero = "1";
+    startHero(canvas);
+  }
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
-  $("#pack-label").textContent = pack === "psilocybin" ? "Restricted pack" : "Culinary library";
+  $("#pack-label").textContent = pack === "psilocybin" ? "Off-menu" : "Culinary library";
   $("#legal")?.classList.toggle("hidden", pack !== "psilocybin");
   $("#q").value = q;
   $("#pack").value = pack;
+  $("#pack-culinary")?.classList.toggle("is-on", pack !== "psilocybin");
+  $("#pack-restricted")?.classList.toggle("is-on", pack === "psilocybin");
+  $("#pack-culinary")?.setAttribute("aria-pressed", pack !== "psilocybin" ? "true" : "false");
+  $("#pack-restricted")?.setAttribute("aria-pressed", pack === "psilocybin" ? "true" : "false");
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", pack === "psilocybin");
   $("#coach-promo")?.classList.toggle("hidden", pack === "psilocybin");
   $("#nav-coach")?.classList.toggle("hidden", pack === "psilocybin");
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
-  $("#cards").innerHTML =
-    profiles
-      .map(
-        (p) => `
+  $("#cards").innerHTML = profiles.length
+    ? profiles
+        .map(
+          (p) => `
     <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
-      <div class="profile-art">${speciesArt(p.species, p.strain, p.name)}</div>
+      <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack)}</div>
       <div class="profile-body">
         <p><span class="chip">${escapeHtml(p.pack)}</span>${
           p.pricing?.kind === "paid"
@@ -80,8 +104,14 @@ async function renderHome() {
         ${stageDots(p.stage_list || [])}
       </div>
     </a>`
-      )
-      .join("") || "<p>No profiles match.</p>";
+        )
+        .join("")
+    : `<div class="empty-library">
+        <svg class="empty-mark" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg>
+        <h2>Nothing in this flush</h2>
+        <p>No profiles match that search. Try oyster, lion’s mane, or clear the query.</p>
+        <a class="button ghost" href="/?pack=${encodeURIComponent(pack)}#library">Clear search</a>
+      </div>`;
 }
 
 async function renderProfile() {
@@ -93,7 +123,7 @@ async function renderProfile() {
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${p.pack}`;
   $("#summary").textContent = p.summary || "";
   $("#chips").innerHTML = `<span class="chip">${escapeHtml(p.pack || "")}</span>`;
-  $("#art").innerHTML = speciesArt(p.species, p.strain, p.name);
+  $("#art").innerHTML = speciesArt(p.species, p.strain, p.name, p.pack);
   if (p.legal_notice) {
     $("#legal").textContent = p.legal_notice;
     $("#legal").classList.remove("hidden");
@@ -113,7 +143,7 @@ async function renderProfile() {
       return;
     }
     $("#buy")?.addEventListener("click", async () => {
-      const session = await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
+      await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
       const notice = $("#locked")?.querySelector("p");
       if (notice) notice.textContent = "Checkout started. This recipe unlocks after the payment provider confirms.";
       $("#buy")?.remove();
@@ -148,7 +178,7 @@ async function renderProfile() {
       "</ul>";
   }
   $("#ratings").innerHTML =
-    data.ratings.map((r) => `<li>${escapeHtml(r.username)} — ${r.stars}/5 — ${escapeHtml(r.comment || "")}</li>`).join("") ||
+    data.ratings.map((r) => `<li>${escapeHtml(r.username)}, ${r.stars}/5. ${escapeHtml(r.comment || "")}</li>`).join("") ||
     "<li class='muted'>No ratings yet.</li>";
   $("#reports").innerHTML =
     data.reports
@@ -270,7 +300,7 @@ async function renderCallback() {
       $("#status").textContent = "OIDC finished on the API host. You can close this if you were redirected.";
       return;
     }
-    $("#error").textContent = "Missing token.";
+    $("#error").textContent = "This sign-in link is missing or expired.";
     $("#error").classList.remove("hidden");
   } catch (err) {
     $("#error").textContent = err.message;
@@ -286,7 +316,7 @@ async function renderAccount() {
   const me = await api("/api/me");
   $("#who").textContent = me.user.email || me.user.username;
   $("#verified").textContent = me.user.email_verified
-    ? "Email verified — you can publish, buy, and claim devices."
+    ? "Email verified. You can publish, buy, and claim devices."
     : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
   $("#ents").innerHTML =
@@ -369,8 +399,21 @@ function fileToBase64(file) {
 }
 
 renderNav();
+bindMobileNav();
 const page = document.body.dataset.page;
-if (page === "home") renderHome().catch((err) => ($("#cards").textContent = err.message));
+if (page === "home") {
+  renderHome().catch(() => {
+    if ($("#cards")) {
+      $("#cards").innerHTML = `<div class="empty-library">
+        <h2>The library is waking up</h2>
+        <p>Refresh in a moment to load profiles.</p>
+      </div>`;
+    }
+  });
+  $("#pack-culinary")?.addEventListener("click", () => selectPack("culinary"));
+  $("#pack-restricted")?.addEventListener("click", () => selectPack("psilocybin"));
+  window.addEventListener("popstate", () => renderHome().catch(() => {}));
+}
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));
 if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
@@ -393,7 +436,7 @@ function showCoachError(err) {
 }
 
 function fmtNum(value, digits = 1) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
+  if (value == null || Number.isNaN(Number(value))) return "n/a";
   return Number(value).toFixed(digits);
 }
 
@@ -430,7 +473,7 @@ async function renderCoach() {
     $("#subscribe-panel").classList.remove("hidden");
     $("#subscribe").addEventListener("click", async () => {
       try {
-        const session = await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
+        await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
         showCoachError(new Error("Checkout started. Grow Coach unlocks after the payment provider confirms."));
       } catch (err) {
         showCoachError(err);
@@ -469,7 +512,7 @@ async function renderCoach() {
       .join("");
     $("#alerts").innerHTML =
       (data.alerts || [])
-        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong> — ${escapeHtml(a.message)}</li>`)
+        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong>. ${escapeHtml(a.message)}</li>`)
         .join("") || `<li class="info">No alerts right now.</li>`;
     const s = data.suggestion || {};
     $("#suggestion").innerHTML = s.humidity_percent
@@ -549,9 +592,21 @@ async function renderCoach() {
 
 async function renderClaim() {
   if (!getToken()) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    const title = $("#claim-title");
+    if (title) title.textContent = "Sign in to claim your device";
+    $("#claim-form")?.classList.add("hidden");
+    const signin = $("#claim-signin");
+    if (signin) {
+      const next = encodeURIComponent(location.pathname + location.search);
+      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in</a>`;
+      signin.classList.remove("hidden");
+    }
     return;
   }
+  const title = $("#claim-title");
+  if (title) title.textContent = "Claim a chamber";
+  $("#claim-signin")?.classList.add("hidden");
+  $("#claim-form")?.classList.remove("hidden");
   const preset = params().get("code") || "";
   if (preset) $("#code").value = preset;
   $("#claim-form").addEventListener("submit", async (ev) => {

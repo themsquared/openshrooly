@@ -6,6 +6,9 @@
   <title>Grow Coach · Shroom Labs</title>
   <meta name="description" content="Culinary grow coaching for your chamber: learned setpoints, photo checks, and alerts. $3.99/month.">
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="coach">
@@ -16,10 +19,13 @@
       <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       <span>Shroom Labs<small>works with OpenShrooly</small></span>
     </a>
-    <nav>
-      <a href="/?pack=culinary">Culinary</a>
-      <a href="/claim.html">Claim device</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site">
+      <a href="/">Profiles</a>
+      <a href="/faq.html">FAQ</a>
       <a href="/coach.html" aria-current="page">Grow Coach</a>
+      <a href="/claim.html">Claim device</a>
+      <a href="/docs.html">Docs</a>
       <span id="session-nav"></span>
     </nav>
   </header>
@@ -29,7 +35,7 @@
         <p class="eyebrow">Culinary subscription · $3.99 / month</p>
         <h1>A coach that learns your chamber.</h1>
         <p class="lede">Grow Coach watches humidity drift, sensor offset, and past culinary flushes, then suggests safer setpoints. Photo checks flag mold, dryness, and pinning. Alerts catch a stall before you lose a block.</p>
-        <p class="muted">Sold for general home cultivation only. It is not marketed or billed with the restricted pack.</p>
+        <p class="muted">Sold for general home cultivation only. It is not marketed or billed with Off-menu profiles.</p>
         <p id="coach-status" class="muted"></p>
         <p id="coach-error" class="notice hidden" role="alert"></p>
         <div id="subscribe-panel" class="hidden">
@@ -83,7 +89,7 @@
             <input id="photo-file" type="file" accept="image/*">
           </label>
           <label>Notes
-            <input id="photo-hint" maxlength="200" placeholder="Optional — what you are seeing">
+            <input id="photo-hint" maxlength="200" placeholder="Optional. What you are seeing">
           </label>
           <button type="submit">Check photo</button>
         </form>

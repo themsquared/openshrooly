@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Shroom Labs">
+  <rect width="32" height="32" rx="8" fill="#07110e"/>
+  <g fill="none" stroke="#7dffb3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 18h18l2.2-2.2-3.4-6.8-7.8-4.4-7.8 4.4-3.4 6.8z"/>
+    <path d="M12.4 18 10.8 25l2.8 2.6h4.8l2.6-2.8L19.4 18"/>
+  </g>
+</svg>

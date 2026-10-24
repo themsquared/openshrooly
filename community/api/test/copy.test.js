@@ -13,6 +13,13 @@ const BANNED = [
   { name: "wrangler", re: /wrangler/i },
   { name: "docs/", re: /docs\//i },
   { name: "Mike", re: /\bMike\b/ },
+  { name: "httpOnly", re: /httpOnly/i },
+  { name: "Bearer", re: /\bBearer\b/ },
+  { name: "cookie", re: /\bcookies?\b/i },
+  { name: "token", re: /\btokens?\b/i },
+  { name: "CSR", re: /\bCSR\b/ },
+  { name: "mTLS", re: /\bmTLS\b/i },
+  { name: "JSON", re: /\bJSON\b/ },
 ];
 
 function visitorFacing(html) {
@@ -43,4 +50,56 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
     }
   }
   assert.deepEqual(hits, []);
+});
+
+test("public pages share one nav label set", () => {
+  const required = ["Profiles", "FAQ", "Grow Coach", "Claim device", "Docs"];
+  const missing = [];
+  for (const page of pages()) {
+    if (page.name === "legacy-preview.html") continue;
+    const text = visitorFacing(page.html);
+    for (const label of required) {
+      if (!text.includes(label)) missing.push(`${page.name}: ${label}`);
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
+const DASH = /[\u2013\u2014]/;
+
+test("visitor-facing pages and chrome never use en or em dashes", () => {
+  const hits = [];
+  for (const page of pages()) {
+    const found = visitorFacing(page.html).match(DASH);
+    if (found) hits.push(`${page.name}: ${found[0]}`);
+  }
+  const jsDir = join(PUBLIC, "js");
+  for (const name of readdirSync(jsDir).filter((file) => file.endsWith(".js"))) {
+    const found = readFileSync(join(jsDir, name), "utf8").match(DASH);
+    if (found) hits.push(`js/${name}: ${found[0]}`);
+  }
+  assert.deepEqual(hits, []);
+});
+
+test("home pack toggle is Off-menu, not Restricted", () => {
+  const home = pages().find((page) => page.name === "index.html");
+  const text = visitorFacing(home.html);
+  assert.match(text, /Off-menu/);
+  const hits = [];
+  for (const page of pages()) {
+    if (/Restricted/i.test(visitorFacing(page.html))) hits.push(page.name);
+  }
+  assert.deepEqual(hits, []);
+});
+
+test("shared chrome uses an accessible mobile menu button", () => {
+  const missing = [];
+  for (const page of pages()) {
+    if (page.name === "legacy-preview.html") continue;
+    if (!page.html.includes('class="nav-toggle"')) missing.push(`${page.name}: nav-toggle`);
+    if (!page.html.includes('aria-expanded="false"')) missing.push(`${page.name}: aria-expanded`);
+    if (!page.html.includes('aria-controls="site-nav"')) missing.push(`${page.name}: aria-controls`);
+    if (!page.html.includes('id="site-nav"')) missing.push(`${page.name}: site-nav`);
+  }
+  assert.deepEqual(missing, []);
 });

@@ -6,6 +6,9 @@
   <title>Claim a device · Shroom Labs</title>
   <meta name="description" content="Bind an OpenShrooly chamber to your Shroom Labs account with the short code from the device.">
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="claim">
@@ -16,20 +19,24 @@
       <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       <span>Shroom Labs<small>works with OpenShrooly</small></span>
     </a>
-    <nav>
-      <a href="/">Catalog</a>
-      <a href="/account.html">Account</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site">
+      <a href="/">Profiles</a>
+      <a href="/faq.html">FAQ</a>
       <a href="/coach.html">Grow Coach</a>
+      <a href="/claim.html" aria-current="page">Claim device</a>
+      <a href="/docs.html">Docs</a>
       <span id="session-nav"></span>
     </nav>
   </header>
   <main id="main">
     <section class="auth-panel card">
       <p class="eyebrow">Cloud is opt-in</p>
-      <h1>Claim a chamber</h1>
+      <h1 id="claim-title">Sign in to claim your device</h1>
       <p class="muted">The device shows a 6-character code (or a QR that opens this page). Claiming binds it to your verified account so you can manage that chamber from Shroom Labs.</p>
+      <p id="claim-signin" class="hidden"><a class="button" href="/login.html?next=%2Fclaim.html">Sign in</a></p>
       <p id="error" class="notice hidden" role="alert"></p>
-      <form id="claim-form">
+      <form id="claim-form" class="hidden">
         <label>Device code
           <input id="code" name="code" maxlength="8" autocomplete="one-time-code" spellcheck="false" placeholder="e.g. 7K3M9P" required>
         </label>
