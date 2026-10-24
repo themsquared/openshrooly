@@ -1,8 +1,8 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
+import { renderProfileCards } from "./profile-cards.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
-import { INDEXED_PROFILES } from "./indexed-profiles.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 
 function cfg() {
@@ -51,13 +51,6 @@ function renderNav() {
   }
 }
 
-function stageDots(stages = []) {
-  if (!stages.length) return "";
-  return `<ol class="mini-timeline" aria-label="Stage timeline">${stages
-    .map((s, i) => `<li class="${i === 0 ? "is-on" : ""}" title="${escapeHtml(s.name || s.id)} · ${s.duration_days || 0}d"></li>`)
-    .join("")}</ol>`;
-}
-
 function selectPack(pack) {
   const url = new URL(location.href);
   url.searchParams.set("pack", pack);
@@ -65,11 +58,6 @@ function selectPack(pack) {
   history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
   document.getElementById("library")?.scrollIntoView();
   return renderHome();
-}
-
-/** Seeded profiles have an indexed static page. Community published ones use the live page. */
-function profileHref(id) {
-  return INDEXED_PROFILES.has(id) ? `/profiles/${encodeURIComponent(id)}.html` : `/profile.html?id=${encodeURIComponent(id)}`;
 }
 
 function renderResources(el, resources) {
@@ -116,26 +104,7 @@ async function renderHome() {
   for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", off);
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML = profiles.length
-    ? profiles
-        .map((p, index) => {
-          const art = speciesArt(p.species, p.strain, p.name, p.pack, { priority: index === 0, id: p.id });
-          return `
-    <a class="profile-card" href="${profileHref(p.id)}">
-      ${art ? `<div class="profile-art">${art}</div>` : ""}
-      <div class="profile-body">
-        <p><span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>${
-          p.pricing?.kind === "paid"
-            ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
-            : `<span class="chip">free</span>`
-        }</p>
-        <h2>${escapeHtml(p.name)}</h2>
-        <p class="muted">${escapeHtml(p.species)}${p.strain ? " · " + escapeHtml(p.strain) : ""}</p>
-        <p>${escapeHtml(p.summary || "")}</p>
-        ${stageDots(p.stage_list || [])}
-      </div>
-    </a>`;
-        })
-        .join("")
+    ? renderProfileCards(profiles)
     : `<div class="empty-library">
         <svg class="empty-mark" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg>
         <h2>Nothing in this flush</h2>

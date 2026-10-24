@@ -25,7 +25,8 @@ export const LICENSED_PHOTOS = [
     og: "/og/b-plus.jpg",
     width: 1200,
     height: 800,
-    alt: "Fruiting bodies of Psilocybe cubensis, the species grown as B+, standing in grass. One cap is flipped to show dark gills",
+    alt: "Wild Psilocybe cubensis fruiting bodies in grass. One cap is flipped to show dark gills. This is not the B+ strain.",
+    caption: "Wild P. cubensis, not the B+ strain.",
     author: "Alan Rockefeller",
     license: "CC BY-SA 3.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
@@ -87,16 +88,23 @@ function escapeAttr(value) {
   return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
-export function renderCredit(photo) {
-  const author = `<a href="${escapeAttr(photo.sourcePage)}">${escapeAttr(photo.author)}</a>`;
-  const license = `<a href="${escapeAttr(photo.licenseUrl)}">${escapeAttr(photo.license)}</a>`;
-  const via = `<a href="${escapeAttr(photo.sourcePage)}">${escapeAttr(photo.sourceName)}</a>`;
-  return `<figcaption class="photo-credit">Photo: ${author}, ${license}, via ${via}</figcaption>`;
+export function renderCredit(photo, { linked = true } = {}) {
+  const author = linked
+    ? `<a href="${escapeAttr(photo.sourcePage)}">${escapeAttr(photo.author)}</a>`
+    : escapeAttr(photo.author);
+  const license = linked
+    ? `<a href="${escapeAttr(photo.licenseUrl)}">${escapeAttr(photo.license)}</a>`
+    : escapeAttr(photo.license);
+  const via = linked
+    ? `<a href="${escapeAttr(photo.sourcePage)}">${escapeAttr(photo.sourceName)}</a>`
+    : escapeAttr(photo.sourceName);
+  const note = photo.caption ? `<span class="photo-caption">${escapeAttr(photo.caption)}</span>` : "";
+  return `<figcaption class="photo-credit">Photo: ${author}, ${license}, via ${via}${note}</figcaption>`;
 }
 
-/** Pass { priority: true } only for the largest above-the-fold image. */
-export function renderLicensedPhoto(photo, { priority = false } = {}) {
+/** Pass { priority: true } only for the largest above-the-fold image. Cards must use linked: false. */
+export function renderLicensedPhoto(photo, { priority = false, linked = true } = {}) {
   const loading = priority ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
   const srcset = `${photo.src640} 640w, ${photo.src} 1200w`;
-  return `<figure class="species-photo"><img src="${escapeAttr(photo.src)}" srcset="${escapeAttr(srcset)}" sizes="(max-width: 720px) 100vw, 720px" alt="${escapeAttr(photo.alt)}" width="${photo.width}" height="${photo.height}" ${loading} decoding="async">${renderCredit(photo)}</figure>`;
+  return `<figure class="species-photo"><img src="${escapeAttr(photo.src)}" srcset="${escapeAttr(srcset)}" sizes="(max-width: 720px) 100vw, 720px" alt="${escapeAttr(photo.alt)}" width="${photo.width}" height="${photo.height}" ${loading} decoding="async">${renderCredit(photo, { linked })}</figure>`;
 }

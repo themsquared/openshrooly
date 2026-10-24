@@ -282,6 +282,7 @@ h1, .display {
   color: var(--sl-ink-dim);
 }
 .photo-credit a { color: inherit; }
+.photo-caption { display: block; margin-top: 0.25rem; }
 .profile-card:hover .profile-art img,
 .profile-card:hover .profile-art svg,
 .profile-card:focus-visible .profile-art img,

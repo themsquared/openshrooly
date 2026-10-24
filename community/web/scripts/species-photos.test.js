@@ -5,12 +5,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadProfiles, profileJsonLd, renderProfilePage } from "./generate-seo.js";
 import { speciesArt, speciesPhoto } from "../public/js/species-art.js";
+import { renderProfileCards } from "../public/js/profile-cards.js";
 import {
   ALLOWED_LICENSES,
   LICENSED_PHOTOS,
   creditText,
   licenseFamily,
   photoRecordFor,
+  renderCredit,
 } from "../public/js/species-photos.js";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -80,6 +82,9 @@ test("Off-menu pages with a photo render credit, ImageObject, and existing og:im
     assert.match(html, new RegExp(`Photo: <a href="${photo.sourcePage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}">`));
     assert.match(html, new RegExp(photo.author));
     assert.match(html, new RegExp(photo.licenseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    if (photo.caption) {
+      assert.match(html, new RegExp(`<span class="photo-caption">${photo.caption.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</span>`));
+    }
     assert.match(html, /legal-prominent/);
     const main = html.slice(html.indexOf("<article"), html.indexOf("</article>"));
     assert.doesNotMatch(html, /Restricted/i);
@@ -113,4 +118,46 @@ test("culinary harvest shots stay on the generated JPEG path", () => {
   assert.match(first, /species-oyster\.jpg|species-blue-oyster\.jpg/);
   assert.doesNotMatch(first, /species-photo|figcaption/);
   assert.equal(speciesArt("Psilocybe cubensis", "Penis Envy", "Penis Envy", "psilocybin", { id: "penis-envy" }), "");
+});
+
+function nestedAnchor(html) {
+  let depth = 0;
+  for (const token of html.matchAll(/<\/?a\b[^>]*>/gi)) {
+    if (token[0].startsWith("</")) {
+      depth -= 1;
+      continue;
+    }
+    if (depth > 0) return token[0];
+    depth += 1;
+  }
+  return "";
+}
+
+test("rendered cards never nest an <a> inside another <a>", () => {
+  const profiles = loadProfiles();
+  const offMenu = profiles.filter((p) => p.pack === "psilocybin");
+  assert.equal(offMenu.length, 5);
+  const html = renderProfileCards(profiles);
+  assert.match(html, /<a class="profile-card"/);
+  assert.match(html, /photo-credit/);
+  assert.equal(nestedAnchor(html), "", html);
+  const photo = photoRecordFor({ id: "b-plus" });
+  const linked = renderCredit(photo, { linked: true });
+  const plain = renderCredit(photo, { linked: false });
+  assert.match(linked, /<a href="/);
+  assert.doesNotMatch(plain, /<a\b/);
+  assert.match(plain, /Alan Rockefeller/);
+  for (const id of ["penis-envy", "p-natalensis"]) {
+    const card = html.match(new RegExp(`<a class="profile-card" href="/profiles/${id}\\.html">[\\s\\S]*?</a>`))[0];
+    assert.doesNotMatch(card, /<img|profile-art|species-photo/);
+  }
+});
+
+test("B+ profile caption says the photo is wild cubensis, not the B+ strain", () => {
+  const profile = loadProfiles().find((p) => p.id === "b-plus");
+  const html = renderProfilePage(profile);
+  const caption = html.match(/<figcaption class="photo-credit">[\s\S]*?<\/figcaption>/)[0];
+  assert.match(caption, /<span class="photo-caption">Wild P\. cubensis, not the B\+ strain\.<\/span>/);
+  assert.match(caption, /<a href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Cubensis\.natural\.habitat\.jpg">/);
+  assert.doesNotMatch(html, DASH);
 });

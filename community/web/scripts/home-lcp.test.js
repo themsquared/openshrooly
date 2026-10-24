@@ -18,8 +18,8 @@ test("only the priority card image is eager with fetchpriority=high", () => {
 });
 
 test("home grid marks only the first card as the LCP image", () => {
-  const app = readFileSync(join(PUBLIC, "js", "app.js"), "utf8");
-  assert.match(app, /speciesArt\([^)]*\{ priority: index === 0, id: p.id \}\)/);
+  const cards = readFileSync(join(PUBLIC, "js", "profile-cards.js"), "utf8");
+  assert.match(cards, /speciesArt\([^)]*\{ priority: index === 0, id: p.id, linked: false \}\)/);
 });
 
 test("pack toggle buttons are 44px tap targets on phones", () => {

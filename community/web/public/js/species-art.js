@@ -67,10 +67,12 @@ export function speciesPhoto(species, strain = "", name = "", pack = "", id = ""
   return culinaryPhoto(species, strain, name);
 }
 
-/** Pass { priority: true } only for the largest above-the-fold image (the LCP candidate). */
-export function speciesArt(species, strain = "", name = "", pack = "", { priority = false, id = "" } = {}) {
+/** Pass { priority: true } only for the largest above-the-fold image (the LCP candidate).
+ *  Cards that wrap the art in an <a> must pass { linked: false } so credits stay plain text.
+ */
+export function speciesArt(species, strain = "", name = "", pack = "", { priority = false, id = "", linked = true } = {}) {
   const licensed = photoRecordFor({ id, species, strain, name, pack });
-  if (licensed) return renderLicensedPhoto(licensed, { priority });
+  if (licensed) return renderLicensedPhoto(licensed, { priority, linked });
   if (isOffMenuArt(species, strain, name, pack)) return "";
   const src = culinaryPhoto(species, strain, name);
   const label = [name, species].filter(Boolean).join(" · ") || "mushroom";
