@@ -89,7 +89,6 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   gap: 1rem;
   padding: 0.7rem 1.4rem;
   background: var(--sl-bg-glass);
-  backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--sl-line);
   position: sticky;
   top: 0;
@@ -153,11 +152,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 .nav-backdrop[hidden] { display: none; }
 .nav-lock { overflow: hidden; }
-.site-nav .nav-signin {
+.site-nav a.nav-signin {
   padding: 0.45rem 0.95rem;
+  background: linear-gradient(180deg, #3aa36c, #1d6a44);
+  border: 1px solid var(--sl-line-strong);
   color: #edfff4;
 }
-.site-nav .nav-signin:hover { color: #edfff4; }
+.site-nav a.nav-signin:hover { color: #edfff4; }
 main { max-width: var(--sl-max); margin: 0 auto; padding: 1.5rem 1.4rem 4rem; }
 .hero {
   position: relative;
@@ -544,7 +545,8 @@ button.nav-toggle {
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(20.5rem, 88vw);
+    width: min(20.5rem, 82vw);
+    height: 100dvh;
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
@@ -565,10 +567,13 @@ button.nav-toggle {
     align-items: center;
     padding: 0.55rem 0.35rem;
   }
-  .site-nav .nav-signin {
+  .site-nav a.nav-signin {
     margin-top: 0.75rem;
     justify-content: center;
+    background: linear-gradient(180deg, #3aa36c, #1d6a44);
+    border: 1px solid var(--sl-line-strong);
     color: #edfff4;
+    box-shadow: 0 8px 20px rgba(47, 143, 92, 0.25);
   }
   .site-nav .account-menu-links {
     position: static;

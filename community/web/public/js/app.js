@@ -401,7 +401,14 @@ renderNav();
 bindMobileNav();
 const page = document.body.dataset.page;
 if (page === "home") {
-  renderHome().catch((err) => ($("#cards").textContent = err.message));
+  renderHome().catch(() => {
+    if ($("#cards")) {
+      $("#cards").innerHTML = `<div class="empty-library">
+        <h2>The library is waking up</h2>
+        <p>Refresh in a moment to load profiles.</p>
+      </div>`;
+    }
+  });
   $("#pack-culinary")?.addEventListener("click", () => selectPack("culinary"));
   $("#pack-restricted")?.addEventListener("click", () => selectPack("psilocybin"));
   window.addEventListener("popstate", () => renderHome().catch(() => {}));
