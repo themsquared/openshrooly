@@ -587,9 +587,12 @@ async function consumeUserTotp(db, user, env, code) {
   if (!secret) return false;
   const matched = await matchTotp(secret, code, clockMs(env));
   if (!matched.ok) return false;
-  const last = Number(user.totp_last_step || 0);
-  if (last && matched.step <= last) return false;
-  await db.run("UPDATE users SET totp_last_step=? WHERE id=?", [matched.step, user.id]);
+  const result = await db.run(
+    "UPDATE users SET totp_last_step=? WHERE id=? AND (totp_last_step IS NULL OR totp_last_step < ?)",
+    [matched.step, user.id, matched.step]
+  );
+  const changes = Number(result?.meta?.changes ?? result?.changes ?? 0);
+  if (!changes) return false;
   user.totp_last_step = matched.step;
   return true;
 }

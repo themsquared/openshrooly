@@ -192,10 +192,18 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.totp_enabled = params[0];
     return {};
   }
+  if (q.startsWith("UPDATE users SET totp_last_step=? WHERE id=? AND")) {
+    const row = tables.users.find((u) => u.id === Number(params[1]));
+    const next = Number(params[0]);
+    const last = row?.totp_last_step;
+    if (!row || (last != null && last !== "" && Number(last) >= next)) return { changes: 0, meta: { changes: 0 } };
+    row.totp_last_step = next;
+    return { changes: 1, meta: { changes: 1 } };
+  }
   if (q.startsWith("UPDATE users SET totp_last_step=")) {
     const row = tables.users.find((u) => u.id === Number(params[1]));
     if (row) row.totp_last_step = params[0];
-    return {};
+    return { changes: 1 };
   }
   if (q.includes("FROM users JOIN sessions")) {
     const session = tables.sessions.find((s) => s.session_hash === params[0] && !s.revoked_at);

@@ -313,6 +313,33 @@ test("stolen refresh token cannot disable TOTP", async () => {
   assert.equal(allowed.status, 200, JSON.stringify(allowed.data));
 });
 
+test("TOTP rejects two concurrent uses of the same code", async () => {
+  const ctx = testEnv();
+  const t0 = Date.now();
+  ctx.NOW_MS = t0;
+  const { token } = await register(ctx, "concurrent@example.com");
+  const secret = await enableTotp(ctx, token);
+  ctx.NOW_MS = t0 + 30_000;
+  const code = await totpAt(secret, Math.floor(ctx.NOW_MS / 30_000));
+
+  const start1 = await call(ctx, "POST", "/api/auth/magic/start", {
+    body: { email: "concurrent@example.com", turnstile: "ok" },
+  });
+  const pending1 = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start1.data.debug_token } });
+  const start2 = await call(ctx, "POST", "/api/auth/magic/start", {
+    body: { email: "concurrent@example.com", turnstile: "ok" },
+  });
+  const pending2 = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start2.data.debug_token } });
+  assert.equal(pending1.data.totp_required, true);
+  assert.equal(pending2.data.totp_required, true);
+
+  const [first, second] = await Promise.all([
+    call(ctx, "POST", "/api/auth/totp/verify", { body: { totp_token: pending1.data.totp_token, code } }),
+    call(ctx, "POST", "/api/auth/totp/verify", { body: { totp_token: pending2.data.totp_token, code } }),
+  ]);
+  assert.deepEqual([first.status, second.status].sort(), [200, 401]);
+});
+
 test("TOTP rejects a replayed code in the same time step", async () => {
   const ctx = testEnv();
   const t0 = Date.now();

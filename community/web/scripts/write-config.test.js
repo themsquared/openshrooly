@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 test("write-config emits apiBase and turnstileSiteKey from env", () => {
@@ -26,4 +27,35 @@ test("write-config emits apiBase and turnstileSiteKey from env", () => {
     writeFileSync(configPath, before);
   }
   assert.doesNotMatch(readFileSync(registerPath, "utf8"), /Turnstile and OIDC keys are documented/);
+});
+
+test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or Mike", () => {
+  const publicDir = join(dirname(fileURLToPath(import.meta.url)), "../public");
+  const allow = /\bpasskeys?\b/gi;
+  const banned = [
+    { name: "key", re: /\bkeys?\b/i },
+    { name: "R2", re: /\bR2\b/i },
+    { name: "Cloudflare", re: /Cloudflare/i },
+    { name: "wrangler", re: /wrangler/i },
+    { name: "docs/", re: /docs\//i },
+    { name: "Mike", re: /\bMike\b/ },
+  ];
+  const hits = [];
+  for (const name of readdirSync(publicDir).filter((file) => file.endsWith(".html"))) {
+    const html = readFileSync(join(publicDir, name), "utf8")
+      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[\s\S]*?<\/style>/gi, " ");
+    const extras = [];
+    for (const match of html.matchAll(
+      /\b(?:content|placeholder|title|alt|aria-label|aria-description)\s*=\s*("([^"]*)"|'([^']*)')/gi
+    )) {
+      extras.push(match[2] ?? match[3] ?? "");
+    }
+    const text = `${html.replace(/<[^>]+>/g, " ")} ${extras.join(" ")}`.replace(allow, " ");
+    for (const rule of banned) {
+      const found = text.match(rule.re);
+      if (found) hits.push(`${name}: ${rule.name} (${found[0]})`);
+    }
+  }
+  assert.deepEqual(hits, []);
 });
