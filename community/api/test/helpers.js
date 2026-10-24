@@ -72,6 +72,7 @@ export function hasEmailLocalPart(text, email) {
 }
 
 export function assertNoPublicPii(value, email, extra = [], label = "public output") {
+  if (value == null) return;
   const text = typeof value === "string" ? value : JSON.stringify(value);
   assert.equal(hasEmailLocalPart(text, email), false, `${label} leaked the email local part`);
   assert.doesNotMatch(text, new RegExp(String(email).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), `${label} leaked the email`);

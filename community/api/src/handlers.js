@@ -10,7 +10,7 @@ import {
   validateProfile,
   ValidationError,
 } from "./profile.js";
-import { reviewConfirmExtra } from "./profile-schema.js";
+import { reviewConfirmExtra, slugify } from "./profile-schema.js";
 import { decodeBase64Photo, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES } from "./photos.js";
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
@@ -650,10 +650,11 @@ function reservedProfileIdReason(id) {
 }
 
 async function nextForkId(db, sourceId, username) {
-  let id = `${sourceId}-fork-${username}`;
+  const handle = slugify(username) || "grower";
+  let id = `${sourceId}-fork-${handle}`;
   let n = 2;
   while (await db.one("SELECT * FROM profiles WHERE id=?", [id])) {
-    id = `${sourceId}-fork-${username}-${n}`;
+    id = `${sourceId}-fork-${handle}-${n}`;
     n += 1;
   }
   return id;
@@ -752,15 +753,7 @@ async function showProfile(request, db, env, profileId) {
   const reportRows = await db.all("SELECT * FROM grow_reports WHERE profile_id=? ORDER BY id DESC LIMIT 20", [profileId]);
   const reports = [];
   for (const report of reportRows) {
-    let photoUrl = null;
-    let photoKey = report.photo_key || null;
-    const photoStatus = report.photo_status || (report.photo_key ? "approved" : null);
-    if (report.photo_key) {
-      const visible = await canServeReportPhoto(db, user, report);
-      if (visible) photoUrl = mediaUrl(env, report.photo_key);
-      else photoKey = null;
-    }
-    reports.push({ ...report, photo_key: photoKey, photo_url: photoUrl, photo_status: photoStatus });
+    reports.push({ ...report, ...reportPhotoPayload(env, report, user) });
   }
   const lockedDoc = unlocked
     ? profile

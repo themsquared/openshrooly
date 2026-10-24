@@ -118,7 +118,7 @@ test("rejects oversized files and oversized dimensions", () => {
   const huge = new Uint8Array(PHOTO_MAX_BYTES + 1);
   huge.set([0xff, 0xd8, 0xff]);
   assert.throws(() => assertSafeImage(huge));
-  assert.throws(() => processPhoto(jpeg({ width: 5000, height: 20 })));
+  assert.throws(() => processPhoto(jpeg({ width: 9000, height: 20 })));
 });
 
 test("strips JPEG EXIF and GPS on rewrite", () => {

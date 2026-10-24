@@ -533,7 +533,7 @@ test("grow report photos are sanitized and stay private until approved", async (
     body: { outcome: "success", photo_base64: b64(poly), photo_type: "text/html", photo_ext: "html" },
   });
   assert.equal(report.status, 201, JSON.stringify(report.data));
-  assert.match(report.data.photo_key, /^reports\/pearl-oyster\//);
+  assert.match(report.data.photo_key, /^pending\/reports\/pearl-oyster\//);
   assert.equal(report.data.photo_status, "pending");
   const media = await call(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
   assert.equal(media.status, 404);
@@ -625,7 +625,7 @@ test("grow report photos stay off the profile gallery and are queued for the upl
     body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
   });
   assert.equal(report.status, 201, JSON.stringify(report.data));
-  assert.match(report.data.photo_key, /^reports\/alice-gallery\//);
+  assert.match(report.data.photo_key, /^pending\/reports\/alice-gallery\//);
   const photosAfter = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", ["alice-gallery"]);
   assert.equal(photosAfter.length, photosBefore.length);
   assert.equal(
@@ -793,7 +793,7 @@ test("fork and official seed ids cannot be squatted", async () => {
   assert.equal(seedSquat.status, 409);
   const forked = await call(ctx, "POST", "/api/profiles/blue-oyster/fork", { token: alice.token, body: {} });
   assert.equal(forked.status, 201, JSON.stringify(forked.data));
-  assert.equal(forked.data.id, `blue-oyster-fork-${alice.user.username}`);
+  assert.equal(forked.data.id, `blue-oyster-fork-${String(alice.user.username).replace(/_/g, "-")}`);
 });
 
 test("an approved report photo on an unpublished draft stays private", async () => {

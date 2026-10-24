@@ -352,32 +352,39 @@ export function stripWebp(bytes) {
   const chunks = [];
   let width = 0;
   let height = 0;
+  let canvasW = 0;
+  let canvasH = 0;
+  let bitW = 0;
+  let bitH = 0;
   for (const chunk of parsed) {
     if (!keep.has(chunk.type)) continue;
     const start = chunk.start;
     if (chunk.type === "VP8X") {
-      width = 1 + (bytes[start + 12] | (bytes[start + 13] << 8) | (bytes[start + 14] << 16));
-      height = 1 + (bytes[start + 15] | (bytes[start + 16] << 8) | (bytes[start + 17] << 16));
+      canvasW = 1 + (bytes[start + 12] | (bytes[start + 13] << 8) | (bytes[start + 14] << 16));
+      canvasH = 1 + (bytes[start + 15] | (bytes[start + 16] << 8) | (bytes[start + 17] << 16));
       let flags = bytes[start + 8] & ~WEBP_FLAG_XMP & ~WEBP_FLAG_EXIF & ~WEBP_FLAG_ICC & ~WEBP_FLAG_ANIM;
-      if (hasAlpha) flags |= WEBP_FLAG_ALPHA;
+      if (hasAlpha || (bytes[start + 8] & WEBP_FLAG_ALPHA)) flags |= WEBP_FLAG_ALPHA;
       else flags &= ~WEBP_FLAG_ALPHA;
       const copy = bytes.slice(start, Math.min(chunk.end, bytes.length));
       copy[8] = flags;
       chunks.push(copy);
     } else {
       if (chunk.type === "VP8 ") {
-        width = readU16(bytes, start + 14, true) & 0x3fff;
-        height = readU16(bytes, start + 16, true) & 0x3fff;
+        bitW = readU16(bytes, start + 14, true) & 0x3fff;
+        bitH = readU16(bytes, start + 16, true) & 0x3fff;
       }
       if (chunk.type === "VP8L") {
         const bits = readU32(bytes, start + 9, true) >>> 0;
-        width = (bits & 0x3fff) + 1;
-        height = ((bits >> 14) & 0x3fff) + 1;
+        bitW = (bits & 0x3fff) + 1;
+        bitH = ((bits >> 14) & 0x3fff) + 1;
       }
       chunks.push(bytes.slice(start, Math.min(chunk.end, bytes.length)));
     }
   }
-  if (width > PHOTO_MAX_EDGE || height > PHOTO_MAX_EDGE) {
+  if (canvasW && bitW && (canvasW !== bitW || canvasH !== bitH)) throw new ValidationError("That WebP is damaged.");
+  width = bitW || canvasW;
+  height = bitH || canvasH;
+  if (bitW > PHOTO_MAX_EDGE || bitH > PHOTO_MAX_EDGE || width > PHOTO_MAX_EDGE || height > PHOTO_MAX_EDGE) {
     throw new ValidationError(`Photos must be ${PHOTO_MAX_EDGE} pixels or smaller on each side.`);
   }
   if (!width || !height) throw new ValidationError("That WebP is damaged.");

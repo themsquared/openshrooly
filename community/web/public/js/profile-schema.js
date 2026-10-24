@@ -385,6 +385,10 @@ function identityHasPsychoactiveGenus(profile, extra = {}) {
 }
 
 export function taxonLatinOk(profile, extra = {}) {
+  return [profile?.species, profile?.strain, profile?.variety_group].every((value) => isLatinLetterSafe(value));
+}
+
+export function confirmLatinOk(profile, extra = {}) {
   return [profile?.species, profile?.strain, profile?.name, profile?.variety_group, profile?.id, extra.title].every((value) =>
     isLatinLetterSafe(value)
   );
@@ -446,7 +450,11 @@ function offmenuEpithetsIn(parsed) {
 }
 
 function isVettedCulinaryPair(parsed) {
-  return offmenuEpithetsIn(parsed).every((epithet) => VETTED_CULINARY_PAIRS.has(`${parsed.genus} ${epithet}`));
+  const epithets = new Set(offmenuEpithetsIn(parsed));
+  const compact = parsed.words.slice(1).join("");
+  if (compact && OFFMENU_EPITHETS.has(compact)) epithets.add(compact);
+  if (!epithets.size) return false;
+  return [...epithets].every((epithet) => VETTED_CULINARY_PAIRS.has(`${parsed.genus} ${epithet}`));
 }
 
 export function classifyTaxon(profile, extra = {}) {
@@ -491,7 +499,7 @@ export function classifyTaxon(profile, extra = {}) {
 export function canConfirmCulinary(profile, extra = {}) {
   const classified = classifyTaxon(profile, extra);
   if (classified.force) return false;
-  if (!taxonLatinOk(profile, extra)) return false;
+  if (!confirmLatinOk(profile, extra)) return false;
   const parsed = parseSpeciesParts(profile?.species);
   if (!CULINARY_GENERA.has(parsed.genus)) return false;
   if (isPsychoactiveGenus(parsed.genus)) return false;
@@ -669,25 +677,38 @@ export function applyPackRules(profile, extra = {}) {
   }
   const confirmedCulinary = extra.moderatorPack === "culinary" || Boolean(extra.confirmedCulinary);
   const offMenu =
-    extra.moderatorPack === "psilocybin" ||
-    (!confirmedCulinary && (classified.force || classified.hold || next.pack === "psilocybin" || Boolean(next.restricted)));
+    extra.moderatorPack === "psilocybin" || classified.force || (!confirmedCulinary && classified.hold);
   if (offMenu) {
+    if (!next.pricing_before_hold) {
+      next.pricing_before_hold = next.pricing;
+      next.providers_before_hold = next.allowed_payment_providers;
+      next.affiliates_allowed_before_hold = next.affiliates_allowed;
+      next.affiliate_links_before_hold = next.affiliate_links;
+    }
     next.pack = "psilocybin";
     next.restricted = true;
     if (!next.tags.includes("psilocybin")) next.tags = [...next.tags, "psilocybin"];
-    if (!canConfirmCulinary(next, extra)) {
-      next.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
-      next.allowed_payment_providers = [];
-      next.affiliates_allowed = false;
-      next.affiliate_links = [];
-    }
+    next.pricing = { kind: "free", amount_cents: 0, currency: "USD", creator_share_percent: 70 };
+    next.allowed_payment_providers = [];
+    next.affiliates_allowed = false;
+    next.affiliate_links = [];
     next.legal_notice = PSILOCYBIN_LEGAL_NOTICE;
-  } else if (confirmedCulinary) {
+  } else if (confirmedCulinary || classified.culinary) {
     next.pack = "culinary";
     next.restricted = false;
     next.tags = next.tags.filter((tag) => tag !== "psilocybin");
     if (!next.tags.includes("culinary")) next.tags = [...next.tags, "culinary"];
     next.legal_notice = null;
+    if (confirmedCulinary && next.pricing_before_hold) {
+      next.pricing = next.pricing_before_hold;
+      next.allowed_payment_providers = next.providers_before_hold || [];
+      if (next.affiliates_allowed_before_hold != null) next.affiliates_allowed = next.affiliates_allowed_before_hold;
+      if (Array.isArray(next.affiliate_links_before_hold)) next.affiliate_links = next.affiliate_links_before_hold;
+      delete next.pricing_before_hold;
+      delete next.providers_before_hold;
+      delete next.affiliates_allowed_before_hold;
+      delete next.affiliate_links_before_hold;
+    }
   } else {
     next.legal_notice = null;
   }
