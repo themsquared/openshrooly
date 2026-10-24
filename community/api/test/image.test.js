@@ -1,8 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_PHOTO_BYTES, MAX_PHOTO_EDGE, sanitizeGrowPhoto, sniffImage } from "../src/image.js";
+import { decodePhotoBase64, MAX_PHOTO_BASE64_CHARS, MAX_PHOTO_BYTES, MAX_PHOTO_EDGE, sanitizeGrowPhoto, sniffImage } from "../src/image.js";
 import { ValidationError } from "../src/profile.js";
-import { buildJpeg, buildPng, buildWebp, includesAscii, jpegExifGps, u8 } from "./image-fixtures.js";
+import {
+  buildJpeg,
+  buildPng,
+  buildWebp,
+  buildWebpFromChunks,
+  includesAscii,
+  jpegExifGps,
+  jpegSegment,
+  u8,
+  vp8lPayload,
+  vp8xPayload,
+} from "./image-fixtures.js";
 
 test("sniff accepts JPEG PNG WebP and rejects SVG HTML GIF", () => {
   assert.equal(sniffImage(buildJpeg()), "jpeg");
@@ -95,3 +106,36 @@ test("oversize and huge dimensions are rejected", () => {
   assert.throws(() => sanitizeGrowPhoto(buildJpeg({ width: MAX_PHOTO_EDGE + 1 })), ValidationError);
   assert.throws(() => sanitizeGrowPhoto(buildPng({ width: 0, height: 8 })), ValidationError);
 });
+
+test("WebP VP8L bomb then VP8X 1x1 is rejected", () => {
+  const bomb = buildWebpFromChunks([
+    ["VP8L", vp8lPayload(16384, 16384)],
+    ["VP8X", vp8xPayload(1, 1)],
+  ]);
+  assert.throws(() => sanitizeGrowPhoto(bomb), ValidationError);
+});
+
+test("WebP VP8X 1x1 then VP8L bomb is rejected", () => {
+  const mismatch = buildWebpFromChunks([
+    ["VP8X", vp8xPayload(1, 1)],
+    ["VP8L", vp8lPayload(16384, 16384)],
+  ]);
+  assert.throws(() => sanitizeGrowPhoto(mismatch), ValidationError);
+});
+
+test("JPEG JPGn HTML is dropped and APP14 Adobe is kept", () => {
+  const dirty = buildJpeg({
+    apps: [jpegSegment(0xf0, "<html>jpgn</html>"), jpegSegment(0xee, "Adobe\0")],
+  });
+  assert.ok(includesAscii(dirty, "<html>"));
+  const clean = sanitizeGrowPhoto(dirty);
+  assert.equal(includesAscii(clean.bytes, "<html>"), false);
+  assert.ok(includesAscii(clean.bytes, "Adobe"));
+});
+
+test("overlong photo_base64 is rejected before decode", () => {
+  const started = Date.now();
+  assert.throws(() => decodePhotoBase64("A".repeat(MAX_PHOTO_BASE64_CHARS + 1)), ValidationError);
+  assert.ok(Date.now() - started < 200);
+});
+

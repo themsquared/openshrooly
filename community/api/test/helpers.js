@@ -18,6 +18,7 @@ export function testEnv(extra = {}) {
     DEV_STUBS: "1",
     HIBP_DISABLED: "1",
     SITE_ORIGIN: "http://127.0.0.1:8888",
+    API_ORIGIN: "https://api.shroomlabs.io",
     OIDC_STUB: "1",
     TURNSTILE_STUB: "1",
     GROW_COACH_STUB: "1",

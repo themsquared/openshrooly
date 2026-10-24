@@ -12,11 +12,6 @@ async function envContext(env) {
     } catch {
       // Local/minimal D1 may not support exec of a batch; `npm run db:init` applies schema.sql.
     }
-    try {
-      await db.exec("ALTER TABLE grow_reports ADD COLUMN photo_status TEXT NOT NULL DEFAULT 'approved'");
-    } catch {
-      // Column already exists on newer D1 / memory schemas.
-    }
     env._ctx = {
       db,
       storage: createOptionalStorage(env.PHOTOS, { allowMemory: String(env.DEV_STUBS || "") === "1" }),

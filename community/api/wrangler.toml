@@ -22,7 +22,10 @@ SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
 # Browser origins allowed to call api.shroomlabs.io with Authorization headers.
 CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
-# Public R2 custom domain for grow-report photos (unused until the bucket exists).
+# Not used for grow-report or coach photos. Those are served only through
+# /api/media. Pending objects live under pending/ and must never be mapped on
+# a public R2 domain. Approval (when built) copies to reports/ or coach/ and
+# deletes pending/; reject/takedown deletes the object.
 CDN_BASE_URL = "https://cdn.shroomlabs.io"
 # Google sign-in. The client ID is public; GOOGLE_CLIENT_SECRET is a Wrangler secret (see docs/AUTH.md).
 GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleusercontent.com"

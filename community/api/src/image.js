@@ -1,8 +1,9 @@
-/** Grow-report photo sniff, size/dimension caps, and metadata stripping. */
+/** Grow-report and coach photo sniff, size/dimension caps, and metadata stripping. */
 
 import { ValidationError } from "./profile.js";
 
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+export const MAX_PHOTO_BASE64_CHARS = Math.ceil(MAX_PHOTO_BYTES / 3) * 4;
 export const MAX_PHOTO_EDGE = 8192;
 export const MIN_PHOTO_EDGE = 1;
 
@@ -14,7 +15,6 @@ export const IMAGE_TYPES = {
 
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const PNG_KEEP = new Set(["IHDR", "PLTE", "IDAT", "IEND", "tRNS"]);
-const WEBP_KEEP = new Set(["VP8 ", "VP8L", "VP8X", "ALPH"]);
 const WEBP_ANIM = new Set(["ANIM", "ANMF"]);
 const VP8X_FLAG_ICC = 0x20;
 const VP8X_FLAG_ALPHA = 0x10;
@@ -40,6 +40,25 @@ export function sniffImage(bytes) {
     return "webp";
   }
   return null;
+}
+
+export function decodePhotoBase64(value) {
+  if (typeof value !== "string") throw new ValidationError("invalid photo encoding");
+  if (value.length > MAX_PHOTO_BASE64_CHARS) throw new ValidationError("photo too large");
+  try {
+    if (typeof Uint8Array.fromBase64 === "function") return Uint8Array.fromBase64(value);
+    return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+  } catch {
+    throw new ValidationError("invalid photo encoding");
+  }
+}
+
+export function bytesToBase64(bytes) {
+  const raw = asBytes(bytes);
+  if (typeof Buffer !== "undefined") return Buffer.from(raw).toString("base64");
+  let bin = "";
+  for (let i = 0; i < raw.length; i += 1) bin += String.fromCharCode(raw[i]);
+  return btoa(bin);
 }
 
 export function sanitizeGrowPhoto(input) {
@@ -83,12 +102,27 @@ function asBytes(input) {
   return new Uint8Array(input || []);
 }
 
+function jpegKeep(marker) {
+  if (marker >= 0xd0 && marker <= 0xd7) return true;
+  if (marker === 0xd9 || marker === 0xda) return true;
+  if (isSofMarker(marker)) return true;
+  if (marker === 0xc4 || marker === 0xcc) return true;
+  if (marker === 0xdb || marker === 0xdd) return true;
+  if (marker === 0xee) return true;
+  return false;
+}
+
 function sanitizeJpeg(input) {
   if (input.length < 4 || input[0] !== 0xff || input[1] !== 0xd8) throw new ValidationError("invalid JPEG");
-  const out = [0xff, 0xd8];
+  const out = new Uint8Array(input.length);
+  out[0] = 0xff;
+  out[1] = 0xd8;
+  let o = 2;
   let i = 2;
   let sawSof = false;
   let sawSos = false;
+  let sawApp14 = false;
+  let sofComponents = 0;
   while (i < input.length) {
     if (input[i] !== 0xff) throw new ValidationError("invalid JPEG");
     while (i < input.length && input[i] === 0xff) i += 1;
@@ -96,22 +130,30 @@ function sanitizeJpeg(input) {
     const marker = input[i];
     i += 1;
     if (marker === 0xd9) {
-      out.push(0xff, 0xd9);
+      out[o] = 0xff;
+      out[o + 1] = 0xd9;
+      o += 2;
       break;
     }
     if (marker === 0xd8) throw new ValidationError("invalid JPEG");
     if (marker >= 0xd0 && marker <= 0xd7) {
-      out.push(0xff, marker);
+      out[o] = 0xff;
+      out[o + 1] = marker;
+      o += 2;
       continue;
     }
     if (i + 1 >= input.length) throw new ValidationError("invalid JPEG");
     const len = (input[i] << 8) | input[i + 1];
     if (len < 2 || i + len > input.length) throw new ValidationError("invalid JPEG");
-    const drop = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
-    const copy = !drop;
-    if (copy) {
-      out.push(0xff, marker);
-      for (let n = 0; n < len; n += 1) out.push(input[i + n]);
+    const keep = jpegKeep(marker);
+    if (keep) {
+      if (marker === 0xee) sawApp14 = true;
+      if (isSofMarker(marker) && len >= 8) sofComponents = input[i + 7];
+      out[o] = 0xff;
+      out[o + 1] = marker;
+      o += 2;
+      out.set(input.subarray(i, i + len), o);
+      o += len;
     }
     if (isSofMarker(marker)) sawSof = true;
     i += len;
@@ -120,7 +162,7 @@ function sanitizeJpeg(input) {
     while (i < input.length) {
       const b = input[i];
       if (b !== 0xff) {
-        if (copy) out.push(b);
+        if (keep) out[o++] = b;
         i += 1;
         continue;
       }
@@ -130,12 +172,20 @@ function sanitizeJpeg(input) {
       }
       const next = input[i + 1];
       if (next === 0x00) {
-        if (copy) out.push(0xff, 0x00);
+        if (keep) {
+          out[o] = 0xff;
+          out[o + 1] = 0x00;
+          o += 2;
+        }
         i += 2;
         continue;
       }
       if (next >= 0xd0 && next <= 0xd7) {
-        if (copy) out.push(0xff, next);
+        if (keep) {
+          out[o] = 0xff;
+          out[o + 1] = next;
+          o += 2;
+        }
         i += 2;
         continue;
       }
@@ -147,7 +197,8 @@ function sanitizeJpeg(input) {
     }
   }
   if (!sawSof || !sawSos) throw new ValidationError("invalid JPEG");
-  return Uint8Array.from(out);
+  if (sofComponents === 4 && !sawApp14) throw new ValidationError("CMYK JPEG is not allowed");
+  return out.subarray(0, o);
 }
 
 function isSofMarker(marker) {
@@ -194,7 +245,9 @@ function jpegDimensions(input) {
 
 function sanitizePng(input) {
   if (input.length < 8 || !PNG_SIG.every((v, i) => input[i] === v)) throw new ValidationError("invalid PNG");
-  const out = [input[0], input[1], input[2], input[3], input[4], input[5], input[6], input[7]];
+  const out = new Uint8Array(input.length);
+  out.set(input.subarray(0, 8), 0);
+  let o = 8;
   let i = 8;
   let sawIhdr = false;
   let sawIdat = false;
@@ -203,12 +256,11 @@ function sanitizePng(input) {
     const len = readU32be(input, i);
     const type = ascii(input, i + 4, 4);
     const end = i + 12 + len;
-    if (len < 0 || end > input.length) throw new ValidationError("invalid PNG");
+    if (end > input.length) throw new ValidationError("invalid PNG");
     if (type === "IEND") {
       if (len !== 0) throw new ValidationError("invalid PNG");
-      if (PNG_KEEP.has(type)) {
-        for (let n = i; n < end; n += 1) out.push(input[n]);
-      }
+      out.set(input.subarray(i, end), o);
+      o += end - i;
       sawIend = true;
       break;
     }
@@ -218,12 +270,13 @@ function sanitizePng(input) {
         sawIhdr = true;
       }
       if (type === "IDAT") sawIdat = true;
-      for (let n = i; n < end; n += 1) out.push(input[n]);
+      out.set(input.subarray(i, end), o);
+      o += end - i;
     }
     i = end;
   }
   if (!sawIhdr || !sawIdat || !sawIend) throw new ValidationError("invalid PNG");
-  return Uint8Array.from(out);
+  return out.subarray(0, o);
 }
 
 function pngDimensions(input) {
@@ -232,38 +285,101 @@ function pngDimensions(input) {
   return { width: readU32be(input, 16), height: readU32be(input, 20) };
 }
 
-function sanitizeWebp(input) {
+function parseWebpChunks(input) {
   if (sniffImage(input) !== "webp") throw new ValidationError("invalid WebP");
   const declared = readU32le(input, 4);
   const limit = Math.min(input.length, 8 + declared);
   if (limit < 12) throw new ValidationError("invalid WebP");
-  const kept = [];
+  const chunks = [];
   let i = 12;
-  let hasBitstream = false;
   while (i + 8 <= limit) {
     const fourcc = ascii(input, i, 4);
     const size = readU32le(input, i + 4);
     const dataStart = i + 8;
     const dataEnd = dataStart + size;
     if (dataEnd > limit) throw new ValidationError("invalid WebP");
-    if (WEBP_ANIM.has(fourcc)) throw new ValidationError("animated WebP is not allowed");
-    if (WEBP_KEEP.has(fourcc)) {
-      let payload = input.subarray(dataStart, dataEnd);
-      if (fourcc === "VP8X") {
-        if (payload.length < 10) throw new ValidationError("invalid WebP");
-        const flags = payload[0];
-        if (flags & VP8X_FLAG_ANIM) throw new ValidationError("animated WebP is not allowed");
-        const next = new Uint8Array(payload);
-        next[0] = flags & ~(VP8X_FLAG_EXIF | VP8X_FLAG_XMP | VP8X_FLAG_ICC);
-        next[0] = (next[0] & ~VP8X_FLAG_ALPHA) | (flags & VP8X_FLAG_ALPHA);
-        payload = next;
-      }
-      if (fourcc === "VP8 " || fourcc === "VP8L") hasBitstream = true;
-      kept.push({ fourcc, payload });
-    }
+    chunks.push({ fourcc, payload: input.subarray(dataStart, dataEnd) });
     i = dataEnd + (size & 1);
   }
-  if (!hasBitstream) throw new ValidationError("invalid WebP");
+  return chunks;
+}
+
+function bitstreamDimensions(chunk) {
+  const payload = chunk.payload;
+  if (chunk.fourcc === "VP8L" && payload.length >= 5 && payload[0] === 0x2f) {
+    const bits = payload[1] | (payload[2] << 8) | (payload[3] << 16) | (payload[4] << 24);
+    return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+  }
+  if (chunk.fourcc === "VP8 " && payload.length >= 10 && payload[3] === 0x9d && payload[4] === 0x01 && payload[5] === 0x2a) {
+    return { width: payload[6] | ((payload[7] & 0x3f) << 8), height: payload[8] | ((payload[9] & 0x3f) << 8) };
+  }
+  return null;
+}
+
+function vp8xCanvas(payload) {
+  if (!payload || payload.length < 10) return null;
+  return { width: readU24le(payload, 4) + 1, height: readU24le(payload, 7) + 1 };
+}
+
+function sanitizeWebp(input) {
+  const chunks = parseWebpChunks(input);
+  if (!chunks.length) throw new ValidationError("invalid WebP");
+  const first = chunks[0].fourcc;
+  if (first !== "VP8X" && first !== "VP8 " && first !== "VP8L") throw new ValidationError("invalid WebP");
+  if (chunks.some((chunk) => WEBP_ANIM.has(chunk.fourcc))) throw new ValidationError("animated WebP is not allowed");
+
+  const vp8xChunks = chunks.filter((chunk) => chunk.fourcc === "VP8X");
+  if (vp8xChunks.length > 1) throw new ValidationError("invalid WebP");
+  if (vp8xChunks.length === 1 && first !== "VP8X") throw new ValidationError("invalid WebP");
+
+  const bitstreams = chunks.filter((chunk) => chunk.fourcc === "VP8 " || chunk.fourcc === "VP8L");
+  if (bitstreams.length !== 1) throw new ValidationError("invalid WebP");
+  const bitstream = bitstreams[0];
+  const bitIndex = chunks.indexOf(bitstream);
+
+  const alphs = chunks.filter((chunk) => chunk.fourcc === "ALPH");
+  if (alphs.length > 1) throw new ValidationError("invalid WebP");
+  if (alphs.length && !vp8xChunks.length) throw new ValidationError("invalid WebP");
+  if (alphs.length && chunks.indexOf(alphs[0]) > bitIndex) throw new ValidationError("invalid WebP");
+
+  const bitDims = bitstreamDimensions(bitstream);
+  if (!bitDims) throw new ValidationError("invalid WebP");
+
+  const kept = [];
+  if (vp8xChunks.length) {
+    const payload = new Uint8Array(vp8xChunks[0].payload);
+    if (payload.length < 10) throw new ValidationError("invalid WebP");
+    const flags = payload[0];
+    if (flags & VP8X_FLAG_ANIM) throw new ValidationError("animated WebP is not allowed");
+    const canvas = vp8xCanvas(payload);
+    if (!canvas || canvas.width !== bitDims.width || canvas.height !== bitDims.height) {
+      throw new ValidationError("invalid WebP");
+    }
+    payload[0] = (flags & ~(VP8X_FLAG_EXIF | VP8X_FLAG_XMP | VP8X_FLAG_ICC | VP8X_FLAG_ANIM)) | (flags & VP8X_FLAG_ALPHA);
+    kept.push({ fourcc: "VP8X", payload });
+  }
+  if (alphs.length) kept.push(alphs[0]);
+  kept.push(bitstream);
+  return writeWebp(kept);
+}
+
+function webpDimensions(input) {
+  let chunks;
+  try {
+    chunks = parseWebpChunks(input);
+  } catch {
+    return null;
+  }
+  if (!chunks.length) return null;
+  const first = chunks[0].fourcc;
+  if (first !== "VP8X" && first !== "VP8 " && first !== "VP8L") return null;
+  if (chunks.some((chunk) => chunk.fourcc === "VP8X") && first !== "VP8X") return null;
+  const bitstreams = chunks.filter((chunk) => chunk.fourcc === "VP8 " || chunk.fourcc === "VP8L");
+  if (bitstreams.length !== 1) return null;
+  return bitstreamDimensions(bitstreams[0]);
+}
+
+function writeWebp(kept) {
   const chunks = [];
   let body = 4;
   for (const chunk of kept) {
@@ -285,31 +401,6 @@ function sanitizeWebp(input) {
     o += chunk.length;
   }
   return out;
-}
-
-function webpDimensions(input) {
-  const declared = readU32le(input, 4);
-  const limit = Math.min(input.length, 8 + declared);
-  let i = 12;
-  let dims = null;
-  while (i + 8 <= limit) {
-    const fourcc = ascii(input, i, 4);
-    const size = readU32le(input, i + 4);
-    const dataStart = i + 8;
-    const dataEnd = dataStart + size;
-    if (dataEnd > limit) break;
-    const payload = input.subarray(dataStart, dataEnd);
-    if (fourcc === "VP8X" && payload.length >= 10) {
-      dims = { width: readU24le(payload, 4) + 1, height: readU24le(payload, 7) + 1 };
-    } else if (!dims && fourcc === "VP8L" && payload.length >= 5 && payload[0] === 0x2f) {
-      const bits = payload[1] | (payload[2] << 8) | (payload[3] << 16) | (payload[4] << 24);
-      dims = { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
-    } else if (!dims && fourcc === "VP8 " && payload.length >= 10 && payload[3] === 0x9d && payload[4] === 0x01 && payload[5] === 0x2a) {
-      dims = { width: payload[6] | ((payload[7] & 0x3f) << 8), height: payload[8] | ((payload[9] & 0x3f) << 8) };
-    }
-    i = dataEnd + (size & 1);
-  }
-  return dims;
 }
 
 function readU32be(b, i) {

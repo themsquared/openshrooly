@@ -10,6 +10,7 @@ export function createMemoryDb() {
     profiles: [],
     ratings: [],
     grow_reports: [],
+    uploaded_media: [],
     entitlements: [],
     checkouts: [],
     affiliate_clicks: [],
@@ -584,6 +585,19 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("SELECT * FROM grow_reports WHERE photo_key=")) {
     return tables.grow_reports.filter((r) => r.photo_key === params[0]);
+  }
+  if (q.startsWith("INSERT INTO uploaded_media")) {
+    tables.uploaded_media.push({
+      photo_key: params[0],
+      owner_id: params[1],
+      status: params[2],
+      kind: params[3],
+      created_at: params[4],
+    });
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM uploaded_media WHERE photo_key=")) {
+    return tables.uploaded_media.filter((r) => r.photo_key === params[0]);
   }
   if (q.startsWith("SELECT * FROM grow_reports")) {
     return tables.grow_reports.filter((r) => r.profile_id === params[0]).reverse();

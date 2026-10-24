@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { MAX_PHOTO_BASE64_CHARS } from "../src/image.js";
+import { MAX_JSON_BODY_BYTES, readJsonLimited } from "../src/http-body.js";
 import { call, callRaw, register, testEnv } from "./helpers.js";
 import { buildJpeg, buildPng, buildWebp, includesAscii, jpegExifGps, toBase64 } from "./image-fixtures.js";
 
@@ -31,7 +33,7 @@ test("grow report photo uses sniffed type, strips metadata, and stays pending", 
   });
   assert.equal(posted.status, 201, JSON.stringify(posted.data));
   assert.equal(posted.data.photo_status, "pending");
-  assert.match(posted.data.photo_key, /^reports\/pearl-oyster\/[0-9a-f]+\.jpg$/);
+  assert.match(posted.data.photo_key, /^pending\/reports\/pearl-oyster\/[0-9a-f]+\.jpg$/);
   const stored = await ctx.storage.get(posted.data.photo_key);
   assert.equal(stored.contentType, "image/jpeg");
   assert.equal(includesAscii(stored.bytes, "Exif"), false);
@@ -42,11 +44,15 @@ test("grow report photo uses sniffed type, strips metadata, and stays pending", 
   const publicProfile = await call(ctx, "GET", "/api/profiles/pearl-oyster");
   assert.equal(publicProfile.data.reports[0].photo_url, null);
   assert.equal(publicProfile.data.reports[0].photo_key, null);
-  assert.equal(publicProfile.data.reports[0].photo_status, "pending");
+  assert.equal(publicProfile.data.reports[0].photo_status, null);
 
+  ctx.CDN_BASE_URL = "https://cdn.shroomlabs.io";
   const ownerProfile = await call(ctx, "GET", "/api/profiles/pearl-oyster", { token });
   assert.equal(ownerProfile.data.reports[0].photo_key, posted.data.photo_key);
-  assert.match(ownerProfile.data.reports[0].photo_url, /^\/api\/media\//);
+  assert.equal(
+    ownerProfile.data.reports[0].photo_url,
+    `https://api.shroomlabs.io/api/media/${encodeURIComponent(posted.data.photo_key)}`
+  );
   assert.doesNotMatch(ownerProfile.data.reports[0].photo_url, /cdn\.shroomlabs\.io/);
 
   const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(posted.data.photo_key)}`);
@@ -75,10 +81,12 @@ test("grow report photo uses sniffed type, strips metadata, and stays pending", 
 
   const report = await ctx.db.one("SELECT * FROM grow_reports WHERE photo_key=?", [posted.data.photo_key]);
   report.photo_status = "approved";
+  const acl = await ctx.db.one("SELECT * FROM uploaded_media WHERE photo_key=?", [posted.data.photo_key]);
+  acl.status = "approved";
   const publicAfter = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(posted.data.photo_key)}`);
   assert.equal(publicAfter.status, 200);
   const listed = await call(ctx, "GET", "/api/profiles/pearl-oyster");
-  assert.ok(listed.data.reports[0].photo_url);
+  assert.ok(listed.data.reports[0].photo_url.startsWith("https://api.shroomlabs.io/api/media/"));
 });
 
 test("mismatched claimed type follows sniffed PNG, not the client", async () => {
@@ -118,4 +126,37 @@ test("SVG HTML GIF animated WebP and claimed-jpeg HTML are 400", async () => {
     assert.equal(res.status, 400, JSON.stringify(res.data));
     assert.ok(res.data.error);
   }
+});
+
+test("overlong photo_base64 is 400 without storing", async () => {
+  const ctx = testEnv();
+  const { token } = await register(ctx, "huge@example.com");
+  const res = await call(ctx, "POST", "/api/profiles/pearl-oyster/reports", {
+    token,
+    body: { outcome: "success", photo_base64: "A".repeat(MAX_PHOTO_BASE64_CHARS + 1) },
+  });
+  assert.equal(res.status, 400);
+  assert.match(res.data.error, /too large/);
+});
+
+test("readJson rejects oversized Content-Length and streamed bodies", async () => {
+  const fake = {
+    headers: { get: (name) => (name === "content-length" ? String(MAX_JSON_BODY_BYTES + 1) : "application/json") },
+    body: null,
+  };
+  await assert.rejects(() => readJsonLimited(fake), (err) => err.message === "request too large");
+  const stream = new Request("http://test/api", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: new Uint8Array(MAX_JSON_BODY_BYTES + 1),
+  });
+  await assert.rejects(() => readJsonLimited(stream), (err) => err.message === "request too large");
+});
+
+test("/api/media denies objects without an uploaded_media row", async () => {
+  const ctx = testEnv();
+  const key = "coach/1/orphan.jpg";
+  await ctx.storage.put(key, buildJpeg(), "image/jpeg");
+  const res = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(key)}`);
+  assert.equal(res.status, 404);
 });

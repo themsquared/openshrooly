@@ -105,10 +105,26 @@ export function buildPng({ width = 8, height = 8, extraChunks = [] } = {}) {
   return concat(u8(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a), ihdr, ...extras, idat, pngChunk("IEND"));
 }
 
-function riffChunk(fourcc, data) {
+export function riffChunk(fourcc, data) {
   const payload = typeof data === "string" ? new TextEncoder().encode(data) : data;
   const pad = payload.length & 1 ? u8(0) : new Uint8Array();
   return concat(new TextEncoder().encode(fourcc), le32(payload.length), payload, pad);
+}
+
+export function vp8lPayload(width, height) {
+  const w = width - 1;
+  const h = height - 1;
+  const bits = (w & 0x3fff) | ((h & 0x3fff) << 14);
+  return u8(0x2f, bits & 0xff, (bits >>> 8) & 0xff, (bits >>> 16) & 0xff, (bits >>> 24) & 0xff);
+}
+
+export function vp8xPayload(width, height, flags = 0x10) {
+  return concat(u8(flags, 0, 0, 0), le24(width - 1), le24(height - 1));
+}
+
+export function buildWebpFromChunks(chunks) {
+  const body = concat(...chunks.map(([type, data]) => riffChunk(type, data)));
+  return concat("RIFF", le32(body.length + 4), "WEBP", body);
 }
 
 export function buildWebp({

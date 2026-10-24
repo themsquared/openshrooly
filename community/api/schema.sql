@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS grow_reports (
     photo_status TEXT NOT NULL DEFAULT 'approved',
     created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_grow_reports_photo_key ON grow_reports(photo_key);
+CREATE TABLE IF NOT EXISTS uploaded_media (
+    photo_key TEXT PRIMARY KEY,
+    owner_id INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS entitlements (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     item_id TEXT NOT NULL,

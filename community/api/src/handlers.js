@@ -20,7 +20,9 @@ import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RE
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 import { handleAlerts } from "./alerts/http.js";
-import { IMAGE_TYPES, mediaFilename, sanitizeGrowPhoto, sniffImage } from "./image.js";
+import { decodePhotoBase64, IMAGE_TYPES, mediaFilename, sanitizeGrowPhoto, sniffImage } from "./image.js";
+import { readJsonLimited } from "./http-body.js";
+import { canSeeMedia, getMedia, insertMedia, mediaApiUrl, mediaApproved, pendingPhotoKey } from "./media-acl.js";
 
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
@@ -60,39 +62,19 @@ export function withCors(response, env, request) {
 }
 
 export function mediaUrl(env, key) {
-  if (!key) return null;
-  const cdn = String(env.CDN_BASE_URL || "").replace(/\/$/, "");
-  if (cdn) return `${cdn}/${key}`;
-  return `/api/media/${encodeURIComponent(key)}`;
-}
-
-function photoApproved(report) {
-  return (report?.photo_status || "approved") === "approved";
-}
-
-function isStaff(user) {
-  const role = user?.role || "";
-  return role === "admin" || role === "moderator" || role === "staff";
-}
-
-function canSeePendingPhoto(user, report) {
-  if (!user || !report) return false;
-  if (isStaff(user)) return true;
-  return Number(user.id) === Number(report.author_id);
+  return mediaApiUrl(env, key);
 }
 
 function reportPhotoPayload(env, report, viewer) {
   if (!report.photo_key) return { photo_key: null, photo_url: null, photo_status: null };
   const status = report.photo_status || "approved";
-  if (status === "approved") {
-    return { photo_key: report.photo_key, photo_url: mediaUrl(env, report.photo_key), photo_status: status };
-  }
-  if (!canSeePendingPhoto(viewer, report)) {
-    return { photo_key: null, photo_url: null, photo_status: status };
+  const acl = { owner_id: report.author_id, status };
+  if (!canSeeMedia(viewer, acl)) {
+    return { photo_key: null, photo_url: null, photo_status: null };
   }
   return {
     photo_key: report.photo_key,
-    photo_url: `/api/media/${encodeURIComponent(report.photo_key)}`,
+    photo_url: mediaApiUrl(env, report.photo_key),
     photo_status: status,
   };
 }
@@ -109,17 +91,7 @@ function redirect(location, status = 302) {
 }
 
 async function readJson(request) {
-  const type = request.headers.get("content-type") || "";
-  if (type.includes("application/json")) return request.json();
-  if (type.includes("application/x-www-form-urlencoded")) {
-    const text = await request.text();
-    return Object.fromEntries(new URLSearchParams(text).entries());
-  }
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
+  return readJsonLimited(request);
 }
 
 async function userFromAuth(request, db) {
@@ -393,16 +365,11 @@ async function route(method, path, url, request, env) {
     if (body.photo_base64) {
       const caps = capabilities(env, request);
       if (caps.photos) {
-        let raw;
-        try {
-          raw = Uint8Array.from(atob(body.photo_base64), (c) => c.charCodeAt(0));
-        } catch {
-          throw new ValidationError("invalid photo encoding");
-        }
-        const photo = sanitizeGrowPhoto(raw);
-        photoKey = `reports/${profileId}/${randomToken()}.${photo.ext}`;
+        const photo = sanitizeGrowPhoto(decodePhotoBase64(body.photo_base64));
+        photoKey = pendingPhotoKey("reports", profileId, photo.ext);
         await storage.put(photoKey, photo.bytes, photo.contentType);
         photoStatus = "pending";
+        await insertMedia(db, { photo_key: photoKey, owner_id: user.id, status: "pending", kind: "report" });
       }
     }
     await db.run(
@@ -493,16 +460,14 @@ async function route(method, path, url, request, env) {
     if (!key || key.includes("..") || key.includes("\\") || key.includes("\0")) {
       return json({ error: "not found" }, 404);
     }
+    const row = await getMedia(db, key);
+    const viewer = await userFromAuth(request, db);
+    if (!canSeeMedia(viewer, row)) return json({ error: "not found" }, 404);
     const file = await storage.get(key);
     if (!file) return json({ error: "not found" }, 404);
     const bytes = file.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file.bytes);
     const kind = sniffImage(bytes);
     if (!kind) return json({ error: "not found" }, 404);
-    const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
-    if (report && !photoApproved(report)) {
-      const viewer = await userFromAuth(request, db);
-      if (!canSeePendingPhoto(viewer, report)) return json({ error: "not found" }, 404);
-    }
     const type = IMAGE_TYPES[kind];
     const headers = {
       "content-type": type.mime,
@@ -510,7 +475,7 @@ async function route(method, path, url, request, env) {
       "content-disposition": `inline; filename="${mediaFilename(kind)}"`,
       "content-security-policy": "default-src 'none'",
     };
-    if (report && !photoApproved(report)) headers["cache-control"] = "private, no-store";
+    if (!mediaApproved(row)) headers["cache-control"] = "private, no-store";
     return new Response(bytes, { headers });
   }
 
