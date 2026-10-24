@@ -89,9 +89,9 @@ async function renderHome() {
   $("#cards").innerHTML = profiles.length
     ? profiles
         .map(
-          (p) => `
+          (p, index) => `
     <a class="profile-card" href="/profile.html?id=${encodeURIComponent(p.id)}">
-      <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack)}</div>
+      <div class="profile-art">${speciesArt(p.species, p.strain, p.name, p.pack, { priority: index === 0 })}</div>
       <div class="profile-body">
         <p><span class="chip">${escapeHtml(p.pack)}</span>${
           p.pricing?.kind === "paid"

@@ -15,26 +15,21 @@ import { handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
-import { latestFirmwareMeta, refuseUnsignedOta, validateManifest } from "./firmware-sign.js";
-import { originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
+import { corsAllowlist, originAllowed, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
 
-export const DEFAULT_CORS_ORIGINS =
-  "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888";
+export const DEFAULT_CORS_ORIGINS = "https://shroomlabs.io,https://www.shroomlabs.io";
 
-export function allowedOrigins(env) {
-  return String(env.CORS_ORIGIN || DEFAULT_CORS_ORIGINS)
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+export function allowedOrigins(env, request) {
+  return corsAllowlist(env, request);
 }
 
 export function pickCorsOrigin(env, request) {
-  const allowed = allowedOrigins(env);
+  const allowed = allowedOrigins(env, request);
   const requestOrigin = request?.headers?.get?.("origin") || "";
   if (requestOrigin && allowed.includes(requestOrigin)) return requestOrigin;
   return allowed[0] || "*";
@@ -128,24 +123,63 @@ async function listProfiles(db, env, pack, q) {
 }
 
 export async function handleRequest(request, env) {
-  if (!env._seeded) {
-    // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
-    // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
-    await seedMissing(env.db, seeds);
-    env._seeded = true;
-  }
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
   if (method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env, request) });
 
   try {
+    if (!env._seeded) {
+      // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
+      // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
+      await seedMissing(env.db, seeds);
+      env._seeded = true;
+    }
     return await route(method, path, url, request, env);
   } catch (err) {
     if (err instanceof ValidationError) return json({ error: err.message }, err.status || 400);
-    if (String(err.message) === "UNIQUE") return json({ error: "username taken" }, 409);
-    return json({ error: err.message || "server error" }, 500);
+    if (String(err?.message) === "UNIQUE") return json({ error: "username taken" }, 409);
+    return internalError(err, method, path);
   }
+}
+
+export const INTERNAL_ERROR_MESSAGE = "Something went wrong on our side. Please try again.";
+
+const REDACTIONS = [
+  [/-----BEGIN [^-]+-----[\s\S]*?(?:-----END [^-]+-----|$)/g, "[pem]"],
+  [/\b(bearer|basic)\s+\S+/gi, "$1 [redacted]"],
+  [/\b(token|secret|password|passwd|api[_-]?key|authorization|cookie|session|sig(?:nature)?)(["']?\s*[:=]\s*)\S+/gi, "$1$2[redacted]"],
+  [/[A-Za-z0-9+/_=-]{24,}/g, "[redacted]"],
+];
+
+/** Strip anything that looks like a credential before it reaches the log. */
+export function redactForLog(value, max = 2000) {
+  let text = String(value ?? "");
+  for (const [re, replacement] of REDACTIONS) text = text.replace(re, replacement);
+  return text.length > max ? `${text.slice(0, max)}...` : text;
+}
+
+function newRequestId() {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Generic 500 for clients; the detail goes to the server log under the same request id. */
+export function internalError(err, method, path) {
+  const requestId = newRequestId();
+  console.error(
+    JSON.stringify({
+      level: "error",
+      request_id: requestId,
+      method,
+      path: redactForLog(path, 200),
+      name: redactForLog(err?.name || typeof err, 100),
+      message: redactForLog(err?.message ?? err),
+      stack: redactForLog(err?.stack || "", 4000),
+    })
+  );
+  return json({ error: INTERNAL_ERROR_MESSAGE, request_id: requestId }, 500, { "x-request-id": requestId });
 }
 
 async function route(method, path, url, request, env) {
@@ -166,25 +200,6 @@ async function route(method, path, url, request, env) {
 
   if (method === "GET" && path === "/api/capabilities") {
     return json(capabilities(env, request));
-  }
-
-  if (method === "GET" && path === "/api/firmware/latest") {
-    return json(latestFirmwareMeta(env));
-  }
-
-  if (method === "POST" && path === "/api/firmware/verify") {
-    const body = await readJson(request);
-    if (body.manifest) {
-      const manifest = validateManifest(body.manifest);
-      if (!manifest.ok) return json(manifest, 400);
-    }
-    const result = await refuseUnsignedOta({
-      checksums: body.checksums,
-      signature: body.signature,
-      publicPem: env.FIRMWARE_SIGNING_PUB,
-      filename: body.filename,
-    });
-    return json(result, result.ok ? 200 : 400);
   }
 
   if (method === "GET" && path === "/api/me") {

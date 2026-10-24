@@ -2,11 +2,10 @@ name: Firmware CI
 
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
+      - cursor/community-platform-fa9c
   workflow_dispatch:
 
 concurrency:
@@ -108,7 +107,14 @@ jobs:
           path: webapp/out
           retention-days: 7
 
+      - name: Growing screen previews, fonts, and font-merge IDs
+        run: |
+          python -m pip install pillow
+          python3 scripts/test_epaper_previews.py
+
       - name: Validate configuration
+        env:
+          REQUIRE_ESPHOME_CONFIG: "1"
         run: esphome config esphome/openshrooly.yaml
 
       - name: Compile firmware

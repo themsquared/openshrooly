@@ -351,6 +351,18 @@ h1, .display {
 }
 .pack-toggle a:focus-visible,
 .pack-toggle button:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
+@media (max-width: 640px) {
+  /* 44px tap targets on phones; the pill grows only a few pixels. */
+  .pack-toggle { padding: 2px; }
+  .pack-toggle a,
+  .pack-toggle button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding-block: 0;
+  }
+}
 .pack-hint { margin: 0; color: var(--sl-muted); font-size: 13px; max-width: 36rem; }
 .empty-library {
   grid-column: 1 / -1;

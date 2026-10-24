@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickCorsOrigin, withCors } from "../src/handlers.js";
+import { allowedOrigins, pickCorsOrigin, withCors } from "../src/handlers.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 function env() {
@@ -69,6 +69,30 @@ test("CORS allows shroomlabs.io and local frontend", async () => {
   assert.ok(res.headers.get("content-security-policy"));
 });
 
+test("prod CORS never reflects localhost even when CORS_ORIGIN lists it", () => {
+  const ctx = {
+    CORS_ORIGIN: "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888",
+    DEV_STUBS: "1",
+  };
+  const request = new Request("https://api.shroomlabs.io/health", {
+    headers: { origin: "http://127.0.0.1:8888" },
+  });
+  assert.deepEqual(allowedOrigins(ctx, request), ["https://shroomlabs.io", "https://www.shroomlabs.io"]);
+  assert.equal(pickCorsOrigin(ctx, request), "https://shroomlabs.io");
+  const res = withCors(new Response("ok"), ctx, request);
+  assert.equal(res.headers.get("access-control-allow-origin"), "https://shroomlabs.io");
+  assert.equal(res.headers.get("access-control-allow-credentials"), "true");
+});
+
+test("Netlify deploy-preview CORS is only allowed when DEV_STUBS is on", () => {
+  const preview = "https://deploy-preview-18--shroomlabs.netlify.app";
+  const local = new Request("http://127.0.0.1:8787/health", { headers: { origin: preview } });
+  assert.ok(allowedOrigins({ DEV_STUBS: "1" }, local).includes(preview));
+  assert.equal(allowedOrigins({ DEV_STUBS: "" }, local).includes(preview), false);
+  const prod = new Request("https://api.shroomlabs.io/health", { headers: { origin: preview } });
+  assert.equal(allowedOrigins({ DEV_STUBS: "1" }, prod).includes(preview), false);
+});
+
 test("affiliate click is blocked for psilocybin ids", async () => {
   const ctx = env();
   const res = await call(ctx, "GET", "/api/go/golden-teacher/example-spawn");
@@ -114,37 +138,6 @@ test("refresh rotation and logout-everywhere", async () => {
   assert.equal(me.status, 200);
 });
 
-test("firmware verify refuses unsigned OTA and accepts a signed checksum", async () => {
-  const pair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
-  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
-  const spki = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
-  const toPem = (type, bytes) =>
-    `-----BEGIN ${type}-----\n${btoa(String.fromCharCode(...bytes))}\n-----END ${type}-----\n`;
-  const { checksumLines, signChecksums } = await import("../src/firmware-sign.js");
-  const sums = await checksumLines([{ name: "openshrooly.ota.bin", bytes: Buffer.from("ota") }]);
-  const sig = await signChecksums(sums, toPem("PRIVATE KEY", pkcs8));
-  const closed = env();
-  const refused = await call(closed, "POST", "/api/firmware/verify", {
-    body: { checksums: sums, signature: sig, filename: "openshrooly.ota.bin" },
-  });
-  assert.equal(refused.status, 400);
-  assert.equal(refused.data.error, "unsigned firmware rejected");
-  const latest = await call(closed, "GET", "/api/firmware/latest");
-  assert.equal(latest.status, 200);
-  assert.match(latest.data.manifest_url, /grahamsz\/openshrooly/);
-  const ctx = env();
-  ctx.FIRMWARE_SIGNING_PUB = toPem("PUBLIC KEY", spki);
-  const ok = await call(ctx, "POST", "/api/firmware/verify", {
-    body: { checksums: sums, signature: sig, filename: "openshrooly.ota.bin" },
-  });
-  assert.equal(ok.status, 200, JSON.stringify(ok.data));
-  assert.equal(ok.data.ok, true);
-  const badName = await call(ctx, "POST", "/api/firmware/verify", {
-    body: { checksums: sums, signature: sig, filename: "other.ota.bin" },
-  });
-  assert.equal(badName.status, 400);
-});
-
 test("unverified email cannot publish (blocked when email_verified=0)", async () => {
   const ctx = env();
   const start = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "new@example.com", turnstile: "ok" } });
@@ -152,3 +145,55 @@ test("unverified email cannot publish (blocked when email_verified=0)", async ()
   assert.equal(done.data.user.email_verified, true);
 });
 
+
+test("internal errors return a generic message and request id, and the log is scrubbed", async () => {
+  const ctx = env();
+  await call(ctx, "GET", "/health");
+  const secret = ["unit", "test", "credential", "a1b2c3d4e5f6a7b8c9d0e1f2a3b4"].join("_");
+  const leak = `D1_ERROR: no such column: users.secret_col; token=${secret}`;
+  const realAll = ctx.db.all.bind(ctx.db);
+  ctx.db.all = async () => {
+    throw new Error(leak);
+  };
+  const logged = [];
+  const realError = console.error;
+  console.error = (...args) => logged.push(args.join(" "));
+  let res;
+  try {
+    res = await call(ctx, "GET", "/api/profiles?pack=culinary", { headers: { authorization: `Bearer ${secret}` } });
+  } finally {
+    console.error = realError;
+    ctx.db.all = realAll;
+  }
+  assert.equal(res.status, 500);
+  assert.deepEqual(Object.keys(res.data).sort(), ["error", "request_id"]);
+  assert.equal(res.data.error, "Something went wrong on our side. Please try again.");
+  assert.match(res.data.request_id, /^[0-9a-f]{24}$/);
+  assert.equal(res.headers.get("x-request-id"), res.data.request_id);
+  const body = JSON.stringify(res.data);
+  for (const fragment of ["D1_ERROR", "no such column", "secret_col", secret]) assert.ok(!body.includes(fragment), fragment);
+  assert.equal(logged.length, 1);
+  const entry = JSON.parse(logged[0]);
+  assert.equal(entry.request_id, res.data.request_id);
+  assert.match(entry.message, /no such column/);
+  assert.ok(!logged[0].includes(secret), "secret must not reach the log");
+  assert.ok(!logged[0].toLowerCase().includes("bearer"), "headers are never logged");
+});
+
+test("non-Error throws also get the generic 500", async () => {
+  const ctx = env();
+  await call(ctx, "GET", "/health");
+  ctx.db.all = async () => {
+    throw "raw string detail";
+  };
+  const realError = console.error;
+  console.error = () => {};
+  let res;
+  try {
+    res = await call(ctx, "GET", "/api/profiles");
+  } finally {
+    console.error = realError;
+  }
+  assert.equal(res.status, 500);
+  assert.ok(!JSON.stringify(res.data).includes("raw string detail"));
+});

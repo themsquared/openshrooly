@@ -26,6 +26,7 @@ export function createMemoryDb() {
     device_certs: [],
     device_commands: [],
     device_telemetry: [],
+    device_nonces: [],
     coach_subs: [],
     coach_usage: [],
     coach_cache: [],
@@ -667,6 +668,11 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM cloud_devices WHERE owner_id=")) {
     return tables.cloud_devices.filter((d) => Number(d.owner_id) === Number(params[0]));
   }
+  if (q === "UPDATE cloud_devices SET public_jwk=? WHERE id=?") {
+    const row = tables.cloud_devices.find((d) => d.id === params[1]);
+    if (row) row.public_jwk = params[0];
+    return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
+  }
   if (q.startsWith("UPDATE cloud_devices SET public_jwk=")) {
     const row = tables.cloud_devices.find((d) => d.id === params[7]);
     if (row) {
@@ -774,10 +780,32 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL")) {
     return tables.device_commands.filter((c) => c.device_id === params[0] && !c.consumed_at);
   }
-  if (q.startsWith("UPDATE device_commands SET consumed_at=")) {
-    const row = tables.device_commands.find((c) => c.id === params[1]);
+  if (q.startsWith("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?")) {
+    const row = tables.device_commands.find((c) => Number(c.id) === Number(params[1]) && c.device_id === params[2]);
     if (row) row.consumed_at = params[0];
-    return {};
+    return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
+  }
+  if (q.startsWith("DELETE FROM device_nonces WHERE expires_at<?")) {
+    const before = tables.device_nonces.length;
+    tables.device_nonces = tables.device_nonces.filter((n) => !(Number(n.expires_at) < Number(params[0])));
+    const changes = before - tables.device_nonces.length;
+    return { changes, meta: { changes } };
+  }
+  if (q.startsWith("SELECT nonce_hash FROM device_nonces WHERE device_id=? AND expires_at>?")) {
+    return tables.device_nonces.filter((n) => n.device_id === params[0] && Number(n.expires_at) > Number(params[1]));
+  }
+  if (q.startsWith("INSERT INTO device_nonces")) {
+    if (tables.device_nonces.some((n) => n.nonce_hash === params[0])) throw new Error("UNIQUE");
+    tables.device_nonces.push({ nonce_hash: params[0], device_id: params[1], expires_at: params[2], created_at: params[3] });
+    return { changes: 1, meta: { changes: 1 } };
+  }
+  if (q.startsWith("DELETE FROM device_nonces WHERE nonce_hash=? AND device_id=? AND expires_at>?")) {
+    const idx = tables.device_nonces.findIndex(
+      (n) => n.nonce_hash === params[0] && n.device_id === params[1] && Number(n.expires_at) > Number(params[2])
+    );
+    if (idx < 0) return { changes: 0, meta: { changes: 0 } };
+    tables.device_nonces.splice(idx, 1);
+    return { changes: 1, meta: { changes: 1 } };
   }
   if (q.startsWith("SELECT * FROM device_telemetry WHERE device_id=")) {
     return tables.device_telemetry.filter((t) => t.device_id === params[0]);
