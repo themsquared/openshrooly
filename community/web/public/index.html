@@ -6,6 +6,9 @@
   <title>Shroom Labs — mushroom profiles for OpenShrooly</title>
   <meta name="description" content="Browse, fork, and apply researched mushroom grow profiles. Local-first. Works with Shrooly devices running OpenShrooly.">
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="home">
@@ -16,10 +19,12 @@
       <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       <span>Shroom Labs<small>works with OpenShrooly</small></span>
     </a>
-    <nav>
-      <a href="/">Catalog</a>
-      <a href="/claim.html">Claim device</a>
+    <nav aria-label="Site">
+      <a href="/" aria-current="page">Profiles</a>
+      <a href="/faq.html">FAQ</a>
       <a id="nav-coach" href="/coach.html">Grow Coach</a>
+      <a href="/claim.html">Claim device</a>
+      <a href="/docs.html">Docs</a>
       <span id="session-nav"></span>
     </nav>
   </header>
@@ -46,8 +51,8 @@
     <section id="library" class="library" aria-label="Profile library">
       <div class="library-toolbar">
         <div class="pack-toggle" role="group" aria-label="Library pack filter">
-          <a id="pack-culinary" href="/?pack=culinary#library">Culinary</a>
-          <a id="pack-restricted" href="/?pack=psilocybin#library">Restricted</a>
+          <button type="button" id="pack-culinary" aria-pressed="true">Culinary</button>
+          <button type="button" id="pack-restricted" aria-pressed="false">Restricted</button>
         </div>
         <p class="pack-hint">Restricted species stay off the main nav. Open them here only if your jurisdiction allows cultivation.</p>
       </div>

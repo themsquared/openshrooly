@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Account · Shroom Labs</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <script src="/js/config.js"></script>
 </head>
 <body data-page="account">
@@ -15,9 +18,12 @@
       <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       <span>Shroom Labs<small>works with OpenShrooly</small></span>
     </a>
-    <nav>
-      <a href="/">Catalog</a>
+    <nav aria-label="Site">
+      <a href="/">Profiles</a>
+      <a href="/faq.html">FAQ</a>
       <a href="/coach.html">Grow Coach</a>
+      <a href="/claim.html">Claim device</a>
+      <a href="/docs.html">Docs</a>
       <span id="session-nav"></span>
     </nav>
   </header>
@@ -26,16 +32,16 @@
     <p>Signed in as <strong id="who"></strong></p>
     <p id="verified" class="muted"></p>
     <h2>Sessions</h2>
-    <p class="muted">Browser sessions are httpOnly cookies with rotation. Sign out everywhere revokes them.</p>
+    <p class="muted">Sign out everywhere ends every open session on every device.</p>
     <ul id="sessions"></ul>
     <p><button type="button" class="secondary" id="signout-all">Sign out everywhere</button></p>
-    <h2>Hub API token</h2>
-    <p>Mint a token and set it as <code>COMMUNITY_TOKEN</code> on your local hub. The hub calls <code>https://api.shroomlabs.io</code> with <code>Authorization: Bearer</code>.</p>
+    <h2>Home hub</h2>
+    <p>Give your hub a name, then copy the connection once and paste it on that hub so it can reach Shroom Labs.</p>
     <form id="mint" class="card" style="padding:1.2rem">
       <label>Name <input name="name" value="home-hub"></label>
-      <button type="submit">Mint token</button>
+      <button type="submit">Create hub connection</button>
     </form>
-    <p id="new-token-wrap" class="notice hidden">Copy this token now.<br><code id="new-token"></code></p>
+    <p id="new-token-wrap" class="notice hidden">Copy this now. It will not be shown again.<br><code id="new-token"></code></p>
     <ul id="tokens"></ul>
     <h2>Chambers</h2>
     <p class="muted">Claim a device with the code on its local UI. Cloud control is opt-in; the chamber stays fully usable offline.</p>

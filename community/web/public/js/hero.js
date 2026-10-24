@@ -38,6 +38,26 @@ export function startHero(canvas) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  function copyRect(width, height) {
+    const copy = canvas.parentElement?.querySelector(".hero-copy");
+    if (!copy) return null;
+    const canvasBox = canvas.getBoundingClientRect();
+    const box = copy.getBoundingClientRect();
+    return {
+      x: box.left - canvasBox.left,
+      y: box.top - canvasBox.top,
+      w: Math.min(box.width + 28, width),
+      h: Math.min(box.height + 16, height),
+    };
+  }
+
+  function inCopy(nx, ny, rect, width, height, pad = 28) {
+    if (!rect) return false;
+    const x = nx * width;
+    const y = ny * height;
+    return x >= rect.x - pad && x <= rect.x + rect.w + pad && y >= rect.y - pad && y <= rect.y + rect.h + pad;
+  }
+
   function drawStatic() {
     const { width, height } = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, width, height);
@@ -45,9 +65,12 @@ export function startHero(canvas) {
   }
 
   function paint(width, height, now, animate) {
-    const glow = ctx.createRadialGradient(width * 0.3, height * 0.38, 10, width * 0.42, height * 0.48, width * 0.62);
-    glow.addColorStop(0, "rgba(125,255,179,0.28)");
-    glow.addColorStop(0.35, "rgba(94,228,255,0.1)");
+    const rect = copyRect(width, height);
+    const glowX = width < 800 ? width * 0.55 : width * 0.78;
+    const glowY = width < 800 ? height * 0.78 : height * 0.42;
+    const glow = ctx.createRadialGradient(glowX, glowY, 10, glowX, glowY, width * 0.55);
+    glow.addColorStop(0, "rgba(125,255,179,0.2)");
+    glow.addColorStop(0.4, "rgba(94,228,255,0.06)");
     glow.addColorStop(1, "rgba(7,17,14,0)");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
@@ -55,12 +78,14 @@ export function startHero(canvas) {
     for (const [i, j, bend] of hyphae) {
       const a = nodes[i];
       const b = nodes[j];
+      if (inCopy(a.x, a.y, rect, width, height) && inCopy(b.x, b.y, rect, width, height)) continue;
       const dx = a.x - b.x;
       const dy = a.y - b.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0.3) continue;
       const pulse = animate ? 0.62 + 0.38 * Math.sin(now / 820 + a.pulse) : 0.85;
-      const alpha = Math.min(0.85, (0.3 - dist) * 3.4 * pulse);
+      let alpha = Math.min(0.85, (0.3 - dist) * 3.4 * pulse);
+      if (inCopy(a.x, a.y, rect, width, height) || inCopy(b.x, b.y, rect, width, height)) alpha *= 0.08;
       ctx.strokeStyle = a.gold || b.gold ? `rgba(246,193,91,${alpha})` : `rgba(125,255,179,${alpha})`;
       ctx.lineWidth = dist < 0.1 ? 2.1 : 1.35;
       ctx.beginPath();
@@ -72,6 +97,8 @@ export function startHero(canvas) {
     }
 
     for (const node of nodes) {
+      if (node.gold && inCopy(node.x, node.y, rect, width, height, 36)) continue;
+      if (inCopy(node.x, node.y, rect, width, height, 16)) continue;
       const beat = animate ? 0.7 + 0.3 * Math.sin(now / 640 + node.pulse) : 0.95;
       const r = (node.gold ? 3.4 : 2.3) * beat;
       ctx.shadowColor = node.gold ? "rgba(246,193,91,1)" : "rgba(125,255,179,1)";
@@ -82,6 +109,23 @@ export function startHero(canvas) {
       ctx.fill();
     }
     ctx.shadowBlur = 0;
+
+    if (rect) {
+      const fade = width < 800
+        ? ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h + 36)
+        : ctx.createLinearGradient(rect.x, 0, rect.x + rect.w + 48, 0);
+      if (width < 800) {
+        fade.addColorStop(0, "rgba(7,17,14,0.94)");
+        fade.addColorStop(0.78, "rgba(7,17,14,0.88)");
+        fade.addColorStop(1, "rgba(7,17,14,0.15)");
+      } else {
+        fade.addColorStop(0, "rgba(7,17,14,0.95)");
+        fade.addColorStop(0.7, "rgba(7,17,14,0.86)");
+        fade.addColorStop(1, "rgba(7,17,14,0)");
+      }
+      ctx.fillStyle = fade;
+      ctx.fillRect(Math.max(0, rect.x - 12), Math.max(0, rect.y - 12), rect.w + 56, rect.h + 28);
+    }
   }
 
   function frame(now) {
@@ -98,6 +142,11 @@ export function startHero(canvas) {
     raf = requestAnimationFrame(frame);
   }
 
+  function onResize() {
+    resize();
+    if (reduced) drawStatic();
+  }
+
   const io = new IntersectionObserver((entries) => {
     running = entries.some((entry) => entry.isIntersecting);
     if (running && !reduced) {
@@ -107,12 +156,12 @@ export function startHero(canvas) {
   });
   io.observe(canvas);
   resize();
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", onResize);
   if (reduced) {
     drawStatic();
     return () => {
       io.disconnect();
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
     };
   }
   raf = requestAnimationFrame(frame);
@@ -120,6 +169,6 @@ export function startHero(canvas) {
     running = false;
     cancelAnimationFrame(raf);
     io.disconnect();
-    window.removeEventListener("resize", resize);
+    window.removeEventListener("resize", onResize);
   };
 }

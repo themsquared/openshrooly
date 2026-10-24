@@ -151,6 +151,20 @@ main { max-width: var(--sl-max); margin: 0 auto; padding: 1.5rem 1.4rem 4rem; }
   padding: 3.4rem 2.4rem 2.6rem;
   max-width: 46rem;
 }
+.hero-copy::before {
+  content: "";
+  position: absolute;
+  inset: -1rem -1.4rem -0.6rem -1.6rem;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 28px;
+  background: linear-gradient(to top, rgba(7, 17, 14, 0.94) 0%, rgba(7, 17, 14, 0.9) 62%, rgba(7, 17, 14, 0.55) 100%);
+}
+@media (min-width: 800px) {
+  .hero-copy::before {
+    background: linear-gradient(to right, rgba(7, 17, 14, 0.95) 0%, rgba(7, 17, 14, 0.88) 68%, rgba(7, 17, 14, 0) 100%);
+  }
+}
 .hero-copy p.eyebrow {
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -277,20 +291,28 @@ h1, .display {
   border-radius: 999px;
   background: rgba(7, 17, 14, 0.55);
 }
-.pack-toggle a {
+.pack-toggle a,
+.pack-toggle button {
   color: var(--sl-ink-dim);
   text-decoration: none;
   padding: 0.45rem 0.95rem;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 700;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
 }
-.pack-toggle a.is-on {
+.pack-toggle a.is-on,
+.pack-toggle button.is-on,
+.pack-toggle button[aria-pressed="true"] {
   background: linear-gradient(180deg, #3aa36c, #1d6a44);
   color: #edfff4;
   box-shadow: 0 0 16px rgba(125, 255, 179, 0.18);
 }
-.pack-toggle a:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
+.pack-toggle a:focus-visible,
+.pack-toggle button:focus-visible { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
 .pack-hint { margin: 0; color: var(--sl-muted); font-size: 13px; max-width: 36rem; }
 .empty-library {
   grid-column: 1 / -1;
@@ -479,8 +501,29 @@ button.ghost, .button.ghost {
   nav { gap: 0.7rem; }
   .library-toolbar { flex-direction: column; align-items: flex-start; }
 }
+.account-menu { position: relative; }
+.account-menu summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--sl-ink-dim);
+}
+.account-menu summary::-webkit-details-marker { display: none; }
+.account-menu-links {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 10rem;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--sl-line);
+  background: var(--sl-bg-elev);
+  box-shadow: var(--sl-shadow);
+  z-index: 6;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
-  .hero canvas { display: none; }
   .profile-card:hover, .profile-card:focus-visible { transform: none; }
 }

@@ -26,7 +26,14 @@ function renderNav() {
   const nav = $("#session-nav");
   if (!nav) return;
   if (isSignedIn()) {
-    nav.innerHTML = `<a href="/account.html">Account</a> <button class="link" id="logout" type="button">Log out</button>`;
+    nav.innerHTML = `<details class="account-menu">
+      <summary>Account</summary>
+      <div class="account-menu-links">
+        <a href="/account.html">Account</a>
+        <a href="/publish.html">Publish</a>
+        <button class="link" id="logout" type="button">Log out</button>
+      </div>
+    </details>`;
     $("#logout")?.addEventListener("click", async () => {
       try {
         await api("/api/auth/logout", { method: "POST", jsonBody: {} });
@@ -48,9 +55,20 @@ function stageDots(stages = []) {
     .join("")}</ol>`;
 }
 
+function selectPack(pack) {
+  const url = new URL(location.href);
+  url.searchParams.set("pack", pack);
+  if (!url.hash) url.hash = "library";
+  history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  return renderHome();
+}
+
 async function renderHome() {
   const canvas = $("#mycelium");
-  if (canvas) startHero(canvas);
+  if (canvas && !canvas.dataset.hero) {
+    canvas.dataset.hero = "1";
+    startHero(canvas);
+  }
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
   $("#pack-label").textContent = pack === "psilocybin" ? "Restricted pack" : "Culinary library";
@@ -280,7 +298,7 @@ async function renderCallback() {
       $("#status").textContent = "OIDC finished on the API host. You can close this if you were redirected.";
       return;
     }
-    $("#error").textContent = "Missing token.";
+    $("#error").textContent = "This sign-in link is missing or expired.";
     $("#error").classList.remove("hidden");
   } catch (err) {
     $("#error").textContent = err.message;
@@ -380,7 +398,12 @@ function fileToBase64(file) {
 
 renderNav();
 const page = document.body.dataset.page;
-if (page === "home") renderHome().catch((err) => ($("#cards").textContent = err.message));
+if (page === "home") {
+  renderHome().catch((err) => ($("#cards").textContent = err.message));
+  $("#pack-culinary")?.addEventListener("click", () => selectPack("culinary"));
+  $("#pack-restricted")?.addEventListener("click", () => selectPack("psilocybin"));
+  window.addEventListener("popstate", () => renderHome().catch(() => {}));
+}
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));
 if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
@@ -559,9 +582,21 @@ async function renderCoach() {
 
 async function renderClaim() {
   if (!getToken()) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    const title = $("#claim-title");
+    if (title) title.textContent = "Sign in to claim your device";
+    $("#claim-form")?.classList.add("hidden");
+    const signin = $("#claim-signin");
+    if (signin) {
+      const next = encodeURIComponent(location.pathname + location.search);
+      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in</a>`;
+      signin.classList.remove("hidden");
+    }
     return;
   }
+  const title = $("#claim-title");
+  if (title) title.textContent = "Claim a chamber";
+  $("#claim-signin")?.classList.add("hidden");
+  $("#claim-form")?.classList.remove("hidden");
   const preset = params().get("code") || "";
   if (preset) $("#code").value = preset;
   $("#claim-form").addEventListener("submit", async (ev) => {

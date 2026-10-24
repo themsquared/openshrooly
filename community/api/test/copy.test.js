@@ -13,6 +13,12 @@ const BANNED = [
   { name: "wrangler", re: /wrangler/i },
   { name: "docs/", re: /docs\//i },
   { name: "Mike", re: /\bMike\b/ },
+  { name: "httpOnly", re: /httpOnly/i },
+  { name: "Bearer", re: /\bBearer\b/ },
+  { name: "cookie", re: /\bcookies?\b/i },
+  { name: "token", re: /\btokens?\b/i },
+  { name: "CSR", re: /\bCSR\b/ },
+  { name: "mTLS", re: /\bmTLS\b/i },
 ];
 
 function visitorFacing(html) {
@@ -43,4 +49,17 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
     }
   }
   assert.deepEqual(hits, []);
+});
+
+test("public pages share one nav label set", () => {
+  const required = ["Profiles", "FAQ", "Grow Coach", "Claim device", "Docs"];
+  const missing = [];
+  for (const page of pages()) {
+    if (page.name === "legacy-preview.html") continue;
+    const text = visitorFacing(page.html);
+    for (const label of required) {
+      if (!text.includes(label)) missing.push(`${page.name}: ${label}`);
+    }
+  }
+  assert.deepEqual(missing, []);
 });

@@ -39,6 +39,12 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
     { name: "wrangler", re: /wrangler/i },
     { name: "docs/", re: /docs\//i },
     { name: "Mike", re: /\bMike\b/ },
+    { name: "httpOnly", re: /httpOnly/i },
+    { name: "Bearer", re: /\bBearer\b/ },
+    { name: "cookie", re: /\bcookies?\b/i },
+    { name: "token", re: /\btokens?\b/i },
+    { name: "CSR", re: /\bCSR\b/ },
+    { name: "mTLS", re: /\bmTLS\b/i },
   ];
   const hits = [];
   for (const name of readdirSync(publicDir).filter((file) => file.endsWith(".html"))) {
