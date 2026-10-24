@@ -751,6 +751,9 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM device_certs WHERE device_id=")) {
     return tables.device_certs.filter((c) => c.device_id === params[0]);
   }
+  if (q.startsWith("SELECT * FROM device_certs WHERE issuer=? AND status=")) {
+    return tables.device_certs.filter((c) => c.issuer === params[0] && c.status === params[1]);
+  }
   if (q.startsWith("UPDATE device_certs SET status=? WHERE id=")) {
     const row = tables.device_certs.find((c) => c.id === params[1]);
     if (row) row.status = params[0];
