@@ -168,7 +168,7 @@ export const FAQ = [
   },
   {
     q: "Do I need the cloud?",
-    a: "No. Growing runs on your own network. Claim a device only if you want optional cloud tools. Local controls still win if the cloud is down.",
+    a: "No. Growing runs on your own network. Linking a chamber to the cloud needs a firmware update that is not out yet. Local controls still win if the cloud is down.",
   },
   {
     q: "How long does pearl oyster take?",
@@ -472,12 +472,12 @@ export const PAGES = {
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach.html`]]) },
   },
   "claim.html": {
-    active: "claim",
+    active: "",
     sitemap: true,
     path: "/claim.html",
-    title: "Claim a device · Shroom Labs",
-    description: "Link a chamber running OpenShrooly to your Shroom Labs account with the short code it shows. Optional.",
-    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Claim a device", `${SITE}/claim.html`]]) },
+    title: "Link a chamber · Shroom Labs",
+    description: "Link your chamber to your account so you can see it, get grow alerts by email, and change its profile. Firmware update not out yet.",
+    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Link a chamber", `${SITE}/claim.html`]]) },
   },
   "install.html": {
     active: "",

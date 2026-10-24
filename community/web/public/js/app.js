@@ -649,26 +649,45 @@ async function renderCoach() {
   await refreshUsage();
 }
 
+function deviceClaimingLive() {
+  return Boolean(cfg().deviceClaiming) || params().has("code");
+}
+
 async function renderClaim() {
+  const primary = $("#claim-now-primary");
+  if (getToken() && primary) {
+    primary.textContent = "Open your account";
+    primary.setAttribute("href", "/account.html");
+  }
+
+  const live = deviceClaimingLive();
+  const panel = $("#claim-code-panel");
+  const form = $("#claim-form");
+  const signin = $("#claim-signin");
+  if (!live) {
+    panel?.classList.add("hidden");
+    form?.classList.add("hidden");
+    signin?.classList.add("hidden");
+    return;
+  }
+
+  panel?.classList.remove("hidden");
+  const preset = params().get("code") || "";
+  if (preset && $("#code")) $("#code").value = preset;
+
   if (!getToken()) {
-    const title = $("#claim-title");
-    if (title) title.textContent = "Sign in to claim your device";
-    $("#claim-form")?.classList.add("hidden");
-    const signin = $("#claim-signin");
+    form?.classList.add("hidden");
     if (signin) {
       const next = encodeURIComponent(location.pathname + location.search);
-      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in</a>`;
+      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in to enter a code</a>`;
       signin.classList.remove("hidden");
     }
     return;
   }
-  const title = $("#claim-title");
-  if (title) title.textContent = "Claim a chamber";
-  $("#claim-signin")?.classList.add("hidden");
-  $("#claim-form")?.classList.remove("hidden");
-  const preset = params().get("code") || "";
-  if (preset) $("#code").value = preset;
-  $("#claim-form").addEventListener("submit", async (ev) => {
+
+  signin?.classList.add("hidden");
+  form?.classList.remove("hidden");
+  form?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     try {
       const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code: $("#code").value } });
