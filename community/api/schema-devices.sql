@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS cloud_devices (
     claim_expires_at TEXT,
     cloud_enabled INTEGER NOT NULL DEFAULT 0,
     last_seen_at TEXT,
+    device_type TEXT NOT NULL DEFAULT 'shrooly_chamber',
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS device_certs (
