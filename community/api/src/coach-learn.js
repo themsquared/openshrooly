@@ -15,6 +15,25 @@ export const SAFE_BOUNDS = {
   fan_speed_percent: [10, 80],
 };
 
+/** User-facing temperature: one decimal, e.g. 22.75559 → "22.8". */
+export function formatTempC(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return (Math.round(n * 10) / 10).toFixed(1);
+}
+
+/** User-facing humidity: whole percent when exact, otherwise one decimal. */
+export function formatHumidity(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function formatReading(value, unit) {
+  return String(unit).includes("%") ? formatHumidity(value) : formatTempC(value);
+}
+
 /** Clip the global envelope to a stage's warning band when the profile has one. */
 export function safeBoundsForStage(stage = {}) {
   const floor = TEMPERATURE_CLAMP[0];
@@ -66,7 +85,7 @@ export function compareReadingToStage(reading, stage = {}) {
         field: kind,
         value,
         limit: hi,
-        message: `${label} ${value} ${unit} is above the ${hi} ${unit} ${band}.`,
+        message: `${label} ${formatReading(value, unit)} ${unit} is above the ${formatReading(hi, unit)} ${unit} ${band}.`,
       });
     } else if (lo != null && value < lo) {
       flags.push({
@@ -74,7 +93,7 @@ export function compareReadingToStage(reading, stage = {}) {
         field: kind,
         value,
         limit: lo,
-        message: `${label} ${value} ${unit} is below the ${lo} ${unit} ${band}.`,
+        message: `${label} ${formatReading(value, unit)} ${unit} is below the ${formatReading(lo, unit)} ${unit} ${band}.`,
       });
     }
   }
@@ -123,7 +142,7 @@ export function compareReadingToStage(reading, stage = {}) {
       field: "temperature",
       value: reading.temperature,
       limit: targetMax,
-      message: `Temperature ${reading.temperature} °C is above the ${targetMax} °C target.`,
+      message: `Temperature ${formatTempC(reading.temperature)} °C is above the ${formatTempC(targetMax)} °C target.`,
     });
   }
   return flags;
@@ -234,7 +253,7 @@ export function suggestSetpoints(model, stage = {}, { auto = false, reading = nu
   if ((model.humidity_droop || 0) >= 2) {
     const bump = Math.min(bounds.humidity_delta, Math.round(model.humidity_droop));
     humidity += bump;
-    reasons.push(`Chamber lags humidity setpoint by ~${model.humidity_droop.toFixed(1)}%.`);
+    reasons.push(`Chamber lags humidity setpoint by ~${formatHumidity(model.humidity_droop)}%.`);
   }
   if ((model.humidity_error || 0) >= 3) {
     humidity -= Math.min(bounds.humidity_delta, Math.round(model.humidity_error));
@@ -247,7 +266,7 @@ export function suggestSetpoints(model, stage = {}, { auto = false, reading = nu
   const calibration = num(model.temperature_calibration);
   if (calibration != null && Math.abs(calibration) >= 0.1) {
     temperature -= calibration;
-    reasons.push(`Applying a ${calibration.toFixed(1)}°C sensor calibration.`);
+    reasons.push(`Applying a ${formatTempC(calibration)}°C sensor calibration.`);
   }
 
   const currentTemp = num(reading?.temperature);
@@ -255,11 +274,11 @@ export function suggestSetpoints(model, stage = {}, { auto = false, reading = nu
   const targetHi = targetRange ? targetRange[1] : baseTemp;
   if (currentTemp != null && targetHi != null && currentTemp > targetHi) {
     reasons.push(
-      `The chamber is running warm at ${currentTemp} °C (above the ${targetHi} °C target). Lower the setpoint toward ${baseTemp} °C.`
+      `The chamber is running warm at ${formatTempC(currentTemp)} °C (above the ${formatTempC(targetHi)} °C target). Lower the setpoint toward ${formatTempC(baseTemp)} °C.`
     );
   } else if (currentTemp != null && targetLo != null && currentTemp < targetLo) {
     reasons.push(
-      `The chamber is running cool at ${currentTemp} °C (below the ${targetLo} °C target). Raise the setpoint toward ${baseTemp} °C.`
+      `The chamber is running cool at ${formatTempC(currentTemp)} °C (below the ${formatTempC(targetLo)} °C target). Raise the setpoint toward ${formatTempC(baseTemp)} °C.`
     );
   }
 
