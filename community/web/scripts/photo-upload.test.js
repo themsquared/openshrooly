@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { encodePhotoForUpload, resolveMediaUrl } from "../public/js/photo-upload.js";
+import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl } from "../public/js/photo-upload.js";
 
 test("resolveMediaUrl prefixes relative /api/media with apiBase", () => {
   assert.equal(
@@ -12,6 +12,26 @@ test("resolveMediaUrl prefixes relative /api/media with apiBase", () => {
     "https://api.shroomlabs.io/api/media/abc.jpg"
   );
   assert.equal(resolveMediaUrl("", "https://api.shroomlabs.io"), "");
+});
+
+test("fetchAuthedImageUrl sends the auth header and returns a blob URL", async () => {
+  const calls = [];
+  const src = await fetchAuthedImageUrl("/api/media/pending%2Freports%2Fa.jpg", {
+    apiBase: "https://api.shroomlabs.io",
+    token: "mod-token",
+    fetchImpl: async (url, opts) => {
+      calls.push({ url, opts });
+      return {
+        ok: true,
+        blob: async () => new Blob(["jpeg"], { type: "image/jpeg" }),
+      };
+    },
+    createObjectURL: () => "blob:https://shroomlabs.io/thumb",
+  });
+  assert.equal(src, "blob:https://shroomlabs.io/thumb");
+  assert.equal(calls[0].url, "https://api.shroomlabs.io/api/media/pending%2Freports%2Fa.jpg");
+  assert.equal(calls[0].opts.headers.authorization, "Bearer mod-token");
+  assert.equal(calls[0].opts.headers.accept, "image/*");
 });
 
 test("encodePhotoForUpload downscales using EXIF-aware bitmap bounds", async () => {

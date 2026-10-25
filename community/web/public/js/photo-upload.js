@@ -8,6 +8,21 @@ export function resolveMediaUrl(href, apiBase) {
   return value;
 }
 
+/** Fetch a media URL with the session token and return a page-local blob: URL. */
+export async function fetchAuthedImageUrl(href, { apiBase, token, fetchImpl, createObjectURL } = {}) {
+  const url = resolveMediaUrl(href, apiBase);
+  if (!url) return "";
+  const fetchFn = fetchImpl || globalThis.fetch;
+  if (typeof fetchFn !== "function") return "";
+  const headers = { accept: "image/*" };
+  if (token) headers.authorization = `Bearer ${token}`;
+  const res = await fetchFn(url, { headers, credentials: "include" });
+  if (!res.ok) return "";
+  const blob = await res.blob();
+  const makeUrl = createObjectURL || globalThis.URL?.createObjectURL;
+  return typeof makeUrl === "function" ? makeUrl(blob) : "";
+}
+
 export async function encodePhotoForUpload(file, { createImageBitmap: bitmapFn, document: doc } = {}) {
   const makeBitmap = bitmapFn || globalThis.createImageBitmap;
   const documentRef = doc || globalThis.document;

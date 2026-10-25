@@ -185,7 +185,7 @@ test("photo check returns stage flags and next steps", async () => {
   assert.equal(photo.status, 200, JSON.stringify(photo.data));
   assert.ok(photo.data.flags.some((f) => f.kind === "contamination"));
   assert.match(photo.data.next_steps, /Isolate/i);
-  assert.match(photo.data.photo_key, /^pending\/coach\/\d+\//);
+  assert.match(photo.data.photo_key, /^pending\/coach\/[0-9a-f]+\.(jpe?g|png|webp)$/);
   const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`);
   assert.equal(anon.status, 404);
   const owner = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`, { token });

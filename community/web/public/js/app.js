@@ -4,7 +4,7 @@ import { renderProfileCards } from "./profile-cards.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
-import { encodePhotoForUpload, resolveMediaUrl } from "./photo-upload.js";
+import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl } from "./photo-upload.js";
 import { queueItemHtml } from "./moderate-queue.js";
 
 function cfg() {
@@ -466,11 +466,18 @@ function fileToBase64(file) {
 }
 
 async function ownerPhotoUrl(profileId, photoId) {
-  const res = await fetch(`${apiBase()}/api/profiles/${encodeURIComponent(profileId)}/photos/${encodeURIComponent(photoId)}`, {
-    headers: { authorization: `Bearer ${getToken()}`, accept: "image/*" },
+  return fetchAuthedImageUrl(`/api/profiles/${encodeURIComponent(profileId)}/photos/${encodeURIComponent(photoId)}`, {
+    apiBase: apiBase(),
+    token: getToken(),
   });
-  if (!res.ok) return "";
-  return URL.createObjectURL(await res.blob());
+}
+
+async function reportPhotoUrl(photoKey) {
+  if (!photoKey) return "";
+  return fetchAuthedImageUrl(`/api/media/${encodeURIComponent(photoKey)}`, {
+    apiBase: apiBase(),
+    token: getToken(),
+  });
 }
 
 async function loadBuilderSources(builder) {
@@ -603,7 +610,7 @@ async function renderModerate() {
     for (const item of data.items || []) {
       try {
         if (item?.kind === "report-photo") {
-          const html = queueItemHtml(item, { mediaSrc: mediaUrl(item.photo_key) });
+          const html = queueItemHtml(item, { mediaSrc: await reportPhotoUrl(item.photo_key) });
           if (html) items.push(html);
           continue;
         }

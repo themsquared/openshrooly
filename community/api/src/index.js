@@ -16,6 +16,8 @@ async function envContext(env) {
     env._ctx = {
       db,
       storage: createOptionalStorage(env.PHOTOS, { allowMemory: String(env.DEV_STUBS || "") === "1" }),
+      PHOTOS: env.PHOTOS,
+      PHOTOS_ENABLED: env.PHOTOS_ENABLED,
       CORS_ORIGIN: env.CORS_ORIGIN,
       CDN_BASE_URL: env.CDN_BASE_URL,
       SHOW_PSILOCYBIN: env.SHOW_PSILOCYBIN,

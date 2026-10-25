@@ -23,17 +23,19 @@ Pending and rejected profiles never appear on public profile pages, the sitemap,
 
 ## Photo storage
 
-Uploads go through the `PHOTOS` R2 binding. R2 is not enabled on the account yet.
+Uploads go through the `PHOTOS` R2 binding (`shroomlabs-photos`). The Worker config is wired; uploads stay off until `PHOTOS_ENABLED=1`.
 
 Before production photo uploads work:
 
-1. `npx wrangler r2 bucket create shroomlabs-media`
-2. Uncomment the `[[r2_buckets]]` `PHOTOS` binding in `community/api/wrangler.toml`
-3. Attach `cdn.shroomlabs.io` in the dashboard if you want a public CDN
+1. `npx wrangler r2 bucket create shroomlabs-photos`
+2. Deploy the Worker so the `PHOTOS` binding attaches. Do **not** enable public listing or map this bucket on a public hostname.
+3. Flip `[vars] PHOTOS_ENABLED = "1"` in `community/api/wrangler.toml` (or set the same var in the dashboard) and redeploy.
 
-Local tests use miniflare R2 or the in-memory store. If the binding is missing in production, photo uploads return 503.
+User photos are served only through `/api/media`. `cdn.shroomlabs.io` is not used for grow-report, profile, or coach uploads. Pending objects live under `pending/` and are copied off that prefix on approve.
 
-Server checks: 5 MB limit, JPEG/PNG/WebP magic bytes only (no SVG), decode and rewrite to drop EXIF/GPS, max 4096 px, random object keys, 10 uploads per user per hour.
+Local tests use miniflare R2 or the in-memory store. If the flag is off or storage is missing, photo uploads return 503.
+
+Server checks: 8 MB limit, JPEG/PNG/WebP magic bytes only (no SVG/GIF), rewrite to drop EXIF/GPS, max 8192 px, random object keys, no public listing, 10 uploads per user per hour. Pending photos are served only to the uploader and moderators.
 
 ## Off-menu
 

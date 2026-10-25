@@ -673,6 +673,14 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM grow_reports WHERE photo_status=")) {
     return tables.grow_reports.filter((r) => (r.photo_status || "approved") === params[0]).sort((a, b) => b.id - a.id);
   }
+  if (q.startsWith("UPDATE grow_reports SET photo_key=")) {
+    const row = tables.grow_reports.find((r) => Number(r.id) === Number(params[2]));
+    if (row) {
+      row.photo_key = params[0];
+      row.photo_status = params[1];
+    }
+    return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
+  }
   if (q.startsWith("UPDATE grow_reports SET photo_status=")) {
     const row = tables.grow_reports.find((r) => Number(r.id) === Number(params[1]));
     if (row) row.photo_status = params[0];
@@ -695,6 +703,12 @@ function dispatch(mode, tables, ids, sql, params) {
     const row = tables.uploaded_media.find((r) => r.photo_key === params[1]);
     if (row) row.status = params[0];
     return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
+  }
+  if (q.startsWith("DELETE FROM uploaded_media WHERE photo_key=")) {
+    const before = tables.uploaded_media.length;
+    tables.uploaded_media = tables.uploaded_media.filter((r) => r.photo_key !== params[0]);
+    const changes = before - tables.uploaded_media.length;
+    return { changes, meta: { changes } };
   }
   if (q.startsWith("SELECT * FROM grow_reports")) {
     return tables.grow_reports.filter((r) => r.profile_id === params[0]).reverse();

@@ -23,13 +23,13 @@ test("mixed moderation queue renders report photos and skips a broken item", () 
       outcome: "success",
       notes: "flush 2",
     },
-    { mediaSrc: "https://api.shroomlabs.io/api/media/pending%2Freports%2Fchestnut%2Fa.jpg" }
+    { mediaSrc: "blob:https://shroomlabs.io/report-thumb" }
   );
   assert.match(report, /Grow report photo/);
   assert.match(report, /data-mod="report-photo-approve"/);
   assert.match(report, /data-mod="report-photo-reject"/);
   assert.match(report, /chestnut/);
-  assert.match(report, /api\/media/);
+  assert.match(report, /blob:https:\/\/shroomlabs.io\/report-thumb/);
 
   const broken = queueItemHtml({ kind: "report-photo" });
   assert.match(broken, /Grow report photo/);

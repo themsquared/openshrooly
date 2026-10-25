@@ -16,6 +16,7 @@ const env = {
     "https://shroomlabs.io,https://www.shroomlabs.io,http://127.0.0.1:8888,http://localhost:8888",
   CDN_BASE_URL: process.env.CDN_BASE_URL || "",
   SHOW_PSILOCYBIN: process.env.COMMUNITY_SHOW_PSILOCYBIN || "1",
+  PHOTOS_ENABLED: process.env.PHOTOS_ENABLED || "1",
   SITE_NAME: process.env.COMMUNITY_SITE_NAME || "Shroom Labs",
   AUTH_DEBUG: process.env.AUTH_DEBUG || "1",
   DEV_STUBS: process.env.DEV_STUBS || "1",
