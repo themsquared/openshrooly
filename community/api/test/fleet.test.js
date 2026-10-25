@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { nowIso } from "../src/crypto.js";
 import { commandExpired, deviceIsOnline, FLEET_ONLINE_MS, validateFleetChange } from "../src/fleet.js";
-import { call, register, testEnv } from "./helpers.js";
+import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 const pearlOyster = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../../data/profiles/culinary/pearl-oyster.json"), "utf8")
@@ -36,6 +36,21 @@ async function addProfile(ctx, userId, profile) {
     "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
     [profile.id, JSON.stringify(profile), userId, 1, nowIso(), nowIso()]
   );
+}
+
+async function grantCoach(ctx, token) {
+  const session = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
+  assert.equal(session.status, 200, JSON.stringify(session.data));
+  const me = await call(ctx, "GET", "/api/me", { token });
+  const paid = await signedWebhook(
+    ctx,
+    stripeCheckoutEvent({
+      sessionId: session.data.id,
+      itemId: session.data.item_id,
+      userId: me.data.user.id,
+    })
+  );
+  assert.equal(paid.status, 200, JSON.stringify(paid.data));
 }
 
 function statements(sql) {
@@ -174,6 +189,104 @@ test("rename and Unlink require confirm and stay on the owner", async () => {
   assert.equal(yes.status, 200, JSON.stringify(yes.data));
   const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-n"]);
   assert.equal(row.status, "revoked");
+});
+
+test("fleet setpoint apply pauses Autopilot immediately", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "pause@example.com");
+  await grantCoach(ctx, token);
+  await addDevice(ctx, user.id, "dev-pause");
+  await addReading(ctx, "dev-pause", { temperature: 20, humidity: 88, temperature_setpoint: 20, humidity_setpoint: 88 });
+  await addProfile(ctx, user.id, pearlOyster);
+  const on = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-pause", mode: "autopilot", profile_id: pearlOyster.id },
+  });
+  assert.equal(on.status, 200, JSON.stringify(on.data));
+  const applied = await call(ctx, "POST", "/api/fleet/apply", {
+    token,
+    body: { action: "setpoints", device_ids: ["dev-pause"], payload: { temperature_c: 18 } },
+  });
+  assert.equal(applied.status, 200, JSON.stringify(applied.data));
+  assert.equal(applied.data.results[0].status, "applied");
+  const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-pause", { token });
+  assert.equal(status.data.mode, "advisor");
+  assert.equal(status.data.status, "paused");
+  assert.match(status.data.pause_reason, /you changed a setpoint/i);
+});
+
+test("fleet profile action requires a published or owned profile and does not leak names", async () => {
+  const ctx = env();
+  const owner = await register(ctx, "prof-owner@example.com");
+  const other = await register(ctx, "prof-other@example.com");
+  await addDevice(ctx, owner.user.id, "dev-prof");
+  await addProfile(ctx, owner.user.id, pearlOyster);
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      "secret-draft",
+      JSON.stringify({ id: "secret-draft", name: "Hidden Draft", pack: "culinary", stages: [] }),
+      other.user.id,
+      0,
+      nowIso(),
+      nowIso(),
+    ]
+  );
+  const leaked = await call(ctx, "POST", "/api/fleet/preview", {
+    token: owner.token,
+    body: { action: "profile", device_ids: ["dev-prof"], payload: { profile_id: "secret-draft" } },
+  });
+  assert.equal(leaked.data.results[0].status, "failed");
+  assert.doesNotMatch(JSON.stringify(leaked.data), /Hidden Draft/);
+  const ok = await call(ctx, "POST", "/api/fleet/preview", {
+    token: owner.token,
+    body: { action: "profile", device_ids: ["dev-prof"], payload: { profile_id: pearlOyster.id } },
+  });
+  assert.equal(ok.data.results[0].status, "ok", JSON.stringify(ok.data));
+  assert.equal(ok.data.results[0].preview.profile_id, pearlOyster.id);
+  assert.equal(ok.data.results[0].preview.profile_name, undefined);
+});
+
+test("fleet and single-device light payloads are validated", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "light@example.com");
+  await addDevice(ctx, user.id, "dev-light");
+  await addProfile(ctx, user.id, pearlOyster);
+  const bad = await call(ctx, "POST", "/api/fleet/preview", {
+    token,
+    body: {
+      action: "light",
+      device_ids: ["dev-light"],
+      payload: { light: { sunrise_hour: 30, duration_hours: 12, white_led_lux: 90, red_percent: 0, green_percent: 0, blue_percent: 80 } },
+    },
+  });
+  assert.equal(bad.data.results[0].status, "failed");
+  assert.match(bad.data.results[0].error, /sunrise/i);
+  const ok = validateFleetChange({
+    action: "light",
+    payload: { light: { sunrise_hour: 8, duration_hours: 12, white_led_lux: 90, red_percent: 0, green_percent: 0, blue_percent: 80 } },
+  });
+  assert.equal(ok.ok, true);
+  const single = await call(ctx, "POST", "/api/devices/dev-light/commands", {
+    token,
+    body: { kind: "schedule", payload: { light: { sunrise_hour: 30 } } },
+  });
+  assert.equal(single.status, 400);
+  assert.match(single.data.error, /sunrise/i);
+});
+
+test("group deletion is audited and the audit list is newest first", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "del@example.com");
+  await addDevice(ctx, user.id, "dev-del");
+  const created = await call(ctx, "POST", "/api/fleet/groups", { token, body: { name: "Old rack" } });
+  const id = created.data.group.id;
+  const gone = await call(ctx, "DELETE", `/api/fleet/groups/${id}`, { token });
+  assert.equal(gone.status, 200, JSON.stringify(gone.data));
+  const audit = await call(ctx, "GET", "/api/fleet/audit", { token });
+  assert.equal(audit.data.entries[0].action, "group_delete");
+  assert.equal(audit.data.entries[0].target, String(id));
+  assert.ok(audit.data.entries.every((e, i, all) => i === 0 || Number(all[i - 1].id) >= Number(e.id)));
 });
 
 test("deviceIsOnline uses a 15 minute window", () => {

@@ -1023,6 +1023,44 @@ export function validateLightRecipe(recipe) {
   return recipe;
 }
 
+/** Chamber schedule payload: the same ranges as per-stage `light` on a profile. */
+export function collectStageLightIssues(light = {}, prefix = "light") {
+  const issues = [];
+  if (!light || typeof light !== "object") {
+    addIssue(issues, prefix, "Light recipe is required.");
+    return issues;
+  }
+  if (light.sunrise_hour != null && !inRange(light.sunrise_hour, 0, 23)) {
+    addIssue(issues, `${prefix}.sunrise_hour`, "Sunrise must be hour 0 to 23.");
+  }
+  if (light.duration_hours != null && !inRange(light.duration_hours, 0, 24)) {
+    addIssue(issues, `${prefix}.duration_hours`, "Light hours must be 0 to 24.");
+  }
+  if (light.white_led_lux != null && !inRange(light.white_led_lux, 0, 4000)) {
+    addIssue(issues, `${prefix}.white_led_lux`, "White light must be 0 to 4000 lux.");
+  }
+  for (const channel of ["red_percent", "green_percent", "blue_percent"]) {
+    if (light[channel] != null && !inRange(light[channel], 0, 100)) {
+      addIssue(issues, `${prefix}.${channel}`, `${channel.replace("_percent", "")} must be 0 to 100%.`);
+    }
+  }
+  return issues;
+}
+
+export function validateStageLight(light) {
+  if (!light || typeof light !== "object") throw new ValidationError("Light recipe is required.");
+  const issues = collectStageLightIssues(light);
+  if (issues.length) throw new ValidationError(issues[0].message);
+  return {
+    sunrise_hour: light.sunrise_hour ?? null,
+    duration_hours: light.duration_hours ?? null,
+    white_led_lux: light.white_led_lux ?? null,
+    red_percent: light.red_percent ?? null,
+    green_percent: light.green_percent ?? null,
+    blue_percent: light.blue_percent ?? null,
+  };
+}
+
 export function issuesFor(issues, path) {
   return issues.filter((i) => i.path === path || i.path.startsWith(`${path}.`));
 }

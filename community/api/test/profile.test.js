@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
-import { affiliateLinksFor, isPsilocybin, validateProfile, ValidationError } from "../src/profile.js";
+import { affiliateLinksFor, isPsilocybin, validateProfile, validateStageLight, ValidationError } from "../src/profile.js";
 import {
   applyPackRules,
   classifyTaxon,
@@ -64,6 +64,22 @@ test("every seed profile has a sourced light recipe inside the ranges", () => {
       assert.ok(phase.white_brightness_percent >= 0 && phase.white_brightness_percent <= 100, `${file} ${name}`);
     }
   }
+});
+
+test("stage light payloads use the same ranges as the profile light schema", () => {
+  const ok = validateStageLight({
+    sunrise_hour: 8,
+    duration_hours: 12,
+    white_led_lux: 92,
+    red_percent: 0,
+    green_percent: 0,
+    blue_percent: 80,
+  });
+  assert.equal(ok.duration_hours, 12);
+  assert.throws(() => validateStageLight({ sunrise_hour: 24 }), /sunrise/i);
+  assert.throws(() => validateStageLight({ duration_hours: 25 }), /hours/i);
+  assert.throws(() => validateStageLight({ white_led_lux: 5000 }), /lux/i);
+  assert.throws(() => validateStageLight({ red_percent: 120 }), /red/i);
 });
 
 test("light recipe validation rejects bad ranges and missing sources", () => {

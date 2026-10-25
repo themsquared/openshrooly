@@ -6,7 +6,7 @@ import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl, revokeTrackedBlobUrls } from "./photo-upload.js";
 import { queueItemHtml } from "./moderate-queue.js";
-import { escapeHtml, renderSafeMarkdown } from "./safe-markdown.js";
+import { escapeHtml, renderSafeMarkdown, safeDisplay } from "./safe-markdown.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -1375,7 +1375,7 @@ async function renderFleet() {
       ["Profile", d.profile?.name || "None", ""],
       ["Coach", coachLabel(d), ""],
     ]
-      .map(([label, value, unit]) => `<div class="stat"><strong>${escapeHtml(value == null ? "n/a" : `${value}${unit}`)}</strong><span>${label}</span></div>`)
+      .map(([label, value, unit]) => `<div class="stat"><strong>${value == null || value === "" ? "n/a" : `${safeDisplay(value)}${escapeHtml(unit)}`}</strong><span>${escapeHtml(label)}</span></div>`)
       .join("");
     drawReadingChart(data.history || []);
     $("#rename-form").addEventListener("submit", async (ev) => {
@@ -1415,7 +1415,7 @@ async function renderFleet() {
   const groupRows = groups.groups || [];
   $("#fleet-group-filter").innerHTML =
     `<option value="">All chambers</option>` +
-    groupRows.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join("");
+    groupRows.map((g) => `<option value="${safeDisplay(g.id)}">${escapeHtml(g.name)}</option>`).join("");
 
   function selectedIds() {
     return [...document.querySelectorAll("#fleet-rows input[type=checkbox]:checked")].map((el) => el.value);
@@ -1443,9 +1443,9 @@ async function renderFleet() {
             <td><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></td>
             <td><a href="/fleet.html?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
             <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(d.last_seen_at || "never")}</span></td>
-            <td>${d.reading ? `${d.reading.temperature ?? "?"} °C · ${d.reading.humidity ?? "?"}%` : "No reading"}</td>
+            <td>${d.reading ? `${safeDisplay(d.reading.temperature, "?")} °C · ${safeDisplay(d.reading.humidity, "?")}%` : "No reading"}</td>
             <td>${escapeHtml(d.profile?.name || "None")}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
-            <td>${d.setpoints?.temperature_c ?? "?"} °C · ${d.setpoints?.humidity_percent ?? "?"}%</td>
+            <td>${safeDisplay(d.setpoints?.temperature_c, "?")} °C · ${safeDisplay(d.setpoints?.humidity_percent, "?")}%</td>
             <td>${escapeHtml(coachLabel(d))}</td>
             <td>${(d.alerts || []).map((a) => escapeHtml(a.message)).join(" ") || "None"}</td>
           </tr>`

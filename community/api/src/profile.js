@@ -12,8 +12,10 @@ export {
   stripCommunityAffiliates,
   validateProfile,
   validateLightRecipe,
+  validateStageLight,
   collectProfileIssues,
   collectLightRecipeIssues,
+  collectStageLightIssues,
 } from "./profile-schema.js";
 
 import { isPsilocybin, ValidationError } from "./profile-schema.js";

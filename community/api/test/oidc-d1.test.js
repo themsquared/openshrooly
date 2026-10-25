@@ -8,6 +8,8 @@ import { createD1Db } from "../src/db.js";
 import { resetJwksCache } from "../src/oidc.js";
 import { assertPublicHandle, call, testEnv } from "./helpers.js";
 import { CLIENT_ID, SITE, fakeGoogle, realFetch } from "./fake-google.js";
+import { seedMissing } from "../src/seed.js";
+import seeds from "../src/seeds.json" with { type: "json" };
 
 let google;
 
@@ -34,6 +36,10 @@ async function withD1(fn) {
       GOOGLE_CLIENT_SECRET: "test-secret-value",
       SITE_ORIGIN: SITE,
     });
+    // Seed before the first HTTP request so sign-in never races Miniflare D1
+    // batch + first() inside handleRequest's catalog seed.
+    await seedMissing(ctx.db, seeds);
+    ctx._seeded = true;
     await fn(d1, ctx);
   } finally {
     await mf.dispose();
@@ -119,6 +125,9 @@ test("D1: Google sign-up with grower@gmail.com and a name hint gets grower_<hex>
 });
 
 test("D1: verified account is linked, unverified account is not taken over", async () => {
+  // Flake was 500 from seedMissing row-looping SELECT after D1 batch on the first
+  // handleRequest. Catalog is now seeded once in withD1 and seedMissing no longer
+  // follows the batch with per-profile first() calls.
   await withD1(async (d1, ctx) => {
     const now = new Date().toISOString();
     await d1.prepare("INSERT INTO users (username, password_hash, email, email_verified, display_name, role, created_at) VALUES ('v', '!no-password', 'grower@gmail.com', 1, 'v', 'user', ?)").bind(now).run();

@@ -2,12 +2,13 @@
 
 import { laterIso, nowIso } from "./crypto.js";
 import { requireVerified, userFromRequest } from "./auth.js";
-import { isPsilocybin, ValidationError } from "./profile.js";
+import { isPsilocybin, ValidationError, validateStageLight } from "./profile.js";
 import { compareReadingToStage, latestReading, parseTelemetry, refuseRestrictedPack } from "./coach-learn.js";
 import {
   clampAutopilotSetpoints,
   coachAutopilotFlagOn,
   getDeviceMode,
+  noteManualSetpointCommand,
   setDeviceAutopilotMode,
 } from "./coach-autopilot.js";
 import { fleetUiEnabled } from "./providers.js";
@@ -89,11 +90,15 @@ function firmwareFromReading(reading, raw) {
   return doc.firmware_version || doc.firmware || doc.version || reading?.firmware || null;
 }
 
-async function loadProfile(db, profileId) {
+async function loadProfile(db, user, profileId) {
   if (!profileId) return null;
   const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
   if (!row) return null;
-  return typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  const published = Boolean(Number(row.published));
+  const owned = user && row.author_id != null && Number(row.author_id) === Number(user.id);
+  if (!published && !owned) return null;
+  const doc = typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+  return doc ? { ...doc, id: doc.id || row.id } : null;
 }
 
 async function requireFleetUser(request, db, env) {
@@ -151,7 +156,7 @@ export async function enrichDevice(db, env, user, device, { now = Date.now() } =
     ? parseJson(samples.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))).at(-1).document, {})
     : {};
   const modeRow = await getDeviceMode(db, device.id, user.id);
-  const profile = await loadProfile(db, modeRow.profile_id);
+  const profile = await loadProfile(db, user, modeRow.profile_id);
   const offMenu = Boolean(profile && (isPsilocybin(profile) || refuseRestrictedPack(profile)));
   const stage = stageFromProfile(profile, current?.stage);
   const certs = await db.all("SELECT * FROM device_certs WHERE device_id=?", [device.id]);
@@ -225,13 +230,18 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
       ok: true,
       kind: "apply_profile",
       payload: { profile_id: profile.id, stage: stageId },
-      preview: { profile_id: profile.id, profile_name: profile.name, stage: stageId },
+      preview: { profile_id: profile.id, stage: stageId },
     };
   }
   if (action === "light") {
     const light = payload.light || lightFromStage(stage);
     if (!light) return { ok: false, error: "No light recipe on this profile stage." };
-    return { ok: true, kind: "schedule", payload: { light }, preview: { light } };
+    try {
+      const checked = validateStageLight(light);
+      return { ok: true, kind: "schedule", payload: { light: checked }, preview: { light: checked } };
+    } catch (err) {
+      return { ok: false, error: err.message || "Light recipe is not valid." };
+    }
   }
   if (action === "coach_mode") {
     if (profile && refuseRestrictedPack(profile)) {
@@ -281,7 +291,7 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
   }
   const modeRow = await getDeviceMode(db, device.id, user.id);
   const profileId = payload.profile_id || modeRow.profile_id;
-  const profile = await loadProfile(db, profileId);
+  const profile = await loadProfile(db, user, profileId);
   const samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id]);
   const current = latestReading(samples, now);
   const stage = stageFromProfile(profile, payload.stage || current?.stage);
@@ -307,6 +317,9 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
     return { device_id: device.id, name: device.name, status: "failed", error: "Chamber is not linked.", preview: plan.preview };
   }
   const status = await queueCommand(db, device, plan.kind, plan.payload, now);
+  if (plan.kind === "setpoints") {
+    await noteManualSetpointCommand(db, device, { ...plan.payload, source: "fleet" });
+  }
   return { device_id: device.id, name: device.name, status, preview: plan.preview };
 }
 
@@ -440,6 +453,13 @@ export async function handleFleet(method, path, url, request, env) {
     if (!group) return json({ error: "Group not found." }, 404);
     await db.run("DELETE FROM device_group_members WHERE group_id=?", [group.id]);
     await db.run("DELETE FROM device_groups WHERE id=?", [group.id]);
+    await writeAudit(db, user, {
+      action: "group_delete",
+      scope: "group",
+      target: String(group.id),
+      preview: { name: group.name },
+      results: [],
+    });
     return json({ ok: true });
   }
 
@@ -475,7 +495,7 @@ export async function handleFleet(method, path, url, request, env) {
     for (const device of devices) {
       if (path.endsWith("/preview")) {
         const modeRow = await getDeviceMode(db, device.id, user.id);
-        const profile = await loadProfile(db, body.payload?.profile_id || modeRow.profile_id);
+        const profile = await loadProfile(db, user, body.payload?.profile_id || modeRow.profile_id);
         const samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id]);
         const current = latestReading(samples, now);
         const stage = stageFromProfile(profile, body.payload?.stage || current?.stage);
@@ -504,12 +524,8 @@ export async function handleFleet(method, path, url, request, env) {
   }
 
   if (method === "GET" && path === "/api/fleet/audit") {
-    const rows = await db.all("SELECT * FROM fleet_audit WHERE owner_id=?", [user.id]);
-    const entries = (rows || [])
-      .slice()
-      .sort((a, b) => Number(b.id) - Number(a.id))
-      .slice(0, 40)
-      .map((row) => ({
+    const rows = await db.all("SELECT * FROM fleet_audit WHERE owner_id=? ORDER BY id DESC LIMIT ?", [user.id, 40]);
+    const entries = (rows || []).map((row) => ({
         id: row.id,
         action: row.action,
         scope: row.scope,

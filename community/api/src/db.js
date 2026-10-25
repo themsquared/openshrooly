@@ -1216,7 +1216,13 @@ function dispatch(mode, tables, ids, sql, params) {
     return { lastRowId: row.id };
   }
   if (q.startsWith("SELECT * FROM fleet_audit WHERE owner_id=")) {
-    return tables.fleet_audit.filter((r) => Number(r.owner_id) === Number(params[0]));
+    let rows = tables.fleet_audit.filter((r) => Number(r.owner_id) === Number(params[0]));
+    if (q.includes("ORDER BY id DESC")) rows = rows.slice().sort((a, b) => Number(b.id) - Number(a.id));
+    if (q.includes("LIMIT")) {
+      const limit = Number(params[1] ?? params[params.length - 1]);
+      if (Number.isFinite(limit)) rows = rows.slice(0, limit);
+    }
+    return rows;
   }
   if (q.startsWith("INSERT INTO device_telemetry")) {
     tables.device_telemetry.push({

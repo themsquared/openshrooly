@@ -34,16 +34,10 @@ export async function seedMissing(db, profiles) {
   const statements = seedStatements(profiles);
   if (typeof db.batch === "function") {
     await db.batch(statements);
-  } else {
-    for (const statement of statements) {
-      await db.run(statement.sql, statement.params);
-    }
+    return;
   }
-  for (const profile of profiles || []) {
-    const row = await db.one("SELECT * FROM profiles WHERE id=?", [profile.id]);
-    if (row && row.author_id != null) {
-      console.error(JSON.stringify({ level: "error", event: "seed_id_conflict", id: profile.id, author_id: row.author_id }));
-    }
+  for (const statement of statements) {
+    await db.run(statement.sql, statement.params);
   }
 }
 

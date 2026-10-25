@@ -3,7 +3,7 @@
 import { laterIso, nowIso, randomToken, sha256Hex, timingSafeEqual } from "./crypto.js";
 import { rateLimit, rateLimitClient } from "./security.js";
 import { devStubsEnabled } from "./providers.js";
-import { ValidationError } from "./profile.js";
+import { ValidationError, validateStageLight } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
 import { noteManualSetpointCommand } from "./coach-autopilot.js";
 import { commandExpired } from "./fleet.js";
@@ -767,7 +767,11 @@ export async function handleDevices(method, path, url, request, env) {
       throw new ValidationError("unknown command");
     }
     const issuedAt = nowIso();
-    const payload = body.payload || {};
+    let payload = body.payload || {};
+    if (kind === "schedule") {
+      const light = payload.light || payload;
+      payload = { ...payload, light: validateStageLight(light) };
+    }
     await db.run(
       "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
       [device.id, kind, JSON.stringify(payload), issuedAt, null]

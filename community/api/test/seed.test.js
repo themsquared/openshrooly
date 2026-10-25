@@ -18,6 +18,45 @@ test("seed SQL is insert-if-missing for every profile and the guide stub", () =>
   }
 });
 
+test("seedMissing uses one batch and does not SELECT each profile afterward", async () => {
+  const calls = [];
+  const db = {
+    async batch(statements) {
+      calls.push(["batch", statements.length]);
+    },
+    async one() {
+      calls.push(["one"]);
+      return null;
+    },
+    async run() {
+      calls.push(["run"]);
+    },
+  };
+  await seedMissing(db, [{ id: "a" }, { id: "b" }]);
+  assert.deepEqual(calls, [["batch", 3]]);
+});
+
+test("concurrent first requests share one catalog seed", async () => {
+  const ctx = {
+    db: createMemoryDb(),
+    storage: createMemoryStorage(),
+    CORS_ORIGIN: "http://127.0.0.1:8888",
+    SHOW_PSILOCYBIN: "1",
+    SITE_NAME: "test",
+    AUTH_DEBUG: "1",
+    HIBP_DISABLED: "1",
+    SITE_ORIGIN: "http://127.0.0.1:8888",
+    OIDC_STUB: "1",
+  };
+  const [a, b] = await Promise.all([
+    handleRequest(new Request("http://test/api/profiles?pack=culinary"), ctx),
+    handleRequest(new Request("http://test/api/profiles?pack=culinary"), ctx),
+  ]);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.equal(ctx._seeded, true);
+});
+
 test("seedMissing fills a partial catalog and does not overwrite existing rows", async () => {
   const db = createMemoryDb();
   const first = seeds[0];

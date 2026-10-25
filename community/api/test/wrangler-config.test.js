@@ -37,6 +37,13 @@ function hasAiTable(src) {
   return /(?:^|\n)\[ai\]\s*\n/.test(src);
 }
 
+test("platform workflow runs on every pull request, including stacked branches", () => {
+  const yml = readFileSync(join(root, "../../../.github/workflows/platform.yml"), "utf8");
+  const on = yml.split("jobs:")[0];
+  assert.match(on, /pull_request:/);
+  assert.doesNotMatch(on, /pull_request:\s*\n\s+branches:/);
+});
+
 test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
   assert.deepEqual(r2Photos(deploy), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
   assert.equal(quoted(deploy, "PHOTOS_ENABLED"), "1");

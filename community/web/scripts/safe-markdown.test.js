@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { escapeHtml, renderSafeMarkdown } from "../public/js/safe-markdown.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { escapeHtml, renderSafeMarkdown, safeDisplay } from "../public/js/safe-markdown.js";
+
+test("safeDisplay escapes numeric and string fleet fields", () => {
+  assert.equal(safeDisplay(22.5), "22.5");
+  assert.equal(safeDisplay(null, "?"), "?");
+  assert.equal(safeDisplay(`<img src=x onerror="alert(1)">`), `&lt;img src=x onerror=&quot;alert(1)&quot;&gt;`);
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/js/app.js"), "utf8");
+  assert.match(src, /safeDisplay\(d\.reading\.temperature/);
+  assert.match(src, /safeDisplay\(d\.setpoints\?\.temperature_c/);
+  assert.doesNotMatch(src, /\$\{d\.reading\.temperature \?\?/);
+});
 
 test("escapeHtml encodes tags before any markdown runs", () => {
   assert.equal(escapeHtml(`<img src=x onerror="alert(1)">`), `&lt;img src=x onerror=&quot;alert(1)&quot;&gt;`);
