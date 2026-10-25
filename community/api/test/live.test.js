@@ -77,11 +77,13 @@ test("liveNotifyAfter only runs with the binding and pokes the right object", as
   assert.match(hits[0][1], /\/notify\?device=d1&reason=telemetry$/);
 });
 
-test("rechecks: offline flip, pending commands, and watched pages", () => {
+test("rechecks: offline flip, pending commands only while watched, and watched pages", () => {
   const now = Date.parse("2026-10-25T21:00:00Z");
   const seen = new Date(now - 60_000).toISOString();
   assert.equal(nextRecheckAt({ device: { online: true, last_seen_at: seen } }, { now }), Date.parse(seen) + FLEET_ONLINE_MS + 1000);
-  assert.equal(nextRecheckAt({ device: { online: false, commands: [{ status: "queued" }] } }, { now }), now + 30_000);
+  assert.equal(nextRecheckAt({ device: { online: false, commands: [{ status: "queued" }] } }, { now, watched: true }), now + 30_000);
+  // Nobody watching: a stuck queued command must not keep the object rebuilding every 30 s.
+  assert.equal(nextRecheckAt({ device: { online: false, commands: [{ status: "queued" }] } }, { now }), null);
   assert.equal(nextRecheckAt({ device: { online: false, commands: [{ status: "acked" }] } }, { now }), null);
   assert.equal(nextRecheckAt({ device: { online: false } }, { now, watched: true }), now + 5 * 60_000);
 });

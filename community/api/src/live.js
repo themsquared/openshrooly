@@ -89,7 +89,10 @@ export function nextRecheckAt(snapshot, { now = Date.now(), watched = false } = 
     const offlineAt = Date.parse(d.last_seen_at) + FLEET_ONLINE_MS + 1000;
     if (Number.isFinite(offlineAt)) times.push(Math.max(offlineAt, now + 1000));
   }
-  if ((d?.commands || []).some((c) => PENDING.has(c.status))) times.push(now + PENDING_RECHECK_MS);
+  // Only poll pending commands while a page is watching. Unwatched objects still get
+  // pokes from inbox/ack writes and revalidate on the next read, so a command that is
+  // never picked up (or a chamber that is off) can't keep an idle object rebuilding.
+  if (watched && (d?.commands || []).some((c) => PENDING.has(c.status))) times.push(now + PENDING_RECHECK_MS);
   if (watched) times.push(now + WATCHED_RECHECK_MS);
   return times.length ? Math.min(...times) : null;
 }
