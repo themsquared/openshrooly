@@ -49,14 +49,14 @@ test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
   assert.equal(quoted(deploy, "PHOTOS_ENABLED"), "1");
   assert.equal(hasAiTable(deploy), false);
   assert.equal(quoted(deploy, "COACH_PUBLIC"), null);
-  assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), null);
+  // Cloud Autopilot is on in prod for the beta user only. Coach stays hidden (COACH_PUBLIC unset).
+  assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), "82");
   assert.equal(quoted(deploy, "ENVIRONMENT"), null);
   assert.equal(quoted(deploy, "CF_ACCOUNT_ID"), null);
   assert.equal(quoted(deploy, "WORKERS_AI_TOKEN"), null);
   assert.doesNotMatch(deploy, /ENVIRONMENT\s*=\s*"local"/);
   assert.doesNotMatch(deploy, /WORKERS_AI_TOKEN/);
-  assert.equal(quoted(deploy, "COACH_AUTOPILOT_ENABLED"), null);
-  assert.doesNotMatch(deploy, /COACH_AUTOPILOT_ENABLED/);
+  assert.equal(quoted(deploy, "COACH_AUTOPILOT_ENABLED"), "1");
   assert.equal(quoted(deploy, "FLEET_UI_ENABLED"), null);
   assert.doesNotMatch(deploy, /FLEET_UI_ENABLED/);
   assert.doesNotMatch(quoted(deploy, "CORS_ORIGIN") || "", /localhost|127\.0\.0\.1/);

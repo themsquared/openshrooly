@@ -38,6 +38,9 @@ GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleuse
 GROW_COACH_PROVIDER = "workers-ai"
 GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
 GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+# Cloud Autopilot (no [ai] needed). Only beta users can arm it; COACH_PUBLIC stays unset so Coach stays hidden.
+COACH_AUTOPILOT_ENABLED = "1"
+COACH_BETA_USER_IDS = "82"
 
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
 [triggers]
