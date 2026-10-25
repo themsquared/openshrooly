@@ -44,6 +44,10 @@ const env = {
   DEVICE_CA_CERT: process.env.DEVICE_CA_CERT,
   GROW_COACH_STUB: process.env.GROW_COACH_STUB || "1",
   GROW_COACH_PROVIDER: process.env.GROW_COACH_PROVIDER || "stub",
+  GROW_COACH_TEXT_MODEL: process.env.GROW_COACH_TEXT_MODEL,
+  GROW_COACH_VISION_MODEL: process.env.GROW_COACH_VISION_MODEL,
+  COACH_PUBLIC: process.env.COACH_PUBLIC,
+  COACH_BETA_USER_IDS: process.env.COACH_BETA_USER_IDS,
 };
 
 const server = createServer(async (req, res) => {

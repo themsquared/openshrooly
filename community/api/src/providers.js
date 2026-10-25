@@ -60,6 +60,23 @@ export function coachAiConfigured(env = {}) {
   return Boolean(env.AI) && String(env.GROW_COACH_PROVIDER || "").toLowerCase() !== "stub";
 }
 
+/** Public Coach checkout/UI. Beta users are gated separately via COACH_BETA_USER_IDS. */
+export function coachPublicEnabled(env = {}) {
+  return String(env.COACH_PUBLIC || "") === "1";
+}
+
+export function parseCoachBetaUserIds(env = {}) {
+  return String(env.COACH_BETA_USER_IDS || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+export function isCoachBetaUser(env = {}, user) {
+  if (!user) return false;
+  return parseCoachBetaUserIds(env).includes(String(user.id));
+}
+
 // Push delivery is not built yet, so it is never available in production, whatever keys are set.
 export function pushConfigured() {
   return false;
@@ -73,7 +90,7 @@ export function capabilities(env = {}, request) {
     apple: appleConfigured(env) || stubs,
     payments: paymentsConfigured(env) || stubs,
     photos: photosConfigured(env),
-    coach: coachAiConfigured(env) || stubs,
+    coach: coachAiConfigured(env) && coachPublicEnabled(env),
     push: pushConfigured() || stubs,
     show_psilocybin: String(env.SHOW_PSILOCYBIN ?? "1") !== "0",
     stubs,

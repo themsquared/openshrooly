@@ -1,6 +1,7 @@
 # Local / wrangler dev. Production deploy uses wrangler.deploy.toml.
 # Prod photos are on and have no AI binding; do not copy those from here
-# (see test/wrangler-config.test.js).
+# (see test/wrangler-config.test.js). Grow Coach private beta uses
+# wrangler.coach-local.toml — see COACH-LOCAL.md.
 name = "shroomlabs-api"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
@@ -41,7 +42,7 @@ GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleuse
 # The Worker mints the client secret at runtime. Do not commit the .p8 key.
 # Grow Coach: Workers AI in production; local Node defaults GROW_COACH_STUB=1.
 GROW_COACH_PROVIDER = "workers-ai"
-GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
+GROW_COACH_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.

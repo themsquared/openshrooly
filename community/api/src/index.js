@@ -57,6 +57,8 @@ async function envContext(env) {
       GROW_COACH_PROVIDER: env.GROW_COACH_PROVIDER,
       GROW_COACH_TEXT_MODEL: env.GROW_COACH_TEXT_MODEL,
       GROW_COACH_VISION_MODEL: env.GROW_COACH_VISION_MODEL,
+      COACH_PUBLIC: env.COACH_PUBLIC,
+      COACH_BETA_USER_IDS: env.COACH_BETA_USER_IDS,
     };
   }
   return env._ctx;

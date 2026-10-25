@@ -23,6 +23,7 @@ export function testEnv(extra = {}) {
     OIDC_STUB: "1",
     TURNSTILE_STUB: "1",
     GROW_COACH_STUB: "1",
+    COACH_PUBLIC: "1",
     PAYMENTS_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
     TOTP_ENC_KEY: TEST_TOTP_KEY,
     ...extra,

@@ -184,9 +184,15 @@ export function refuseRestrictedPack(profile) {
   return profile.pack === "psilocybin" || profile.restricted || (profile.tags || []).includes("psilocybin");
 }
 
+/** Workers AI neuron rates for @cf/qwen/qwen3-30b-a3b-fp8 (text) and the vision model. */
+export const TEXT_NEURONS_PER_M_INPUT = 4625;
+export const TEXT_NEURONS_PER_M_OUTPUT = 30475;
+export const VISION_NEURONS_PER_M_INPUT = 4410;
+export const VISION_NEURONS_PER_M_OUTPUT = 61493;
+
 export function estimateNeurons({ inputTokens = 0, outputTokens = 0, vision = false }) {
-  const inPerM = vision ? 4410 : 4625;
-  const outPerM = vision ? 61493 : 30475;
+  const inPerM = vision ? VISION_NEURONS_PER_M_INPUT : TEXT_NEURONS_PER_M_INPUT;
+  const outPerM = vision ? VISION_NEURONS_PER_M_OUTPUT : TEXT_NEURONS_PER_M_OUTPUT;
   return Math.ceil((inputTokens / 1e6) * inPerM + (outputTokens / 1e6) * outPerM);
 }
 

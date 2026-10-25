@@ -11,6 +11,7 @@ function prodLike() {
     OIDC_STUB: "1",
     TURNSTILE_STUB: "1",
     GROW_COACH_STUB: "1",
+    COACH_PUBLIC: "0",
     RESEND_API_KEY: "",
     GOOGLE_CLIENT_ID: "",
     APPLE_TEAM_ID: "",

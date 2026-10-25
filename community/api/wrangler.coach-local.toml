@@ -1,0 +1,31 @@
+# Local Grow Coach beta. Do not deploy this file.
+# `wrangler dev` binds Workers AI remotely; D1 stays on disk under
+# .wrangler/coach-local. See COACH-LOCAL.md.
+name = "shroomlabs-api-coach-local"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shroomlabs-coach-local"
+database_id = "00000000-0000-4000-8000-00000000c0ac"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "shroomlabs-photos-coach-local"
+
+[ai]
+binding = "AI"
+
+[vars]
+SITE_NAME = "Shroom Labs"
+SHOW_PSILOCYBIN = "1"
+PHOTOS_ENABLED = "1"
+COACH_PUBLIC = "0"
+COACH_BETA_USER_IDS = "1"
+CORS_ORIGIN = "http://127.0.0.1:8888,http://localhost:8888"
+CDN_BASE_URL = ""
+SITE_ORIGIN = "http://127.0.0.1:8888"
+GROW_COACH_PROVIDER = "workers-ai"
+GROW_COACH_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"

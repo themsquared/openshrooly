@@ -2,10 +2,42 @@
 
 import { coachAiConfigured, comingSoonBody, devStubsEnabled } from "./providers.js";
 
+export const DEFAULT_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
+export const DEFAULT_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+
 export function createModelProvider(env, request) {
   if (coachAiConfigured(env)) return workersAiProvider(env);
   if (devStubsEnabled(env, request)) return stubProvider();
   return disabledProvider();
+}
+
+/** Qwen3 may wrap chain-of-thought in <think>…</think>. Never return or store it. */
+export function stripThinkTags(text) {
+  return String(text ?? "")
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
+    .replace(/^\s+|\s+$/g, "");
+}
+
+function choiceContent(choice) {
+  if (!choice) return "";
+  const content = choice.message?.content ?? choice.delta?.content ?? choice.text ?? "";
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (typeof part === "string" ? part : part?.text || part?.content || ""))
+      .join("");
+  }
+  return content;
+}
+
+/** Workers AI may return OpenAI-style choices or a top-level `response` field. */
+export function workersAiText(result) {
+  const raw =
+    choiceContent(result?.choices?.[0]) ||
+    result?.response ||
+    result?.result ||
+    result?.text ||
+    "";
+  return stripThinkTags(raw);
 }
 
 function disabledProvider() {
@@ -69,8 +101,8 @@ function stubProvider() {
 }
 
 function workersAiProvider(env) {
-  const textModel = env.GROW_COACH_TEXT_MODEL || "@cf/meta/llama-3.2-3b-instruct";
-  const visionModel = env.GROW_COACH_VISION_MODEL || "@cf/meta/llama-3.2-11b-vision-instruct";
+  const textModel = env.GROW_COACH_TEXT_MODEL || DEFAULT_TEXT_MODEL;
+  const visionModel = env.GROW_COACH_VISION_MODEL || DEFAULT_VISION_MODEL;
   return {
     name: "workers-ai",
     async chat({ message, grounding }) {
@@ -82,11 +114,11 @@ function workersAiProvider(env) {
           { role: "user", content: `Grounding:\n${JSON.stringify(grounding)}\n\nQuestion: ${message}` },
         ],
       });
-      const text = result.response || result.result || result.text || "";
+      const text = workersAiText(result);
       return {
         text,
-        input_tokens: result.usage?.prompt_tokens || 800,
-        output_tokens: result.usage?.completion_tokens || 200,
+        input_tokens: result.usage?.prompt_tokens || result.usage?.input_tokens || 800,
+        output_tokens: result.usage?.completion_tokens || result.usage?.output_tokens || 200,
         cached: false,
         model: textModel,
       };
@@ -106,7 +138,7 @@ function workersAiProvider(env) {
           },
         ],
       });
-      const raw = result.response || result.result || "";
+      const raw = workersAiText(result);
       let parsed = {};
       try {
         parsed = JSON.parse(String(raw).replace(/^```json|```$/g, "").trim());

@@ -25,10 +25,14 @@ Cloud control is still opt-in. Coach can only *queue* setpoints; the chamber app
 | `GROW_COACH_PROVIDER` / flags | Backend |
 | --- | --- |
 | `stub` or `GROW_COACH_STUB=1` | Deterministic replies (tests + local Node) |
-| `workers-ai` + `env.AI` | Cloudflare Workers AI |
+| `workers-ai` + `env.AI` | Cloudflare Workers AI (`wrangler.coach-local.toml` for Mac beta) |
 | anything else without `AI` | stub |
 
-Defaults: text `@cf/meta/llama-3.2-3b-instruct`, vision `@cf/meta/llama-3.2-11b-vision-instruct`. Swap with `GROW_COACH_TEXT_MODEL` / `GROW_COACH_VISION_MODEL`.
+Defaults: text `@cf/qwen/qwen3-30b-a3b-fp8`, vision `@cf/meta/llama-3.2-11b-vision-instruct`. Swap with `GROW_COACH_TEXT_MODEL` / `GROW_COACH_VISION_MODEL`. Qwen3 may return OpenAI-style `choices` or a `response` field and may wrap reasoning in `<think>`; the Worker strips that before returning or storing.
+
+Public `capabilities.coach` is on only when Workers AI is bound **and** `COACH_PUBLIC=1`. `COACH_BETA_USER_IDS` is a comma list of user ids that get full Coach access (no payment) when AI is configured, even if `COACH_PUBLIC=0`. `/api/coach/subscribe` stays 503 preview unless `COACH_PUBLIC=1` and payments are configured.
+
+Production `wrangler.deploy.toml` does not bind `[ai]` yet. Try Coach on a Mac with a local D1 and a LAN chamber: [`community/api/COACH-LOCAL.md`](../community/api/COACH-LOCAL.md).
 
 Daily caps: 40 chats, 8 photos, 80k neurons. Chat cache 10 minutes. Usage in `coach_usage`.
 
