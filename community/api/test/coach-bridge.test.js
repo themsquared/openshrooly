@@ -13,6 +13,7 @@ import {
   bridgeCommandExpired,
   bridgeMode,
   chamberSetpointsUnreadable,
+  missingFromSnapshot,
   expireStaleOnLiveStart,
   httpApplyWrites,
   planBridgeCommand,
@@ -217,6 +218,50 @@ test("expired commands are refused", () => {
   assert.equal(BRIDGE_STALE_MS, 30 * 60 * 1000);
 });
 
+test("live writes refuse commands that lack a from snapshot", async () => {
+  assert.match(missingFromSnapshot({ temperature_c: 16 }), /from snapshot/i);
+  assert.match(missingFromSnapshot({ from: {} }), /from snapshot/i);
+  assert.equal(missingFromSnapshot({ from: { temperature_c: 16 } }), null);
+  const noFrom = command({
+    payload: JSON.stringify({ temperature_c: 16.5, humidity_percent: 88, source: "grow-coach-autopilot", approved: true }),
+  });
+  const parsed = JSON.parse(noFrom.payload);
+  assert.equal(parsed.from, undefined);
+  const plan = planBridgeCommand({ command: noFrom, stage: fruiting, reading });
+  assert.equal(plan.ok, false);
+  assert.equal(plan.mark, true);
+  assert.match(plan.reason, /from snapshot/i);
+
+  const db = createMemoryDb();
+  await db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["local-chamber", "hw-local", "{}", "LAN", "claimed", 1, null, null, null, 1, nowIso(), nowIso()]
+  );
+  await db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+    "local-chamber",
+    "setpoints",
+    noFrom.payload,
+    nowIso(),
+    null,
+  ]);
+  const posts = [];
+  const live = await runBridgeCycle({
+    ...memoryPending(db),
+    env: { COACH_BRIDGE_LIVE: "1" },
+    state: {},
+    stage: fruiting,
+    readChamber: async () => reading,
+    applyWrites: async (writes) => {
+      posts.push(...writes);
+      return { ok: true };
+    },
+  });
+  assert.equal(live.ok, false);
+  assert.equal(live.sent, false);
+  assert.match(live.reason, /from snapshot/i);
+  assert.equal(posts.length, 0);
+});
+
 test("manual override wins when the chamber setpoint moved", () => {
   const plan = planBridgeCommand({
     command: command(),
@@ -286,6 +331,65 @@ test("live writes honor the 10 minute rate limit and the kill switch", async () 
   assert.ok(posts.length > 0);
   const left = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["local-chamber"]);
   assert.equal(left.length, 0);
+});
+
+test("rate-limit timestamp is recorded before the live write so a failed mark cannot bypass it", async () => {
+  const db = createMemoryDb();
+  await db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["local-chamber", "hw-local", "{}", "LAN", "claimed", 1, null, null, null, 1, nowIso(), nowIso()]
+  );
+  let state = {};
+  const now = Date.parse("2026-10-25T12:00:00Z");
+  await db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+    "local-chamber",
+    "setpoints",
+    command().payload,
+    new Date(now - 60_000).toISOString(),
+    null,
+  ]);
+  const posts = [];
+  await assert.rejects(
+    () =>
+      runBridgeCycle({
+        ...memoryPending(db),
+        env: { COACH_BRIDGE_LIVE: "1" },
+        now,
+        state,
+        saveState: (next) => {
+          state = { ...state, ...next };
+        },
+        stage: fruiting,
+        readChamber: async () => reading,
+        applyWrites: async (writes) => {
+          posts.push(...writes);
+          return { ok: true };
+        },
+        markCommand: async () => {
+          throw new Error("mark failed");
+        },
+      }),
+    /mark failed/
+  );
+  assert.ok(posts.length > 0);
+  assert.equal(state.last_live_write_at, now);
+  assert.equal(rateLimited(state, now + 60_000), true);
+
+  const posts2 = [];
+  const again = await runBridgeCycle({
+    ...memoryPending(db),
+    env: { COACH_BRIDGE_LIVE: "1" },
+    now: now + 60_000,
+    state,
+    stage: fruiting,
+    readChamber: async () => reading,
+    applyWrites: async (writes) => {
+      posts2.push(...writes);
+      return { ok: true };
+    },
+  });
+  assert.equal(again.skipped, "rate_limit");
+  assert.equal(posts2.length, 0);
 });
 
 test("live start expires pending commands older than 30 minutes", async () => {

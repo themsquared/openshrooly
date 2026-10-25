@@ -53,6 +53,15 @@ export function bridgeCommandExpired(command, now = Date.now()) {
   return now - issued > BRIDGE_COMMAND_TTL_MS;
 }
 
+export function missingFromSnapshot(payload = {}) {
+  const from = payload.from || payload.planned_from;
+  if (!from || typeof from !== "object") return "Command is missing a from snapshot.";
+  const temp = finite(from.temperature_c ?? from.temperature_target);
+  const rh = finite(from.humidity_percent ?? from.target_humidity);
+  if (temp == null && rh == null) return "Command is missing a from snapshot.";
+  return null;
+}
+
 export function chamberSetpointsUnreadable(reading, payload = {}) {
   if (!reading) return "Chamber setpoints could not be read.";
   const needTemp = payload.temperature_c != null || payload.temperature_target != null;
@@ -92,8 +101,12 @@ export function planBridgeCommand({ command, stage = {}, reading, now = Date.now
   if (unread) {
     return { ok: false, status: "failed", reason: unread, mark: true };
   }
-  const plannedFrom = payload.from || payload.planned_from || null;
-  if (plannedFrom && setpointsMismatch(reading, plannedFrom, { now })) {
+  const missingFrom = missingFromSnapshot(payload);
+  if (missingFrom) {
+    return { ok: false, status: "failed", reason: missingFrom, mark: true };
+  }
+  const plannedFrom = payload.from || payload.planned_from;
+  if (setpointsMismatch(reading, plannedFrom, { now })) {
     return { ok: false, status: "failed", reason: "Chamber setpoint changed; manual override wins.", mark: true };
   }
 
@@ -235,6 +248,7 @@ export async function runBridgeCycle({
     return { skipped: "rate_limit", mode, command_id: command.id, sent: false };
   }
 
+  await saveState?.({ last_live_write_at: now });
   const apply = await applyWrites(plan.writes);
   const after = await readChamber();
   const status = apply.ok ? "sent" : "failed";
@@ -250,7 +264,6 @@ export async function runBridgeCycle({
     at: new Date(now).toISOString(),
   };
   await markCommand(command, result);
-  await saveState?.({ last_live_write_at: now });
   log({ action: status, command_id: command.id, ...result });
   return { ok: apply.ok, mode: "live", status, sent: apply.ok, writes: plan.writes, before, after, command_id: command.id };
 }
