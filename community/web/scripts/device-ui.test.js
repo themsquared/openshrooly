@@ -165,3 +165,121 @@ test("each submit gets its own request id", () => {
   const b = newRequestId();
   assert.ok(a && b && a !== b);
 });
+
+test("each grow fact shows once on the identity card and the device card", async () => {
+  const { growingLabels, deviceMetaLine } = await import("../public/js/device-ui.js");
+  const lion = {
+    id: "dev-lion",
+    name: "Mike's chamber",
+    device_type: "shrooly_chamber",
+    online: true,
+    last_seen_at: new Date().toISOString(),
+    profile: { id: "lions-mane", name: "Lion's Mane", species: "Hericium erinaceus", strain: "Standard" },
+    stage: { name: "Fruiting" },
+    grow: { phase: "Fruiting" },
+    reading: { temperature: 21.97, humidity: 88.93, reading_at: new Date().toISOString() },
+    setpoints: { temperature_c: 18, humidity_percent: 90 },
+  };
+  const labels = growingLabels(lion);
+  assert.equal(labels.title, "Lion's Mane");
+  assert.equal(labels.latin, "Hericium erinaceus (Standard)");
+  assert.equal(labels.phase, "Fruiting");
+  // Visible text only; image alt text is for screen readers and may name both.
+  const count = (html, text) => html.replace(/<[^>]*>/g, " ").split(text).length - 1;
+  const identity = renderIdentity(lion);
+  assert.equal(count(identity, "Lion&#39;s Mane") + count(identity, "Lion's Mane"), 1);
+  assert.equal(count(identity, "Hericium erinaceus"), 1);
+  assert.equal(count(identity, "Fruiting"), 1);
+  const card = renderDeviceCard(lion);
+  assert.equal(count(card, "Hericium erinaceus"), 1);
+  assert.equal(count(card, "Fruiting"), 1);
+  // The page header says what the hardware is doing, not what is growing again.
+  const meta = deviceMetaLine(lion);
+  assert.doesNotMatch(meta, /Hericium|Lion|Fruiting/);
+  assert.match(meta, /Shrooly chamber · Online/);
+});
+
+test("a chamber that does not report water gets no Water tile and never n/a", async () => {
+  const { renderGauges, readingLine } = await import("../public/js/device-ui.js");
+  const dry = { reading: { temperature: 21.9, humidity: 88.9, reading_at: new Date().toISOString() }, setpoints: { temperature_c: 18, humidity_percent: 90 } };
+  const html = renderGauges(dry);
+  assert.doesNotMatch(html, /Water</);
+  assert.doesNotMatch(html, /n\/a/);
+  assert.match(html, /does not report its water level/);
+  assert.match(html, /Measured at/);
+  const wet = renderGauges({ ...dry, reading: { ...dry.reading, water_level: 64 } });
+  assert.match(wet, /Water</);
+  assert.match(wet, /64%/);
+  const partial = renderGauges({ reading: { humidity: 80 }, setpoints: {} });
+  assert.match(partial, /Not reported/);
+  assert.doesNotMatch(readingLine({ reading: { humidity: 80 } }), /n\/a/);
+  for (const page of ["device.html", "fleet.html", "devices.html"]) {
+    assert.doesNotMatch(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public", page), "utf8"), /n\/a/);
+  }
+  const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/js/app.js"), "utf8");
+  assert.doesNotMatch(app.slice(app.indexOf("async function renderDevices"), app.indexOf("function bulkBody")), /n\/a/);
+});
+
+test("device pages show a skeleton at once and preload their modules", () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "../public");
+  const device = readFileSync(join(root, "device.html"), "utf8");
+  assert.match(device, /id="device-skeleton"/);
+  assert.match(device, /id="device-live"/);
+  for (const page of ["device.html", "devices.html", "fleet.html"]) {
+    const html = readFileSync(join(root, page), "utf8");
+    assert.match(html, /rel="modulepreload" href="\/js\/app\.js"/);
+    assert.match(html, /rel="modulepreload" href="\/js\/live\.js"/);
+  }
+});
+
+test("live cache only hands a snapshot back to the same sign-in", async () => {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    key: (i) => [...store.keys()][i] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+  // Object.keys(localStorage) is how the cache finds its entries; mirror it.
+  const keysOf = () => Object.fromEntries(store);
+  const realKeys = Object.keys;
+  Object.keys = (o) => (o === globalThis.localStorage ? realKeys(keysOf()) : realKeys(o));
+  globalThis.window = { SHROOM_LABS: { apiBase: "https://api.shroomlabs.io" } };
+  try {
+    const { liveCache, liveSocketUrl, ageText } = await import("../public/js/live.js");
+    const { setToken } = await import("../public/js/api.js");
+    setToken("token-for-alice-aaaaaaaaaaaa");
+    liveCache.set("device:x", { device: { id: "x" } });
+    assert.equal(liveCache.get("device:x").data.device.id, "x");
+    store.set("openshrooly_token", "token-for-bob-bbbbbbbbbbbbbbb");
+    assert.equal(liveCache.get("device:x"), null);
+    store.set("openshrooly_token", "token-for-alice-aaaaaaaaaaaa");
+    setToken("");
+    assert.equal(liveCache.get("device:x"), null);
+    assert.equal([...store.keys()].some((k) => k.startsWith("sl.live.")), false);
+    assert.equal(liveSocketUrl("/api/live/socket", "https://api.shroomlabs.io"), "wss://api.shroomlabs.io/api/live/socket");
+    assert.equal(liveSocketUrl("/api/live/socket", "http://127.0.0.1:8787"), "ws://127.0.0.1:8787/api/live/socket");
+    assert.equal(ageText(new Date(Date.now() - 5 * 60000).toISOString()), "5 min ago");
+  } finally {
+    Object.keys = realKeys;
+    delete globalThis.localStorage;
+    delete globalThis.window;
+  }
+});
+
+test("site CSP lets the device pages open the live socket", () => {
+  const toml = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../netlify.toml"), "utf8");
+  const main = toml.match(/for = "\/\*"[\s\S]*?Content-Security-Policy = "([^"]+)"/)[1];
+  assert.match(main, /connect-src[^;]*wss:\/\/api\.shroomlabs\.io/);
+});
+
+test("live pages wait for app.js to finish loading before the cached paint", () => {
+  const app = readFileSync(new URL("../public/js/app.js", import.meta.url), "utf8");
+  for (const fn of ["renderDevice", "renderDevices", "renderFleet"]) {
+    const re = new RegExp(`async function ${fn}\\(\\) \\{\\n(?:\\s*//[^\\n]*\\n)*\\s*await Promise\\.resolve\\(\\);`);
+    assert.match(app, re, fn);
+  }
+});

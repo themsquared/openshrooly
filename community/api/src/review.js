@@ -117,11 +117,16 @@ export function publicDocument(row, review, profile) {
   return null;
 }
 
-export async function isPublicProfile(db, row) {
+/** Same rule as isPublicProfile, for callers that already loaded the review row. */
+export function isPublicRow(row, review) {
   if (!row || Number(row.published) !== 1) return false;
-  const review = await getReview(db, row.id);
   if (!review) return true;
   return Number(review.published_live) === 1;
+}
+
+export async function isPublicProfile(db, row) {
+  if (!row || Number(row.published) !== 1) return false;
+  return isPublicRow(row, await getReview(db, row.id));
 }
 
 export async function canSeeProfile(db, user, row) {

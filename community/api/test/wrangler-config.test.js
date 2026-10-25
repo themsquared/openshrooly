@@ -91,3 +91,12 @@ test("wrangler.coach-local.toml is fully local: no AI binding, REST via .dev.var
   assert.doesNotMatch(deploy, /COACH_CHAMBER_PASSWORD|COACH_CHAMBER_USER/);
   assert.doesNotMatch(local, /COACH_CHAMBER_PASSWORD|COACH_CHAMBER_USER/);
 });
+
+test("both configs bind the live cache objects as SQLite-backed Durable Objects", () => {
+  for (const src of [deploy, local]) {
+    assert.match(src, /\[\[durable_objects\.bindings\]\]\s*\nname = "DEVICE_LIVE"\s*\nclass_name = "DeviceLive"/);
+    assert.match(src, /\[\[durable_objects\.bindings\]\]\s*\nname = "USER_LIVE"\s*\nclass_name = "UserLive"/);
+    assert.match(src, /\[\[migrations\]\]\s*\ntag = "v1"\s*\nnew_sqlite_classes = \["DeviceLive", "UserLive"\]/);
+  }
+  assert.equal(hasAiTable(deploy), false);
+});

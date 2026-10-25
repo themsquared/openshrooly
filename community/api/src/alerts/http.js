@@ -58,6 +58,28 @@ async function ownDevice(db, user, deviceId) {
   return device;
 }
 
+/**
+ * The device page's alerts panel. The live cache (src/live.js) builds the same
+ * view so the page gets it in one request. Caller has already checked that
+ * `user` is verified and owns `device`.
+ */
+export async function deviceAlertsView(db, env, user, device, rulesRow) {
+  const [row, states, alerts, prefs] = await Promise.all([
+    rulesRow === undefined ? db.one(SQL.rulesGet, [device.id]) : rulesRow,
+    db.all(SQL.stateAll, [device.id]),
+    db.all(SQL.alertsForDevice, [user.id, device.id, LIST_LIMIT]),
+    prefsFor(db, user.id),
+  ]);
+  return {
+    device: { id: device.id, name: device.name, status: device.status, last_seen_at: device.last_seen_at },
+    rules: rulesFor(row, device),
+    states: Object.fromEntries(RULES.map((rule) => [rule, readState(states.find((s) => s.rule === rule)).status])),
+    profiles: trackableList(),
+    alerts: alerts.map(publicAlert),
+    ...accountView(env, user, prefs),
+  };
+}
+
 export function publicAlert(row) {
   return {
     id: row.id,
@@ -130,20 +152,7 @@ export async function handleAlerts(method, path, url, request, env) {
     const user = await verifiedUser(request, db);
     const device = await ownDevice(db, user, decodeURIComponent(deviceMatch[1]));
     const row = await db.one(SQL.rulesGet, [device.id]);
-    if (method === "GET") {
-      const states = await db.all(SQL.stateAll, [device.id]);
-      const alerts = await db.all(SQL.alertsForDevice, [user.id, device.id, LIST_LIMIT]);
-      return json({
-        device: { id: device.id, name: device.name, status: device.status, last_seen_at: device.last_seen_at },
-        rules: rulesFor(row, device),
-        states: Object.fromEntries(
-          RULES.map((rule) => [rule, readState(states.find((s) => s.rule === rule)).status])
-        ),
-        profiles: trackableList(),
-        alerts: alerts.map(publicAlert),
-        ...accountView(env, user, await prefsFor(db, user.id)),
-      });
-    }
+    if (method === "GET") return json(await deviceAlertsView(db, env, user, device, row));
     if (method === "PUT") {
       if (!(await writeAllowed(db, user))) return json({ error: "rate limited" }, 429);
       const body = await readBody(request);
