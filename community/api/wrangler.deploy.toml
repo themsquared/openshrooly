@@ -1,0 +1,62 @@
+# Production deploy config. Keep bindings in lockstep with wrangler.toml.
+# `npm run deploy` uses this file (`wrangler deploy -c wrangler.deploy.toml`).
+# Secrets: npx wrangler secret put NAME -c wrangler.deploy.toml
+name = "shroomlabs-api"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shroomlabs"
+database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
+
+# User photos. Create the bucket at ship time, then deploy, then flip the flag:
+#   npx wrangler r2 bucket create shroomlabs-photos
+# Binding: PHOTOS → shroomlabs-photos. Do not enable public listing or map this
+# bucket on a public hostname. Pending objects stay under pending/ and are
+# served only through /api/media. PHOTOS_ENABLED=0 until you flip it.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "shroomlabs-photos"
+
+[ai]
+binding = "AI"
+
+[vars]
+SITE_NAME = "Shroom Labs"
+SHOW_PSILOCYBIN = "1"
+# Photo uploads stay off until this is "1" AND the R2 bucket exists.
+PHOTOS_ENABLED = "0"
+# Browser origins allowed to call api.shroomlabs.io with Authorization headers.
+CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
+# Not used for grow-report, profile, or coach photos. Those are served only
+# through /api/media. Pending objects live under pending/ and must never be
+# mapped on a public R2 domain. Approval copies off pending/; reject/takedown
+# deletes the object.
+CDN_BASE_URL = "https://cdn.shroomlabs.io"
+# Google sign-in. The client ID is public; GOOGLE_CLIENT_SECRET is a Wrangler secret (see docs/AUTH.md).
+GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleusercontent.com"
+# Sign in with Apple: set APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_SERVICES_ID, and APPLE_PRIVATE_KEY
+# as Wrangler secrets once the Developer portal items exist. See docs/AUTH.md.
+# The Worker mints the client secret at runtime. Do not commit the .p8 key.
+# Grow Coach: Workers AI in production; local Node defaults GROW_COACH_STUB=1.
+GROW_COACH_PROVIDER = "workers-ai"
+GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
+GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+
+# Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[routes]]
+pattern = "api.shroomlabs.io"
+custom_domain = true
+
+# Secrets (do not put live payment keys here):
+#   npx wrangler secret put COMMUNITY_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put PAYMENTS_WEBHOOK_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put TOTP_ENC_KEY -c wrangler.deploy.toml
+#   npx wrangler secret put TURNSTILE_SECRET_KEY -c wrangler.deploy.toml
+#   npx wrangler secret put CF_API_TOKEN -c wrangler.deploy.toml
+# Optional: CF_ZONE_ID in [vars] once DNS is on Cloudflare. See docs/DEVICES.md.
+# Do not set DEV_STUBS on this Worker. Completing stubs refuse api.shroomlabs.io.

@@ -36,26 +36,72 @@ export function approvedObjectKey(pendingKey) {
   return key.replace("/pending/", "/approved/");
 }
 
-export async function promoteStoredObject(storage, pendingKey) {
-  const nextKey = approvedObjectKey(pendingKey);
-  if (!storage || !pendingKey || nextKey === pendingKey) return pendingKey;
-  const file = await storage.get(pendingKey);
-  if (!file) return pendingKey;
-  await storage.put(nextKey, file.bytes, file.contentType);
-  await storage.delete(pendingKey);
-  return nextKey;
+/** Inverse of approvedObjectKey for leftover pending objects after a retry. */
+export function pendingSiblingKey(key) {
+  const value = String(key || "");
+  if (!value) return "";
+  if (value.startsWith("pending/")) return value;
+  if (value.includes("/approved/")) return value.replace("/approved/", "/pending/");
+  return `pending/${value}`;
 }
 
+export function isPendingObjectKey(key) {
+  const value = String(key || "");
+  return value.startsWith("pending/") || value.includes("/pending/");
+}
+
+/**
+ * Copy pending → approved. Never deletes. Safe to retry: if the approved
+ * object already exists, this is a no-op. Caller updates the DB, then deletes.
+ */
+export async function copyApprovedObject(storage, fromKey) {
+  const nextKey = approvedObjectKey(fromKey);
+  if (!fromKey) return { fromKey, nextKey: fromKey, copied: false, missing: true };
+  if (!storage) return { fromKey, nextKey, copied: false, missing: true };
+  if (nextKey === fromKey) {
+    const file = await storage.get(fromKey);
+    return { fromKey, nextKey, copied: false, missing: !file };
+  }
+  if (await storage.get(nextKey)) return { fromKey, nextKey, copied: true, missing: false };
+  const file = await storage.get(fromKey);
+  if (!file) return { fromKey, nextKey, copied: false, missing: true };
+  await storage.put(nextKey, file.bytes, file.contentType);
+  return { fromKey, nextKey, copied: true, missing: false };
+}
+
+export async function deleteStoredObject(storage, key) {
+  if (!storage?.delete || !key) return;
+  try {
+    await storage.delete(key);
+  } catch {
+    // Leftover pending objects are removed on the next approve retry.
+  }
+}
+
+export async function finishApprovedObject(storage, currentKey) {
+  const leftover = pendingSiblingKey(currentKey);
+  if (leftover && leftover !== currentKey) await deleteStoredObject(storage, leftover);
+}
+
+/**
+ * Rewrite the ACL row after a copy. Inserts the new key first so a crash
+ * cannot leave the DB pointing at a key with no uploaded_media row.
+ */
 export async function replaceMediaKey(db, fromKey, toKey, status) {
   if (!fromKey && !toKey) return;
   if (fromKey && fromKey === toKey) {
     await setMediaStatus(db, fromKey, status);
     return;
   }
-  const row = fromKey ? await getMedia(db, fromKey) : null;
-  if (fromKey) await db.run("DELETE FROM uploaded_media WHERE photo_key=?", [fromKey]);
-  if (!toKey || !row) return;
-  await insertMedia(db, { photo_key: toKey, owner_id: row.owner_id, status, kind: row.kind });
+  const fromRow = fromKey ? await getMedia(db, fromKey) : null;
+  const toRow = toKey ? await getMedia(db, toKey) : null;
+  const row = fromRow || toRow;
+  if (toKey && row && !toRow) {
+    await insertMedia(db, { photo_key: toKey, owner_id: row.owner_id, status, kind: row.kind });
+  } else if (toKey && toRow) {
+    await setMediaStatus(db, toKey, status);
+  }
+  if (fromKey && fromKey !== toKey) await db.run("DELETE FROM uploaded_media WHERE photo_key=?", [fromKey]);
 }
 
 export async function insertMedia(db, { photo_key, owner_id, status, kind }) {

@@ -1,7 +1,7 @@
 /** Review, photo, and moderator HTTP routes. */
 
 import { requireVerified, userFromRequest } from "./auth.js";
-import { isPsilocybin, stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
+import { stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
 import { canConfirmCulinary, classifyTaxon, reviewConfirmExtra } from "./profile-schema.js";
 import {
   approveReportPhoto,
@@ -14,6 +14,7 @@ import {
   listPublicProfiles,
   logModeration,
   maybeResetOnPublicEdit,
+  offmenuVisible,
   photoIsPublic,
   publicDocument,
   rejectReportPhoto,
@@ -169,7 +170,8 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     if (!row || !(await isPublicProfile(db, row))) return json({ error: "not found" }, 404);
     const profile = parseProfile(row, seeds);
     if (!profile) return json({ error: "not found" }, 404);
-    if (isPsilocybin(profile) && String(env.SHOW_PSILOCYBIN ?? "1") === "0") return json({ error: "not found" }, 404);
+    const user = await userOf(request, db);
+    if (!(await offmenuVisible(db, env, user, row))) return json({ error: "not found" }, 404);
     return serveStored(env, photo.object_key);
   }
 
@@ -317,6 +319,9 @@ export async function serveProfilePhoto(request, env, profileId, photoId, { publ
   if (publicOnly && !photoIsPublic(photo)) return json({ error: "not found" }, 404);
   const user = await userOf(request, db);
   if (!canSeePhoto(photo, user, row.author_id)) return json({ error: "not found" }, 404);
+  if (!(await offmenuVisible(db, env, user, row, { pending: !photoIsPublic(photo) }))) {
+    return json({ error: "not found" }, 404);
+  }
   return serveStored(env, photo.object_key);
 }
 

@@ -8,6 +8,29 @@ export function resolveMediaUrl(href, apiBase) {
   return value;
 }
 
+const liveBlobUrls = new Set();
+
+export function trackBlobUrl(url) {
+  if (typeof url === "string" && url.startsWith("blob:")) liveBlobUrls.add(url);
+  return url;
+}
+
+export function revokeBlobUrl(url, revoke = globalThis.URL?.revokeObjectURL) {
+  if (typeof url !== "string" || !url.startsWith("blob:")) return;
+  liveBlobUrls.delete(url);
+  if (typeof revoke === "function") {
+    try {
+      revoke(url);
+    } catch {
+      /* already revoked */
+    }
+  }
+}
+
+export function revokeTrackedBlobUrls(revoke = globalThis.URL?.revokeObjectURL) {
+  for (const url of [...liveBlobUrls]) revokeBlobUrl(url, revoke);
+}
+
 /** Fetch a media URL with the session token and return a page-local blob: URL. */
 export async function fetchAuthedImageUrl(href, { apiBase, token, fetchImpl, createObjectURL } = {}) {
   const url = resolveMediaUrl(href, apiBase);
@@ -20,7 +43,7 @@ export async function fetchAuthedImageUrl(href, { apiBase, token, fetchImpl, cre
   if (!res.ok) return "";
   const blob = await res.blob();
   const makeUrl = createObjectURL || globalThis.URL?.createObjectURL;
-  return typeof makeUrl === "function" ? makeUrl(blob) : "";
+  return typeof makeUrl === "function" ? trackBlobUrl(makeUrl(blob)) : "";
 }
 
 export async function encodePhotoForUpload(file, { createImageBitmap: bitmapFn, document: doc } = {}) {

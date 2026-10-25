@@ -7,12 +7,22 @@ import {
   applyPackRules,
   canConfirmCulinary,
   classifyTaxon,
+  isPsilocybin,
   needsOffmenuFlag,
   reviewConfirmExtra,
   ValidationError,
 } from "./profile-schema.js";
 import { PHOTO_MAX_COUNT, extForContentType, photoObjectKey, prescreenImage, processPhoto } from "./photos.js";
-import { insertMedia, pendingPhotoKey, promoteStoredObject, replaceMediaKey, setMediaStatus } from "./media-acl.js";
+import {
+  copyApprovedObject,
+  deleteStoredObject,
+  finishApprovedObject,
+  insertMedia,
+  isPendingObjectKey,
+  pendingPhotoKey,
+  replaceMediaKey,
+  setMediaStatus,
+} from "./media-acl.js";
 import { capabilities } from "./providers.js";
 import { rateLimit, rateLimitClient } from "./security.js";
 
@@ -196,39 +206,34 @@ export async function submitForReview(db, env, request, { profile, user, title, 
 
 export async function approveReview(db, env, request, { profile, user, row, pack } = {}) {
   const review = await getReview(db, profile.id);
-  if (!review || review.status !== REVIEW_PENDING) throw new ValidationError("This profile is not waiting for review.");
+  if (!review) throw new ValidationError("This profile is not waiting for review.");
+  const already = review.status === REVIEW_PUBLISHED && Number(review.published_live) === 1;
+  if (!already && review.status !== REVIEW_PENDING) throw new ValidationError("This profile is not waiting for review.");
   const extra = { title: review.title, description: review.description };
   if (pack === "culinary" || pack === "psilocybin") extra.moderatorPack = pack;
-  if (extra.moderatorPack === "culinary" && !canConfirmCulinary(profile, extra)) {
+  if (!already && extra.moderatorPack === "culinary" && !canConfirmCulinary(profile, extra)) {
     throw new ValidationError("This taxon cannot be confirmed as culinary.", 400);
   }
-  const normalized = applyPackRules(profile, extra);
+  const normalized = already ? profile : applyPackRules(profile, extra);
   const ts = nowIso();
-  await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), ts, profile.id]);
-  await db.run("UPDATE profiles SET published=1, updated_at=? WHERE id=?", [ts, profile.id]);
-  await upsertReview(db, {
-    ...review,
-    status: REVIEW_PUBLISHED,
-    reason: "",
-    live_document: JSON.stringify(normalized),
-    offmenu_flag: extra.moderatorPack === "culinary" ? false : needsOffmenuFlag(normalized, extra),
-    published_live: 1,
-    ...confirmFields(review, normalized, { confirm: extra.moderatorPack === "culinary", actorId: user.id, at: ts }),
-  });
-  const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profile.id]);
-  const approvedAt = nowIso();
-  for (const photo of photos) {
-    const fromKey = photo.object_key;
-    const nextKey = await promoteStoredObject(env?.storage, fromKey);
-    await db.run("UPDATE profile_photos SET object_key=?, status='approved', updated_at=? WHERE id=?", [
-      nextKey,
-      approvedAt,
-      photo.id,
-    ]);
-    await replaceMediaKey(db, fromKey, nextKey, "approved");
+  if (!already) {
+    await db.run("UPDATE profiles SET document=?, updated_at=? WHERE id=?", [JSON.stringify(normalized), ts, profile.id]);
   }
-  await logModeration(db, { profileId: profile.id, actorId: user.id, action: "approve", reason: "" });
-  await notifyOwner(db, env, request, row, "approved", "");
+  await promoteProfilePhotos(db, env, profile.id);
+  if (!already) {
+    await db.run("UPDATE profiles SET published=1, updated_at=? WHERE id=?", [ts, profile.id]);
+    await upsertReview(db, {
+      ...review,
+      status: REVIEW_PUBLISHED,
+      reason: "",
+      live_document: JSON.stringify(normalized),
+      offmenu_flag: extra.moderatorPack === "culinary" ? false : needsOffmenuFlag(normalized, extra),
+      published_live: 1,
+      ...confirmFields(review, normalized, { confirm: extra.moderatorPack === "culinary", actorId: user.id, at: ts }),
+    });
+    await logModeration(db, { profileId: profile.id, actorId: user.id, action: "approve", reason: "" });
+    await notifyOwner(db, env, request, row, "approved", "");
+  }
   return getReview(db, profile.id);
 }
 
@@ -336,11 +341,38 @@ export function canSeePendingReportPhoto(user, report) {
   return Number(user.id) === Number(report.author_id);
 }
 
-export async function canServeReportPhoto(db, user, report) {
+export function showPsilocybin(env) {
+  return String(env?.SHOW_PSILOCYBIN ?? "1") !== "0";
+}
+
+function parseRowDocument(row) {
+  try {
+    return typeof row?.document === "string" ? JSON.parse(row.document) : row?.document || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Site flag plus owner / pending-uploader / staff exceptions, matching profile pages. */
+export async function offmenuVisible(db, env, user, row, { uploaderId, pending } = {}) {
+  if (!row) return false;
+  const profile = parseRowDocument(row);
+  if (!profile) return false;
+  const extra = reviewConfirmExtra(await getReview(db, row.id), profile);
+  if (!isPsilocybin(profile, extra)) return true;
+  if (isModerator(user)) return true;
+  if (user && Number(user.id) === Number(row.author_id)) return true;
+  if (pending && user && uploaderId != null && Number(user.id) === Number(uploaderId)) return true;
+  return showPsilocybin(env);
+}
+
+export async function canServeReportPhoto(db, env, user, report) {
   if (!report?.photo_key) return false;
   if (report.photo_status === "rejected") return false;
   const row = await db.one("SELECT * FROM profiles WHERE id=?", [report.profile_id]);
   if (!row) return false;
+  const pending = report.photo_status !== "approved";
+  if (!(await offmenuVisible(db, env, user, row, { uploaderId: report.author_id, pending }))) return false;
   const publicOk = await isPublicProfile(db, row);
   if (report.photo_status === "approved" && publicOk) return true;
   return canSeePendingReportPhoto(user, report);
@@ -474,12 +506,52 @@ export async function reclassifyUnconfirmedLegacyBatch(db, { limit = RECLASS_BAT
   return { scanned, rewritten, lastId, done: finished };
 }
 
+async function promotePhoto(db, storage, { fromKey, update }) {
+  if (!fromKey) return fromKey;
+  const { nextKey, missing } = await copyApprovedObject(storage, fromKey);
+  if (missing) throw new ValidationError("That photo is missing from storage.", 500);
+  await update(nextKey);
+  await replaceMediaKey(db, fromKey, nextKey, "approved");
+  if (fromKey !== nextKey) await deleteStoredObject(storage, fromKey);
+  return nextKey;
+}
+
+async function promoteProfilePhotos(db, env, profileId) {
+  const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profileId]);
+  const approvedAt = nowIso();
+  for (const photo of photos) {
+    const fromKey = photo.object_key;
+    if (photo.status === "approved" && fromKey && !isPendingObjectKey(fromKey)) {
+      await finishApprovedObject(env?.storage, fromKey);
+      continue;
+    }
+    await promotePhoto(db, env?.storage, {
+      fromKey,
+      update: async (key) => {
+        await db.run("UPDATE profile_photos SET object_key=?, status='approved', updated_at=? WHERE id=?", [
+          key,
+          approvedAt,
+          photo.id,
+        ]);
+      },
+    });
+  }
+}
+
 export async function approveReportPhoto(db, env, { report, user }) {
-  if (!report || report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
+  if (!report?.photo_key) throw new ValidationError("This report photo is not waiting for review.");
+  if (report.photo_status === "approved") {
+    await finishApprovedObject(env?.storage, report.photo_key);
+    return { ...report, photo_status: "approved" };
+  }
+  if (report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
   const fromKey = report.photo_key;
-  const nextKey = fromKey ? await promoteStoredObject(env?.storage, fromKey) : fromKey;
-  await db.run("UPDATE grow_reports SET photo_key=?, photo_status=? WHERE id=?", [nextKey, "approved", report.id]);
-  if (fromKey) await replaceMediaKey(db, fromKey, nextKey, "approved");
+  const nextKey = await promotePhoto(db, env?.storage, {
+    fromKey,
+    update: async (key) => {
+      await db.run("UPDATE grow_reports SET photo_key=?, photo_status=? WHERE id=?", [key, "approved", report.id]);
+    },
+  });
   await logModeration(db, {
     profileId: report.profile_id,
     actorId: user.id,
