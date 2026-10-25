@@ -277,11 +277,11 @@ test("Autopilot applies a stepped setpoint, logs it, and Undo restores the old v
   assert.ok(apply);
   const undo = await call(ctx, "POST", "/api/coach/autopilot/undo", { token, body: { action_id: apply.id } });
   assert.equal(undo.status, 200, JSON.stringify(undo.data));
-  assert.equal(undo.data.restored.temperature_c, 24);
+  assert.equal(undo.data.restored.temperature_c, fruiting.temperature_target_max);
   const after = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-auto"]);
   assert.equal(after.length, 2);
   assert.equal(JSON.parse(after[1].payload).source, "grow-coach-autopilot-undo");
-  assert.equal(JSON.parse(after[1].payload).temperature_c, 24);
+  assert.equal(JSON.parse(after[1].payload).temperature_c, fruiting.temperature_target_max);
 });
 
 test("stale readings flip Autopilot back to Advisor with a visible reason", async () => {
@@ -595,8 +595,8 @@ test("Undo stays allowed while paused, clamps, queues, and logs", async () => {
   saved.pause_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
   const undo = await call(ctx, "POST", "/api/coach/autopilot/undo", { token, body: { action_id: apply.id } });
   assert.equal(undo.status, 200, JSON.stringify(undo.data));
-  assert.equal(undo.data.restored.temperature_c, 10);
-  assert.equal(undo.data.restored.humidity_percent, 98);
+  assert.equal(undo.data.restored.temperature_c, fruiting.temperature_target_min);
+  assert.equal(undo.data.restored.humidity_percent, fruiting.humidity_target_max);
   assert.equal(undo.data.restored.fan_speed_percent, 10);
   const cmds = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-undo"]);
   assert.equal(cmds.length, 2);
@@ -604,6 +604,19 @@ test("Undo stays allowed while paused, clamps, queues, and logs", async () => {
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-undo", { token });
   assert.equal(status.data.status, "paused");
   assert.ok((status.data.actions || []).some((a) => a.action === "undo"));
+});
+
+test("switching to Advisor is not blocked by a missing profile", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "advisor-bad@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-adv");
+  const off = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-adv", mode: "advisor", profile_id: "does-not-exist" },
+  });
+  assert.equal(off.status, 200, JSON.stringify(off.data));
+  assert.equal(off.data.mode, "advisor");
 });
 
 test("changing the profile while Autopilot is on updates the saved profile_id", async () => {

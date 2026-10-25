@@ -8,6 +8,11 @@ export function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+export function safeDisplay(value, fallback = "") {
+  if (value == null || value === "") return fallback;
+  return escapeHtml(String(value));
+}
+
 function formatInline(line) {
   return line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }

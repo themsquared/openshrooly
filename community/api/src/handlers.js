@@ -193,10 +193,17 @@ export async function handleRequest(request, env) {
 
   try {
     if (!env._seeded) {
-      // Insert-if-missing in one batch. Do not row-loop: D1 would hit the Worker subrequest cap
-      // (~10/26) and the old empty-table guard would never finish the catalog or the guide stub.
-      await seedMissing(env.db, seeds);
-      env._seeded = true;
+      // Insert-if-missing in one batch. Share one in-flight seed so concurrent first
+      // requests (and Miniflare D1) do not overlap batch + first() calls.
+      env._seeding ||= seedMissing(env.db, seeds)
+        .then(() => {
+          env._seeded = true;
+        })
+        .catch((err) => {
+          env._seeding = null;
+          throw err;
+        });
+      await env._seeding;
     }
     return await route(method, path, url, request, env);
   } catch (err) {

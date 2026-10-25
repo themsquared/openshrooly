@@ -417,10 +417,13 @@ export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, pr
   }
   const nextMode = mode === "autopilot" ? "autopilot" : "advisor";
   const state = await getDeviceMode(db, deviceId, user.id);
-  if (nextMode === "autopilot" || profileId) {
-    const resolved = await resolveAllowedProfile(db, profileId || (nextMode === "autopilot" ? state.profile_id : null));
+  if (nextMode === "autopilot") {
+    const resolved = await resolveAllowedProfile(db, profileId || state.profile_id);
     if (resolved.error) return resolved;
     state.profile_id = resolved.profile.id;
+  } else if (profileId) {
+    const resolved = await resolveAllowedProfile(db, profileId);
+    if (!resolved.error) state.profile_id = resolved.profile.id;
   }
   if (nextMode === "autopilot") {
     const until = state.pause_until ? Date.parse(state.pause_until) : NaN;
@@ -634,7 +637,8 @@ export async function undoAutopilotAction(db, env, user, actionId) {
   const oldValue = parseJson(row.old_value);
   if (!oldValue) return { error: "Nothing to restore.", status: 400 };
   const state = await getDeviceMode(db, row.device_id, user.id);
-  const restored = clampAutopilotSetpoints(oldValue, {});
+  const resolved = await resolveAllowedProfile(db, state.profile_id);
+  const restored = clampAutopilotSetpoints(oldValue, stageFromProfile(resolved.profile));
   await applySetpointsCommand(db, row.device_id, { ...restored, source: "grow-coach-autopilot-undo", approved: true });
   await db.run("UPDATE coach_autopilot_log SET undone_at=? WHERE id=?", [nowIso(), row.id]);
   await addLog(db, {
