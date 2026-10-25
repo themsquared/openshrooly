@@ -4,6 +4,14 @@ export const COACH_ITEM = "grow-coach";
 export const COACH_PRICE_CENTS = 399;
 export const COACH_PERIOD_DAYS = 30;
 
+/** Chamber heartbeat telemetry cadence (firmware TELEMETRY_INTERVAL_MS). */
+export const DEVICE_HEARTBEAT_MS = 15 * 60 * 1000;
+/** Slack for HTTP latency, probe jitter and cadence drift against the 5 minute cron. */
+export const HEARTBEAT_DRIFT_MS = 5 * 60 * 1000;
+/** One missed-by-a-little heartbeat is not stale. Shared by Autopilot, Advisor and fleet online/stale badges. */
+export const READINGS_STALE_MS = DEVICE_HEARTBEAT_MS + HEARTBEAT_DRIFT_MS;
+export const READINGS_STALE_MINUTES = READINGS_STALE_MS / 60000;
+
 /** Global envelope. Per-stage warning bands tighten this when present. */
 export const TEMPERATURE_CLAMP = [10, 32];
 

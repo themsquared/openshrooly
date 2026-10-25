@@ -5,6 +5,8 @@ import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { isCoachBetaUser } from "./providers.js";
 import {
   COACH_ITEM,
+  READINGS_STALE_MINUTES,
+  READINGS_STALE_MS,
   buildDeviceModel,
   latestReading,
   loadRecentTelemetry,
@@ -23,7 +25,7 @@ export const AUTOPILOT_LIMITS = {
   maxStepFan: 10,
   minIntervalMs: 60 * 60 * 1000,
   dailyCap: 8,
-  staleMs: 15 * 60 * 1000,
+  staleMs: READINGS_STALE_MS,
   manualPauseMs: 12 * 60 * 60 * 1000,
   physicalTemp: [0, 45],
   physicalRh: [10, 100],
@@ -236,7 +238,7 @@ export function evaluateAutopilotPause({ reading, previous, device, now = Date.n
     return { pause: true, reason: "Readings are missing." };
   }
   if (reading.age_seconds != null && reading.age_seconds * 1000 > AUTOPILOT_LIMITS.staleMs) {
-    return { pause: true, reason: "Readings are stale (older than 15 minutes)." };
+    return { pause: true, reason: `Readings are stale (older than ${READINGS_STALE_MINUTES} minutes).` };
   }
   const temp = num(reading.temperature);
   const rh = num(reading.humidity);
