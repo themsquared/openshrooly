@@ -132,18 +132,32 @@ struct ChamberReading {
   float target_humidity{0};
 };
 
+struct EntityRange {
+  bool has{false};
+  float min{0};
+  float max{0};
+  float step{0};
+};
+
 class CloudChamber {
  public:
   virtual ~CloudChamber() = default;
   virtual ChamberReading read() { return {}; }
+  virtual EntityRange temperature_range() { return {}; }
+  virtual EntityRange humidity_range() { return {}; }
   virtual bool write_temperature(float) { return false; }
   virtual bool write_humidity(float) { return false; }
   virtual uint32_t last_local_change_ms() { return 0; }
 };
 
+bool value_in_entity_range(float v, const EntityRange &range);
+float snap_entity_value(float v, const EntityRange &range);
+
 SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uint32_t last_local_ms, uint32_t now_ms,
                                    bool remote_apply);
-std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status);
+std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
+                                const char *ack_reason = nullptr, const EntityRange *temp_range = nullptr,
+                                const EntityRange *rh_range = nullptr);
 float clamp_setpoint_temp(float c);
 float clamp_setpoint_rh(float rh);
 bool setpoint_object_id(const char *object_id);

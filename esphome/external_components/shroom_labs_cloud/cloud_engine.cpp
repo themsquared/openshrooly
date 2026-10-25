@@ -9,6 +9,7 @@ static const char *const TAG = "shroom_labs_cloud";
 #define ESP_LOGD(...)
 #endif
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -191,7 +192,41 @@ void CloudEngine::bump_backoff_(int retry_after_s) {
   next_retry_ms_ = when;
   next_csr_ms_ = when;
   next_rotate_ms_ = when;
-  next_probe_ms_ = when;
+}
+
+void CloudEngine::schedule_probe_error_(int retry_after_s) {
+  bump_backoff_(retry_after_s);
+  const uint32_t wait = backoff_ms_ > PROBE_INTERVAL_MS ? backoff_ms_ : PROBE_INTERVAL_MS;
+  next_probe_ms_ = now_() + wait;
+}
+
+void CloudEngine::schedule_telemetry_error_(int retry_after_s) {
+  bump_backoff_(retry_after_s);
+  const uint32_t wait = backoff_ms_ > TELEMETRY_INTERVAL_MS ? backoff_ms_ : TELEMETRY_INTERVAL_MS;
+  next_telemetry_ms_ = now_() + wait;
+}
+
+void CloudEngine::note_connect_() {
+  const uint32_t now = now_();
+  uint8_t kept = 0;
+  for (uint8_t i = 0; i < connect_n_ && i < CONNECT_HOUR_RING; i++) {
+    if (!time_reached(now, connect_times_[i] + CONNECT_HOUR_MS))
+      connect_times_[kept++] = connect_times_[i];
+  }
+  connect_n_ = kept;
+  if (connect_n_ < CONNECT_HOUR_RING)
+    connect_times_[connect_n_++] = now;
+  request_count_++;
+}
+
+bool CloudEngine::allow_connect_() {
+  const uint32_t now = now_();
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < connect_n_ && i < CONNECT_HOUR_RING; i++) {
+    if (!time_reached(now, connect_times_[i] + CONNECT_HOUR_MS))
+      n++;
+  }
+  return n < CONNECT_HOUR_CAP;
 }
 
 void CloudEngine::set_claim_poll_() { next_csr_ms_ = now_() + claim_poll_ms(clock_->random()); }
@@ -284,6 +319,9 @@ bool CloudEngine::run_job(CloudJob job) {
       break;
     case CloudJob::PROBE:
       ok = handle_probe_();
+      break;
+    case CloudJob::TELEMETRY:
+      ok = handle_telemetry_();
       break;
     case CloudJob::REVOKE:
       ok = handle_revoke_();
@@ -578,6 +616,8 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   fail.ok = false;
   if (transport_ == nullptr)
     return fail;
+  if (!allow_connect_())
+    return fail;
   std::string url = https_url(api_host_.c_str(), path);
   if (query != nullptr && query[0]) {
     url += '?';
@@ -620,7 +660,9 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   }
   if (with_serial && !snap.serial.empty())
     req.headers.emplace_back("x-device-cert-serial", snap.serial);
-  request_count_++;
+  if (!allow_connect_())
+    return fail;
+  note_connect_();
   HttpResponse r = transport_->execute(req);
   if (!response_usable(r)) {
     r.ok = false;
@@ -637,8 +679,10 @@ int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body) {
   }
   if (id.empty())
     return 0;
+  if (!allow_connect_())
+    return 0;
   std::string path = "/api/devices/" + id + "/nonce";
-  request_count_++;
+  note_connect_();
   HttpResponse r = transport_->execute({"POST", https_url(api_host_.c_str(), path.c_str()), "", {}});
   if (body != nullptr)
     *body = r.body;
@@ -949,7 +993,7 @@ bool CloudEngine::handle_probe_() {
     if (o == HttpOutcome::RelinkRequired) {
       if (!confirm_relink_()) {
         apply_(CloudEvent::CertExpired);
-        bump_backoff_(r.retry_after_s);
+        schedule_probe_error_(r.retry_after_s);
         return false;
       }
       apply_(CloudEvent::RelinkRequired);
@@ -958,11 +1002,11 @@ bool CloudEngine::handle_probe_() {
     }
     if (o == HttpOutcome::ProofInvalid) {
       apply_(CloudEvent::ProofInvalid);
-      bump_backoff_(r.retry_after_s);
+      schedule_probe_error_(r.retry_after_s);
       return false;
     }
     if (o != HttpOutcome::Success) {
-      bump_backoff_(r.retry_after_s);
+      schedule_probe_error_(r.retry_after_s);
       return false;
     }
     reset_relink_();
@@ -984,8 +1028,11 @@ bool CloudEngine::process_inbox_(const std::string &body) {
     local_ms = chamber_->last_local_change_ms();
   }
   int64_t ack_id = 0;
-  const char *ack_status = nullptr;
+  std::string ack_status;
+  std::string ack_reason;
   for (size_t i = 0; i < n; i++) {
+    if (cmds[i].id != 0 && cmds[i].id == last_applied_command_id_)
+      continue;
     const SetpointPlan plan = plan_setpoint_command(cmds[i], wall_(), local_ms, now_(), apply_on);
     if (plan.decision == SetpointDecision::Skip)
       continue;
@@ -993,37 +1040,178 @@ bool CloudEngine::process_inbox_(const std::string &body) {
       continue;
     if (plan.decision == SetpointDecision::Refuse || plan.decision == SetpointDecision::Fail) {
       ack_id = cmds[i].id;
-      ack_status = plan.ack_status;
+      ack_status = plan.ack_status ? plan.ack_status : "failed";
+      ack_reason = plan.reason ? plan.reason : "";
       break;
     }
-    bool ok = true;
-    if (chamber_ != nullptr) {
-      if (plan.write_temp)
-        ok = chamber_->write_temperature(plan.temperature_c) && ok;
-      if (plan.write_rh)
-        ok = chamber_->write_humidity(plan.humidity_percent) && ok;
-      reading = chamber_->read();
-    } else {
-      ok = false;
+    if (!sync_jobs_) {
+      std::lock_guard<std::mutex> g(lock_);
+      pending_apply_.ready = true;
+      pending_apply_.command_id = cmds[i].id;
+      pending_apply_.plan = plan;
+      return true;
     }
+    ChamberReading after = reading;
+    std::string reason;
+    const bool ok = apply_plan_now_(plan, cmds[i].id, &after, &reason);
+    reading = after;
     ack_id = cmds[i].id;
     ack_status = ok ? "applied" : "failed";
+    ack_reason = reason;
     break;
   }
   const bool heartbeat = chamber_ != nullptr && next_telemetry_ms_ != 0 && time_reached(now_(), next_telemetry_ms_);
-  if (ack_status != nullptr || heartbeat) {
-    if (post_telemetry_(reading, ack_id, ack_status)) {
+  if (!ack_status.empty() || heartbeat) {
+    if (post_telemetry_(reading, ack_id, ack_status.empty() ? nullptr : ack_status.c_str(),
+                        ack_reason.empty() ? nullptr : ack_reason.c_str())) {
       std::lock_guard<std::mutex> g(lock_);
       next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     } else {
-      std::lock_guard<std::mutex> g(lock_);
-      bump_backoff_(0);
+      schedule_telemetry_error_(0);
     }
   }
   return true;
 }
 
-bool CloudEngine::post_telemetry_(const ChamberReading &reading, int64_t ack_id, const char *ack_status) {
+bool CloudEngine::apply_plan_now_(const SetpointPlan &plan, int64_t command_id, ChamberReading *after,
+                                 std::string *reason) {
+  if (chamber_ == nullptr) {
+    if (reason)
+      *reason = "no chamber";
+    return false;
+  }
+  const ChamberReading before = chamber_->read();
+  const EntityRange tr = chamber_->temperature_range();
+  const EntityRange hr = chamber_->humidity_range();
+  float t = plan.temperature_c;
+  float h = plan.humidity_percent;
+  if (plan.write_temp) {
+    if (tr.has) {
+      if (!value_in_entity_range(t, tr)) {
+        if (reason)
+          *reason = "temperature outside entity range";
+        if (after)
+          *after = before;
+        return false;
+      }
+      t = snap_entity_value(t, tr);
+    } else {
+      t = clamp_setpoint_temp(t);
+    }
+  }
+  if (plan.write_rh) {
+    if (hr.has) {
+      if (!value_in_entity_range(h, hr)) {
+        if (reason)
+          *reason = "humidity outside entity range";
+        if (after)
+          *after = before;
+        return false;
+      }
+      h = snap_entity_value(h, hr);
+    } else {
+      h = clamp_setpoint_rh(h);
+    }
+  }
+  bool ok_t = true;
+  bool ok_h = true;
+  if (plan.write_temp)
+    ok_t = chamber_->write_temperature(t);
+  if (ok_t && plan.write_rh)
+    ok_h = chamber_->write_humidity(h);
+  ChamberReading now = chamber_->read();
+  if (ok_t && plan.write_temp && now.has_temperature_target && std::fabs(now.temperature_target - t) > 0.15f)
+    ok_t = false;
+  if (ok_h && plan.write_rh && now.has_target_humidity && std::fabs(now.target_humidity - h) > 0.6f)
+    ok_h = false;
+  if (!ok_t || !ok_h) {
+    if (plan.write_temp && before.has_temperature_target)
+      chamber_->write_temperature(before.temperature_target);
+    if (plan.write_rh && before.has_target_humidity)
+      chamber_->write_humidity(before.target_humidity);
+    if (after)
+      *after = chamber_->read();
+    if (reason)
+      *reason = "write failed";
+    return false;
+  }
+  last_applied_command_id_ = command_id;
+  if (after)
+    *after = now;
+  return true;
+}
+
+bool CloudEngine::take_pending_apply(PendingApply *out) {
+  std::lock_guard<std::mutex> g(lock_);
+  if (out == nullptr || !pending_apply_.ready)
+    return false;
+  *out = pending_apply_;
+  pending_apply_.ready = false;
+  return true;
+}
+
+bool CloudEngine::apply_now(const PendingApply &pending, ChamberReading *after, std::string *reason) {
+  return apply_plan_now_(pending.plan, pending.command_id, after, reason);
+}
+
+void CloudEngine::complete_apply(int64_t command_id, bool ok, const char *status, const char *reason,
+                                const ChamberReading &reading) {
+  std::lock_guard<std::mutex> g(lock_);
+  if (ok && command_id != 0)
+    last_applied_command_id_ = command_id;
+  pending_ack_ = true;
+  pending_ack_id_ = command_id;
+  pending_ack_status_ = status ? status : (ok ? "applied" : "failed");
+  pending_ack_reason_ = reason ? reason : "";
+  pending_ack_reading_ = reading;
+}
+
+bool CloudEngine::apply_waiting() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return pending_apply_.ready;
+}
+
+bool CloudEngine::ack_waiting() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return pending_ack_;
+}
+
+int64_t CloudEngine::last_applied_command_id() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return last_applied_command_id_;
+}
+
+bool CloudEngine::telemetry_now() { return queue_(CloudJob::TELEMETRY); }
+
+bool CloudEngine::handle_telemetry_() {
+  ChamberReading reading{};
+  int64_t ack_id = 0;
+  std::string status;
+  std::string reason;
+  {
+    std::lock_guard<std::mutex> g(lock_);
+    if (pending_ack_) {
+      reading = pending_ack_reading_;
+      ack_id = pending_ack_id_;
+      status = pending_ack_status_;
+      reason = pending_ack_reason_;
+      pending_ack_ = false;
+    } else if (chamber_) {
+      reading = chamber_->read();
+    }
+  }
+  if (post_telemetry_(reading, ack_id, status.empty() ? nullptr : status.c_str(),
+                      reason.empty() ? nullptr : reason.c_str())) {
+    std::lock_guard<std::mutex> g(lock_);
+    next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
+    return true;
+  }
+  schedule_telemetry_error_(0);
+  return false;
+}
+
+bool CloudEngine::post_telemetry_(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
+                                 const char *ack_reason) {
   std::string id;
   {
     std::lock_guard<std::mutex> g(lock_);
@@ -1032,7 +1220,9 @@ bool CloudEngine::post_telemetry_(const ChamberReading &reading, int64_t ack_id,
   if (id.empty())
     return false;
   std::string path = "/api/devices/" + id + "/telemetry";
-  std::string body = telemetry_body_json(reading, ack_id, ack_status);
+  const EntityRange tr = chamber_ ? chamber_->temperature_range() : EntityRange{};
+  const EntityRange hr = chamber_ ? chamber_->humidity_range() : EntityRange{};
+  std::string body = telemetry_body_json(reading, ack_id, ack_status, ack_reason, &tr, &hr);
   HttpResponse r = http_("POST", path.c_str(), body, true, true);
   return response_usable(r) && r.status == 200;
 }
@@ -1102,6 +1292,7 @@ void CloudEngine::loop() {
   bool poll_due = false;
   bool enroll_due = false;
   bool probe_due = false;
+  bool telemetry_due = false;
   bool rotate_due = false;
   bool expired_again = false;
   {
@@ -1141,6 +1332,9 @@ void CloudEngine::loop() {
       } else if (time_reached(now, next_probe_ms_)) {
         next_probe_ms_ = now + PROBE_INTERVAL_MS;
         probe_due = true;
+      } else if (next_telemetry_ms_ != 0 && time_reached(now, next_telemetry_ms_)) {
+        next_telemetry_ms_ = now + TELEMETRY_INTERVAL_MS;
+        telemetry_due = true;
       }
     }
   }
@@ -1152,6 +1346,8 @@ void CloudEngine::loop() {
     queue_(CloudJob::ROTATE);
   else if (probe_due)
     queue_(CloudJob::PROBE);
+  else if (telemetry_due)
+    queue_(CloudJob::TELEMETRY);
 }
 
 }  // namespace shroom_labs

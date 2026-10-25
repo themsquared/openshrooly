@@ -453,11 +453,20 @@ int main() {
     int nonce_status = 200;
     std::string nonce_error_body = "{\"error\":\"not found\"}";
     int enroll_with_proof = 0;
+    int inbox_status = 0;
+    std::string inbox_body = "{\"commands\":[]}";
+    int telemetry_status = 0;
+    std::string telemetry_body = "{\"ok\":true}";
+    bool tls_fail = false;
     std::function<void(const HttpRequest &)> hook;
     HttpResponse execute(const HttpRequest &req) override {
       urls.push_back(req.url);
       if (hook)
         hook(req);
+      if (tls_fail) {
+        HttpResponse miss;
+        return miss;
+      }
       if (req.url.find("/enroll") != std::string::npos) {
         for (const auto &h : req.headers) {
           if (h.first == "x-device-proof" && !h.second.empty())
@@ -498,6 +507,18 @@ int main() {
         n.complete = true;
         return n;
       }
+      auto repeat = [&](int status, const std::string &body) {
+        HttpResponse r;
+        r.ok = true;
+        r.status = status;
+        r.body = body;
+        r.complete = true;
+        return r;
+      };
+      if (inbox_status != 0 && req.url.find("/inbox") != std::string::npos)
+        return repeat(inbox_status, inbox_body);
+      if (telemetry_status != 0 && req.url.find("/telemetry") != std::string::npos)
+        return repeat(telemetry_status, telemetry_body);
       if (i >= steps.size()) {
         HttpResponse miss;
         return miss;
@@ -1372,6 +1393,7 @@ int main() {
   expect(TELEMETRY_INTERVAL_MS >= PROBE_INTERVAL_MS, "telemetry cadence not faster than inbox");
   // 15 min inbox (nonce+GET) + 15 min telemetry (nonce+POST) = 16 HTTPS/hour.
   expect((3600000u / PROBE_INTERVAL_MS) * 2 + (3600000u / TELEMETRY_INTERVAL_MS) * 2 <= 18, "under 20 connects/hour");
+  expect(CONNECT_HOUR_CAP <= 18 && CONNECT_HOUR_CAP < 20, "hour cap under device limit");
 
   const char *inbox_json =
       "{\"commands\":[{\"id\":12,\"kind\":\"setpoints\",\"issued_at\":\"2026-10-25T15:00:00Z\",\"apply\":true,"
@@ -1387,7 +1409,7 @@ int main() {
   InboxCommand live = parsed[0];
   SetpointPlan plan = plan_setpoint_command(live, parse_iso8601_ms("2026-10-25T15:05:00Z"), 0, 1000, true);
   expect(plan.decision == SetpointDecision::Apply, "plan apply");
-  expect(plan.temperature_c >= SETPOINT_TEMP_MIN && plan.humidity_percent <= SETPOINT_RH_MAX, "plan clamped");
+  expect(plan.temperature_c > 23 && plan.humidity_percent > 90, "plan keeps payload values");
   live.expires_at = "2026-10-25T15:01:00Z";
   expect(plan_setpoint_command(live, parse_iso8601_ms("2026-10-25T15:05:00Z"), 0, 1000, true).decision ==
              SetpointDecision::Skip,
@@ -1406,25 +1428,52 @@ int main() {
 
   struct FakeChamber : CloudChamber {
     ChamberReading cur{};
+    EntityRange t_range{};
+    EntityRange h_range{};
     float wrote_t = 0;
     float wrote_h = 0;
     uint32_t local_ms = 0;
-    bool write_ok = true;
+    bool write_t_ok = true;
+    bool write_h_ok = true;
+    bool verify_fail_t = false;
     ChamberReading read() override { return cur; }
+    EntityRange temperature_range() override { return t_range; }
+    EntityRange humidity_range() override { return h_range; }
     bool write_temperature(float c) override {
       wrote_t = c;
+      if (!write_t_ok)
+        return false;
+      if (verify_fail_t)
+        return true;
       cur.has_temperature_target = true;
       cur.temperature_target = c;
-      return write_ok;
+      return true;
     }
     bool write_humidity(float rh) override {
       wrote_h = rh;
+      if (!write_h_ok)
+        return false;
       cur.has_target_humidity = true;
       cur.target_humidity = rh;
-      return write_ok;
+      return true;
     }
     uint32_t last_local_change_ms() override { return local_ms; }
   };
+
+  const char *inbox_nested =
+      "{\"commands\":[{\"id\":21,\"kind\":\"setpoints\",\"issued_at\":\"2026-10-25T15:00:00Z\",\"apply\":true,"
+      "\"payload\":{\"temperature_target\":23,\"from\":{\"temperature_c\":12,\"target_humidity\":40},"
+      "\"target_humidity\":90,\"expires_at\":\"2099-01-01T00:00:00Z\"}}]}";
+  InboxCommand nested[2];
+  expect(parse_inbox_commands(inbox_nested, nested, 2) == 1, "parse ignores nested from");
+  expect(nested[0].has_temp && nested[0].temperature_c == 23, "top-level temperature_target wins");
+  expect(nested[0].has_rh && nested[0].humidity_percent == 90, "top-level target_humidity wins");
+  const char *inbox_from_only =
+      "{\"commands\":[{\"id\":22,\"kind\":\"setpoints\",\"issued_at\":\"2026-10-25T15:00:00Z\",\"apply\":true,"
+      "\"payload\":{\"from\":{\"temperature_c\":12,\"target_humidity\":40}}}]}";
+  InboxCommand from_only[2];
+  expect(parse_inbox_commands(inbox_from_only, from_only, 2) == 1, "parse from-only command");
+  expect(!from_only[0].has_temp && !from_only[0].has_rh, "nested from keys are not setpoints");
 
   HostStore storeApply;
   ScriptTransport trApply;
@@ -1433,6 +1482,8 @@ int main() {
   chamber.cur.temperature = 22.5f;
   chamber.cur.has_humidity = true;
   chamber.cur.humidity = 88;
+  chamber.t_range = {true, 15.f, 35.f, 0.5f};
+  chamber.h_range = {true, 30.f, 100.f, 0.5f};
   const char *inbox_apply =
       "{\"commands\":[{\"id\":9,\"kind\":\"setpoints\",\"issued_at\":\"2026-10-25T15:00:00Z\",\"apply\":true,"
       "\"payload\":{\"temperature_target\":23,\"target_humidity\":90,\"expires_at\":\"2099-01-01T00:00:00Z\"}}]}";
@@ -1456,6 +1507,9 @@ int main() {
   expect(tel_body.find("\"ack_command_id\":9") != std::string::npos, "telemetry ack id");
   expect(tel_body.find("\"ack_status\":\"applied\"") != std::string::npos, "telemetry ack applied");
   expect(tel_body.find("\"temperature\"") != std::string::npos, "telemetry readings");
+  expect(tel_body.find("\"temperature_target_min\":15.00") != std::string::npos, "telemetry reports temp min");
+  expect(tel_body.find("\"target_humidity_min\":30.00") != std::string::npos, "telemetry reports rh min");
+  expect(engApply.last_applied_command_id() == 9, "remembers applied command");
   bool saw_query = false;
   for (const auto &u : trApply.urls)
     saw_query = saw_query || u.find("/inbox?") != std::string::npos;
@@ -1505,6 +1559,203 @@ int main() {
   for (const auto &u : trLocal.urls)
     saw_local_q = saw_local_q || u.find("last_local_change=") != std::string::npos;
   expect(saw_local_q, "inbox sends last_local_change");
+
+  HostStore storeSkip;
+  ScriptTransport trSkip;
+  FakeChamber chamberSkip;
+  chamberSkip.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberSkip.h_range = {true, 30.f, 100.f, 0.5f};
+  trSkip.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+  trSkip.inbox_status = 200;
+  trSkip.inbox_body = inbox_apply;
+  trSkip.telemetry_status = 200;
+  CloudEngine engSkip(&trSkip, &clk, &storeSkip, &crypto);
+  engSkip.set_chamber(&chamberSkip);
+  clk.now = 60000;
+  clk.wall = parse_iso8601_ms("2026-10-25T15:05:00Z");
+  engSkip.connect();
+  engSkip.csr_now();
+  expect(engSkip.probe_now(), "probe first apply");
+  expect(chamberSkip.wrote_t == 23 && chamberSkip.wrote_h == 90, "first apply writes");
+  chamberSkip.wrote_t = 0;
+  chamberSkip.wrote_h = 0;
+  expect(engSkip.probe_now(), "probe skip already applied");
+  expect(chamberSkip.wrote_t == 0 && chamberSkip.wrote_h == 0, "same command id is not re-applied");
+  expect(engSkip.last_applied_command_id() == 9, "skip keeps last applied id");
+
+  HostStore storeRange;
+  ScriptTransport trRange;
+  FakeChamber chamberRange;
+  chamberRange.cur.has_temperature_target = true;
+  chamberRange.cur.temperature_target = 22;
+  chamberRange.cur.has_target_humidity = true;
+  chamberRange.cur.target_humidity = 80;
+  chamberRange.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberRange.h_range = {true, 30.f, 100.f, 0.5f};
+  const char *inbox_low =
+      "{\"commands\":[{\"id\":31,\"kind\":\"setpoints\",\"issued_at\":\"2026-10-25T15:00:00Z\",\"apply\":true,"
+      "\"payload\":{\"temperature_target\":12,\"target_humidity\":90,\"expires_at\":\"2099-01-01T00:00:00Z\"}}]}";
+  trRange.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                   {"/csr", ok_body(200, cert_ok)},
+                   {"/inbox", ok_body(200, inbox_low)},
+                   {"/telemetry", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine engRange(&trRange, &clk, &storeRange, &crypto);
+  engRange.set_chamber(&chamberRange);
+  clk.now = 70000;
+  clk.wall = parse_iso8601_ms("2026-10-25T15:05:00Z");
+  engRange.connect();
+  engRange.csr_now();
+  std::string range_body;
+  trRange.hook = [&](const HttpRequest &req) {
+    if (req.url.find("/telemetry") != std::string::npos)
+      range_body = req.body;
+  };
+  expect(engRange.probe_now(), "probe entity range reject");
+  expect(chamberRange.wrote_t == 0, "out of range does not write temp");
+  expect(chamberRange.cur.temperature_target == 22 && chamberRange.cur.target_humidity == 80,
+         "out of range leaves previous setpoints");
+  expect(range_body.find("\"ack_status\":\"failed\"") != std::string::npos, "out of range acks failed");
+  expect(range_body.find("entity range") != std::string::npos, "out of range reason");
+  expect(engRange.last_applied_command_id() == 0, "failed apply is not remembered");
+
+  HostStore storeRoll;
+  ScriptTransport trRoll;
+  FakeChamber chamberRoll;
+  chamberRoll.cur.has_temperature_target = true;
+  chamberRoll.cur.temperature_target = 22;
+  chamberRoll.cur.has_target_humidity = true;
+  chamberRoll.cur.target_humidity = 80;
+  chamberRoll.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberRoll.h_range = {true, 30.f, 100.f, 0.5f};
+  chamberRoll.write_h_ok = false;
+  trRoll.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                  {"/csr", ok_body(200, cert_ok)},
+                  {"/inbox", ok_body(200, inbox_apply)},
+                  {"/telemetry", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine engRoll(&trRoll, &clk, &storeRoll, &crypto);
+  engRoll.set_chamber(&chamberRoll);
+  clk.now = 80000;
+  clk.wall = parse_iso8601_ms("2026-10-25T15:05:00Z");
+  engRoll.connect();
+  engRoll.csr_now();
+  std::string roll_body;
+  trRoll.hook = [&](const HttpRequest &req) {
+    if (req.url.find("/telemetry") != std::string::npos)
+      roll_body = req.body;
+  };
+  expect(engRoll.probe_now(), "probe partial write");
+  expect(chamberRoll.cur.temperature_target == 22 && chamberRoll.cur.target_humidity == 80, "partial write rolls back");
+  expect(roll_body.find("\"ack_status\":\"failed\"") != std::string::npos, "partial write acks failed");
+
+  HostStore storeMain;
+  ScriptTransport trMain;
+  FakeChamber chamberMain;
+  chamberMain.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberMain.h_range = {true, 30.f, 100.f, 0.5f};
+  trMain.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+  trMain.inbox_status = 200;
+  trMain.inbox_body = inbox_apply;
+  trMain.telemetry_status = 200;
+  CloudEngine engMain(&trMain, &clk, &storeMain, &crypto);
+  engMain.set_chamber(&chamberMain);
+  clk.now = 90000;
+  clk.wall = parse_iso8601_ms("2026-10-25T15:05:00Z");
+  engMain.connect();
+  engMain.csr_now();
+  engMain.set_sync_jobs(false);
+  expect(engMain.probe_now(), "probe queues apply for main thread");
+  expect(chamberMain.wrote_t == 0 && chamberMain.wrote_h == 0, "cloud task does not write numbers");
+  expect(engMain.apply_waiting(), "parsed plan waits for main loop");
+  PendingApply pending{};
+  expect(engMain.take_pending_apply(&pending), "main loop takes plan");
+  expect(pending.command_id == 9 && pending.plan.decision == SetpointDecision::Apply, "queued plan");
+  ChamberReading after_main{};
+  std::string main_reason;
+  expect(engMain.apply_now(pending, &after_main, &main_reason), "main thread apply");
+  expect(chamberMain.wrote_t == 23 && chamberMain.wrote_h == 90, "main thread wrote setpoints");
+  engMain.complete_apply(pending.command_id, true, "applied", nullptr, after_main);
+  expect(engMain.ack_waiting(), "ack queued after main apply");
+  std::string main_tel;
+  trMain.hook = [&](const HttpRequest &req) {
+    if (req.url.find("/telemetry") != std::string::npos)
+      main_tel = req.body;
+  };
+  expect(engMain.run_job(CloudJob::TELEMETRY), "queued ack posts on cloud task");
+  expect(main_tel.find("\"ack_status\":\"applied\"") != std::string::npos, "main-thread apply acked");
+
+  auto count_hour = [&](const char *name, int inbox_st, const char *inbox_json, int tel_st, bool tls) -> size_t {
+    HostStore st;
+    ScriptTransport tr;
+    FakeChamber ch;
+    ch.t_range = {true, 15.f, 35.f, 0.5f};
+    ch.h_range = {true, 30.f, 100.f, 0.5f};
+    ch.cur.has_temperature_target = true;
+    ch.cur.temperature_target = 22;
+    ch.cur.has_target_humidity = true;
+    ch.cur.target_humidity = 80;
+    tr.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+    CloudEngine eng(&tr, &clk, &st, &crypto);
+    eng.set_chamber(&ch);
+    clk.now = 200000;
+    clk.wall = parse_iso8601_ms("2026-10-25T16:00:00Z");
+    eng.connect();
+    eng.csr_now();
+    const size_t start = tr.urls.size();
+    tr.inbox_status = inbox_st;
+    tr.inbox_body = inbox_json ? inbox_json : "{\"commands\":[]}";
+    tr.telemetry_status = tel_st;
+    tr.telemetry_body = tel_st == 200 ? "{\"ok\":true}" : "{\"error\":\"no\"}";
+    tr.tls_fail = tls;
+    tr.nonce_limit = 200;
+    const uint32_t t0 = clk.now;
+    const int64_t w0 = clk.wall;
+    for (uint32_t t = 0; t <= 3600000; t += 5000) {
+      clk.now = t0 + t;
+      clk.wall = w0 + static_cast<int64_t>(t);
+      eng.loop();
+    }
+    const size_t n = tr.urls.size() - start;
+    expect(n < 20, name);
+    return n;
+  };
+  const size_t healthy_n = count_hour("hour healthy under 20", 200, "{\"commands\":[]}", 200, false);
+  const size_t tel_fail_n = count_hour("hour telemetry fail under 20", 200, inbox_apply, 500, false);
+  const size_t inbox_503_n = count_hour("hour inbox 503 under 20", 503, "{\"commands\":[]}", 200, false);
+  const size_t tls_n = count_hour("hour tls fail under 20", 0, nullptr, 0, true);
+  expect(healthy_n < 20 && tel_fail_n < 20 && inbox_503_n < 20 && tls_n < 20, "all hour cases under 20");
+  std::printf("hour connects healthy=%zu telemetry_fail=%zu inbox_503=%zu tls=%zu\n", healthy_n, tel_fail_n,
+              inbox_503_n, tls_n);
+
+  HostStore storeCadence;
+  ScriptTransport trCadence;
+  FakeChamber chamberCadence;
+  chamberCadence.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberCadence.h_range = {true, 30.f, 100.f, 0.5f};
+  trCadence.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+  trCadence.inbox_status = 200;
+  trCadence.inbox_body = inbox_apply;
+  trCadence.telemetry_status = 500;
+  CloudEngine engCadence(&trCadence, &clk, &storeCadence, &crypto);
+  engCadence.set_chamber(&chamberCadence);
+  clk.now = 300000;
+  clk.wall = parse_iso8601_ms("2026-10-25T16:00:00Z");
+  engCadence.connect();
+  engCadence.csr_now();
+  expect(engCadence.probe_now(), "cadence probe applies");
+  expect(engCadence.next_probe_ms() >= clk.now + PROBE_INTERVAL_MS, "telemetry 500 does not pull probe");
+  expect(engCadence.next_telemetry_ms() >= clk.now + TELEMETRY_INTERVAL_MS, "telemetry 500 waits a full slot");
+
+  HostStore store503;
+  ScriptTransport tr503;
+  tr503.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+  tr503.inbox_status = 503;
+  CloudEngine eng503(&tr503, &clk, &store503, &crypto);
+  clk.now = 400000;
+  clk.wall = parse_iso8601_ms("2026-10-25T16:00:00Z");
+  eng503.connect();
+  eng503.csr_now();
+  expect(!eng503.probe_now(), "inbox 503 probe fails");
+  expect(eng503.next_probe_ms() >= clk.now + PROBE_INTERVAL_MS, "inbox 503 never retries before 15 min");
 
   expect(format_iso8601_ms(parse_iso8601_ms("2026-10-25T15:00:00Z")) == "2026-10-25T15:00:00Z", "iso roundtrip");
   expect(setpoint_object_id("temperature_target") && setpoint_object_id("temperature__target") &&

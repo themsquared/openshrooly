@@ -46,6 +46,8 @@ class EspChamber : public CloudChamber {
  public:
   explicit EspChamber(ShroomLabsCloud *cloud) : cloud_(cloud) {}
   ChamberReading read() override;
+  EntityRange temperature_range() override;
+  EntityRange humidity_range() override;
   bool write_temperature(float c) override;
   bool write_humidity(float rh) override;
   uint32_t last_local_change_ms() override;
@@ -97,6 +99,8 @@ class ShroomLabsCloud : public Component {
   void set_applying_remote(bool on) { applying_remote_ = on; }
 
   ChamberReading read_chamber();
+  EntityRange temperature_target_range();
+  EntityRange humidity_target_range();
   bool write_temperature_target(float c);
   bool write_humidity_target(float rh);
 

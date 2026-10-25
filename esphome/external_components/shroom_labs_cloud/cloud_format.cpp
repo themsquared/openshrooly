@@ -1,6 +1,7 @@
 #include "cloud_format.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -386,6 +387,79 @@ static const char *find_key(const char *json, const char *key) {
   return nullptr;
 }
 
+/** Match "key": only at object depth 1 so nested from.temperature_c is ignored. */
+static const char *find_key_top(const char *json, const char *key) {
+  if (json == nullptr || key == nullptr)
+    return nullptr;
+  const size_t klen = std::strlen(key);
+  int depth = 0;
+  bool in_str = false;
+  bool esc = false;
+  for (const char *p = json; *p; p++) {
+    if (in_str) {
+      if (esc)
+        esc = false;
+      else if (*p == '\\')
+        esc = true;
+      else if (*p == '"')
+        in_str = false;
+      continue;
+    }
+    if (*p == '"') {
+      const char *q = p + 1;
+      if (depth == 1 && std::strncmp(q, key, klen) == 0 && q[klen] == '"') {
+        const char *c = q + klen + 1;
+        while (*c == ' ' || *c == '\n' || *c == '\t')
+          c++;
+        if (*c == ':')
+          return c + 1;
+      }
+      in_str = true;
+      continue;
+    }
+    if (*p == '{' || *p == '[')
+      depth++;
+    else if (*p == '}' || *p == ']')
+      depth--;
+  }
+  return nullptr;
+}
+
+static bool json_get_double_top(const char *json, const char *key, double *out) {
+  const char *p = find_key_top(json, key);
+  if (p == nullptr || out == nullptr)
+    return false;
+  while (*p == ' ' || *p == '\n' || *p == '\t')
+    p++;
+  char *end = nullptr;
+  double v = std::strtod(p, &end);
+  if (end == p)
+    return false;
+  *out = v;
+  return true;
+}
+
+static bool json_get_string_top(const char *json, const char *key, std::string *out) {
+  const char *p = find_key_top(json, key);
+  if (p == nullptr || out == nullptr)
+    return false;
+  while (*p == ' ' || *p == '\n' || *p == '\t')
+    p++;
+  if (*p != '"')
+    return false;
+  p++;
+  out->clear();
+  while (*p && *p != '"') {
+    if (*p == '\\' && p[1]) {
+      p++;
+      out->push_back(*p++);
+    } else {
+      out->push_back(*p++);
+    }
+  }
+  return *p == '"';
+}
+
 bool json_get_string(const char *json, const char *key, std::string *out) {
   const char *p = find_key(json, key);
   if (p == nullptr || out == nullptr)
@@ -517,15 +591,24 @@ size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max) {
     json_get_int64(obj.c_str(), "id", &cmd.id);
     json_get_string(obj.c_str(), "kind", &cmd.kind);
     json_get_string(obj.c_str(), "issued_at", &cmd.issued_at);
-    json_get_string(obj.c_str(), "expires_at", &cmd.expires_at);
     cmd.has_apply = json_get_bool(obj.c_str(), "apply", &cmd.apply);
+    std::string payload;
+    const char *pay = find_key_top(obj.c_str(), "payload");
+    if (pay != nullptr) {
+      pay = skip_ws(pay);
+      extract_balanced(pay, '{', '}', &payload);
+    }
+    const char *src = payload.empty() ? obj.c_str() : payload.c_str();
+    json_get_string_top(src, "expires_at", &cmd.expires_at);
+    if (cmd.expires_at.empty())
+      json_get_string_top(obj.c_str(), "expires_at", &cmd.expires_at);
     double t = 0;
     double h = 0;
-    if (json_get_double(obj.c_str(), "temperature_target", &t) || json_get_double(obj.c_str(), "temperature_c", &t)) {
+    if (json_get_double_top(src, "temperature_target", &t) || json_get_double_top(src, "temperature_c", &t)) {
       cmd.has_temp = true;
       cmd.temperature_c = t;
     }
-    if (json_get_double(obj.c_str(), "target_humidity", &h) || json_get_double(obj.c_str(), "humidity_percent", &h)) {
+    if (json_get_double_top(src, "target_humidity", &h) || json_get_double_top(src, "humidity_percent", &h)) {
       cmd.has_rh = true;
       cmd.humidity_percent = h;
     }
@@ -549,6 +632,32 @@ float clamp_setpoint_rh(float rh) {
   if (rh > SETPOINT_RH_MAX)
     return SETPOINT_RH_MAX;
   return rh;
+}
+
+bool value_in_entity_range(float v, const EntityRange &range) {
+  if (!range.has)
+    return true;
+  const float slop = range.step > 0 ? range.step / 2.0f + 0.001f : 0.15f;
+  return v + slop >= range.min && v - slop <= range.max;
+}
+
+float snap_entity_value(float v, const EntityRange &range) {
+  if (!range.has)
+    return v;
+  float out = v;
+  if (out < range.min)
+    out = range.min;
+  if (out > range.max)
+    out = range.max;
+  if (range.step > 0) {
+    const float n = std::round((out - range.min) / range.step);
+    out = range.min + n * range.step;
+    if (out > range.max)
+      out = range.max;
+    if (out < range.min)
+      out = range.min;
+  }
+  return out;
 }
 
 SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uint32_t last_local_ms, uint32_t now_ms,
@@ -592,11 +701,11 @@ SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uin
   plan.ack_status = "applied";
   if (cmd.has_temp) {
     plan.write_temp = true;
-    plan.temperature_c = clamp_setpoint_temp(static_cast<float>(cmd.temperature_c));
+    plan.temperature_c = static_cast<float>(cmd.temperature_c);
   }
   if (cmd.has_rh) {
     plan.write_rh = true;
-    plan.humidity_percent = clamp_setpoint_rh(static_cast<float>(cmd.humidity_percent));
+    plan.humidity_percent = static_cast<float>(cmd.humidity_percent);
   }
   return plan;
 }
@@ -607,7 +716,8 @@ static void append_num(std::string *out, float v) {
   *out += buf;
 }
 
-std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status) {
+std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
+                                const char *ack_reason, const EntityRange *temp_range, const EntityRange *rh_range) {
   std::string out = "{";
   bool first = true;
   auto comma = [&]() {
@@ -650,6 +760,25 @@ std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, c
     out += ",\"ack_status\":\"";
     out += ack_status;
     out += "\"";
+    if (ack_reason != nullptr && ack_reason[0]) {
+      out += ",\"ack_reason\":\"";
+      out += ack_reason;
+      out += "\"";
+    }
+  }
+  if (temp_range != nullptr && temp_range->has) {
+    comma();
+    out += "\"temperature_target_min\":";
+    append_num(&out, temp_range->min);
+    out += ",\"temperature_target_max\":";
+    append_num(&out, temp_range->max);
+  }
+  if (rh_range != nullptr && rh_range->has) {
+    comma();
+    out += "\"target_humidity_min\":";
+    append_num(&out, rh_range->min);
+    out += ",\"target_humidity_max\":";
+    append_num(&out, rh_range->max);
   }
   out += "}";
   return out;

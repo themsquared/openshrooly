@@ -22,6 +22,10 @@ static constexpr uint32_t PROBE_INTERVAL_MS = 15 * 60 * 1000;
 static constexpr uint32_t PROBE_JITTER_MS = 20 * 1000;
 /** Telemetry on ack, else this cadence. Same 15 min slot as inbox = 8 more connects/hour. */
 static constexpr uint32_t TELEMETRY_INTERVAL_MS = 15 * 60 * 1000;
+/** Hard cap on nonce+request HTTPS connects in any rolling hour. Device limit is 20. */
+static constexpr uint8_t CONNECT_HOUR_CAP = 18;
+static constexpr uint32_t CONNECT_HOUR_MS = 3600000;
+static constexpr uint8_t CONNECT_HOUR_RING = 24;
 static constexpr uint32_t CLAIM_POLL_MS = 5000;
 static constexpr uint32_t CLAIM_POLL_JITTER_MS = 1500;
 static constexpr uint32_t RELINK_CONFIRM_MS = 3600u * 1000u;

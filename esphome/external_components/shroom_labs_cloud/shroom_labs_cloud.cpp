@@ -1,6 +1,7 @@
 #include "shroom_labs_cloud.h"
 
 #include "esphome/core/application.h"
+#include "esphome/core/entity_base.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 #include "esphome/components/number/number.h"
@@ -31,6 +32,10 @@
 #include <ctime>
 #include <memory>
 #include <strings.h>
+
+#ifdef USE_DEVICE_SECURITY
+#include "../device_security/device_security.h"
+#endif
 
 #ifndef SHL_CLOUD_REMOTE_APPLY
 #define SHL_CLOUD_REMOTE_APPLY 1
@@ -75,6 +80,19 @@ class CloudPage : public AsyncWebHandler {
       request->send(404, "text/plain", "not found");
       return;
     }
+#ifdef USE_DEVICE_SECURITY
+    if (::esphome::device_security::global_device_security != nullptr) {
+      auto auth = request->get_header("Authorization");
+      if (!auth.has_value() || !::esphome::device_security::global_device_security->basic_auth_ok(*auth)) {
+        auto *res = request->beginResponse(
+            401, "text/plain",
+            "Sign in with the user name admin and the web password shown on the chamber screen.");
+        res->addHeader("WWW-Authenticate", "Basic realm=\"OpenShrooly\"");
+        request->send(res);
+        return;
+      }
+    }
+#endif
     const std::string action = request->arg("action");
     if (action == "connect")
       this->cloud_->connect();
@@ -421,6 +439,16 @@ void ShroomLabsCloud::loop() {
     this->attach_local_watchers_();
   if (this->busy_)
     return;
+  PendingApply pending;
+  if (this->engine_.take_pending_apply(&pending)) {
+    ChamberReading after{};
+    std::string reason;
+    const bool ok = this->engine_.apply_now(pending, &after, &reason);
+    this->engine_.complete_apply(pending.command_id, ok, ok ? "applied" : "failed",
+                                 reason.empty() ? nullptr : reason.c_str(), after);
+    this->engine_.telemetry_now();
+    return;
+  }
   this->engine_.loop();
 }
 
@@ -515,37 +543,73 @@ ChamberReading ShroomLabsCloud::read_chamber() {
   return out;
 }
 
+static bool ids_match(const char *id, const char *const *ids) {
+  for (const char *const *p = ids; *p != nullptr; p++) {
+    if (std::strcmp(id, *p) == 0)
+      return true;
+  }
+  return false;
+}
+
+static EntityRange number_range(const char *const *ids) {
+  EntityRange range{};
+  char id_buf[OBJECT_ID_MAX_LEN];
+  for (auto *n : App.get_numbers()) {
+    if (n == nullptr)
+      continue;
+    if (!ids_match(entity_object_id(n, id_buf), ids))
+      continue;
+    range.has = true;
+    range.min = n->traits.get_min_value();
+    range.max = n->traits.get_max_value();
+    range.step = n->traits.get_step();
+    return range;
+  }
+  return range;
+}
+
 static bool write_number(const char *const *ids, float value, ShroomLabsCloud *self) {
   char id_buf[OBJECT_ID_MAX_LEN];
   for (auto *n : App.get_numbers()) {
     if (n == nullptr)
       continue;
-    const char *id = entity_object_id(n, id_buf);
-    for (const char *const *p = ids; *p != nullptr; p++) {
-      if (std::strcmp(id, *p) == 0) {
-        self->set_applying_remote(true);
-        auto call = n->make_call();
-        call.set_value(value);
-        call.perform();
-        self->set_applying_remote(false);
-        return true;
-      }
-    }
+    if (!ids_match(entity_object_id(n, id_buf), ids))
+      continue;
+    EntityRange range;
+    range.has = true;
+    range.min = n->traits.get_min_value();
+    range.max = n->traits.get_max_value();
+    range.step = n->traits.get_step();
+    if (!value_in_entity_range(value, range))
+      return false;
+    const float snapped = snap_entity_value(value, range);
+    self->set_applying_remote(true);
+    auto call = n->make_call();
+    call.set_value(snapped);
+    call.perform();
+    self->set_applying_remote(false);
+    const float slop = range.step > 0 ? range.step / 2.0f + 0.01f : 0.15f;
+    if (std::isnan(n->state) || std::fabs(n->state - snapped) > slop)
+      return false;
+    return true;
   }
   return false;
 }
 
-bool ShroomLabsCloud::write_temperature_target(float c) {
-  static const char *const ids[] = {"temperature_target", "temperature__target", nullptr};
-  return write_number(ids, clamp_setpoint_temp(c), this);
-}
+static const char *const TEMP_TARGET_IDS[] = {"temperature_target", "temperature__target", nullptr};
+static const char *const RH_TARGET_IDS[] = {"target_humidity", nullptr};
 
-bool ShroomLabsCloud::write_humidity_target(float rh) {
-  static const char *const ids[] = {"target_humidity", nullptr};
-  return write_number(ids, clamp_setpoint_rh(rh), this);
-}
+bool ShroomLabsCloud::write_temperature_target(float c) { return write_number(TEMP_TARGET_IDS, c, this); }
+
+bool ShroomLabsCloud::write_humidity_target(float rh) { return write_number(RH_TARGET_IDS, rh, this); }
+
+EntityRange ShroomLabsCloud::temperature_target_range() { return number_range(TEMP_TARGET_IDS); }
+
+EntityRange ShroomLabsCloud::humidity_target_range() { return number_range(RH_TARGET_IDS); }
 
 ChamberReading EspChamber::read() { return cloud_->read_chamber(); }
+EntityRange EspChamber::temperature_range() { return cloud_->temperature_target_range(); }
+EntityRange EspChamber::humidity_range() { return cloud_->humidity_target_range(); }
 bool EspChamber::write_temperature(float c) { return cloud_->write_temperature_target(c); }
 bool EspChamber::write_humidity(float rh) { return cloud_->write_humidity_target(rh); }
 uint32_t EspChamber::last_local_change_ms() { return cloud_->last_local_change_ms(); }
