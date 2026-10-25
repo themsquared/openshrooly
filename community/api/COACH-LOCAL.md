@@ -1,20 +1,35 @@
 # Grow Coach local beta (Mac)
 
-Prod stays off. This folder’s `wrangler.coach-local.toml` binds Workers AI
-(remote, even in `wrangler dev`) and a **local** D1. Do not deploy that file.
+Prod stays off. `wrangler.coach-local.toml` uses a **local** D1 and no `[ai]`
+binding, so `wrangler dev` does not open a remote preview. Chat goes to
+Workers AI over REST. Do not deploy this file.
 
-You need Node 20+, a Cloudflare login that can call Workers AI, and a chamber
-on the same LAN. The site is `http://127.0.0.1:8888`; the API is `:8787`.
+You need Node 20+, a Cloudflare **API token** that can call Workers AI, and a
+chamber on the same LAN. No `wrangler login`. The site is
+`http://127.0.0.1:8888`; the API is `:8787`.
+
+## 0. Token (once)
+
+In the Cloudflare dashboard, copy the account ID and create an API token with
+Workers AI read. Then:
+
+```bash
+cd community/api
+cp .dev.vars.example .dev.vars
+chmod 600 .dev.vars
+# edit .dev.vars: CF_ACCOUNT_ID=…  WORKERS_AI_TOKEN=…
+```
+
+`.dev.vars` is gitignored. Wrangler loads it only for this local Worker.
 
 ## 1. API
 
 ```bash
 cd community/api
 npm install
-npx wrangler login
 npm run coach:local:init    # schema + catalog into .wrangler/coach-local
 npm run coach:local:user    # user id 1 + a Bearer token
-npm run coach:local         # wrangler dev, port 8787
+npm run coach:local         # wrangler dev, port 8787, fully local
 ```
 
 `COACH_BETA_USER_IDS` is `1`. If you seed a different user, change that var
@@ -57,6 +72,9 @@ The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
 
 ## Notes
 
-- `npm run deploy` still uses `wrangler.deploy.toml` (photos on, no `[ai]`).
+- `npm run deploy` still uses `wrangler.deploy.toml` (photos on, no `[ai]`,
+  no `ENVIRONMENT=local`, no Workers AI token vars).
 - Persist dir is `.wrangler/coach-local`. Delete it to start over.
 - Text model: `@cf/qwen/qwen3-30b-a3b-fp8`. Override with `GROW_COACH_TEXT_MODEL`.
+- The REST adapter runs only when `ENVIRONMENT=local` **and** both
+  `CF_ACCOUNT_ID` and `WORKERS_AI_TOKEN` are set **and** `env.AI` is absent.

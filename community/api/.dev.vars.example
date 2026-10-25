@@ -1,0 +1,5 @@
+# Copy to .dev.vars and chmod 600. Never commit .dev.vars.
+# Token: Cloudflare dashboard → My Profile → API Tokens → Create Token
+# with Workers AI (read). Account ID is on the dashboard overview.
+CF_ACCOUNT_ID=
+WORKERS_AI_TOKEN=

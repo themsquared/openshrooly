@@ -43,6 +43,11 @@ test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
   assert.equal(hasAiTable(deploy), false);
   assert.equal(quoted(deploy, "COACH_PUBLIC"), null);
   assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), null);
+  assert.equal(quoted(deploy, "ENVIRONMENT"), null);
+  assert.equal(quoted(deploy, "CF_ACCOUNT_ID"), null);
+  assert.equal(quoted(deploy, "WORKERS_AI_TOKEN"), null);
+  assert.doesNotMatch(deploy, /ENVIRONMENT\s*=\s*"local"/);
+  assert.doesNotMatch(deploy, /WORKERS_AI_TOKEN/);
   assert.equal(quoted(deploy, "name"), "shroomlabs-api");
   assert.equal(quoted(tableBlock(deploy, "[[d1_databases]]"), "database_id"), quoted(tableBlock(local, "[[d1_databases]]"), "database_id"));
 });
@@ -52,11 +57,13 @@ test("wrangler.toml keeps local photos off and may bind AI for coach stubs", () 
   assert.equal(quoted(local, "PHOTOS_ENABLED"), "0");
 });
 
-test("wrangler.coach-local.toml binds AI and a local D1 for private beta", () => {
-  assert.equal(hasAiTable(coachLocal), true);
-  assert.equal(quoted(tableBlock(coachLocal, "[ai]"), "binding"), "AI");
+test("wrangler.coach-local.toml is fully local: no AI binding, REST via .dev.vars", () => {
+  assert.equal(hasAiTable(coachLocal), false);
+  assert.equal(quoted(coachLocal, "ENVIRONMENT"), "local");
   assert.equal(quoted(coachLocal, "COACH_PUBLIC"), "0");
   assert.equal(quoted(coachLocal, "COACH_BETA_USER_IDS"), "1");
+  assert.equal(quoted(coachLocal, "CF_ACCOUNT_ID"), null);
+  assert.equal(quoted(coachLocal, "WORKERS_AI_TOKEN"), null);
   assert.equal(quoted(tableBlock(coachLocal, "[[d1_databases]]"), "database_name"), "shroomlabs-coach-local");
   assert.equal(quoted(coachLocal, "GROW_COACH_TEXT_MODEL"), "@cf/qwen/qwen3-30b-a3b-fp8");
   assert.doesNotMatch(coachLocal, /api\.shroomlabs\.io/);

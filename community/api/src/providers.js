@@ -57,7 +57,26 @@ export function photosConfigured(env = {}) {
 }
 
 export function coachAiConfigured(env = {}) {
-  return Boolean(env.AI) && String(env.GROW_COACH_PROVIDER || "").toLowerCase() !== "stub";
+  if (String(env.GROW_COACH_PROVIDER || "").toLowerCase() === "stub") return false;
+  if (env.AI) return true;
+  return coachLocalRestEnabled(env);
+}
+
+/** wrangler.coach-local.toml sets ENVIRONMENT=local. Deploy must never set this. */
+export function coachLocalEnvironment(env = {}) {
+  return String(env.ENVIRONMENT || "").toLowerCase() === "local";
+}
+
+/**
+ * Local-only Workers AI REST (no wrangler [ai] binding).
+ * Requires ENVIRONMENT=local plus CF_ACCOUNT_ID and WORKERS_AI_TOKEN from .dev.vars.
+ * Never true when env.AI is bound or ENVIRONMENT is not local.
+ */
+export function coachLocalRestEnabled(env = {}) {
+  if (!coachLocalEnvironment(env)) return false;
+  if (env.AI) return false;
+  if (String(env.GROW_COACH_PROVIDER || "").toLowerCase() === "stub") return false;
+  return Boolean(String(env.CF_ACCOUNT_ID || "").trim() && String(env.WORKERS_AI_TOKEN || "").trim());
 }
 
 /** Public Coach checkout/UI. Beta users are gated separately via COACH_BETA_USER_IDS. */

@@ -9,8 +9,14 @@ import {
   refuseRestrictedPack,
   suggestSetpoints,
 } from "../src/coach-learn.js";
-import { capabilities } from "../src/providers.js";
-import { DEFAULT_TEXT_MODEL, stripThinkTags, workersAiText } from "../src/coach-models.js";
+import { capabilities, coachAiConfigured, coachLocalRestEnabled } from "../src/providers.js";
+import {
+  DEFAULT_TEXT_MODEL,
+  createModelProvider,
+  stripThinkTags,
+  workersAiRestUrl,
+  workersAiText,
+} from "../src/coach-models.js";
 import { call, callRaw, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 import { buildJpeg, toBase64 } from "./image-fixtures.js";
 
@@ -293,6 +299,78 @@ test("non-beta user stays on preview; subscribe stays 503; public coach stays of
   assert.equal(sub.status, 503);
   assert.equal(sub.data.coming_soon, true);
   assert.equal(sub.data.waitlist, true);
+});
+
+test("Workers AI REST is local-only and never turns on from tokens alone", () => {
+  const tokens = { CF_ACCOUNT_ID: "acc", WORKERS_AI_TOKEN: "tok", GROW_COACH_PROVIDER: "workers-ai" };
+  assert.equal(coachLocalRestEnabled(tokens), false);
+  assert.equal(coachAiConfigured(tokens), false);
+  assert.equal(coachLocalRestEnabled({ ...tokens, ENVIRONMENT: "production" }), false);
+  assert.equal(coachLocalRestEnabled({ ...tokens, ENVIRONMENT: "local" }), true);
+  assert.equal(coachAiConfigured({ ...tokens, ENVIRONMENT: "local" }), true);
+  assert.equal(coachLocalRestEnabled({ ...tokens, ENVIRONMENT: "local", AI: {} }), false);
+  assert.equal(coachAiConfigured({ ...tokens, ENVIRONMENT: "local", AI: {} }), true);
+  assert.equal(
+    workersAiRestUrl("acc", "@cf/qwen/qwen3-30b-a3b-fp8"),
+    "https://api.cloudflare.com/client/v4/accounts/acc/ai/run/@cf/qwen/qwen3-30b-a3b-fp8"
+  );
+  const prod = new Request("https://api.shroomlabs.io/api/coach/chat", { headers: { host: "api.shroomlabs.io" } });
+  assert.equal(createModelProvider({ ...tokens, ENVIRONMENT: "local" }, prod).name, "disabled");
+});
+
+test("beta user can chat via local Workers AI REST; think tags are stripped", async () => {
+  const calls = [];
+  const ctx = privateBetaEnv({
+    ENVIRONMENT: "local",
+    CF_ACCOUNT_ID: "acc_test",
+    WORKERS_AI_TOKEN: "tok_test",
+    fetch: async (url, opts) => {
+      calls.push({ url: String(url), headers: opts.headers, body: opts.body });
+      return {
+        ok: true,
+        async json() {
+          return {
+            success: true,
+            result: {
+              choices: [{ message: { content: "<think>hidden</think>Seal the door and fill the reservoir." } }],
+              usage: { prompt_tokens: 40, completion_tokens: 12 },
+            },
+          };
+        },
+      };
+    },
+  });
+  const { token, user } = await register(ctx, "rest-beta@example.com");
+  ctx.COACH_BETA_USER_IDS = String(user.id);
+
+  const catalog = await call(ctx, "GET", "/api/coach", { token });
+  assert.equal(catalog.data.beta, true);
+  assert.equal(catalog.data.entitled, true);
+
+  const chat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
+  assert.equal(chat.status, 200, JSON.stringify(chat.data));
+  assert.equal(chat.data.provider, "workers-ai-rest");
+  assert.equal(chat.data.reply, "Seal the door and fill the reservoir.");
+  assert.doesNotMatch(chat.data.reply, /<think>/i);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, workersAiRestUrl("acc_test", DEFAULT_TEXT_MODEL));
+  assert.equal(calls[0].headers.authorization, "Bearer tok_test");
+});
+
+test("tokens without ENVIRONMENT=local do not open Coach REST", async () => {
+  const ctx = privateBetaEnv({
+    CF_ACCOUNT_ID: "acc_test",
+    WORKERS_AI_TOKEN: "tok_test",
+    fetch: async () => {
+      throw new Error("REST must not run");
+    },
+  });
+  const { token, user } = await register(ctx, "no-rest@example.com");
+  ctx.COACH_BETA_USER_IDS = String(user.id);
+  const catalog = await call(ctx, "GET", "/api/coach", { token });
+  assert.equal(catalog.data.beta, false);
+  const chat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "hi" } });
+  assert.equal(chat.status, 402);
 });
 
 test("subscribe stays 503 for a beta user while COACH_PUBLIC is off", async () => {
