@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { hourText, scheduleText, rangeText, addSample, trendText } = require('./card-text.js')
+const { hourText, scheduleText, hour24, lightOnSummary, rangeText, addSample, trendText } = require('./card-text.js')
 
 test('hours read like a clock', () => {
   assert.equal(hourText(8), '8 AM')
@@ -10,6 +10,10 @@ test('hours read like a clock', () => {
   assert.equal(hourText(6.5), '6:30 AM')
   assert.equal(hourText(26), '2 AM')
   assert.equal(scheduleText(8, 20), '8 AM to 8 PM')
+  assert.equal(hour24(7), '07:00')
+  assert.equal(hour24(19.5), '19:30')
+  assert.equal(lightOnSummary(7, 12), 'Light on 07:00 to 19:00')
+  assert.equal(lightOnSummary(8, 0), 'Light off (dark)')
 })
 
 test('range needs both ends', () => {

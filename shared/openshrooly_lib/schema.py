@@ -71,6 +71,23 @@ def validate_profile(data: dict[str, Any] | MushroomProfile) -> MushroomProfile:
         _require(0 <= stage.light.sunrise_hour <= 23, f"stage {stage.id} sunrise_hour invalid")
         _require(0 <= stage.light.duration_hours <= 24, f"stage {stage.id} light duration invalid")
         _require(0 <= stage.light.white_led_lux <= 4000, f"stage {stage.id} white_led_lux invalid")
+        light_on = (
+            stage.light.white_led_lux > 0
+            or stage.light.red_percent > 0
+            or stage.light.green_percent > 0
+            or stage.light.blue_percent > 0
+        )
+        if light_on:
+            _require(
+                stage.light.duration_hours > 0,
+                f"stage {stage.id} needs duration_hours > 0 when lux or RGB is on; "
+                "duration 0 is only valid for a dark stage with lux 0 and RGB 0",
+            )
+        if profile.light_recipe is not None:
+            _require(
+                stage.id in profile.light_recipe.phases,
+                f"light_recipe needs a {stage.id} phase so this stage has a complete light mix",
+            )
         _require(15 <= stage.fan.speed_percent <= 100, f"stage {stage.id} fan speed invalid")
         _require(1 <= stage.fan.period_min <= 240, f"stage {stage.id} fan period invalid")
         _require(5 <= stage.fan.run_duration_s <= 900, f"stage {stage.id} fan run duration invalid")
@@ -122,6 +139,7 @@ def _validate_light_recipe(profile: MushroomProfile) -> None:
     _require("colonization" in recipe.phases, "light_recipe needs a colonization phase")
     _require("fruiting" in recipe.phases, "light_recipe needs a fruiting phase")
     for name, phase in recipe.phases.items():
+        _require(name in KNOWN_STAGE_IDS, f"light_recipe phase {name} is not a known stage")
         _require(0 <= phase.photoperiod_hours <= 24, f"light_recipe {name} photoperiod invalid")
         _require(
             0 <= phase.white_brightness_percent <= 100,
@@ -133,6 +151,18 @@ def _validate_light_recipe(profile: MushroomProfile) -> None:
             ("blue", phase.blue_percent),
         ):
             _require(0 <= value <= 100, f"light_recipe {name} {channel} percent invalid")
+        phase_on = (
+            phase.white_brightness_percent > 0
+            or phase.red_percent > 0
+            or phase.green_percent > 0
+            or phase.blue_percent > 0
+        )
+        if phase_on:
+            _require(
+                phase.photoperiod_hours > 0,
+                f"light_recipe {name} needs photoperiod_hours > 0 when the mix is on; "
+                "0 h is only valid for a dark mix with 0% white and RGB 0",
+            )
 
 
 def export_json_dict(profile: MushroomProfile) -> dict[str, Any]:

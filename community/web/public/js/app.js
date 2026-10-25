@@ -19,6 +19,7 @@ import {
   renderReadonlyNotes,
   speciesLine,
 } from "./device-ui.js";
+import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -36,6 +37,71 @@ function $(sel) {
 
 function params() {
   return new URLSearchParams(location.search);
+}
+
+function lightFromForm(form) {
+  const num = (...selectors) => {
+    for (const sel of selectors) {
+      const el = form.elements?.[sel.replace(/^#/, "")] || form.querySelector(sel);
+      if (!el || el.value === "") continue;
+      const n = Number(el.value);
+      if (Number.isFinite(n)) return n;
+    }
+    return null;
+  };
+  return {
+    sunrise_hour: num("[name=sunrise_hour]", "#detail-sunrise"),
+    duration_hours: num("[name=duration_hours]", "#detail-duration"),
+    white_led_lux: num("[name=white_led_lux]", "#detail-lux"),
+    red_percent: num("[name=red_percent]", "#detail-red"),
+    green_percent: num("[name=green_percent]", "#detail-green"),
+    blue_percent: num("[name=blue_percent]", "#detail-blue"),
+  };
+}
+
+function fillLightInputs(light, fields) {
+  if (!light || !fields) return;
+  if (fields.sunrise && light.sunrise_hour != null) fields.sunrise.value = light.sunrise_hour;
+  if (fields.duration && light.duration_hours != null) fields.duration.value = light.duration_hours;
+  if (fields.lux && light.white_led_lux != null) fields.lux.value = light.white_led_lux;
+  if (fields.red && light.red_percent != null) fields.red.value = light.red_percent;
+  if (fields.green && light.green_percent != null) fields.green.value = light.green_percent;
+  if (fields.blue && light.blue_percent != null) fields.blue.value = light.blue_percent;
+  if (fields.summary) fields.summary.textContent = lightOnSummary(light.sunrise_hour ?? 8, light.duration_hours ?? 0);
+}
+
+function bindLightForm(form, { summary, error, status, send } = {}) {
+  if (!form) return;
+  const refresh = () => {
+    const light = lightFromForm(form);
+    if (summary) summary.textContent = lightOnSummary(light.sunrise_hour ?? 8, light.duration_hours ?? 0);
+    const issues = collectStageLightIssues(light);
+    if (error) {
+      error.textContent = issues[0]?.message || "";
+      error.classList.toggle("hidden", !issues.length);
+    }
+    return { light, issues };
+  };
+  form.addEventListener("input", refresh);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const { light, issues } = refresh();
+    if (issues.length) {
+      if (status) status.textContent = issues[0].message;
+      return;
+    }
+    try {
+      await send(light);
+      if (status) status.textContent = "Sent.";
+    } catch (err) {
+      if (status) status.textContent = err.message || String(err);
+      if (error) {
+        error.textContent = err.message || String(err);
+        error.classList.remove("hidden");
+      }
+    }
+  });
+  refresh();
 }
 
 /** Post sign-in destinations stay on this site: a same-origin path, never a scheme or another host. */
@@ -916,17 +982,31 @@ async function renderCoach() {
       (data.actions || [])
         .map((row) => {
           const next = row.new_value || {};
+          const statusLabel = {
+            queued: "Queued for the chamber",
+            applied: "Applied",
+            failed: "Failed",
+            expired: "Expired",
+            refused: "Refused",
+          }[row.apply_status] || "";
           const summary = row.action === "apply"
             ? `Set ${next.temperature_c ?? "?"} °C and ${next.humidity_percent ?? "?"}% RH`
             : row.action === "undo"
               ? "Restored the previous setpoints"
-              : "Paused Autopilot";
-          const undo = row.action === "apply" && !row.undone_at
+              : row.action === "expired"
+                ? "Command expired"
+                : row.action === "failed" || row.action === "refused"
+                  ? `Command ${row.action}`
+                  : "Paused Autopilot";
+          const detail = [statusLabel, row.reason].filter(Boolean).join(". ");
+          const undo = row.action === "apply" && !row.undone_at && row.apply_status !== "failed" && row.apply_status !== "expired" && row.apply_status !== "refused"
             ? `<button type="button" class="secondary" data-undo="${row.id}">Undo</button>`
             : row.undone_at
               ? `<span class="muted">Undone</span>`
-              : "";
-          return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(row.reason || "")}</p></div>${undo}</li>`;
+              : statusLabel && row.action === "apply"
+                ? `<span class="muted">${escapeHtml(statusLabel)}</span>`
+                : "";
+          return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(detail)}</p></div>${undo}</li>`;
         })
         .join("") || `<li class="muted">No Autopilot actions yet.</li>`;
   }
@@ -1298,6 +1378,8 @@ async function renderDevice() {
   const device = detail.device;
   const form = $("#rules-form");
   const species = speciesLine(device);
+  // Coach stays hidden unless this user has Coach beta or entitlement.
+  const showCoach = Boolean(me.grow_coach?.beta || me.grow_coach?.entitled) && !device.off_menu;
   $("#device-name").textContent = device.name;
   document.title = `${device.name} · Shroom Labs`;
   $("#device-meta").textContent = [
@@ -1306,7 +1388,7 @@ async function renderDevice() {
     lastSeenLine(device),
     species || "No species selected",
     growLine(device),
-    coachLine(device),
+    showCoach ? coachLine(device) : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -1315,7 +1397,6 @@ async function renderDevice() {
     $("#device-status").innerHTML = `${escapeHtml(notice)} <a href="/account.html#alerts">Alert settings</a>`;
     $("#device-status").classList.remove("hidden");
   }
-  const showCoach = Boolean(me.grow_coach?.beta || me.grow_coach?.entitled) && !device.off_menu;
   const canWrite = canWriteDevice(device);
   const dash = $("#device-dash");
   if (dash) {
@@ -1433,6 +1514,8 @@ function bindDeviceControls(id, device, { canWrite }) {
           green_percent: numberOrUndefined(form.green_percent.value),
           blue_percent: numberOrUndefined(form.blue_percent.value),
         };
+        const issues = collectStageLightIssues(payload.light);
+        if (issues.length) throw new Error(issues[0].message);
       }
       if (action === "coach_mode") {
         payload.mode = form.coach_mode.value;
@@ -1511,6 +1594,25 @@ async function renderFleet() {
     drawHistoryChart($("#reading-chart"), data.history || []);
     const back = document.querySelector("#fleet-detail .back-link a");
     if (back) back.insertAdjacentHTML("afterend", ` · <a href="/device.html?id=${encodeURIComponent(detailId)}">Open device page</a>`);
+    fillLightInputs(d.light, {
+      sunrise: $("#detail-sunrise"),
+      duration: $("#detail-duration"),
+      lux: $("#detail-lux"),
+      red: $("#detail-red"),
+      green: $("#detail-green"),
+      blue: $("#detail-blue"),
+      summary: $("#detail-light-summary"),
+    });
+    bindLightForm($("#detail-light-form"), {
+      summary: $("#detail-light-summary"),
+      status: $("#detail-light-msg"),
+      send: async (light) => {
+        await api("/api/fleet/apply", {
+          method: "POST",
+          jsonBody: { action: "light", device_ids: [detailId], payload: { light } },
+        });
+      },
+    });
     $("#rename-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       try {
@@ -1604,6 +1706,13 @@ async function renderFleet() {
     if (action === "profile" || action === "light" || action === "coach_mode") {
       if ($("#bulk-profile").value) payload.profile_id = $("#bulk-profile").value.trim();
       if ($("#bulk-stage").value) payload.stage = $("#bulk-stage").value.trim();
+    }
+    if (action === "light") {
+      const light = {};
+      if ($("#bulk-sunrise").value) light.sunrise_hour = Number($("#bulk-sunrise").value);
+      if ($("#bulk-duration").value) light.duration_hours = Number($("#bulk-duration").value);
+      if ($("#bulk-lux").value) light.white_led_lux = Number($("#bulk-lux").value);
+      if (Object.keys(light).length) payload.light = light;
     }
     if (action === "coach_mode") payload.mode = $("#bulk-coach").value;
     return { action, payload, device_ids: selectedIds(), group_id: $("#fleet-group-filter").value ? Number($("#fleet-group-filter").value) : undefined };

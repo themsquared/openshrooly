@@ -13,6 +13,7 @@ import {
 } from "./coach-learn.js";
 import {
   clampAutopilotSetpoints,
+  coachAutopilotAvailable,
   coachAutopilotFlagOn,
   getDeviceMode,
   noteManualSetpointCommand,
@@ -231,7 +232,12 @@ async function loadGrowTracking(db, user, device, modeRow, current, now) {
   };
 }
 
-export async function enrichDevice(db, env, user, device, { now = Date.now() } = {}) {
+/**
+ * Coach details ride on the device payload only for users who can use Coach
+ * (flag on plus beta or entitlement). Everyone else never sees Coach state.
+ * Pass `coachAvailable` when enriching many devices to check access once.
+ */
+export async function enrichDevice(db, env, user, device, { now = Date.now(), coachAvailable } = {}) {
   const samples = await loadRecentTelemetry(db, device.id, { now });
   const current = latestReading(samples, now);
   const latestDoc = samples.length
@@ -246,8 +252,9 @@ export async function enrichDevice(db, env, user, device, { now = Date.now() } =
   const activeCert = (certs || [])
     .filter((c) => c.status === "active")
     .sort((a, b) => String(b.not_after || "").localeCompare(String(a.not_after || "")))[0];
+  const showCoach = !offMenu && (coachAvailable ?? (await coachAutopilotAvailable(env, db, user)));
   const coach =
-    offMenu || !coachAutopilotFlagOn(env)
+    !showCoach
       ? null
       : {
           mode: modeRow.mode,
@@ -337,8 +344,10 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
     };
   }
   if (action === "light") {
-    const light = payload.light || lightFromStage(stage);
-    if (!light) return { ok: false, error: "No light recipe on this profile stage." };
+    const fromStage = lightFromStage(stage) || {};
+    const incoming = payload.light && typeof payload.light === "object" ? payload.light : {};
+    const light = { ...fromStage, ...incoming };
+    if (!Object.keys(light).length) return { ok: false, error: "No light recipe on this profile stage." };
     try {
       const checked = validateStageLight(light);
       return { ok: true, kind: "schedule", payload: { light: checked }, preview: { light: checked } };
@@ -465,7 +474,8 @@ export async function handleFleet(method, path, url, request, env) {
   if (method === "GET" && path === "/api/fleet/devices") {
     const rows = await db.all("SELECT * FROM cloud_devices WHERE owner_id=?", [user.id]);
     const devices = [];
-    for (const row of rows || []) devices.push(await enrichDevice(db, env, user, row));
+    const coachAvailable = await coachAutopilotAvailable(env, db, user);
+    for (const row of rows || []) devices.push(await enrichDevice(db, env, user, row, { coachAvailable }));
     return json({ devices });
   }
 

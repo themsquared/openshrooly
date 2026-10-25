@@ -206,6 +206,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
     </fieldset>
     <fieldset>
       <legend>Lighting</legend>
+      <p class="muted">Duration is required when the light is on. 0 hours is only for a dark stage with lux 0 and RGB 0.</p>
       <div class="row">
         <label>Sunrise hour
           <input name="sunrise_hour" type="number" step="0.25" min="0" max="23.75" value="${numOrBlank(light.sunrise_hour)}"${disabled}>
