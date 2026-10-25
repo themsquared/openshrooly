@@ -567,7 +567,7 @@ export const PAGES = {
   },
   "login.html": { active: "", path: "/login.html", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and claim a chamber. No password." },
   "register.html": { active: "", path: "/register.html", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and claim a chamber. No password." },
-  "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs sessions, home hub, claimed chambers, alerts, Grow Coach, and purchases." },
+  "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs profile, devices, billing, security, and shared profiles." },
   "devices.html": { active: "", path: "/devices.html", robots: PRIVATE, title: "Devices · Shroom Labs", description: "See the chambers linked to your Shroom Labs account, with species, live readings, and grow status." },
   "device.html": { active: "", path: "/device.html", robots: PRIVATE, title: "Device · Shroom Labs", description: "Live stats, grow identity, and chamber controls for one of your Shroom Labs devices." },
   "fleet.html": { active: "", path: "/fleet.html", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "Bulk tools for the chambers linked to your Shroom Labs account." },
