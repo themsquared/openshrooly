@@ -4,7 +4,7 @@
 #   dance  one step per refresh: idle, lean left, bob 2px down, lean right
 #   blink  on an upright step about once a minute
 #   meh    flat mouth and a sweat drop on the upright steps while humidity is off target
-#   sleep  while a grow is running and the lights are off
+#   it dances day and night, lights on or off
 #   and very rarely it does something else.
 
 - id: update_mascot
@@ -23,9 +23,6 @@
           return;
         }
 
-        const std::string phase = id(grow_phase).current_option();
-        const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
-        const bool growing = !phase.empty() && phase != "Idle" && total > 0;
         const bool rh_ok = !id(humidity).has_state() || !id(target_humidity).has_state() ||
             fabsf(id(humidity).state - id(target_humidity).state) <=
                 (id(humidity_hysteresis).has_state() ? id(humidity_hysteresis).state : 0.0f);
@@ -36,10 +33,7 @@
         const uint32_t step = tick % 4;
         image::Image *frame = dance[step];
         int dy = step == 2 ? 2 : 0;
-        if (growing && !id(lights_on_flag)) {
-          frame = id(mascot_sleep);
-          dy = (tick & 1) ? 1 : 0;
-        } else if (tick - last_odd > 30 && esp_random() % 90 == 0) {
+        if (tick - last_odd > 30 && esp_random() % 90 == 0) {
           // Roughly once every 15 minutes, never twice in five.
           frame = id(mascot_surprise);
           last_odd = tick;

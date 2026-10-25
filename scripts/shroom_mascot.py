@@ -47,7 +47,7 @@ STEM = (  # rows 14..25
     "....################....",
 )
 
-FRAMES = ("idle", "meh", "blink", "surprise", "sleep", "lean_left", "lean_right")
+FRAMES = ("idle", "meh", "blink", "surprise", "lean_left", "lean_right")
 
 
 def _blank() -> list[list[str]]:
@@ -78,13 +78,10 @@ def _stem(face: str) -> list[str]:
         rows[6] = list("......#...####...#......")
     if face == "meh":
         rows[6] = list("......#...####...#......")
-    if face in ("blink", "sleep"):
-        rows[3] = list("......#.##....##.#......")
     if face == "blink":
+        rows[3] = list("......#.##....##.#......")
         rows[5] = list("......#..#....#..#......")
         rows[6] = list("......#...####...#......")
-    if face == "sleep":
-        rows[6] = list("......#....##....#......")
     if face == "surprise":
         rows[1] = list("......#.##....##.#......")
         rows[2] = list("......#.##....##.#......")
@@ -120,10 +117,6 @@ def frame(name: str) -> Image.Image:
         grid[16][20] = "#"
         grid[17][20] = grid[17][21] = "#"
         grid[18][20] = grid[18][21] = "#"
-    if name == "sleep":  # a tiny z
-        for x in (19, 20, 21, 22):
-            grid[0][x] = grid[3][x] = "#"
-        grid[1][21] = grid[2][20] = "#"
     img = Image.new("1", (W, H), 1)
     for y, row in enumerate(grid):
         for x, ch in enumerate(row):
@@ -181,7 +174,6 @@ def save_previews(out: Path, scale: int = 8, per_frame: bool = True) -> None:
 
     gif(SEQUENCE[:10] + (("surprise", 0),) + SEQUENCE[11:], out / "mascot.gif")
     gif(tuple(step_frame(t, rh_ok=False) for t in range(1, 9)), out / "mascot_meh.gif")
-    gif((("sleep", 0), ("sleep", 1)), out / "mascot_sleep.gif")
 
 
 def main() -> None:

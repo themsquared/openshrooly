@@ -12,7 +12,7 @@ python3 scripts/render_epaper_previews.py
 | --- | --- |
 | `growing-in-range.png` | Fruiting, day 6 of 10, progress bar, 48px temp/RH, `target 24  OK` lines |
 | `growing-alert.png` | Same grow, LOW shown inverted, water-low banner |
-| `growing-night.png` | Same grow with the lights off; the mushroom is asleep |
+| `growing-night.png` | Same grow with the lights off; the mushroom keeps dancing |
 | `idle.png` | No grow; climate numbers still shown; humidity is low so the mushroom looks worried |
 | `boot-splash.png` | 64px filled mushroom mark, OpenShrooly wordmark, by Shroom Labs |
 | `wifi-setup.png` | Wi-Fi setup on: network name, password, 192.168.4.1, web login (example values) |
@@ -27,7 +27,7 @@ LVGL draws a 1-bit image as an alpha mask painted in the widget's `image_recolor
 
 - Dances one step per refresh: upright, lean left, bob 2 px down, lean right. Blinks about once a minute.
 - Flat mouth and a sweat drop on the upright steps while humidity is off target.
-- Asleep while a grow is running and the lights are off.
+- Dances with the lights on or off. There is no sleep frame.
 - Hidden under the alert banner and the Wi-Fi setup box.
 - Turn it off with the `Screen Mushroom` switch (on by default), or Settings, Display & Time on the chamber web page.
 
