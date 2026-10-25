@@ -18,9 +18,16 @@ cd community/api
 cp .dev.vars.example .dev.vars
 chmod 600 .dev.vars
 # edit .dev.vars: CF_ACCOUNT_ID=…  WORKERS_AI_TOKEN=…
+# for live chamber writes also set:
+#   COACH_CHAMBER_PASSWORD=…   # web password shown on the chamber screen
+#   COACH_CHAMBER_USER=admin   # optional; defaults to admin
 ```
 
 `.dev.vars` is gitignored. Wrangler loads it only for this local Worker.
+The local Coach bridge also reads `.dev.vars` itself so live writes can send
+the chamber web password without putting a secret on the command line.
+`COACH_CHAMBER_PASSWORD` / `COACH_CHAMBER_USER` belong in local `.dev.vars`
+only. Do not add them to any wrangler toml, and do not put them in prod.
 
 ## 1. API
 
@@ -102,14 +109,23 @@ Dry-run is the default (`DRY_RUN=1`): it GETs a reading, logs the writes, and
 marks the row `dry_run` (not sent) so going live cannot replay a backlog.
 Autopilot setpoint commands expire after 30 minutes. Live start expires any
 pending row older than 30 minutes. Live writes need `COACH_BRIDGE_LIVE=1`
-and not `DRY_RUN=1`. Live: one command per cycle, at most one write per 10
-minutes, GET before and after. Kill switch: `touch .wrangler/coach-local/BRIDGE_OFF`.
+and not `DRY_RUN=1`. Chamber POSTs require HTTP Basic auth: user `admin`
+(override with `COACH_CHAMBER_USER`) plus `COACH_CHAMBER_PASSWORD` from the
+chamber screen. Reads stay open. The bridge loads those vars from local
+`.dev.vars` (it never overwrites a var already in the environment) and
+never logs the password or Authorization header. Live start without a
+password logs one warning; a 401 is recorded as
+`chamber web password missing or wrong (401)` and does not retry the
+alternate firmware id. Live: one command per cycle, at most one write per
+10 minutes, GET before and after. Kill switch:
+`touch .wrangler/coach-local/BRIDGE_OFF`.
 
 ```bash
 # start dry-run (Ctrl+C to stop)
 npm run coach:local:bridge -- --chamber http://192.168.1.42 --loop
 
 # live (still rate-limited; stop with Ctrl+C or the kill file)
+# password comes from community/api/.dev.vars — do not put it on this line
 COACH_BRIDGE_LIVE=1 npm run coach:local:bridge -- --chamber http://192.168.1.42 --loop
 ```
 

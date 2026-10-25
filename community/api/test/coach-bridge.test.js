@@ -14,6 +14,7 @@ import {
   bridgeMode,
   chamberSetpointsUnreadable,
   missingFromSnapshot,
+  chamberAuthHeader,
   expireStaleOnLiveStart,
   httpApplyWrites,
   planBridgeCommand,
@@ -438,7 +439,7 @@ test("httpApplyWrites posts number set and records nothing on mock refusal", asy
     [{ field: "temperature_target", value: 16, entityIds: ["temperature_target"] }],
     {
       fetchImpl: async (url, opts) => {
-        calls.push({ url, method: opts.method });
+        calls.push({ url, method: opts.method, headers: opts.headers });
         return { ok: true };
       },
     }
@@ -446,4 +447,159 @@ test("httpApplyWrites posts number set and records nothing on mock refusal", asy
   assert.equal(result.ok, true);
   assert.equal(calls[0].method, "POST");
   assert.match(calls[0].url, /\/number\/temperature_target\/set\?value=16/);
+  assert.equal(calls[0].headers?.authorization, undefined);
+});
+
+test("chamberAuthHeader is Basic admin:password and omitted without a password", () => {
+  assert.equal(chamberAuthHeader({}), null);
+  assert.equal(chamberAuthHeader({ COACH_CHAMBER_USER: "admin" }), null);
+  assert.equal(chamberAuthHeader({ COACH_CHAMBER_PASSWORD: "" }), null);
+  assert.equal(
+    chamberAuthHeader({ COACH_CHAMBER_PASSWORD: "screen-secret" }),
+    `Basic ${Buffer.from("admin:screen-secret").toString("base64")}`
+  );
+  assert.equal(
+    chamberAuthHeader({ COACH_CHAMBER_USER: "op", COACH_CHAMBER_PASSWORD: "screen-secret" }),
+    `Basic ${Buffer.from("op:screen-secret").toString("base64")}`
+  );
+});
+
+test("httpApplyWrites sends authorization only when auth is set", async () => {
+  const withAuth = [];
+  const withoutAuth = [];
+  const auth = chamberAuthHeader({ COACH_CHAMBER_PASSWORD: "screen-secret" });
+  await httpApplyWrites(
+    "http://192.168.1.42",
+    [{ field: "temperature_target", value: 16, entityIds: ["temperature__target"] }],
+    {
+      auth,
+      fetchImpl: async (_url, opts) => {
+        withAuth.push(opts.headers);
+        return { ok: true };
+      },
+    }
+  );
+  await httpApplyWrites(
+    "http://192.168.1.42",
+    [{ field: "temperature_target", value: 16, entityIds: ["temperature__target"] }],
+    {
+      fetchImpl: async (_url, opts) => {
+        withoutAuth.push(opts.headers);
+        return { ok: true };
+      },
+    }
+  );
+  assert.equal(withAuth[0].authorization, auth);
+  assert.equal(withoutAuth[0].authorization, undefined);
+});
+
+test("httpApplyWrites records 401 and does not retry the second firmware id", async () => {
+  const calls = [];
+  const result = await httpApplyWrites(
+    "http://192.168.1.42",
+    [
+      {
+        field: "temperature_target",
+        value: 16,
+        entityIds: ["temperature__target", "temperature_target"],
+      },
+    ],
+    {
+      auth: chamberAuthHeader({ COACH_CHAMBER_PASSWORD: "wrong" }),
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, authorization: opts.headers?.authorization });
+        return { ok: false, status: 401 };
+      },
+    }
+  );
+  assert.equal(result.ok, false);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/number\/temperature__target\/set/);
+  assert.equal(result.failed[0].error, "chamber web password missing or wrong (401)");
+  assert.equal(result.error, "chamber web password missing or wrong (401)");
+  assert.equal(result.failed[0].entity_id, null);
+});
+
+test("httpApplyWrites records HTTP status or error name on non-auth failures", async () => {
+  const http = await httpApplyWrites(
+    "http://192.168.1.42",
+    [{ field: "target_humidity", value: 88, entityIds: ["target_humidity"] }],
+    { fetchImpl: async () => ({ ok: false, status: 500 }) }
+  );
+  assert.equal(http.failed[0].error, "HTTP 500");
+
+  let forbiddenCalls = 0;
+  const forbidden = await httpApplyWrites(
+    "http://192.168.1.42",
+    [{ field: "temperature_target", value: 16, entityIds: ["temperature__target", "temperature_target"] }],
+    {
+      fetchImpl: async () => {
+        forbiddenCalls += 1;
+        return { ok: false, status: 403 };
+      },
+    }
+  );
+  assert.equal(forbidden.failed[0].error, "HTTP 403");
+  assert.equal(forbiddenCalls, 1);
+
+  const crashed = await httpApplyWrites(
+    "http://192.168.1.42",
+    [{ field: "target_humidity", value: 88, entityIds: ["target_humidity"] }],
+    {
+      fetchImpl: async () => {
+        const err = new Error("offline");
+        err.name = "AbortError";
+        throw err;
+      },
+    }
+  );
+  assert.equal(crashed.failed[0].error, "AbortError");
+});
+
+test("plan prefers temperature__target then falls back to temperature_target", () => {
+  const plan = planBridgeCommand({ command: command(), stage: fruiting, reading });
+  const temp = plan.writes.find((w) => w.field === "temperature_target");
+  assert.deepEqual(temp.entityIds, ["temperature__target", "temperature_target"]);
+});
+
+test("live cycle logs the chamber write error instead of a generic failure", async () => {
+  const db = createMemoryDb();
+  await db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["local-chamber", "hw-local", "{}", "LAN", "claimed", 1, null, null, null, 1, nowIso(), nowIso()]
+  );
+  await db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+    "local-chamber",
+    "setpoints",
+    command().payload,
+    nowIso(),
+    null,
+  ]);
+  const logs = [];
+  await runBridgeCycle({
+    ...memoryPending(db),
+    env: { COACH_BRIDGE_LIVE: "1" },
+    state: {},
+    stage: fruiting,
+    readChamber: async () => reading,
+    applyWrites: async () => ({
+      ok: false,
+      applied: [],
+      failed: [
+        {
+          field: "temperature_target",
+          value: 16,
+          entity_id: null,
+          error: "chamber web password missing or wrong (401)",
+        },
+      ],
+      error: "chamber web password missing or wrong (401)",
+    }),
+    log: (event) => logs.push(event),
+  });
+  assert.equal(logs[0].action, "failed");
+  assert.equal(logs[0].reason, "chamber web password missing or wrong (401)");
+  assert.doesNotMatch(JSON.stringify(logs[0]), /authorization|screen-secret|COACH_CHAMBER_PASSWORD=/i);
+  const marked = await db.all("SELECT * FROM device_commands WHERE device_id=?", ["local-chamber"]);
+  assert.equal(JSON.parse(marked[0].payload)._bridge.reason, "chamber web password missing or wrong (401)");
 });

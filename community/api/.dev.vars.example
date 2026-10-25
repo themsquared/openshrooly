@@ -3,3 +3,8 @@
 # with Workers AI (read). Account ID is on the dashboard overview.
 CF_ACCOUNT_ID=
 WORKERS_AI_TOKEN=
+
+# Chamber web password shown on the device screen. Local only — required for
+# live Coach bridge writes. Never add these to wrangler toml or prod.
+# COACH_CHAMBER_USER=admin
+COACH_CHAMBER_PASSWORD=
