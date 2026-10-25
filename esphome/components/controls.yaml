@@ -50,6 +50,34 @@ switch:
             - delay: 50ms
             - component.update: my_display
 
+  # Tiny mushroom on the growing screen. On by default.
+  - platform: template
+    id: screen_mushroom
+    name: "Screen Mushroom"
+    icon: mdi:mushroom-outline
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    web_server:
+      sorting_group_id: grp_system
+      sorting_weight: 3
+    on_turn_on:
+      - if:
+          condition:
+            lambda: 'return id(display_ready);'
+          then:
+            - script.execute: update_mascot
+            - delay: 50ms
+            - component.update: my_display
+    on_turn_off:
+      - if:
+          condition:
+            lambda: 'return id(display_ready);'
+          then:
+            - script.execute: update_mascot
+            - delay: 50ms
+            - component.update: my_display
+
 number:
   - platform: template
     id: target_humidity

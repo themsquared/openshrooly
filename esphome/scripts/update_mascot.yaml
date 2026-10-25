@@ -1,0 +1,51 @@
+# Tiny mushroom in the bottom right of the growing screen.
+# Runs at the end of update_growing_screen (every 10s), so it adds no extra
+# e-paper refreshes. Display-only: reads state, never calls a control manager.
+#   bob    2px down on every other refresh
+#   blink  about once a minute
+#   meh    flat mouth and a sweat drop while humidity is off target
+#   sleep  while a grow is running and the lights are off
+#   and very rarely it does something else.
+
+- id: update_mascot
+  mode: single
+  then:
+    - lambda: |-
+        static uint32_t tick = 0;
+        static uint32_t last_odd = 0;
+        tick++;
+        lv_obj_t *m = id(grow_mascot);
+
+        const bool covered = !lv_obj_has_flag(id(grow_alert_bar), LV_OBJ_FLAG_HIDDEN) ||
+                             !lv_obj_has_flag(id(setup_overlay), LV_OBJ_FLAG_HIDDEN);
+        if (!id(screen_mushroom).state || covered) {
+          lv_obj_add_flag(m, LV_OBJ_FLAG_HIDDEN);
+          return;
+        }
+
+        const std::string phase = id(grow_phase).current_option();
+        const int total = id(grow_days_total).has_state() ? (int) id(grow_days_total).state : 0;
+        const bool growing = !phase.empty() && phase != "Idle" && total > 0;
+        const bool rh_ok = !id(humidity).has_state() || !id(target_humidity).has_state() ||
+            fabsf(id(humidity).state - id(target_humidity).state) <=
+                (id(humidity_hysteresis).has_state() ? id(humidity_hysteresis).state : 0.0f);
+
+        image::Image *frame = id(mascot_idle);
+        int dy = (tick & 1) ? 2 : 0;
+        if (growing && !id(lights_on_flag)) {
+          frame = id(mascot_sleep);
+          dy = (tick & 1) ? 1 : 0;
+        } else if (tick - last_odd > 30 && esp_random() % 90 == 0) {
+          // Roughly once every 15 minutes, never twice in five.
+          frame = id(mascot_surprise);
+          last_odd = tick;
+          dy = 0;
+        } else if (tick % 6 == 0) {
+          frame = id(mascot_blink);
+        } else if (!rh_ok) {
+          frame = id(mascot_meh);
+        }
+
+        lv_image_set_src(m, frame->get_lv_image_dsc());
+        lv_obj_set_style_translate_y(m, dy, LV_PART_MAIN);
+        lv_obj_clear_flag(m, LV_OBJ_FLAG_HIDDEN);

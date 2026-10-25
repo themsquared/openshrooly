@@ -22,6 +22,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+from shroom_mascot import save_firmware_frames as save_mascot_frames
+
 ROOT = Path(__file__).resolve().parents[1]
 ESPHOME = ROOT / "esphome"
 FONTS = ESPHOME / "fonts"
@@ -48,6 +50,7 @@ NEXT_Y = 84
 ALERT_Y, ALERT_H = 78, 24
 STATUS_Y = 112
 SELECT = (224, 107, 294, 126)
+MASCOT_X, MASCOT_Y = 264, 77  # grow_mascot, 24x26, hidden under alerts and setup
 
 
 def parse_bdf(path: Path) -> dict[int, dict]:
@@ -361,6 +364,10 @@ def draw_header(img: Image.Image, fonts: dict[str, BitmapFont], time: str, phase
     small.draw(img, WIDTH - 5 - small.text_width(phase), PHASE_Y, phase)
 
 
+def draw_mascot(img: Image.Image, name: str) -> None:
+    img.paste(Image.open(IMAGES / f"mascot_{name}.png").convert("1"), (MASCOT_X, MASCOT_Y))
+
+
 def draw_growing(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
     img = new_paper()
     draw = ImageDraw.Draw(img)
@@ -375,6 +382,7 @@ def draw_growing(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
         ui.draw(img, (WIDTH - ui.text_width(alert)) // 2, ALERT_Y, alert, color=1)
     else:
         small.draw(img, 5, NEXT_Y, state["next_event"])
+        draw_mascot(img, state.get("mascot", "idle"))
     small.draw(img, 5, STATUS_Y, state.get("status", NO_WIFI_STATUS))
     draw_select(img, small)
     return img
@@ -387,6 +395,8 @@ def draw_idle(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
     draw_heroes(img, fonts, state["temp"], state["rh"])
     draw_meta(img, small, *state["meta"])
     small.draw(img, 5, NEXT_Y, "No grow running")
+    if state.get("mascot"):
+        draw_mascot(img, state["mascot"])
     small.draw(img, 5, STATUS_Y, state.get("status", NO_WIFI_STATUS))
     draw_select(img, small)
     return img
@@ -444,6 +454,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args()
     ensure_fonts()
+    save_mascot_frames()
     fonts = {
         "6x12": BitmapFont(FONTS / "spleen-6x12.bdf"),
         "12x24": BitmapFont(FONTS / "spleen-12x24.bdf"),
@@ -493,10 +504,29 @@ def main() -> None:
                 "rh": "55%",
                 "meta": ("22", "OK", "70", "LOW"),
                 "status": NO_WIFI_STATUS,
+                "mascot": "meh",
             },
             fonts,
         ),
         "idle",
+    )
+    save_pair(
+        draw_growing(
+            {
+                "time": "22:10",
+                "phase_line": "Fruiting, day 6 of 10",
+                "day": 6,
+                "total": 10,
+                "temp": "23.8C",
+                "rh": "90%",
+                "meta": ("24", "OK", "90", "OK"),
+                "next_event": "Lights on 07:00",
+                "status": "Wi-Fi 192.168.1.20",
+                "mascot": "sleep",
+            },
+            fonts,
+        ),
+        "growing-night",
     )
     save_pair(
         draw_wifi_setup(

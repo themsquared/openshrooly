@@ -15,7 +15,7 @@ DISPLAY = ROOT / "esphome" / "components" / "display.yaml"
 LVGL = ROOT / "esphome" / "components" / "lvgl_config.yaml"
 MAIN = ROOT / "esphome" / "lvgl_screens" / "00_main_screen.yaml"
 RENDER = ROOT / "scripts" / "render_epaper_previews.py"
-STEMS = ("growing-in-range", "growing-alert", "idle", "boot-splash", "wifi-setup")
+STEMS = ("growing-in-range", "growing-alert", "growing-night", "idle", "boot-splash", "wifi-setup")
 
 
 def assert_hyphen(path: Path) -> None:
@@ -64,6 +64,19 @@ def main() -> None:
     logo = Image.open(ROOT / "esphome" / "images" / "splash_logo.png")
     assert logo.mode == "1" and 60 <= logo.size[1] <= 68, logo.size
     assert logo.transpose(Image.Transpose.FLIP_LEFT_RIGHT).tobytes() == logo.tobytes(), "logo must be symmetric"
+
+    # Screen mushroom: small 1-bit frames, drawn under the alert bar and setup
+    # overlay, before the Select button so flipping keeps working.
+    for name in ("idle", "meh", "blink", "surprise", "sleep"):
+        frame = Image.open(ROOT / "esphome" / "images" / f"mascot_{name}.png")
+        assert frame.mode == "1" and frame.size == (24, 26), (name, frame.mode, frame.size)
+        assert f"id: mascot_{name}" in display, f"mascot_{name} must live in display.yaml"
+    assert "id: grow_mascot" in main_yaml
+    assert main_yaml.index("id: grow_mascot") < main_yaml.index("id: grow_alert_bar"), \
+        "grow_mascot must come before the alert bar so alerts draw over it"
+    assert "script.execute: update_mascot" in script
+    controls = (ROOT / "esphome" / "components" / "controls.yaml").read_text(encoding="utf-8")
+    assert "id: screen_mushroom" in controls and "RESTORE_DEFAULT_ON" in controls.split("id: screen_mushroom", 1)[1][:300]
 
     render = RENDER.read_text(encoding="utf-8")
     assert '"-:%%/?!,+=-"' in render or "+=-" in render
