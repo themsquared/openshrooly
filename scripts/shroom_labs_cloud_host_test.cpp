@@ -1234,6 +1234,111 @@ int main() {
   eng23.drain_queued();
   expect(eng23.request_count() > queued_before, "queued refresh runs");
 
+  auto count_urls = [](const std::vector<std::string> &urls, const char *part) {
+    size_t n = 0;
+    for (const auto &u : urls)
+      if (u.find(part) != std::string::npos)
+        n++;
+    return n;
+  };
+
+  HostStore store24;
+  ScriptTransport tr24;
+  struct StartCount {
+    int enrolls = 0;
+    CloudJob last = CloudJob::NONE;
+  } starts24;
+  auto start_count = [](void *ctx, CloudJob job) {
+    auto *s = static_cast<StartCount *>(ctx);
+    s->last = job;
+    if (job == CloudJob::ENROLL)
+      s->enrolls++;
+    return true;
+  };
+  tr24.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng24(&tr24, &clk, &store24, &crypto);
+  eng24.set_sync_jobs(false);
+  eng24.set_start_job(+start_count, &starts24);
+  clk.now = 80000;
+  eng24.connect();
+  expect(starts24.enrolls == 1, "connect-loop one start");
+  for (int i = 0; i < 8; i++) {
+    clk.now += 1000;
+    eng24.loop();
+  }
+  expect(starts24.enrolls == 1, "connect-loop no second start");
+  expect(eng24.try_begin(CloudJob::ENROLL), "connect-loop begin");
+  eng24.run_job(CloudJob::ENROLL);
+  eng24.finish();
+  eng24.drain_queued();
+  expect(count_urls(tr24.urls, "/enroll") == 1, "connect-loop one enroll");
+  expect(eng24.state() == CloudState::PendingClaim, "connect-loop pending claim");
+  eng24.set_start_job(nullptr, nullptr);
+  eng24.set_sync_jobs(true);
+
+  HostStore store25;
+  ScriptTransport tr25;
+  tr25.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/self-revoke", ok_body(200, "{\"ok\":true}")},
+                {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng25(&tr25, &clk, &store25, &crypto);
+  expect(eng25.try_begin(CloudJob::ENROLL), "disc-mid-enroll begin");
+  eng25.connect();
+  eng25.loop();
+  eng25.disconnect();
+  expect(std::strstr(eng25.status_json().c_str(), "disconnecting") != nullptr, "disc-mid-enroll json");
+  expect(std::strstr(eng25.status_json().c_str(), "\"claim_code\":\"\"") != nullptr, "disc-mid-enroll no code");
+  expect(eng25.display_code().empty(), "disc-mid-enroll display code");
+  expect(eng25.display_expiry().empty(), "disc-mid-enroll expiry");
+  eng25.run_job(CloudJob::ENROLL);
+  expect(count_urls(tr25.urls, "/self-revoke") == 1, "disc-mid-enroll self-revoke");
+  expect(eng25.state() == CloudState::Off, "disc-mid-enroll wipes");
+  expect(!eng25.cloud_enabled(), "disc-mid-enroll disabled");
+  expect(!eng25.has_key(), "disc-mid-enroll zeros key");
+  eng25.finish();
+  eng25.drain_queued();
+  expect(eng25.state() == CloudState::Off, "disc-mid-enroll stays Off");
+  expect(!eng25.cloud_enabled(), "disc-mid-enroll stays disabled");
+  expect(count_urls(tr25.urls, "/enroll") == 1, "disc-mid-enroll no re-enroll");
+
+  HostStore store26;
+  ScriptTransport tr26;
+  tr26.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                {"/self-revoke", ok_body(200, "{\"ok\":true}")},
+                {"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng26(&tr26, &clk, &store26, &crypto);
+  expect(eng26.try_begin(CloudJob::ENROLL), "connect-during-disc begin");
+  eng26.connect();
+  eng26.disconnect();
+  eng26.connect();
+  expect(eng26.pending_wipe(), "connect-during-disc still wiping");
+  eng26.run_job(CloudJob::ENROLL);
+  expect(eng26.state() == CloudState::Off, "connect-during-disc wipes first");
+  expect(!eng26.has_key(), "connect-during-disc zeros key");
+  eng26.finish();
+  eng26.drain_queued();
+  expect(eng26.state() == CloudState::PendingClaim, "connect-during-disc enrolls");
+  expect(eng26.cloud_enabled(), "connect-during-disc stays on");
+  expect(count_urls(tr26.urls, "/enroll") == 2, "connect-during-disc one kept enroll");
+
+  HostStore store27;
+  ScriptTransport tr27;
+  tr27.steps = {{"/enroll", ok_body(200, enroll_ok)}};
+  CloudEngine eng27(&tr27, &clk, &store27, &crypto);
+  eng27.connect();
+  expect(eng27.claim_code() == "AB2C3D", "wipe-status has code");
+  expect(eng27.try_begin(CloudJob::CSR), "wipe-status begin");
+  eng27.disconnect();
+  expect(eng27.pending_wipe(), "wipe-status pending");
+  const std::string json27 = eng27.status_json();
+  expect(std::strstr(json27.c_str(), "disconnecting") != nullptr, "wipe-status disconnecting");
+  expect(std::strstr(json27.c_str(), "\"claim_code\":\"\"") != nullptr, "wipe-status no claim_code");
+  expect(std::strstr(json27.c_str(), "\"claim_url\":\"\"") != nullptr, "wipe-status no claim_url");
+  expect(std::strstr(json27.c_str(), "\"expires_in_s\":0") != nullptr, "wipe-status no expiry");
+  expect(eng27.display_code().empty(), "wipe-status display code");
+  expect(eng27.display_expiry().empty(), "wipe-status display expiry");
+  expect(eng27.display_title() == std::string("Disconnecting..."), "wipe-status title");
+  eng27.finish();
+
   const char *empty_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
   const char *abc_sha = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
   uint8_t digest[32];

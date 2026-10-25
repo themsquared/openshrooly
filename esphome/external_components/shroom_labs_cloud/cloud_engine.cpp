@@ -322,6 +322,7 @@ void CloudEngine::connect() {
     }
     apply_(CloudEvent::Enable);
     job = CloudJob::ENROLL;
+    next_retry_ms_ = now_() + backoff_ms_;
     save_identity_();
   }
   queue_(job);
@@ -331,8 +332,11 @@ void CloudEngine::disconnect() {
   {
     std::lock_guard<std::mutex> g(lock_);
     pending_wipe_ = true;
-    if (queued_ != CloudJob::ENROLL)
-      queued_ = CloudJob::NONE;
+    queued_ = CloudJob::NONE;
+    claim_code_.clear();
+    claim_url_.clear();
+    claim_expires_.clear();
+    claim_deadline_mono_ = 0;
   }
   if (sync_jobs_ && start_job_ == nullptr) {
     if (!try_begin(CloudJob::REVOKE))
@@ -360,6 +364,7 @@ void CloudEngine::refresh() {
       show_claim_ = true;
       apply_(CloudEvent::Refresh);
       job = CloudJob::ENROLL;
+      next_retry_ms_ = now_() + backoff_ms_;
     }
   }
   queue_(job);
@@ -452,6 +457,8 @@ std::string CloudEngine::display_title() const {
 
 std::string CloudEngine::display_code() const {
   std::lock_guard<std::mutex> g(lock_);
+  if (pending_wipe_)
+    return "";
   if (state_ == CloudState::Linked)
     return "OK";
   if (state_ == CloudState::Off || state_ == CloudState::Owned || state_ == CloudState::WaitClaim ||
@@ -472,7 +479,7 @@ std::string CloudEngine::display_hint() const {
 }
 
 std::string CloudEngine::display_expiry() const {
-  if (state() != CloudState::PendingClaim)
+  if (pending_wipe_ || state() != CloudState::PendingClaim)
     return "";
   uint32_t s = claim_seconds_left();
   if (s == 0)
@@ -487,7 +494,7 @@ std::string CloudEngine::status_json() const {
   std::string url = claim_url_;
   if (url.empty() && !claim_code_.empty() && claim_deadline_mono_ != 0 && !time_reached(now_(), claim_deadline_mono_))
     url = claim_url_for(site_origin_.c_str(), claim_code_.c_str());
-  const bool live = state_ == CloudState::PendingClaim && !claim_code_.empty() &&
+  const bool live = !pending_wipe_ && state_ == CloudState::PendingClaim && !claim_code_.empty() &&
                     (claim_deadline_mono_ == 0 || !time_reached(now_(), claim_deadline_mono_));
   uint32_t left = 0;
   if (live && claim_deadline_mono_ != 0 && !time_reached(now_(), claim_deadline_mono_))
@@ -705,8 +712,17 @@ bool CloudEngine::handle_enroll_() {
     r = http_("POST", "/api/devices/enroll", body, false, false);
   }
   std::lock_guard<std::mutex> g(lock_);
-  if (discard_job_())
+  if (discard_job_()) {
+    if (response_usable(r) && r.status == 200 && enroll_fields_ok(r.body.c_str())) {
+      device_id_.clear();
+      json_get_string(r.body.c_str(), "device_id", &device_id_);
+      if (!enroll_token_.empty())
+        secure_clear(&enroll_token_[0], enroll_token_.size());
+      enroll_token_.clear();
+      json_get_string(r.body.c_str(), "enroll_token", &enroll_token_);
+    }
     return false;
+  }
   const HttpOutcome o = enroll_outcome(response_usable(r), r.status, r.body.c_str());
   if (o == HttpOutcome::Success) {
     if (!store_enroll_(r.body)) {
@@ -1002,7 +1018,7 @@ void CloudEngine::loop() {
     maybe_fill_issued_();
     if (!enabled)
       return;
-    if (st == CloudState::Connecting && time_reached(now, next_retry_ms_)) {
+    if (st == CloudState::Connecting && job_ != CloudJob::ENROLL && time_reached(now, next_retry_ms_)) {
       next_retry_ms_ = now + backoff_ms_;
       enroll_due = true;
     } else if (st == CloudState::PendingClaim || st == CloudState::Issuing) {
