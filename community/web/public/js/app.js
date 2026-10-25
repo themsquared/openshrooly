@@ -41,6 +41,7 @@ function renderNav() {
       <summary>Account</summary>
       <div class="account-menu-links">
         <a href="/account.html">Account</a>
+        <a href="/fleet.html" id="nav-fleet" class="hidden">Chambers</a>
         <a href="/publish.html">Build a profile</a>
         <a href="/moderate.html" id="nav-moderate" class="hidden">Review queue</a>
         <button class="link" id="logout" type="button">Log out</button>
@@ -55,6 +56,11 @@ function renderNav() {
       setToken("");
       location.href = "/";
     });
+    capabilities()
+      .then((caps) => {
+        if (caps.fleet) $("#nav-fleet")?.classList.remove("hidden");
+      })
+      .catch(() => {});
   } else {
     nav.innerHTML = `<a class="nav-signin button" href="/login.html">Sign in</a>`;
   }
@@ -419,6 +425,11 @@ async function renderAccount() {
     setToken("");
     location.href = "/";
   });
+  capabilities()
+    .then((caps) => {
+      if (caps.fleet) $("#fleet-link")?.classList.remove("hidden");
+    })
+    .catch(() => {});
   const devices = await api("/api/devices").catch(() => ({ devices: [] }));
   $("#devices").innerHTML =
     (devices.devices || [])
@@ -711,6 +722,17 @@ if (page === "alerts-unsub") renderUnsubscribe();
 if (page === "claim") renderClaim();
 if (page === "coach") renderCoach().catch((err) => {
   const box = $("#coach-error");
+  if (box) {
+    box.textContent = err.message;
+    box.classList.remove("hidden");
+  }
+});
+if (page === "fleet") renderFleet().catch((err) => {
+  if (err.status === 401) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  const box = $("#fleet-error");
   if (box) {
     box.textContent = err.message;
     box.classList.remove("hidden");
@@ -1280,6 +1302,238 @@ async function renderDevice() {
       flash(msg, err.status === 429 ? "Too many changes this hour. Try again later." : err.message);
     }
   });
+}
+
+function coachLabel(device) {
+  if (device.off_menu) return "Off-menu";
+  if (!device.coach) return "Advisor";
+  if (device.coach.status === "paused") return `Paused: ${device.coach.pause_reason || "paused"}`;
+  if (device.coach.mode === "autopilot") return "Autopilot";
+  return "Advisor";
+}
+
+function drawReadingChart(points) {
+  const svg = $("#reading-chart");
+  if (!svg) return;
+  const temps = points.map((p) => p.temperature).filter((v) => v != null);
+  const hums = points.map((p) => p.humidity).filter((v) => v != null);
+  if (!points.length || (!temps.length && !hums.length)) {
+    svg.innerHTML = `<text x="12" y="72" fill="currentColor">Need a few readings to draw this.</text>`;
+    return;
+  }
+  const minT = Math.min(...temps, 10);
+  const maxT = Math.max(...temps, 32);
+  const minH = Math.min(...hums, 60);
+  const maxH = Math.max(...hums, 100);
+  function series(values, lo, hi, color) {
+    const pts = points
+      .map((p, i) => {
+        const v = values === "temperature" ? p.temperature : p.humidity;
+        if (v == null) return null;
+        const x = 10 + (i / Math.max(1, points.length - 1)) * 340;
+        const y = 120 - ((v - lo) / Math.max(0.1, hi - lo)) * 100;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .filter(Boolean);
+    return `<polyline fill="none" stroke="${color}" stroke-width="2" points="${pts.join(" ")}" />`;
+  }
+  svg.innerHTML =
+    series("temperature", minT, maxT, "#7dffb3") + series("humidity", minH, maxH, "#5ee4ff");
+}
+
+async function renderFleet() {
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  const showError = (err) => {
+    const box = $("#fleet-error");
+    box.textContent = err.message || String(err);
+    box.classList.remove("hidden");
+  };
+  const caps = await capabilities();
+  if (!caps.fleet) {
+    $("#fleet-off").classList.remove("hidden");
+    return;
+  }
+  const detailId = params().get("id");
+  if (detailId) {
+    $("#fleet-detail").classList.remove("hidden");
+    const data = await api(`/api/fleet/devices/${encodeURIComponent(detailId)}`);
+    const d = data.device;
+    $("#detail-name").textContent = d.name;
+    $("#rename-name").value = d.name;
+    $("#detail-meta").textContent = `${d.online ? "Online" : "Offline"} · last seen ${d.last_seen_at || "never"} · firmware ${d.firmware || "unknown"} · cert ${d.cert_expires_at || "none"}`;
+    $("#detail-alerts").innerHTML =
+      (d.alerts || []).map((a) => `<li class="${escapeHtml(a.kind)}">${escapeHtml(a.message)}</li>`).join("") ||
+      `<li class="info">No alerts right now.</li>`;
+    $("#detail-stats").innerHTML = [
+      ["Temperature", d.reading?.temperature, "°C"],
+      ["Humidity", d.reading?.humidity, "%"],
+      ["Temp target", d.setpoints?.temperature_c, "°C"],
+      ["Humidity target", d.setpoints?.humidity_percent, "%"],
+      ["Profile", d.profile?.name || "None", ""],
+      ["Coach", coachLabel(d), ""],
+    ]
+      .map(([label, value, unit]) => `<div class="stat"><strong>${escapeHtml(value == null ? "n/a" : `${value}${unit}`)}</strong><span>${label}</span></div>`)
+      .join("");
+    drawReadingChart(data.history || []);
+    $("#rename-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try {
+        await api(`/api/fleet/devices/${encodeURIComponent(detailId)}`, {
+          method: "PATCH",
+          jsonBody: { name: $("#rename-name").value },
+        });
+        location.reload();
+      } catch (err) {
+        showError(err);
+      }
+    });
+    $("#unlink-device").addEventListener("click", async () => {
+      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      try {
+        await api(`/api/fleet/devices/${encodeURIComponent(detailId)}/unlink`, {
+          method: "POST",
+          jsonBody: { confirm: true },
+        });
+        location.href = "/fleet.html";
+      } catch (err) {
+        showError(err);
+      }
+    });
+    return;
+  }
+
+  $("#fleet-list").classList.remove("hidden");
+  const [list, groups, audit] = await Promise.all([
+    api("/api/fleet/devices"),
+    api("/api/fleet/groups"),
+    api("/api/fleet/audit"),
+  ]);
+  let rows = list.devices || [];
+  const groupRows = groups.groups || [];
+  $("#fleet-group-filter").innerHTML =
+    `<option value="">All chambers</option>` +
+    groupRows.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join("");
+
+  function selectedIds() {
+    return [...document.querySelectorAll("#fleet-rows input[type=checkbox]:checked")].map((el) => el.value);
+  }
+
+  function paint() {
+    const q = ($("#fleet-filter").value || "").toLowerCase();
+    const groupId = $("#fleet-group-filter").value;
+    const sort = $("#fleet-sort").value;
+    let shown = rows.filter((d) => {
+      const hay = `${d.name} ${d.profile?.name || ""} ${d.profile?.id || ""}`.toLowerCase();
+      if (q && !hay.includes(q)) return false;
+      if (groupId && !(d.group_ids || []).includes(Number(groupId))) return false;
+      return true;
+    });
+    shown.sort((a, b) => {
+      if (sort === "status") return Number(b.online) - Number(a.online) || a.name.localeCompare(b.name);
+      if (sort === "seen") return String(b.last_seen_at || "").localeCompare(String(a.last_seen_at || ""));
+      return a.name.localeCompare(b.name);
+    });
+    $("#fleet-rows").innerHTML =
+      shown
+        .map(
+          (d) => `<tr>
+            <td><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></td>
+            <td><a href="/fleet.html?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
+            <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(d.last_seen_at || "never")}</span></td>
+            <td>${d.reading ? `${d.reading.temperature ?? "?"} °C · ${d.reading.humidity ?? "?"}%` : "No reading"}</td>
+            <td>${escapeHtml(d.profile?.name || "None")}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
+            <td>${d.setpoints?.temperature_c ?? "?"} °C · ${d.setpoints?.humidity_percent ?? "?"}%</td>
+            <td>${escapeHtml(coachLabel(d))}</td>
+            <td>${(d.alerts || []).map((a) => escapeHtml(a.message)).join(" ") || "None"}</td>
+          </tr>`
+        )
+        .join("") || `<tr><td colspan="8" class="muted">No chambers yet.</td></tr>`;
+  }
+
+  $("#fleet-filter").addEventListener("input", paint);
+  $("#fleet-sort").addEventListener("change", paint);
+  $("#fleet-group-filter").addEventListener("change", paint);
+  $("#fleet-all").addEventListener("change", () => {
+    for (const box of document.querySelectorAll("#fleet-rows input[type=checkbox]")) box.checked = $("#fleet-all").checked;
+  });
+  paint();
+
+  function bulkBody() {
+    const action = $("#bulk-action").value;
+    const payload = {};
+    if (action === "setpoints") {
+      if ($("#bulk-temp").value) payload.temperature_c = Number($("#bulk-temp").value);
+      if ($("#bulk-rh").value) payload.humidity_percent = Number($("#bulk-rh").value);
+    }
+    if (action === "profile" || action === "light" || action === "coach_mode") {
+      if ($("#bulk-profile").value) payload.profile_id = $("#bulk-profile").value.trim();
+      if ($("#bulk-stage").value) payload.stage = $("#bulk-stage").value.trim();
+    }
+    if (action === "coach_mode") payload.mode = $("#bulk-coach").value;
+    return { action, payload, device_ids: selectedIds(), group_id: $("#fleet-group-filter").value ? Number($("#fleet-group-filter").value) : undefined };
+  }
+
+  async function runBulk(path) {
+    const body = bulkBody();
+    if (!body.device_ids.length && !body.group_id) throw new Error("Pick at least one chamber.");
+    if (body.device_ids.length) delete body.group_id;
+    const data = await api(path, { method: "POST", jsonBody: body });
+    $("#bulk-results").innerHTML = (data.results || [])
+      .map((r) => `<li><strong>${escapeHtml(r.name || r.device_id)}</strong> · ${escapeHtml(r.status)}${r.error ? ` · ${escapeHtml(r.error)}` : ""}</li>`)
+      .join("");
+  }
+  $("#bulk-preview").addEventListener("click", () => runBulk("/api/fleet/preview").catch(showError));
+  $("#bulk-apply").addEventListener("click", () => runBulk("/api/fleet/apply").catch(showError));
+
+  function paintGroups() {
+    $("#group-list").innerHTML =
+      groupRows
+        .map(
+          (g) => `<li>
+            <div><strong>${escapeHtml(g.name)}</strong><p class="muted">${(g.device_ids || []).length} chambers</p></div>
+            <div class="row">
+              <button type="button" class="secondary" data-assign="${g.id}">Assign selected</button>
+              <button type="button" class="secondary" data-rename="${g.id}">Rename</button>
+            </div>
+          </li>`
+        )
+        .join("") || `<li class="muted">No groups yet.</li>`;
+  }
+  paintGroups();
+  $("#group-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      await api("/api/fleet/groups", { method: "POST", jsonBody: { name: $("#group-name").value } });
+      location.reload();
+    } catch (err) {
+      showError(err);
+    }
+  });
+  $("#group-list").addEventListener("click", async (ev) => {
+    const assign = ev.target?.dataset?.assign;
+    const rename = ev.target?.dataset?.rename;
+    try {
+      if (assign) {
+        await api(`/api/fleet/groups/${assign}/members`, { method: "POST", jsonBody: { device_ids: selectedIds() } });
+        location.reload();
+      }
+      if (rename) {
+        const next = prompt("Group name");
+        if (!next) return;
+        await api(`/api/fleet/groups/${rename}`, { method: "PATCH", jsonBody: { name: next } });
+        location.reload();
+      }
+    } catch (err) {
+      showError(err);
+    }
+  });
+  $("#fleet-audit").innerHTML =
+    (audit.entries || [])
+      .map((e) => `<li><strong>${escapeHtml(e.action)}</strong> · ${escapeHtml(e.scope)} · ${escapeHtml(e.created_at)}</li>`)
+      .join("") || `<li class="muted">No changes yet.</li>`;
 }
 
 async function renderUnsubscribe() {

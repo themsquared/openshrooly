@@ -29,6 +29,7 @@ GROW_COACH_PROVIDER = "workers-ai"
 GROW_COACH_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 COACH_AUTOPILOT_ENABLED = "1"
+FLEET_UI_ENABLED = "1"
 
 # Local Autopilot loop. Do not copy this trigger into wrangler.deploy.toml.
 [triggers]

@@ -15,6 +15,7 @@ import { decodePhotoBase64, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
+import { handleFleet } from "./fleet.js";
 import { coachBetaAccess, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
@@ -274,6 +275,8 @@ async function route(method, path, url, request, env) {
   if (authResponse) return authResponse;
   const deviceResponse = await handleDevices(method, path, url, request, env);
   if (deviceResponse) return deviceResponse;
+  const fleetResponse = await handleFleet(method, path, url, request, env);
+  if (fleetResponse) return fleetResponse;
   const coachResponse = await handleCoach(method, path, url, request, env);
   if (coachResponse) return coachResponse;
   const alertsResponse = await handleAlerts(method, path, url, request, env);

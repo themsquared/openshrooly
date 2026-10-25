@@ -1,0 +1,184 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { nowIso } from "../src/crypto.js";
+import { commandExpired, deviceIsOnline, FLEET_ONLINE_MS, validateFleetChange } from "../src/fleet.js";
+import { call, register, testEnv } from "./helpers.js";
+
+const pearlOyster = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../../data/profiles/culinary/pearl-oyster.json"), "utf8")
+);
+const MIGRATION = readFileSync(new URL("../migrations/0008_fleet.sql", import.meta.url), "utf8");
+
+function env(extra = {}) {
+  return testEnv({ GROW_COACH_STUB: "1", FLEET_UI_ENABLED: "1", COACH_AUTOPILOT_ENABLED: "1", ...extra });
+}
+
+async function addDevice(ctx, userId, id, { status = "active", lastSeen = nowIso(), name = "Kitchen" } = {}) {
+  await ctx.db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [id, `hw-${id}`, "{}", name, status, userId, null, null, null, 1, lastSeen, nowIso()]
+  );
+}
+
+async function addReading(ctx, deviceId, doc, createdAt = nowIso()) {
+  await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+    deviceId,
+    JSON.stringify(doc),
+    createdAt,
+  ]);
+}
+
+async function addProfile(ctx, userId, profile) {
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [profile.id, JSON.stringify(profile), userId, 1, nowIso(), nowIso()]
+  );
+}
+
+function statements(sql) {
+  return sql
+    .replace(/--.*$/gm, "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+test("0008 migration is additive CREATE TABLE/INDEX only", () => {
+  const body = MIGRATION.replace(/--.*$/gm, "").replace(/ON DELETE CASCADE/g, "");
+  assert.doesNotMatch(body, /\b(DROP|ALTER|DELETE|UPDATE|INSERT|REPLACE)\b/i);
+  for (const s of statements(MIGRATION)) assert.match(s, /^CREATE (TABLE|INDEX) IF NOT EXISTS /);
+  assert.match(MIGRATION, /device_groups/);
+  assert.match(MIGRATION, /fleet_audit/);
+  assert.match(MIGRATION, /owner_id/);
+});
+
+test("kill switch hides fleet APIs", async () => {
+  const ctx = env({ FLEET_UI_ENABLED: "0" });
+  const { token } = await register(ctx, "off@example.com");
+  const catalog = await call(ctx, "GET", "/api/fleet", { token });
+  assert.equal(catalog.data.available, false);
+  const list = await call(ctx, "GET", "/api/fleet/devices", { token });
+  assert.equal(list.status, 404);
+});
+
+test("users only see and manage their own chambers", async () => {
+  const ctx = env();
+  const a = await register(ctx, "owner@example.com");
+  const b = await register(ctx, "other@example.com");
+  await addDevice(ctx, a.user.id, "dev-a");
+  await addReading(ctx, "dev-a", { temperature: 20, humidity: 88, temperature_setpoint: 20, humidity_setpoint: 88 });
+  const mine = await call(ctx, "GET", "/api/fleet/devices", { token: a.token });
+  assert.equal(mine.status, 200);
+  assert.equal(mine.data.devices.length, 1);
+  assert.equal(mine.data.devices[0].id, "dev-a");
+  const other = await call(ctx, "GET", "/api/fleet/devices", { token: b.token });
+  assert.equal(other.data.devices.length, 0);
+  const sneak = await call(ctx, "GET", "/api/fleet/devices/dev-a", { token: b.token });
+  assert.equal(sneak.status, 403);
+  const rename = await call(ctx, "PATCH", "/api/fleet/devices/dev-a", { token: b.token, body: { name: "Stolen" } });
+  assert.equal(rename.status, 403);
+});
+
+test("bulk setpoints clamp to global limits and record per-device results", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "bulk@example.com");
+  await addDevice(ctx, user.id, "dev-hot", { lastSeen: nowIso() });
+  await addDevice(ctx, user.id, "dev-off", { lastSeen: new Date(Date.now() - 40 * 60 * 1000).toISOString() });
+  await addReading(ctx, "dev-hot", { temperature: 22, humidity: 88, temperature_setpoint: 22, humidity_setpoint: 88 });
+  await addReading(ctx, "dev-off", { temperature: 18, humidity: 90, temperature_setpoint: 18, humidity_setpoint: 90 });
+  await addProfile(ctx, user.id, pearlOyster);
+  const preview = await call(ctx, "POST", "/api/fleet/preview", {
+    token,
+    body: { action: "setpoints", device_ids: ["dev-hot", "dev-off"], payload: { temperature_c: 40, humidity_percent: 99 } },
+  });
+  assert.equal(preview.status, 200, JSON.stringify(preview.data));
+  assert.equal(preview.data.results.length, 2);
+  assert.ok(preview.data.results.every((r) => r.preview.to.temperature_c <= 32));
+  assert.ok(preview.data.results.every((r) => r.preview.to.humidity_percent <= 98));
+  const applied = await call(ctx, "POST", "/api/fleet/apply", {
+    token,
+    body: { action: "setpoints", device_ids: ["dev-hot", "dev-off"], payload: { temperature_c: 18, humidity_percent: 88 } },
+  });
+  assert.equal(applied.status, 200, JSON.stringify(applied.data));
+  const byId = Object.fromEntries(applied.data.results.map((r) => [r.device_id, r]));
+  assert.equal(byId["dev-hot"].status, "applied");
+  assert.equal(byId["dev-off"].status, "queued");
+  const audit = await call(ctx, "GET", "/api/fleet/audit", { token });
+  assert.ok(audit.data.entries.some((e) => e.action === "setpoints" && e.results.length === 2));
+});
+
+test("offline queue expires and is omitted from the device inbox", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "queue@example.com");
+  await addDevice(ctx, user.id, "dev-q", { lastSeen: new Date(Date.now() - 40 * 60 * 1000).toISOString() });
+  const applied = await call(ctx, "POST", "/api/fleet/apply", {
+    token,
+    body: { action: "setpoints", device_ids: ["dev-q"], payload: { temperature_c: 18 } },
+  });
+  assert.equal(applied.data.results[0].status, "queued");
+  const rows = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-q"]);
+  assert.equal(rows.length, 1);
+  const payload = JSON.parse(rows[0].payload);
+  assert.ok(payload.expires_at);
+  assert.equal(commandExpired({ expires_at: new Date(Date.now() - 1000).toISOString() }), true);
+  assert.equal(commandExpired({ expires_at: new Date(Date.now() + 60_000).toISOString() }), false);
+  payload.expires_at = new Date(Date.now() - 1000).toISOString();
+  rows[0].payload = JSON.stringify(payload);
+  assert.equal(commandExpired(JSON.parse(rows[0].payload)), true);
+});
+
+test("Off-menu profiles cannot take a Coach mode change", () => {
+  const plan = validateFleetChange({
+    action: "coach_mode",
+    payload: { mode: "autopilot" },
+    profile: { id: "psi-cube", pack: "psilocybin", restricted: true, tags: ["psilocybin"] },
+  });
+  assert.equal(plan.ok, false);
+  assert.match(plan.error, /off-menu/i);
+});
+
+test("groups stay on owner_id and cannot take another user's chamber", async () => {
+  const ctx = env();
+  const a = await register(ctx, "g1@example.com");
+  const b = await register(ctx, "g2@example.com");
+  await addDevice(ctx, a.user.id, "dev-g");
+  await addDevice(ctx, b.user.id, "dev-b");
+  const created = await call(ctx, "POST", "/api/fleet/groups", { token: a.token, body: { name: "Garage rack" } });
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  assert.equal(created.data.group.owner_id, a.user.id);
+  const stolen = await call(ctx, "POST", `/api/fleet/groups/${created.data.group.id}/members`, {
+    token: a.token,
+    body: { device_ids: ["dev-b"] },
+  });
+  assert.equal(stolen.status, 403);
+  const peek = await call(ctx, "PATCH", `/api/fleet/groups/${created.data.group.id}`, {
+    token: b.token,
+    body: { name: "Mine" },
+  });
+  assert.equal(peek.status, 404);
+});
+
+test("rename and Unlink require confirm and stay on the owner", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "name@example.com");
+  await addDevice(ctx, user.id, "dev-n", { name: "Old" });
+  const named = await call(ctx, "PATCH", "/api/fleet/devices/dev-n", { token, body: { name: "Tent one" } });
+  assert.equal(named.status, 200);
+  assert.equal(named.data.name, "Tent one");
+  const no = await call(ctx, "POST", "/api/fleet/devices/dev-n/unlink", { token, body: {} });
+  assert.equal(no.status, 400);
+  const yes = await call(ctx, "POST", "/api/fleet/devices/dev-n/unlink", { token, body: { confirm: true } });
+  assert.equal(yes.status, 200, JSON.stringify(yes.data));
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-n"]);
+  assert.equal(row.status, "revoked");
+});
+
+test("deviceIsOnline uses a 15 minute window", () => {
+  const now = Date.parse("2026-10-25T12:00:00Z");
+  assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:50:00Z" }, now), true);
+  assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:40:00Z" }, now), false);
+  assert.equal(FLEET_ONLINE_MS, 15 * 60 * 1000);
+});
