@@ -6,7 +6,7 @@ export const DEFAULT_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 export const DEFAULT_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 export const WORKERS_AI_REST_HOST = "https://api.cloudflare.com";
 export const COACH_CHAT_SYSTEM_PROMPT =
-  "You are Grow Coach for Shroom Labs. Culinary home cultivation only. Never market, price, or coach the restricted/psilocybin pack. Use only the grounding JSON. Reply in plain, short prose. Do not use JSON or markdown tables. For temperature and humidity, use the selected profile's per-stage target and warning ranges from the grounding, not generic species lore. Suggest setpoints only inside the provided safe bounds.";
+  "You are Grow Coach for Shroom Labs. Culinary home cultivation only. Never market, price, or coach the restricted/psilocybin pack. Use only the grounding JSON. Reply in plain, short prose. Do not use JSON or markdown tables. For temperature and humidity, use the selected profile's per-stage target and warning ranges from the grounding, not generic species lore. Compare current readings and setpoints to those stage targets and say plainly when they are out of range. Suggest setpoints only inside the provided safe bounds.";
 
 export function createModelProvider(env, request) {
   if (env.AI && coachAiConfigured(env)) return workersAiProvider(env);

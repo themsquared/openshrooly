@@ -6,6 +6,7 @@ import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl, revokeTrackedBlobUrls } from "./photo-upload.js";
 import { queueItemHtml } from "./moderate-queue.js";
+import { escapeHtml, renderSafeMarkdown } from "./safe-markdown.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -674,14 +675,6 @@ async function renderModerate() {
   }
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 bindMobileNav();
 renderNav();
 const page = document.body.dataset.page;
@@ -882,7 +875,7 @@ async function renderCoach() {
         method: "POST",
         jsonBody: { message, device_id: deviceId() || undefined, profile_id: profileId() || undefined },
       });
-      $("#chat-log").insertAdjacentHTML("beforeend", `<div class="chat-bubble">${escapeHtml(data.reply)}</div>`);
+      $("#chat-log").insertAdjacentHTML("beforeend", `<div class="chat-bubble">${renderSafeMarkdown(data.reply)}</div>`);
       await refreshUsage();
     } catch (err) {
       showCoachError(err);

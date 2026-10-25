@@ -6,12 +6,16 @@ import { fileURLToPath } from "node:url";
 import { nowIso } from "../src/crypto.js";
 import {
   buildDeviceModel,
+  compareReadingToStage,
   detectAlerts,
   estimateNeurons,
   estimateUsd,
+  latestReading,
   refuseRestrictedPack,
   SAFE_BOUNDS,
+  safeBoundsForStage,
   suggestSetpoints,
+  TEMPERATURE_CLAMP,
 } from "../src/coach-learn.js";
 import { capabilities, coachAiConfigured, coachLocalRestEnabled } from "../src/providers.js";
 import {
@@ -396,8 +400,10 @@ test("oyster fruiting grounding uses the profile warning band, not a 14-16 C lor
   assert.equal(fruiting.humidity_target_max, 90);
   assert.ok(fruiting.temperature_warning_min_c < 14);
   assert.ok(fruiting.temperature_warning_max_c > 16);
-  assert.deepEqual(SAFE_BOUNDS.temperature_c, [16, 28]);
+  assert.deepEqual(SAFE_BOUNDS.temperature_c, [10, 32]);
+  assert.deepEqual(TEMPERATURE_CLAMP, [10, 32]);
   assert.deepEqual(SAFE_BOUNDS.humidity_percent, [70, 96]);
+  assert.deepEqual(safeBoundsForStage(fruiting).temperature_c, [11, 21]);
 
   const slim = slimCulinaryProfile(pearlOyster);
   assert.equal(slim.stages.find((s) => s.id === "fruiting").temperature_warning_max_c, 21);
@@ -410,6 +416,8 @@ test("coach chat prompt is plain prose grounded in the selected profile stages",
   assert.match(COACH_CHAT_SYSTEM_PROMPT, /selected profile's per-stage/i);
   assert.match(COACH_CHAT_SYSTEM_PROMPT, /not generic species lore/i);
   assert.match(COACH_CHAT_SYSTEM_PROMPT, /safe bounds/i);
+  assert.match(COACH_CHAT_SYSTEM_PROMPT, /current readings and setpoints/i);
+  assert.match(COACH_CHAT_SYSTEM_PROMPT, /out of range/i);
   assert.doesNotMatch(COACH_CHAT_SYSTEM_PROMPT, /Be concise\.$/);
 });
 
@@ -449,8 +457,93 @@ test("chat grounding passes pearl-oyster stage ranges and keeps the safe-bounds 
   assert.equal(fruiting.temperature_warning_max_c, 21);
   assert.equal(fruiting.temperature_target_min, 15);
   assert.equal(fruiting.temperature_target_max, 17);
-  assert.deepEqual(grounding.safe_bounds.temperature_c, [16, 28]);
+  assert.deepEqual(grounding.safe_bounds.temperature_c, [11, 21]);
   assert.deepEqual(grounding.safe_bounds.humidity_percent, [70, 96]);
+});
+
+test("latest reading 22.9 C with a 24 C setpoint is above pearl fruiting's 21 C warning", () => {
+  const fruiting = profileStageTargets(pearlOyster.stages.find((s) => s.id === "fruiting"));
+  const now = Date.parse("2026-10-25T03:00:00Z");
+  const current = latestReading(
+    [
+      {
+        document: { humidity: 88, humidity_setpoint: 88, temperature: 22.9, temperature_setpoint: 24 },
+        created_at: "2026-10-25T02:50:00Z",
+      },
+    ],
+    now
+  );
+  assert.equal(current.temperature, 22.9);
+  assert.equal(current.temperature_setpoint, 24);
+  assert.equal(current.humidity, 88);
+  assert.equal(current.humidity_setpoint, 88);
+  assert.equal(current.reading_at, "2026-10-25T02:50:00Z");
+  assert.equal(current.age_seconds, 600);
+  const flags = compareReadingToStage(current, fruiting);
+  assert.ok(flags.some((f) => f.kind === "temperature_above_warning" && f.value === 22.9 && f.limit === 21));
+  assert.ok(flags.some((f) => f.kind === "temperature_setpoint_above_warning" && f.value === 24 && f.limit === 21));
+  assert.match(flags.find((f) => f.kind === "temperature_above_warning").message, /above the 21/);
+});
+
+test("safe bounds follow profile warning bands so pearl 15 C and king/blue 14 C are reachable", () => {
+  const pearl = profileStageTargets(pearlOyster.stages.find((s) => s.id === "fruiting"));
+  assert.deepEqual(safeBoundsForStage(pearl).temperature_c, [11, 21]);
+  const pearlCool = suggestSetpoints({ humidity_droop: 0, humidity_error: 0, temperature_offset: 1 }, pearl);
+  assert.equal(pearlCool.temperature_c, 15);
+  assert.equal(pearlCool.within_bounds, true);
+
+  const kingFruit = { temperature_c: 14, temperature_warning_min_c: 11, temperature_warning_max_c: 19, humidity_percent: 88 };
+  const blueFruit = { temperature_c: 14, temperature_warning_min_c: 10, temperature_warning_max_c: 20, humidity_percent: 88 };
+  assert.ok(safeBoundsForStage(kingFruit).temperature_c[0] <= 14);
+  assert.ok(safeBoundsForStage(blueFruit).temperature_c[0] <= 14);
+  assert.equal(suggestSetpoints({ sample_count: 0 }, kingFruit).temperature_c, 14);
+  assert.equal(suggestSetpoints({ sample_count: 0 }, blueFruit).temperature_c, 14);
+  assert.deepEqual(safeBoundsForStage({ temperature_warning_min_c: 5, temperature_warning_max_c: 40 }).temperature_c, [10, 32]);
+});
+
+test("chat grounding includes the latest reading and flags pearl fruiting above 21 C", async () => {
+  const calls = [];
+  const ctx = privateBetaEnv({
+    ENVIRONMENT: "local",
+    CF_ACCOUNT_ID: "acc_test",
+    WORKERS_AI_TOKEN: "tok_test",
+    fetch: async (_url, opts) => {
+      calls.push({ body: opts.body });
+      return {
+        ok: true,
+        async json() {
+          return { success: true, result: { response: "22.9 C is above Pearl Oyster's 21 C fruiting warning." } };
+        },
+      };
+    },
+  });
+  const { token, user } = await register(ctx, "hot-oyster@example.com");
+  ctx.COACH_BETA_USER_IDS = String(user.id);
+  await ctx.db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["dev-hot", "hw-hot", "{}", "Kitchen", "claimed", user.id, null, null, null, 1, null, nowIso()]
+  );
+  await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+    "dev-hot",
+    JSON.stringify({ humidity: 88, humidity_setpoint: 88, temperature: 22.9, temperature_setpoint: 24 }),
+    "2026-10-25T02:50:00Z",
+  ]);
+  const chat = await call(ctx, "POST", "/api/coach/chat", {
+    token,
+    body: { message: "Is this too warm?", device_id: "dev-hot", profile_id: "pearl-oyster" },
+  });
+  assert.equal(chat.status, 200, JSON.stringify(chat.data));
+  const sent = JSON.parse(calls[0].body);
+  const userMsg = String(sent.messages[1].content);
+  const grounded = userMsg.match(/^Grounding:\n([\s\S]*)\n\nQuestion: /);
+  assert.ok(grounded);
+  const grounding = JSON.parse(grounded[1]);
+  assert.equal(grounding.current.temperature, 22.9);
+  assert.equal(grounding.current.temperature_setpoint, 24);
+  assert.equal(grounding.current.humidity, 88);
+  assert.ok(grounding.current.age_seconds != null);
+  assert.ok(grounding.reading_vs_targets.some((f) => f.kind === "temperature_above_warning" && f.limit === 21));
+  assert.ok(grounding.reading_vs_targets.some((f) => f.kind === "temperature_setpoint_above_warning"));
 });
 
 test("subscribe stays 503 for a beta user while COACH_PUBLIC is off", async () => {

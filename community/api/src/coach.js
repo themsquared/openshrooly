@@ -20,11 +20,13 @@ import {
   COACH_ITEM,
   COACH_PERIOD_DAYS,
   COACH_PRICE_CENTS,
-  SAFE_BOUNDS,
   buildDeviceModel,
+  compareReadingToStage,
   detectAlerts,
   estimateNeurons,
+  latestReading,
   refuseRestrictedPack,
+  safeBoundsForStage,
   suggestSetpoints,
 } from "./coach-learn.js";
 
@@ -199,6 +201,8 @@ async function loadGrounding(db, user, deviceId, profileId) {
   const profile = pickCoachProfile(culinary, profileId, culinaryReports);
   const stage = profile?.stages?.find((s) => s.id === "fruiting") || profile?.stages?.[0] || {};
   const alerts = detectAlerts(model, samples, stage);
+  const current = latestReading(samples);
+  const reading_vs_targets = compareReadingToStage(current, stage);
   const settings = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
   return {
     device: device ? { id: device.id, name: device.name } : null,
@@ -212,10 +216,12 @@ async function loadGrounding(db, user, deviceId, profileId) {
     })),
     profile,
     library: culinary.slice(0, 12),
-    safe_bounds: SAFE_BOUNDS,
+    safe_bounds: safeBoundsForStage(stage),
     auto_tune: Boolean(Number(settings?.auto_tune)),
     samples,
     stage,
+    current,
+    reading_vs_targets,
   };
 }
 
@@ -230,6 +236,8 @@ export function slimGrounding(grounding) {
     safe_bounds: grounding.safe_bounds,
     auto_tune: grounding.auto_tune,
     stage: grounding.stage,
+    current: grounding.current,
+    reading_vs_targets: grounding.reading_vs_targets,
   };
 }
 
