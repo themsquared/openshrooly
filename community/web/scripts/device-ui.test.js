@@ -68,6 +68,16 @@ test("grow line falls back when no profile is set", () => {
   assert.equal(growLine({}), "No grow selected");
 });
 
+test("account page keeps the old hooks inside named sections", () => {
+  const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/account.html"), "utf8");
+  for (const id of ["profile", "devices", "billing", "security", "community", "who", "verified", "device-cards", "alert-prefs", "sessions", "signout-all", "mint", "my-profiles", "ents", "coach-account"]) {
+    assert.match(html, new RegExp(`id="${id}"`), id);
+  }
+  assert.match(html, /Account sections/);
+  assert.match(html, /Subscriptions and billing/);
+  assert.doesNotMatch(html.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " "), DASH);
+});
+
 test("public device pages stay dash-free", () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), "../public");
   for (const name of ["devices.html", "device.html"]) {
