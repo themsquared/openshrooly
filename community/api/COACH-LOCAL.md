@@ -167,9 +167,11 @@ calls retry briefly with jitter on `SQLITE_BUSY`.
 Prod stays off. Do not add `COACH_AUTOPILOT_ENABLED` or change
 `wrangler.deploy.toml` bindings. When Mike wants a first cloud chamber:
 
-1. **Migration.** Apply `migrations/0009_coach_autopilot_ack.sql` once on
-   the prod D1 (`pending_command_id`, `delivery`, `command_id`,
-   `apply_status`). Fresh `schema.sql` already has those columns.
+1. **Migration.** Apply `migrations/0007_coach_autopilot.sql` first if that
+   table is not already on prod D1, then `migrations/0009_coach_autopilot_ack.sql`
+   (`pending_command_id`, `delivery`, `command_id`, `apply_status`). Fresh
+   `schema.sql` already has those columns. Telemetry ingest stays up if 0009
+   is late; Autopilot ack/infer is skipped until the columns exist.
 2. **Env vars (dashboard, not this repo).**
    `COACH_AUTOPILOT_ENABLED=1` and `COACH_BETA_USER_IDS=82`. Do not add an
    `[ai]` binding for Autopilot. Chat/photo still need AI later.

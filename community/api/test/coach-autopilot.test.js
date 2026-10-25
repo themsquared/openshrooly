@@ -10,6 +10,7 @@ import {
   coachAutopilotFlagOn,
   evaluateAutopilotPause,
   getDeviceMode,
+  inferAutopilotApplyFromReading,
   limitAutopilotStep,
   noteAutopilotCommandAck,
   planAutopilotChange,
@@ -19,6 +20,7 @@ import {
   setDeviceAutopilotMode,
   setpointsMismatch,
 } from "../src/coach-autopilot.js";
+import { withBridgeResult } from "../src/coach-bridge.js";
 import { suggestSetpoints } from "../src/coach-learn.js";
 import { profileStageTargets } from "../src/coach.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
@@ -981,6 +983,177 @@ test("Coach and Autopilot read a 24h telemetry window, not every row", async () 
   });
   assert.equal(result.paused, true);
   assert.match(result.reason, /missing/i);
+});
+
+test("local bridge success then next pass does not pause as a manual change", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "rep@example.com");
+  await subscribe(ctx, token);
+  const t0 = Date.now();
+  await ctx.db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["local-chamber", "hw", "{}", "LAN", "claimed", user.id, null, null, null, 1, nowIso(), nowIso()]
+  );
+  await addPublishedProfile(ctx, user.id);
+  const rd = (sp, rh, at) =>
+    ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+      "local-chamber",
+      JSON.stringify({ humidity: 88, humidity_setpoint: rh, temperature: 21, temperature_setpoint: sp }),
+      new Date(at).toISOString(),
+    ]);
+  await rd(24, 90, t0);
+  await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "local-chamber",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["local-chamber"]);
+  const first = await runAutopilotForDevice(ctx.db, ctx, { device, user, now: t0 });
+  assert.equal(first.applied, true, JSON.stringify(first));
+  const cmd = await ctx.db.one("SELECT * FROM device_commands WHERE id=?", [first.command_id]);
+  await ctx.db.run("UPDATE device_commands SET consumed_at=?, payload=? WHERE id=? AND device_id=?", [
+    nowIso(),
+    JSON.stringify(withBridgeResult(cmd, { status: "sent", sent: true })),
+    cmd.id,
+    "local-chamber",
+  ]);
+  const t1 = t0 + 65 * 60 * 1000;
+  device.last_seen_at = new Date(t1).toISOString();
+  await rd(first.next.temperature_c, first.next.humidity_percent, t1);
+  const second = await runAutopilotForDevice(ctx.db, ctx, { device, user, now: t1 });
+  assert.equal(second.paused, undefined, JSON.stringify(second));
+  assert.notEqual(second.flipped_to, "advisor");
+  const after = await getDeviceMode(ctx.db, "local-chamber", user.id);
+  assert.notEqual(Number(after.pending_command_id), Number(first.command_id));
+  assert.equal(JSON.parse(after.last_setpoints).temperature_c, first.next.temperature_c);
+  assert.equal(after.mode, "autopilot");
+  const firstCmd = await ctx.db.one("SELECT * FROM device_commands WHERE id=?", [first.command_id]);
+  assert.match(firstCmd.payload, /"_ack"/);
+});
+
+test("unknown ack_status is treated as failed, not applied", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "badack@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-badack");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-badack", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-badack",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-badack"]);
+  const first = await runAutopilotForDevice(ctx.db, ctx, { device, user, now: Date.now() });
+  assert.equal(first.applied, true);
+  const acked = await noteAutopilotCommandAck(ctx.db, device, first.command_id, "wat");
+  assert.equal(acked.status, "failed");
+  const state = await getDeviceMode(ctx.db, "dev-badack", user.id);
+  assert.equal(JSON.parse(state.last_setpoints).temperature_c, 24);
+  assert.equal(state.pending_command_id, null);
+});
+
+test("finalize is idempotent on replayed acks", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "idem@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-idem");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-idem", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-idem",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-idem"]);
+  const first = await runAutopilotForDevice(ctx.db, ctx, { device, user, now: Date.now() });
+  assert.equal(first.applied, true);
+  const once = await noteAutopilotCommandAck(ctx.db, device, first.command_id, "applied");
+  assert.equal(once.status, "applied");
+  const logsAfter = await ctx.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=?", ["dev-idem"]);
+  const replay = await noteAutopilotCommandAck(ctx.db, device, first.command_id, "failed");
+  assert.equal(replay.skipped, "already_finalized");
+  assert.equal(replay.status, "applied");
+  const state = await getDeviceMode(ctx.db, "dev-idem", user.id);
+  assert.equal(JSON.parse(state.last_setpoints).temperature_c, 23);
+  const logsReplay = await ctx.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=?", ["dev-idem"]);
+  assert.equal(logsReplay.length, logsAfter.length);
+});
+
+test("Undo refuses apply rows that failed, expired, or were refused", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "noundo@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-noundo");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-noundo", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-noundo",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-noundo"]);
+  const t0 = Date.now();
+  const first = await runAutopilotForDevice(ctx.db, ctx, { device, user, now: t0 });
+  assert.equal(first.applied, true);
+  await noteAutopilotCommandAck(ctx.db, device, first.command_id, "failed");
+  const apply = (await ctx.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", [
+    "dev-noundo",
+    8,
+  ])).find((row) => row.action === "apply");
+  assert.equal(apply.apply_status, "failed");
+  const undo = await call(ctx, "POST", "/api/coach/autopilot/undo", { token, body: { action_id: apply.id } });
+  assert.equal(undo.status, 400);
+});
+
+test("inferAutopilotApplyFromReading does not throw when 0009 columns are missing", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "schema@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-schema");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-schema", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-schema",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-schema"]);
+  const first = await runAutopilotForDevice(ctx.db, ctx, { device, user, now: Date.now() });
+  assert.equal(first.applied, true);
+  const original = ctx.db.run.bind(ctx.db);
+  ctx.db.run = async (sql, params) => {
+    if (String(sql).includes("pending_command_id") || String(sql).includes("apply_status")) {
+      throw new Error("no such column: pending_command_id");
+    }
+    return original(sql, params);
+  };
+  const inferred = await inferAutopilotApplyFromReading(ctx.db, device, {
+    temperature_setpoint: first.next.temperature_c,
+    humidity_setpoint: first.next.humidity_percent,
+  });
+  assert.equal(inferred.skipped, "schema");
+  assert.deepEqual(inferred.reconciled, []);
 });
 
 

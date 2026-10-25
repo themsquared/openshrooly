@@ -820,23 +820,27 @@ export async function handleDevices(method, path, url, request, env) {
       nowIso(),
     ]);
     await db.run("UPDATE cloud_devices SET last_seen_at=? WHERE id=?", [nowIso(), bound.device.id]);
-    if (body.ack_command_id) {
-      const acked = await noteAutopilotCommandAck(
-        db,
-        bound.device,
-        body.ack_command_id,
-        body.ack_status || "applied",
-        body
-      );
-      if (!acked) {
-        await db.run("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?", [
-          nowIso(),
+    try {
+      if (body.ack_command_id) {
+        const acked = await noteAutopilotCommandAck(
+          db,
+          bound.device,
           body.ack_command_id,
-          bound.device.id,
-        ]);
+          body.ack_status || "applied",
+          body
+        );
+        if (!acked) {
+          await db.run("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?", [
+            nowIso(),
+            body.ack_command_id,
+            bound.device.id,
+          ]);
+        }
+      } else {
+        await inferAutopilotApplyFromReading(db, bound.device, body);
       }
-    } else {
-      await inferAutopilotApplyFromReading(db, bound.device, body);
+    } catch {
+      // Autopilot ack/infer must not fail telemetry ingest (missing 0009 columns, etc).
     }
     return json({ ok: true });
   }
