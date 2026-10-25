@@ -64,6 +64,7 @@ async function envContext(env) {
       COACH_PUBLIC: env.COACH_PUBLIC,
       COACH_BETA_USER_IDS: env.COACH_BETA_USER_IDS,
       COACH_AUTOPILOT_ENABLED: env.COACH_AUTOPILOT_ENABLED,
+      FLEET_UI_ENABLED: env.FLEET_UI_ENABLED,
     };
   }
   return env._ctx;

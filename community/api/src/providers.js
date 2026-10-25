@@ -110,6 +110,10 @@ export function pushConfigured() {
   return false;
 }
 
+export function fleetUiEnabled(env = {}) {
+  return String(env.FLEET_UI_ENABLED || "") === "1";
+}
+
 export function capabilities(env = {}, request) {
   const stubs = devStubsEnabled(env, request);
   return {
@@ -119,6 +123,7 @@ export function capabilities(env = {}, request) {
     payments: paymentsConfigured(env) || stubs,
     photos: photosConfigured(env),
     coach: coachAiConfigured(env) && coachPublicEnabled(env),
+    fleet: fleetUiEnabled(env),
     push: pushConfigured() || stubs,
     show_psilocybin: String(env.SHOW_PSILOCYBIN ?? "1") !== "0",
     stubs,

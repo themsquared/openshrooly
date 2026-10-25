@@ -644,6 +644,14 @@ button.nav-toggle {
   background: rgba(125, 255, 179, 0.16);
   color: var(--sl-ink);
 }
+.table-wrap { overflow-x: auto; margin: 0 0 1.2rem; }
+.fleet-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.fleet-table th,
+.fleet-table td { text-align: left; padding: 0.55rem 0.65rem; border-bottom: 1px solid var(--sl-line); vertical-align: top; }
+.fleet-table a { font-weight: 700; }
+.fleet-chart { padding: 0.8rem 1rem 1rem; margin: 1rem 0; }
+.fleet-chart figcaption { margin: 0 0 0.4rem; color: var(--sl-muted); font-size: 0.9rem; }
+.fleet-chart svg { width: 100%; height: auto; display: block; }
 .action-list { list-style: none; padding: 0; margin: 0.8rem 0 0; }
 .action-list li {
   display: flex;

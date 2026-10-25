@@ -85,3 +85,6 @@ The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
   runs on the 15 minute cron. Prod stays off: do not add that flag or a
   Coach cron to `wrangler.deploy.toml`. Use **Run Autopilot now** on the
   Coach page to test without waiting.
+- Chamber list (`FLEET_UI_ENABLED=1`) is on here so you can manage one or
+  many chambers. Prod stays off. Do not add that flag to
+  `wrangler.deploy.toml`.

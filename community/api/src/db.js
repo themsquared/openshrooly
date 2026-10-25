@@ -35,6 +35,9 @@ export function createMemoryDb() {
     coach_cache: [],
     coach_device_mode: [],
     coach_autopilot_log: [],
+    device_groups: [],
+    device_group_members: [],
+    fleet_audit: [],
     totp_pending: [],
     payment_events: [],
     profile_review: [],
@@ -60,6 +63,8 @@ export function createMemoryDb() {
     device_commands: 1,
     device_telemetry: 1,
     coach_autopilot_log: 1,
+    device_groups: 1,
+    fleet_audit: 1,
     profile_photos: 1,
     moderation_log: 1,
     profile_reports: 1,
@@ -903,6 +908,11 @@ function dispatch(mode, tables, ids, sql, params) {
     }
     return {};
   }
+  if (q.startsWith("UPDATE cloud_devices SET name=? WHERE id=")) {
+    const row = tables.cloud_devices.find((d) => d.id === params[1]);
+    if (row) row.name = params[0];
+    return { changes: row ? 1 : 0 };
+  }
   if (q.startsWith("UPDATE cloud_devices SET last_seen_at=")) {
     const row = tables.cloud_devices.find((d) => d.id === params[1]);
     if (row) row.last_seen_at = params[0];
@@ -1144,6 +1154,69 @@ function dispatch(mode, tables, ids, sql, params) {
     const row = tables.coach_autopilot_log.find((r) => Number(r.id) === Number(params[1]));
     if (row) row.undone_at = params[0];
     return {};
+  }
+  if (q.startsWith("SELECT * FROM device_groups WHERE id=")) {
+    return tables.device_groups.filter((g) => Number(g.id) === Number(params[0]));
+  }
+  if (q.startsWith("SELECT * FROM device_groups WHERE owner_id=")) {
+    return tables.device_groups.filter((g) => Number(g.owner_id) === Number(params[0]));
+  }
+  if (q.startsWith("INSERT INTO device_groups")) {
+    const row = {
+      id: ids.device_groups++,
+      owner_id: params[0],
+      name: params[1],
+      created_at: params[2],
+      updated_at: params[3],
+    };
+    tables.device_groups.push(row);
+    return { lastRowId: row.id };
+  }
+  if (q.startsWith("UPDATE device_groups SET name=?")) {
+    const row = tables.device_groups.find((g) => Number(g.id) === Number(params[2]));
+    if (row) {
+      row.name = params[0];
+      row.updated_at = params[1];
+    }
+    return {};
+  }
+  if (q.startsWith("DELETE FROM device_groups WHERE id=")) {
+    const before = tables.device_groups.length;
+    tables.device_groups = tables.device_groups.filter((g) => Number(g.id) !== Number(params[0]));
+    return { changes: before - tables.device_groups.length };
+  }
+  if (q.startsWith("SELECT * FROM device_group_members WHERE group_id=")) {
+    return tables.device_group_members.filter((m) => Number(m.group_id) === Number(params[0]));
+  }
+  if (q.startsWith("SELECT * FROM device_group_members WHERE device_id=")) {
+    return tables.device_group_members.filter((m) => m.device_id === params[0]);
+  }
+  if (q.startsWith("INSERT INTO device_group_members")) {
+    tables.device_group_members.push({ group_id: params[0], device_id: params[1], added_at: params[2] });
+    return {};
+  }
+  if (q.startsWith("DELETE FROM device_group_members WHERE group_id=")) {
+    const before = tables.device_group_members.length;
+    tables.device_group_members = tables.device_group_members.filter((m) => Number(m.group_id) !== Number(params[0]));
+    return { changes: before - tables.device_group_members.length };
+  }
+  if (q.startsWith("INSERT INTO fleet_audit")) {
+    const row = {
+      id: ids.fleet_audit++,
+      owner_id: params[0],
+      actor_id: params[1],
+      action: params[2],
+      scope: params[3],
+      target: params[4],
+      preview: params[5],
+      results: params[6],
+      created_at: params[7],
+    };
+    tables.fleet_audit.push(row);
+    return { lastRowId: row.id };
+  }
+  if (q.startsWith("SELECT * FROM fleet_audit WHERE owner_id=")) {
+    return tables.fleet_audit.filter((r) => Number(r.owner_id) === Number(params[0]));
   }
   if (q.startsWith("INSERT INTO device_telemetry")) {
     tables.device_telemetry.push({

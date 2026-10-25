@@ -5,6 +5,7 @@ Disallow: /account.html
 Disallow: /publish.html
 Disallow: /moderate.html
 Disallow: /device.html
+Disallow: /fleet.html
 Disallow: /alerts-unsub.html
 Disallow: /auth/
 Sitemap: https://shroomlabs.io/sitemap.xml

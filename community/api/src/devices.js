@@ -6,6 +6,7 @@ import { devStubsEnabled } from "./providers.js";
 import { ValidationError } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
 import { noteManualSetpointCommand } from "./coach-autopilot.js";
+import { commandExpired } from "./fleet.js";
 import {
   buildCsr,
   bytesToB64url,
@@ -782,8 +783,12 @@ export async function handleDevices(method, path, url, request, env) {
     const bound = { device: auth.device, cert: auth.cert };
     await db.run("UPDATE cloud_devices SET last_seen_at=? WHERE id=?", [nowIso(), bound.device.id]);
     const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [bound.device.id]);
+    const open = (rows || []).filter((row) => {
+      const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+      return !commandExpired(payload);
+    });
     return json({
-      commands: rows.map((row) => ({
+      commands: open.map((row) => ({
         id: row.id,
         kind: row.kind,
         payload: typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload,
