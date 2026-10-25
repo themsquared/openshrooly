@@ -465,11 +465,7 @@ bool ShroomLabsCloud::fill_qr(QrCode *out) const {
   return qr_encode(url.c_str(), out);
 }
 
-#ifndef OBJECT_ID_MAX_LEN
-#define OBJECT_ID_MAX_LEN 64
-#endif
-
-static const char *entity_object_id(EntityBase *entity, char *buf) {
+static const char *entity_object_id(EntityBase *entity, char (&buf)[OBJECT_ID_MAX_LEN]) {
   buf[0] = '\0';
   if (entity != nullptr)
     entity->get_object_id_to(buf);
