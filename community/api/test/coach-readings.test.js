@@ -1,14 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createMemoryDb } from "../src/db.js";
-import { nowIso } from "../src/crypto.js";
+import { handleWranglerResult } from "../scripts/coach-local-d1.js";
 import {
   ERROR_BACKOFF_MS,
   POLL_INTERVAL_MS,
+  POLL_LOG_MAX_BYTES,
   READINGS_RETENTION_MS,
+  appendRotatedLog,
   buildImportSql,
   nextPollDelay,
   normalizeChamberUrl,
@@ -139,4 +142,41 @@ test("poll prunes readings older than 14 days and backs off 5 minutes on error",
     log() {},
   });
   assert.ok(sleeps.includes(ERROR_BACKOFF_MS));
+});
+
+test("poll D1 errors back off 5 minutes instead of exiting", async () => {
+  assert.throws(() => handleWranglerResult({ status: 1, stderr: "SQLITE_ERROR" }, { throwOnError: true }), /SQLITE_ERROR/);
+  const d1 = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../scripts/coach-local-d1.js"), "utf8");
+  const poller = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../scripts/coach-import-readings.js"), "utf8");
+  assert.match(d1, /throwOnError/);
+  assert.match(d1, /quiet \? \["ignore", "pipe", "pipe"\] : "inherit"/);
+  assert.match(poller, /throwOnError: flag\("poll"/);
+  assert.match(poller, /quiet: flag\("poll"/);
+  const sleeps = [];
+  let ticks = 0;
+  await runPollLoop({
+    stop: () => ++ticks > 2,
+    intervalMs: 1000,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    collectReadings: async () => ({ readings: { humidity: 90, temperature: 16 }, chamberName: "LAN", source: "json" }),
+    execSql: () => {
+      throw new Error("D1 locked");
+    },
+    log() {},
+  });
+  assert.ok(sleeps.includes(ERROR_BACKOFF_MS));
+});
+
+test("poll log rotates in-process at 1 MB, not only at start", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coach-poll-log-"));
+  const file = join(dir, "poll.log");
+  writeFileSync(file, "x".repeat(POLL_LOG_MAX_BYTES));
+  appendRotatedLog(file, "Imported LAN as local-chamber: RH 90% · 16 °C");
+  appendRotatedLog(file, "Imported LAN as local-chamber: RH 91% · 16 °C");
+  assert.ok(existsSync(`${file}.1`));
+  assert.ok(statSync(`${file}.1`).size >= POLL_LOG_MAX_BYTES);
+  const latest = readFileSync(file, "utf8");
+  assert.match(latest, /RH 91%/);
 });

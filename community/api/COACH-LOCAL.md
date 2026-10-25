@@ -67,8 +67,10 @@ npm run coach:local:readings -- --hub http://127.0.0.1:8090
 ```
 
 Poll instead of the untracked Mac `coach-poller.sh` / `coach-poll-once.mjs`
-helpers. GET-only, 5s reachability timeout, 5 minute backoff on error,
-14-day raw retention (pruned on each poll):
+helpers. GET-only, 5s reachability timeout, 5 minute backoff on chamber or
+D1 errors (the process stays up), 14-day raw retention (pruned on each poll).
+One summary line per cycle; wrangler JSON is quiet. The poll log
+(`.wrangler/coach-local/poll.log`) rotates in-process at 1 MB:
 
 ```bash
 # start (Ctrl+C to stop)
@@ -89,15 +91,19 @@ The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
 ## 4. Local Autopilot delivery
 
 The Worker only queues `device_commands`. This Node bridge applies one pending
-setpoint command to the chamber’s local HTTP API (the same
+**setpoints** command to the chamber’s local HTTP API (the same
 `POST /number/…/set` paths the hub uses). It re-validates global clamps,
-profile stage range, and step limits; lights only if they pass the light
-schema; expired or manually overridden commands are refused.
+profile stage range, and step limits. Schedule/light commands are refused
+until they have the same step and override checks. Missing chamber setpoints
+refuse the write (the command is marked failed). Expired or manually
+overridden commands are refused.
 
 Dry-run is the default (`DRY_RUN=1`): it GETs a reading, logs the writes, and
-marks nothing sent. Live writes need `COACH_BRIDGE_LIVE=1` and not `DRY_RUN=1`.
-Live: one command per cycle, at most one write per 10 minutes, GET before and
-after. Kill switch: `touch .wrangler/coach-local/BRIDGE_OFF`.
+marks the row `dry_run` (not sent) so going live cannot replay a backlog.
+Autopilot setpoint commands expire after 30 minutes. Live start expires any
+pending row older than 30 minutes. Live writes need `COACH_BRIDGE_LIVE=1`
+and not `DRY_RUN=1`. Live: one command per cycle, at most one write per 10
+minutes, GET before and after. Kill switch: `touch .wrangler/coach-local/BRIDGE_OFF`.
 
 ```bash
 # start dry-run (Ctrl+C to stop)

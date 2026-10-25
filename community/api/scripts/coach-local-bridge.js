@@ -12,6 +12,7 @@ import {
   BRIDGE_KILL_FILE,
   BRIDGE_STATE_FILE,
   bridgeMode,
+  expireStaleOnLiveStart,
   httpApplyWrites,
   runBridgeCycle,
   stageFromProfile,
@@ -126,6 +127,22 @@ export async function main() {
   );
   if (existsSync(resolvePath(BRIDGE_KILL_FILE))) {
     console.error(`Kill switch on: ${BRIDGE_KILL_FILE}`);
+  }
+  if (bridgeMode(process.env) === "live") {
+    const expired = await expireStaleOnLiveStart({
+      listPendingAll: async () =>
+        wranglerLocalD1Rows(
+          `SELECT * FROM device_commands WHERE device_id=${sqlQuote(deviceId)} AND consumed_at IS NULL ORDER BY id ASC LIMIT 200;`
+        ),
+      markCommand: async (command, result) => {
+        const payload = withBridgeResult(command, result);
+        wranglerLocalD1Command(
+          `UPDATE device_commands SET consumed_at=${sqlQuote(nowIso())}, payload=${sqlQuote(JSON.stringify(payload))} WHERE id=${Number(command.id)} AND device_id=${sqlQuote(deviceId)};`
+        );
+      },
+      log: (event) => console.log(JSON.stringify({ at: nowIso(), ...event })),
+    });
+    if (expired) console.error(`Expired ${expired} stale pending command(s) on live start.`);
   }
 
   do {

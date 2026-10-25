@@ -10,7 +10,15 @@ export const COACH_LOCAL_PERSIST = ".wrangler/coach-local";
 export const COACH_LOCAL_USER_ID = 1;
 export const COACH_LOCAL_DEVICE_ID = "local-chamber";
 
-export function wranglerLocalD1(file) {
+export function handleWranglerResult(result, { throwOnError = false, quiet = false } = {}) {
+  if (!result.status) return result.stdout || "";
+  const detail = String(result.stderr || result.stdout || `wrangler d1 execute failed (${result.status})`).trim();
+  if (throwOnError) throw new Error(detail || "wrangler d1 execute failed");
+  if (!quiet && result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.status);
+}
+
+export function wranglerLocalD1(file, { quiet = false, throwOnError = false } = {}) {
   const result = spawnSync(
     "npx",
     [
@@ -26,9 +34,9 @@ export function wranglerLocalD1(file) {
       "--file",
       file,
     ],
-    { stdio: "inherit", cwd: API_ROOT }
+    { stdio: quiet ? ["ignore", "pipe", "pipe"] : "inherit", encoding: "utf8", cwd: API_ROOT }
   );
-  if (result.status) process.exit(result.status);
+  return handleWranglerResult(result, { quiet, throwOnError });
 }
 
 export function wranglerLocalD1Command(sql, { json = false } = {}) {
@@ -46,12 +54,8 @@ export function wranglerLocalD1Command(sql, { json = false } = {}) {
     sql,
   ];
   if (json) args.push("--json");
-  const result = spawnSync("npx", args, { encoding: "utf8", cwd: API_ROOT });
-  if (result.status) {
-    if (result.stderr) process.stderr.write(result.stderr);
-    process.exit(result.status);
-  }
-  return result.stdout || "";
+  const result = spawnSync("npx", args, { encoding: "utf8", cwd: API_ROOT, stdio: ["ignore", "pipe", "pipe"] });
+  return handleWranglerResult(result, { quiet: true, throwOnError: json });
 }
 
 export function wranglerLocalD1Rows(sql) {
