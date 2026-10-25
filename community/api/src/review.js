@@ -218,13 +218,14 @@ export async function approveReview(db, env, request, { profile, user, row, pack
   const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profile.id]);
   const approvedAt = nowIso();
   for (const photo of photos) {
-    const nextKey = await promoteStoredObject(env?.storage, photo.object_key);
+    const fromKey = photo.object_key;
+    const nextKey = await promoteStoredObject(env?.storage, fromKey);
     await db.run("UPDATE profile_photos SET object_key=?, status='approved', updated_at=? WHERE id=?", [
       nextKey,
       approvedAt,
       photo.id,
     ]);
-    await replaceMediaKey(db, photo.object_key, nextKey, "approved");
+    await replaceMediaKey(db, fromKey, nextKey, "approved");
   }
   await logModeration(db, { profileId: profile.id, actorId: user.id, action: "approve", reason: "" });
   await notifyOwner(db, env, request, row, "approved", "");
@@ -475,9 +476,10 @@ export async function reclassifyUnconfirmedLegacyBatch(db, { limit = RECLASS_BAT
 
 export async function approveReportPhoto(db, env, { report, user }) {
   if (!report || report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
-  const nextKey = report.photo_key ? await promoteStoredObject(env?.storage, report.photo_key) : report.photo_key;
+  const fromKey = report.photo_key;
+  const nextKey = fromKey ? await promoteStoredObject(env?.storage, fromKey) : fromKey;
   await db.run("UPDATE grow_reports SET photo_key=?, photo_status=? WHERE id=?", [nextKey, "approved", report.id]);
-  if (report.photo_key) await replaceMediaKey(db, report.photo_key, nextKey, "approved");
+  if (fromKey) await replaceMediaKey(db, fromKey, nextKey, "approved");
   await logModeration(db, {
     profileId: report.profile_id,
     actorId: user.id,
