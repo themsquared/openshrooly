@@ -5,8 +5,15 @@ import { rateLimit, rateLimitClient } from "./security.js";
 import { devStubsEnabled } from "./providers.js";
 import { ValidationError, validateStageLight } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
-import { inferAutopilotApplyFromReading, noteAutopilotCommandAck, noteManualSetpointCommand } from "./coach-autopilot.js";
-import { commandExpired } from "./fleet.js";
+import {
+  inferAutopilotApplyFromReading,
+  isAutopilotCommand,
+  noteAutopilotCommandAck,
+  setpointsMatch,
+} from "./coach-autopilot.js";
+import { applyDeviceChange, commandExpired } from "./fleet.js";
+import { deviceCapabilities } from "./device-capabilities.js";
+import { loadRecentTelemetry } from "./coach-learn.js";
 import {
   buildCsr,
   bytesToB64url,
@@ -769,16 +776,24 @@ export async function handleDevices(method, path, url, request, env) {
     }
     const issuedAt = nowIso();
     let payload = body.payload || {};
-    if (kind === "schedule") {
-      const light = payload.light || payload;
-      payload = { ...payload, light: validateStageLight(light) };
+    if (kind === "firmware_notice") {
+      const samples = await loadRecentTelemetry(db, device.id);
+      const latest = samples.at(-1);
+      const caps = deviceCapabilities(latest ? JSON.parse(latest.document || "{}") : {});
+      if (!caps.firmware_notice) {
+        return json({ ok: false, status: "failed", error: "This chamber's firmware can't show update notices from the cloud." }, 409);
+      }
+      await db.run(
+        "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
+        [device.id, kind, JSON.stringify(payload), issuedAt, null]
+      );
+      return json({ ok: true, status: "queued", issued_at: issuedAt, local_wins_if_newer: true });
     }
-    await db.run(
-      "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
-      [device.id, kind, JSON.stringify(payload), issuedAt, null]
-    );
-    if (kind === "setpoints") await noteManualSetpointCommand(db, device, payload);
-    return json({ ok: true, issued_at: issuedAt, local_wins_if_newer: true });
+    if (kind === "schedule") payload = { light: validateStageLight(payload.light || payload) };
+    const action = { setpoints: "setpoints", apply_profile: "profile", schedule: "light" }[kind];
+    const result = await applyDeviceChange(db, env, user, device, { action, payload });
+    if (result.status === "failed") return json({ ok: false, ...result }, 409);
+    return json({ ok: true, ...result, issued_at: result.commands?.[0]?.issued_at || issuedAt, local_wins_if_newer: true });
   }
 
   const inboxMatch = path.match(/^\/api\/devices\/([^/]+)\/inbox$/);
@@ -787,6 +802,11 @@ export async function handleDevices(method, path, url, request, env) {
     if (!auth.ok) throwDeviceAuth(auth);
     const bound = { device: auth.device, cert: auth.cert };
     await db.run("UPDATE cloud_devices SET last_seen_at=? WHERE id=?", [nowIso(), bound.device.id]);
+    try {
+      await db.run("UPDATE cloud_devices SET last_inbox_at=? WHERE id=?", [nowIso(), bound.device.id]);
+    } catch {
+      // 0011 not applied yet: commands just stay "queued" until it is.
+    }
     const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [bound.device.id]);
     const open = (rows || []).filter((row) => {
       const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
@@ -830,15 +850,10 @@ export async function handleDevices(method, path, url, request, env) {
           body.ack_status || "applied",
           body
         );
-        if (!acked) {
-          await db.run("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?", [
-            nowIso(),
-            body.ack_command_id,
-            bound.device.id,
-          ]);
-        }
+        if (!acked) await recordDeviceAck(db, bound.device, body);
       } else {
         await inferAutopilotApplyFromReading(db, bound.device, body);
+        await confirmFromReading(db, bound.device, body);
       }
     } catch {
       // Autopilot ack/infer must not fail telemetry ingest (missing 0009 columns, etc).
@@ -847,6 +862,49 @@ export async function handleDevices(method, path, url, request, env) {
   }
 
   return null;
+}
+
+const ACK_STATUSES = new Set(["applied", "refused", "failed"]);
+
+/** Keep the chamber's ack result on a non-Autopilot command so the site can show it. */
+async function recordDeviceAck(db, device, body) {
+  const at = nowIso();
+  const command = await db.one("SELECT * FROM device_commands WHERE id=?", [body.ack_command_id]);
+  if (!command || command.device_id !== device.id) return;
+  const payload = typeof command.payload === "string" ? JSON.parse(command.payload || "{}") : command.payload || {};
+  const raw = String(body.ack_status || "applied");
+  const status = ACK_STATUSES.has(raw) ? raw : "failed";
+  payload._ack = {
+    status,
+    reason: body.ack_reason ? String(body.ack_reason).slice(0, 200) : status === "applied" ? "Chamber confirmed the change." : `Chamber reported ${status}.`,
+    at,
+    via: "ack",
+  };
+  await db.run("UPDATE device_commands SET consumed_at=?, payload=? WHERE id=? AND device_id=?", [
+    at,
+    JSON.stringify(payload),
+    command.id,
+    device.id,
+  ]);
+}
+
+/** A reading that shows a manual setpoint command's targets confirms it applied. */
+async function confirmFromReading(db, device, reading) {
+  const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [device.id]);
+  for (const command of rows || []) {
+    if (command.kind !== "setpoints" || isAutopilotCommand(command)) continue;
+    const payload = typeof command.payload === "string" ? JSON.parse(command.payload || "{}") : command.payload || {};
+    if (commandExpired(payload)) continue;
+    if (!setpointsMatch(reading, payload)) continue;
+    const at = nowIso();
+    payload._ack = { status: "applied", reason: "Chamber readings show the new targets.", at, via: "readings" };
+    await db.run("UPDATE device_commands SET consumed_at=?, payload=? WHERE id=? AND device_id=?", [
+      at,
+      JSON.stringify(payload),
+      command.id,
+      device.id,
+    ]);
+  }
 }
 
 /** Accept only a public P-256 point that imports cleanly; store just {kty, crv, x, y}. */

@@ -18,16 +18,28 @@ import {
   coachAutopilotAvailable,
   coachAutopilotFlagOn,
   getDeviceMode,
+  insertedId,
   noteManualSetpointCommand,
   rememberDeviceProfile,
   setDeviceAutopilotMode,
 } from "./coach-autopilot.js";
 import { fleetUiEnabled } from "./providers.js";
-import { SQL as ALERT_SQL } from "./alerts/store.js";
+import { isoSeconds, SQL as ALERT_SQL } from "./alerts/store.js";
 import { growStage, readRules } from "./alerts/rules.js";
+import { trackableProfile } from "./alerts/profiles.js";
+import {
+  COMMAND_TTL_MS,
+  commandIntent,
+  commandState,
+  controlSupport,
+  deviceCapabilities,
+  IDEMPOTENCY_WINDOW_MS,
+  planForCapabilities,
+} from "./device-capabilities.js";
 
 export const FLEET_ONLINE_MS = READINGS_STALE_MS;
-export const FLEET_COMMAND_TTL_MS = 24 * 60 * 60 * 1000;
+export const FLEET_COMMAND_TTL_MS = COMMAND_TTL_MS;
+export const RECENT_COMMANDS_SQL = "SELECT * FROM device_commands WHERE device_id=? ORDER BY id DESC LIMIT ?";
 export const DEFAULT_DEVICE_TYPE = "shrooly_chamber";
 
 /** Commands the local chamber UI can do that the cloud channel cannot send yet. */
@@ -35,7 +47,7 @@ export const LOCAL_ONLY_CONTROLS = [
   { id: "water_calibration", label: "Water calibration", note: "Empty-tank calibration has to run on the chamber." },
   { id: "humidifier_speed", label: "Humidifier speed", note: "Cloud writes humidity target, not humidifier speed." },
   { id: "humidity_hysteresis", label: "Humidity band", note: "The humidity on/off band is set on the chamber." },
-  { id: "air_period", label: "Air exchange period", note: "Cloud can set fan speed. Period and run time stay on the chamber." },
+  { id: "air_period", label: "Air exchange period", note: "Air exchange period and run time stay on the chamber." },
   { id: "temperature_enable", label: "Temperature control switch", note: "Turning heater requests on or off stays on the chamber." },
   { id: "temperature_hysteresis", label: "Temperature band", note: "The temperature on/off band is set on the chamber." },
   { id: "temperature_warnings", label: "Temperature warnings", note: "Local warning limits stay on the chamber. Account alerts use their own rules." },
@@ -129,9 +141,33 @@ function lightFromStage(stage = {}) {
   };
 }
 
-function firmwareFromReading(reading, raw) {
-  const doc = raw || {};
-  return doc.firmware_version || doc.firmware || doc.version || reading?.firmware || null;
+function latestDocFrom(samples = []) {
+  if (!samples.length) return {};
+  const last = samples.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))).at(-1);
+  return parseJson(last.document, {});
+}
+
+export async function recentCommands(db, deviceId, limit = 20) {
+  return (await db.all(RECENT_COMMANDS_SQL, [deviceId, limit])) || [];
+}
+
+/** Latest commands with their true state, newest first. */
+export async function commandStates(db, device, caps, { limit = 8, now = Date.now() } = {}) {
+  const rows = await recentCommands(db, device.id, limit);
+  return rows.map((row) => commandState(row, { device, caps, now }));
+}
+
+/** An earlier submit of the same change (same request id, or same intent inside the window). */
+function findDuplicate(rows, { kind, payload, requestId, now }) {
+  const intent = commandIntent(kind, payload);
+  for (const row of rows) {
+    const body = parseJson(row.payload, {});
+    if (requestId && body._request_id === requestId && row.kind === kind) return row;
+    const issued = Date.parse(row.issued_at || "");
+    if (!Number.isFinite(issued) || now - issued > IDEMPOTENCY_WINDOW_MS) continue;
+    if (row.kind === kind && commandIntent(row.kind, body) === intent) return row;
+  }
+  return null;
 }
 
 async function loadProfile(db, user, profileId) {
@@ -242,9 +278,8 @@ async function loadGrowTracking(db, user, device, modeRow, current, now) {
 export async function enrichDevice(db, env, user, device, { now = Date.now(), coachAvailable } = {}) {
   const samples = await loadRecentTelemetry(db, device.id, { now });
   const current = latestReading(samples, now);
-  const latestDoc = samples.length
-    ? parseJson(samples.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))).at(-1).document, {})
-    : {};
+  const latestDoc = latestDocFrom(samples);
+  const caps = deviceCapabilities(latestDoc);
   const modeRow = await getDeviceMode(db, device.id, user.id);
   const tracked = await loadGrowTracking(db, user, device, modeRow, current, now);
   const profile = tracked.profile;
@@ -307,14 +342,24 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     },
     light: lightFromStage(stage),
     coach,
-    firmware: firmwareFromReading(current, latestDoc),
+    firmware: caps.firmware,
+    capabilities: { source: caps.source, list: caps.list, ranges: caps.ranges },
+    controls: controlSupport(caps),
+    commands: await commandStates(db, device, caps, { now }),
     cert_expires_at: activeCert?.not_after || null,
     alerts: fleetAlerts({ device, reading: current, stage, now }),
     group_ids: await groupIdsForDevice(db, user.id, device.id),
     off_menu: offMenu,
-    cloud_controls: CLOUD_CONTROLS,
+    cloud_controls: cloudControls(caps),
     local_only: LOCAL_ONLY_CONTROLS,
   };
+}
+
+/** Cloud controls with whether this chamber's firmware can take each one. */
+export function cloudControls(caps) {
+  const support = controlSupport(caps);
+  const key = { setpoints: "temperature", fan: "fan", light: "light", profile: "profile", name: "name", grow: "grow" };
+  return CLOUD_CONTROLS.map((c) => ({ ...c, supported: support[key[c.id]]?.supported ?? true, note: support[key[c.id]]?.note || null }));
 }
 
 export function validateFleetChange({ action, payload = {}, profile, stage, currentSetpoints = {} } = {}) {
@@ -389,13 +434,113 @@ async function resolveTargets(db, user, { device_ids, group_id } = {}) {
   return { devices, scope: devices.length === 1 ? "device" : "selection", target: ids.join(",") };
 }
 
-async function queueCommand(db, device, kind, payload, now) {
-  const body = { ...payload, source: "fleet", expires_at: laterIso(FLEET_COMMAND_TTL_MS) };
-  await db.run(
+async function insertCommand(db, device, kind, payload, { requestId = null, source = "fleet" } = {}) {
+  const body = { ...payload, source, expires_at: laterIso(FLEET_COMMAND_TTL_MS) };
+  if (requestId) body._request_id = requestId;
+  const issuedAt = nowIso();
+  const result = await db.run(
     "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
-    [device.id, kind, JSON.stringify(body), nowIso(), null]
+    [device.id, kind, JSON.stringify(body), issuedAt, null]
   );
-  return deviceIsOnline(device, now) ? "applied" : "queued";
+  return { id: insertedId(result), device_id: device.id, kind, payload: JSON.stringify(body), issued_at: issuedAt, consumed_at: null };
+}
+
+function requestIdFrom(payload = {}) {
+  const raw = payload.request_id;
+  return raw ? String(raw).slice(0, 64) : null;
+}
+
+/** Day the grow would have started for `stageId` to be today's phase. */
+function startForStage(profile, stageId, now, reportedDay = null) {
+  // The chamber's own grow day wins: use it when it puts the grow in the chosen stage,
+  // and leave the start unset (the page shows the chamber's day) when it does not.
+  const day = reportedDay == null || reportedDay === "" ? NaN : Number(reportedDay);
+  if (Number.isFinite(day) && day >= 0) {
+    const start = isoSeconds(now - Math.floor(day) * 86400000).slice(0, 10);
+    return growStage(profile, start, todayUtc(now))?.stage?.id === stageId ? start : null;
+  }
+  const stages = Array.isArray(profile?.stages) ? profile.stages : [];
+  const index = stages.findIndex((s) => s.id === stageId);
+  const before = stages.slice(0, Math.max(0, index)).reduce((sum, s) => sum + (Number(s.duration_days) || 0), 0);
+  return isoSeconds(now - Math.floor(before) * 86400000).slice(0, 10);
+}
+
+/** Make the applied profile the chamber's tracked grow so the Devices card and device page show it. */
+async function setActiveGrow(db, user, device, profile, stageId, now, current = null) {
+  await rememberDeviceProfile(db, device.id, user.id, profile.id);
+  const row = await db.one(ALERT_SQL.rulesGet, [device.id]);
+  const rules = readRules(row && Number(row.user_id) === Number(device.owner_id) ? row.document : null);
+  let grow = { profile_id: null, started_on: null };
+  if (trackableProfile(profile.id)) {
+    const keep =
+      rules.grow?.profile_id === profile.id &&
+      rules.grow?.started_on &&
+      growStage(profile, rules.grow.started_on, todayUtc(now))?.stage?.id === stageId;
+    grow = { profile_id: profile.id, started_on: keep ? rules.grow.started_on : startForStage(profile, stageId, now, current?.grow_day) };
+  }
+  if (grow.profile_id === rules.grow?.profile_id && grow.started_on === rules.grow?.started_on) return;
+  await db.run(ALERT_SQL.rulesPut, [device.id, user.id, JSON.stringify({ ...rules, grow }), isoSeconds(now)]);
+}
+
+function autopilotSteering(env, modeRow) {
+  return coachAutopilotFlagOn(env) && modeRow.mode === "autopilot" && !Number(modeRow.paused);
+}
+
+function profileLabel(profile, stage) {
+  return `${profile?.name || profile?.id || "Profile"}${stage?.name ? ` ${stage.name}` : ""}`;
+}
+
+function translationMessage(plan, translated, profile, stage) {
+  if (!translated?.ok) return null;
+  const notes = [...new Set((translated.skipped || []).map((s) => s.note).filter(Boolean))];
+  if (plan.kind === "apply_profile" && translated.translated) {
+    const sent = translated.commands.find((c) => c.kind === "setpoints")?.payload || {};
+    const parts = [];
+    if (sent.temperature_c != null) parts.push(`${sent.temperature_c} °C`);
+    if (sent.humidity_percent != null) parts.push(`${sent.humidity_percent}% RH`);
+    if (sent.fan_speed_percent != null) parts.push(`fan ${sent.fan_speed_percent}%`);
+    return [`${profileLabel(profile, stage)}: sending ${parts.join(" and ")}.`, ...notes].join(" ");
+  }
+  return notes.length ? notes.join(" ") : null;
+}
+
+/** Everything needed to preview or apply one change on one chamber. */
+async function planChange(db, user, device, { action, payload = {} }, now) {
+  const modeRow = await getDeviceMode(db, device.id, user.id);
+  const profileId = payload.profile_id || modeRow.profile_id;
+  const profile = await loadProfile(db, user, profileId);
+  const samples = await loadRecentTelemetry(db, device.id, { now });
+  const current = latestReading(samples, now);
+  const caps = deviceCapabilities(latestDocFrom(samples));
+  const stage = stageFromProfile(profile, payload.stage || current?.stage);
+  const currentSetpoints = {
+    temperature_c: current?.temperature_setpoint,
+    humidity_percent: current?.humidity_setpoint,
+  };
+  const plan = validateFleetChange({ action, payload, profile, stage, currentSetpoints });
+  const cloudKind = plan.ok && ["setpoints", "apply_profile", "schedule"].includes(plan.kind);
+  const translated = cloudKind ? planForCapabilities(plan, caps, { stage, requested: payload }) : null;
+  return { modeRow, profile, stage, current, caps, plan, translated };
+}
+
+function previewResult(device, { plan, translated, profile, stage }) {
+  if (!plan.ok) return { device_id: device.id, name: device.name, status: "failed", error: plan.error, preview: null };
+  if (translated && !translated.ok) {
+    return { device_id: device.id, name: device.name, status: "failed", error: translated.error, preview: plan.preview };
+  }
+  return {
+    device_id: device.id,
+    name: device.name,
+    status: "ok",
+    error: null,
+    preview: translated ? { ...plan.preview, sends: translated.commands, skipped: translated.skipped } : plan.preview,
+    message: translationMessage(plan, translated, profile, stage),
+  };
+}
+
+/** One change on one owned chamber, capability-checked (also used by POST /api/devices/:id/commands). */
+export async function applyDeviceChange(db, env, user, device, change, now = Date.now()) {
+  return applyOne(db, env, user, device, change, now);
 }
 
 async function applyOne(db, env, user, device, { action, payload }, now) {
@@ -403,41 +548,70 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
   if (device.status !== "active" && device.status !== "claimed") {
     return { device_id: device.id, status: "failed", error: "Chamber is not linked." };
   }
-  const modeRow = await getDeviceMode(db, device.id, user.id);
-  const profileId = payload.profile_id || modeRow.profile_id;
-  const profile = await loadProfile(db, user, profileId);
-  const samples = await loadRecentTelemetry(db, device.id, { now });
-  const current = latestReading(samples, now);
-  const stage = stageFromProfile(profile, payload.stage || current?.stage);
-  const currentSetpoints = {
-    temperature_c: current?.temperature_setpoint,
-    humidity_percent: current?.humidity_setpoint,
-  };
-  const plan = validateFleetChange({ action, payload, profile, stage, currentSetpoints });
-  if (!plan.ok) return { device_id: device.id, name: device.name, status: "failed", error: plan.error, preview: null };
+  const planned = await planChange(db, user, device, { action, payload }, now);
+  const { modeRow, profile, stage, current, caps, plan, translated } = planned;
+  const base = { device_id: device.id, name: device.name };
+  if (!plan.ok) return { ...base, status: "failed", error: plan.error, preview: null };
   if (plan.kind === "coach_mode") {
     if (!coachAutopilotFlagOn(env)) {
-      return { device_id: device.id, name: device.name, status: "failed", error: "Coach Autopilot is off.", preview: plan.preview };
+      return { ...base, status: "failed", error: "Coach Autopilot is off.", preview: plan.preview };
     }
     const result = await setDeviceAutopilotMode(db, env, user, {
       deviceId: device.id,
       mode: plan.payload.mode,
       profileId: plan.payload.profile_id,
     });
-    if (result.error) return { device_id: device.id, name: device.name, status: "failed", error: result.error, preview: plan.preview };
-    return { device_id: device.id, name: device.name, status: "applied", preview: plan.preview };
+    if (result.error) return { ...base, status: "failed", error: result.error, preview: plan.preview };
+    return { ...base, status: "applied", preview: plan.preview };
   }
   if (device.status !== "active") {
-    return { device_id: device.id, name: device.name, status: "failed", error: "Chamber is not linked.", preview: plan.preview };
+    return { ...base, status: "failed", error: "Chamber is not linked.", preview: plan.preview };
   }
-  const status = await queueCommand(db, device, plan.kind, plan.payload, now);
-  if (plan.kind === "setpoints") {
-    await noteManualSetpointCommand(db, device, { ...plan.payload, source: "fleet" });
+  if (!translated.ok) {
+    return { ...base, status: "failed", error: translated.error, skipped: translated.skipped || [], preview: plan.preview };
   }
-  if (plan.kind === "apply_profile" && plan.payload.profile_id) {
-    await rememberDeviceProfile(db, device.id, user.id, plan.payload.profile_id);
+  if (plan.kind === "apply_profile") {
+    await setActiveGrow(db, user, device, profile, plan.payload.stage, now, current);
+    if (autopilotSteering(env, modeRow)) {
+      return {
+        ...base,
+        status: "applied",
+        preview: plan.preview,
+        commands: [],
+        message: `Autopilot now steers toward ${profileLabel(profile, stage)} a step at a time. No direct change was sent.`,
+      };
+    }
   }
-  return { device_id: device.id, name: device.name, status, preview: plan.preview };
+  const requestId = requestIdFrom(payload);
+  const recent = await recentCommands(db, device.id, 20);
+  const states = [];
+  let deduped = false;
+  for (const command of translated.commands) {
+    const dup = findDuplicate(recent, { kind: command.kind, payload: command.payload, requestId, now });
+    const row = dup || (await insertCommand(db, device, command.kind, command.payload, { requestId }));
+    if (dup) deduped = true;
+    else if (command.kind === "setpoints") await noteManualSetpointCommand(db, device, { ...command.payload, source: "fleet" });
+    states.push(commandState(row, { device, caps, now }));
+  }
+  const status = states.some((c) => c.status === "failed")
+    ? "failed"
+    : states.every((c) => c.status === "applied")
+      ? "applied"
+      : states.some((c) => c.status === "delivered")
+        ? "delivered"
+        : "queued";
+  return {
+    ...base,
+    status,
+    command_id: states[0]?.id ?? null,
+    command_ids: states.map((c) => c.id),
+    commands: states,
+    deduped,
+    translated: Boolean(translated.translated),
+    skipped: translated.skipped || [],
+    message: translationMessage(plan, translated, profile, stage),
+    preview: { ...plan.preview, sends: translated.commands },
+  };
 }
 
 async function writeAudit(db, user, { action, scope, target, preview, results }) {
@@ -499,6 +673,16 @@ export async function handleFleet(method, path, url, request, env) {
     return json({ device: await enrichDevice(db, env, user, device), history });
   }
 
+  const commandsMatch = path.match(/^\/api\/fleet\/devices\/([^/]+)\/commands$/);
+  if (commandsMatch && method === "GET") {
+    const device = await ownedDevice(db, user, decodeURIComponent(commandsMatch[1]));
+    if (!device) return json({ error: "not your device" }, 403);
+    const now = Date.now();
+    const caps = deviceCapabilities(latestDocFrom(await loadRecentTelemetry(db, device.id, { now })));
+    const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit")) || 10));
+    return json({ device_id: device.id, commands: await commandStates(db, device, caps, { limit, now }) });
+  }
+
   if (detail && method === "PATCH") {
     write();
     const device = await ownedDevice(db, user, decodeURIComponent(detail[1]));
@@ -538,30 +722,8 @@ export async function handleFleet(method, path, url, request, env) {
     const body = await request.json().catch(() => ({}));
     const now = Date.now();
     if (deviceAction[2] === "preview") {
-      const modeRow = await getDeviceMode(db, device.id, user.id);
-      const profile = await loadProfile(db, user, body.payload?.profile_id || modeRow.profile_id);
-      const samples = await loadRecentTelemetry(db, device.id, { now });
-      const current = latestReading(samples, now);
-      const stage = stageFromProfile(profile, body.payload?.stage || current?.stage);
-      const plan = validateFleetChange({
-        action: body.action,
-        payload: body.payload || {},
-        profile,
-        stage,
-        currentSetpoints: { temperature_c: current?.temperature_setpoint, humidity_percent: current?.humidity_setpoint },
-      });
-      return json({
-        scope: "device",
-        results: [
-          {
-            device_id: device.id,
-            name: device.name,
-            status: plan.ok ? "ok" : "failed",
-            error: plan.error || null,
-            preview: plan.preview || null,
-          },
-        ],
-      });
+      const planned = await planChange(db, user, device, { action: body.action, payload: body.payload || {} }, now);
+      return json({ scope: "device", results: [previewResult(device, planned)] });
     }
     const result = await applyOne(db, env, user, device, { action: body.action, payload: body.payload || {} }, now);
     await writeAudit(db, user, {
@@ -660,25 +822,8 @@ export async function handleFleet(method, path, url, request, env) {
     const results = [];
     for (const device of devices) {
       if (path.endsWith("/preview")) {
-        const modeRow = await getDeviceMode(db, device.id, user.id);
-        const profile = await loadProfile(db, user, body.payload?.profile_id || modeRow.profile_id);
-        const samples = await loadRecentTelemetry(db, device.id, { now });
-        const current = latestReading(samples, now);
-        const stage = stageFromProfile(profile, body.payload?.stage || current?.stage);
-        const plan = validateFleetChange({
-          action: body.action,
-          payload: body.payload || {},
-          profile,
-          stage,
-          currentSetpoints: { temperature_c: current?.temperature_setpoint, humidity_percent: current?.humidity_setpoint },
-        });
-        results.push({
-          device_id: device.id,
-          name: device.name,
-          status: plan.ok ? "ok" : "failed",
-          error: plan.error || null,
-          preview: plan.preview || null,
-        });
+        const planned = await planChange(db, user, device, { action: body.action, payload: body.payload || {} }, now);
+        results.push(previewResult(device, planned));
       } else {
         results.push(await applyOne(db, env, user, device, { action: body.action, payload: body.payload || {} }, now));
       }

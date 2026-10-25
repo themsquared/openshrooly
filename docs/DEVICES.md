@@ -161,6 +161,38 @@ npx wrangler secret put CF_API_TOKEN     # Zone SSL and Certificates Edit
 
 Local / CI uses the Worker CA (`DEVICE_ISSUER=worker`). Never commit the CA key.
 
+## Commands: capabilities and true state
+
+The site never says "applied" when it queues a change. Every cloud write is a row in `device_commands`, and its state comes from the chamber:
+
+| State | Meaning |
+| --- | --- |
+| `queued` | Saved in the cloud. The chamber has not polled its inbox since. |
+| `delivered` | The chamber polled its inbox (`cloud_devices.last_inbox_at`, migration 0011) or took the command, but has not confirmed it. |
+| `applied` | Confirmed: an `ack_status: applied` in telemetry, or a later reading whose targets match the command. |
+| `failed` | The chamber acked `failed` or `refused` (for example "No setpoints."), or the site refused the change before sending it. |
+| `expired` | Not confirmed within 24 hours (`expires_at`). Commands the firmware can't run say so in the reason. |
+
+`GET /api/fleet/devices/:id/commands` lists recent commands with these states. The device page and fleet page show them and re-check while anything is queued or delivered.
+
+### Capabilities
+
+A chamber may report `firmware_version` and `capabilities` (a list of tokens) in telemetry. Tokens: `setpoints.temperature`, `setpoints.humidity`, `setpoints.fan`, `light.schedule`, `light.color`, `apply_profile`, `firmware_notice`. A chamber that reports none (1.0.4-sl.2 today) is treated as `setpoints.temperature` + `setpoints.humidity`, within the firmware clamp of 10 to 32 °C and 60 to 98 % RH intersected with the chamber's reported min/max.
+
+The API returns `firmware`, `capabilities` and per-control `controls` on each device, and every write is checked against them:
+
+- **Profile apply** on setpoint-only firmware becomes one `setpoints` command with the chosen phase's temperature and RH (plus fan if `setpoints.fan`). Light is skipped with a note unless `light.schedule` is reported. It also sets the chamber's active grow profile and species (Autopilot profile and alert grow tracking), so the Devices card and device page show it. If Autopilot is on and steering, Apply only switches Autopilot's target and sends nothing direct.
+- **Fan-only, light, and update-notice changes** are refused with a plain message on firmware that can't take them.
+- **Repeat submits**: the same `request_id`, or the same change to the same chamber within 60 seconds, returns the existing command (`deduped: true`) instead of queueing another. The buttons are disabled while a send is in flight.
+
+### Firmware follow-ups (not changed yet)
+
+1.0.4-sl.2's cloud apply (`plan_setpoint_command`) only handles `setpoints` with temperature and humidity. To let the site do more, the firmware needs to:
+
+1. Report `firmware_version` and a `capabilities` list in telemetry.
+2. Accept cloud writes to the existing number entities: `air_exchange_speed` (fan), `air_exchange_period_min`, `air_exchange_run_sec`, `sunrise_hour`, `light_hours`, `white_intensity`, `color_r`, `color_g`, `color_b`, plus the `grow_phase` select, and report `setpoints.fan` / `light.schedule` / `light.color` when it does.
+3. Optionally handle `apply_profile` natively (and report `apply_profile`), and ack every command kind it ignores with `ack_status: refused` so nothing sits unanswered.
+
 ## UX
 
 - Device: large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. The component is in the default 1.0.x-sl build and stays off until that toggle.

@@ -12,6 +12,11 @@ import {
   renderDeviceCards,
   renderIdentity,
   speciesLine,
+  renderCommandList,
+  resultMessage,
+  commandStatusLabel,
+  commandPending,
+  newRequestId,
 } from "../public/js/device-ui.js";
 
 const DASH = /[\u2013\u2014]/;
@@ -88,4 +93,75 @@ test("public device pages stay dash-free", () => {
     assert.doesNotMatch(text, DASH, name);
     assert.doesNotMatch(text, /setpoint/i, name);
   }
+});
+
+// What the API sends for a 1.0.4-sl.2 chamber: setpoints only, no firmware version reported.
+const SL2_CONTROLS = {
+  temperature: { supported: true, note: null },
+  humidity: { supported: true, note: null },
+  fan: { supported: false, note: "This chamber's firmware can't change fan speed from the cloud yet. Set it on the chamber." },
+  light: { supported: false, note: "This chamber's firmware can't take light settings from the cloud yet. Set them on the chamber." },
+  profile: {
+    supported: true,
+    mode: "translated",
+    note: "This chamber's firmware can't load a whole profile, so Apply sends the phase's temperature and humidity targets.",
+  },
+};
+const sl2 = { ...pearl, firmware: null, capabilities: { source: "inferred", list: ["setpoints.temperature", "setpoints.humidity"] }, controls: SL2_CONTROLS };
+
+function tagFor(html, name) {
+  return html.match(new RegExp(`<input name="${name}"[^>]*>`))[0];
+}
+
+test("controls the firmware can't take are disabled with a plain note", () => {
+  const html = renderControls(sl2, { profiles: [pearl.profile], canWrite: true });
+  assert.match(tagFor(html, "fan_speed_percent"), /disabled/);
+  assert.match(tagFor(html, "white_led_lux"), /disabled/);
+  assert.match(html, /<button type="submit" data-action="light" disabled>/);
+  assert.doesNotMatch(tagFor(html, "temperature_c"), /disabled/);
+  assert.doesNotMatch(tagFor(html, "humidity_percent"), /disabled/);
+  assert.match(html, /<button type="submit" data-action="profile">/);
+  assert.match(html, /can't change fan speed from the cloud/);
+  assert.match(html, /can't take light settings from the cloud/);
+  assert.match(html, /can't load a whole profile/);
+  assert.match(html, /Firmware version not reported/);
+  assert.doesNotMatch(html, DASH);
+});
+
+test("a chamber that reports light support keeps the light controls on", () => {
+  const html = renderControls(
+    { ...sl2, firmware: "2.0.0", capabilities: { source: "reported" }, controls: { ...SL2_CONTROLS, light: { supported: true, note: null } } },
+    { canWrite: true }
+  );
+  assert.doesNotMatch(tagFor(html, "white_led_lux"), /disabled/);
+  assert.match(html, /Firmware 2\.0\.0/);
+});
+
+test("command states read plainly and queued is never called applied", () => {
+  assert.equal(commandStatusLabel("queued"), "Queued, waiting for the chamber");
+  assert.equal(commandStatusLabel("delivered"), "Delivered, not confirmed yet");
+  assert.equal(commandStatusLabel("applied"), "Applied, confirmed by the chamber");
+  assert.equal(commandStatusLabel("expired"), "Expired");
+  assert.ok(commandPending({ status: "queued" }));
+  assert.ok(commandPending({ status: "delivered" }));
+  assert.ok(!commandPending({ status: "applied" }));
+  const html = renderCommandList([
+    { id: 2, kind: "apply_profile", status: "delivered", summary: "Profile lions-mane, fruiting", reason: "This chamber's firmware can't run profile commands, so it will not be applied.", issued_at: "2026-10-25T19:14:08Z" },
+    { id: 1, kind: "setpoints", status: "applied", summary: "17 °C, 90% RH", issued_at: "2026-10-25T19:05:00Z" },
+  ]);
+  assert.match(html, /Delivered, not confirmed yet/);
+  assert.match(html, /can't run profile commands/);
+  assert.match(html, /Applied, confirmed by the chamber/);
+  assert.match(renderCommandList([]), /Nothing sent from the cloud yet/);
+  const queued = resultMessage({ status: "queued", command_id: 5 });
+  assert.match(queued, /Queued/);
+  assert.doesNotMatch(queued.replace(/shows as applied only after/, ""), /applied/i);
+  assert.match(resultMessage({ status: "queued", deduped: true }), /already sent/);
+  assert.match(resultMessage({ status: "failed", error: "No light from the cloud." }), /No light/);
+});
+
+test("each submit gets its own request id", () => {
+  const a = newRequestId();
+  const b = newRequestId();
+  assert.ok(a && b && a !== b);
 });

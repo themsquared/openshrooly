@@ -13,6 +13,11 @@ import {
   growLine,
   lastSeenLine,
   renderControls,
+  renderCommandList,
+  resultMessage,
+  newRequestId,
+  commandPending,
+  commandStatusLabel,
   renderDeviceCards,
   renderGauges,
   renderIdentity,
@@ -91,8 +96,8 @@ function bindLightForm(form, { summary, error, status, send } = {}) {
       return;
     }
     try {
-      await send(light);
-      if (status) status.textContent = "Sent.";
+      const said = await send(light);
+      if (status) status.textContent = typeof said === "string" && said ? said : "Sent.";
     } catch (err) {
       if (status) status.textContent = err.message || String(err);
       if (error) {
@@ -1440,6 +1445,7 @@ async function renderDevice() {
         <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>
       </figure>
       ${renderControls(device, { profiles: catalog.profiles, canWrite, showCoach })}
+      ${renderCommandList(device.commands || [])}
       ${renderReadonlyNotes(device)}
       <p class="row">
         <button type="button" class="secondary" id="unlink-device">Unlink</button>
@@ -1510,59 +1516,105 @@ function numberOrUndefined(value) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/** Keep the Recent changes list honest: re-read it while anything is still queued or delivered. */
+function watchDeviceCommands(id, { everyMs = 15000, forMs = 10 * 60 * 1000 } = {}) {
+  const started = Date.now();
+  let timer = null;
+  const tick = async () => {
+    try {
+      const data = await api(`/api/fleet/devices/${encodeURIComponent(id)}/commands`);
+      const list = document.querySelector("#device-commands");
+      if (list) list.outerHTML = renderCommandList(data.commands || []).match(/<ul id="device-commands"[\s\S]*?<\/ul>/)[0];
+      if ((data.commands || []).some(commandPending) && Date.now() - started < forMs) timer = setTimeout(tick, everyMs);
+    } catch {
+      timer = null;
+    }
+  };
+  clearTimeout(watchDeviceCommands.timer);
+  timer = setTimeout(tick, 1500);
+  watchDeviceCommands.timer = timer;
+}
+
+/** Run one write with its buttons disabled, so a fast second click cannot send it again. */
+async function inFlight(form, run) {
+  if (form.dataset.busy === "1") return;
+  form.dataset.busy = "1";
+  const buttons = [...form.querySelectorAll("button[type=submit], button[data-action]")];
+  const was = buttons.map((b) => b.disabled);
+  buttons.forEach((b) => (b.disabled = true));
+  try {
+    await run();
+  } finally {
+    buttons.forEach((b, i) => (b.disabled = was[i]));
+    delete form.dataset.busy;
+  }
+}
+
 function bindDeviceControls(id, device, { canWrite }) {
   const form = $("#device-controls");
   const msg = $("#device-controls-msg");
-  form?.addEventListener("submit", async (ev) => {
+  if ((device.commands || []).some(commandPending)) watchDeviceCommands(id);
+  form?.addEventListener("submit", (ev) => {
     ev.preventDefault();
     if (!canWrite) return;
     const action = ev.submitter?.dataset?.action;
-    try {
-      if (action === "name") {
-        await api(`/api/fleet/devices/${encodeURIComponent(id)}`, {
-          method: "PATCH",
-          jsonBody: { name: form.device_name.value },
+    inFlight(form, async () => {
+      try {
+        if (action === "name") {
+          await api(`/api/fleet/devices/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            jsonBody: { name: form.device_name.value },
+          });
+          flash(msg, "Name saved.");
+          location.reload();
+          return;
+        }
+        const payload = { request_id: newRequestId() };
+        if (action === "climate" || action === "setpoints") {
+          payload.temperature_c = numberOrUndefined(form.temperature_c.value);
+          payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
+          // A disabled fan box means this firmware can't take it; don't ask.
+          if (!form.fan_speed_percent.disabled) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
+        }
+        if (action === "profile") {
+          payload.profile_id = form.profile_id.value;
+          payload.stage = form.stage.value;
+        }
+        if (action === "light") {
+          payload.light = {
+            sunrise_hour: numberOrUndefined(form.sunrise_hour.value),
+            duration_hours: numberOrUndefined(form.duration_hours.value),
+            white_led_lux: numberOrUndefined(form.white_led_lux.value),
+            red_percent: numberOrUndefined(form.red_percent.value),
+            green_percent: numberOrUndefined(form.green_percent.value),
+            blue_percent: numberOrUndefined(form.blue_percent.value),
+          };
+          const issues = collectStageLightIssues(payload.light);
+          if (issues.length) throw new Error(issues[0].message);
+        }
+        if (action === "coach_mode") {
+          payload.mode = form.coach_mode.value;
+          payload.profile_id = form.profile_id.value || device.profile?.id;
+        }
+        flash(msg, "Sending...");
+        const applied = await api(`/api/fleet/devices/${encodeURIComponent(id)}/apply`, {
+          method: "POST",
+          jsonBody: { action: action === "climate" ? "setpoints" : action, payload },
         });
-        flash(msg, "Name saved.");
-        location.reload();
-        return;
+        const result = applied.results?.[0];
+        if (!result || result.status === "failed") throw new Error(resultMessage(result));
+        flash(msg, resultMessage(result));
+        if (action === "profile") {
+          // Profile and species on the page come from the server; show what it now tracks.
+          const fresh = await api(`/api/fleet/devices/${encodeURIComponent(id)}`).catch(() => null);
+          const identity = document.querySelector(".device-identity");
+          if (fresh?.device && identity) identity.outerHTML = renderIdentity(fresh.device);
+        }
+        if (result.command_id) watchDeviceCommands(id);
+      } catch (err) {
+        flash(msg, err.message);
       }
-      const payload = {};
-      if (action === "climate" || action === "setpoints") {
-        payload.temperature_c = numberOrUndefined(form.temperature_c.value);
-        payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
-        payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
-      }
-      if (action === "profile") {
-        payload.profile_id = form.profile_id.value;
-        payload.stage = form.stage.value;
-      }
-      if (action === "light") {
-        payload.light = {
-          sunrise_hour: numberOrUndefined(form.sunrise_hour.value),
-          duration_hours: numberOrUndefined(form.duration_hours.value),
-          white_led_lux: numberOrUndefined(form.white_led_lux.value),
-          red_percent: numberOrUndefined(form.red_percent.value),
-          green_percent: numberOrUndefined(form.green_percent.value),
-          blue_percent: numberOrUndefined(form.blue_percent.value),
-        };
-        const issues = collectStageLightIssues(payload.light);
-        if (issues.length) throw new Error(issues[0].message);
-      }
-      if (action === "coach_mode") {
-        payload.mode = form.coach_mode.value;
-        payload.profile_id = form.profile_id.value || device.profile?.id;
-      }
-      const applied = await api(`/api/fleet/devices/${encodeURIComponent(id)}/apply`, {
-        method: "POST",
-        jsonBody: { action: action === "climate" ? "setpoints" : action, payload },
-      });
-      const result = applied.results?.[0];
-      if (!result || result.status === "failed") throw new Error(result?.error || "The chamber did not accept that change.");
-      flash(msg, result.status === "queued" ? "Saved. The chamber will pick it up when it is back." : "Saved.");
-    } catch (err) {
-      flash(msg, err.message);
-    }
+    });
   });
   $("#unlink-device")?.addEventListener("click", async () => {
     if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
@@ -1636,14 +1688,22 @@ async function renderFleet() {
       blue: $("#detail-blue"),
       summary: $("#detail-light-summary"),
     });
-    bindLightForm($("#detail-light-form"), {
+    const lightForm = $("#detail-light-form");
+    if (lightForm && d.controls?.light?.supported === false) {
+      for (const el of lightForm.querySelectorAll("input, button, select")) el.disabled = true;
+      lightForm.insertAdjacentHTML("afterbegin", `<p class="muted control-note">${escapeHtml(d.controls.light.note)}</p>`);
+    }
+    bindLightForm(lightForm, {
       summary: $("#detail-light-summary"),
       status: $("#detail-light-msg"),
       send: async (light) => {
-        await api("/api/fleet/apply", {
+        const data = await api("/api/fleet/apply", {
           method: "POST",
-          jsonBody: { action: "light", device_ids: [detailId], payload: { light } },
+          jsonBody: { action: "light", device_ids: [detailId], payload: { light, request_id: newRequestId() } },
         });
+        const result = data.results?.[0];
+        if (!result || result.status === "failed") throw new Error(resultMessage(result));
+        return resultMessage(result);
       },
     });
     $("#rename-form").addEventListener("submit", async (ev) => {
@@ -1752,6 +1812,7 @@ async function renderFleet() {
       if (Object.keys(light).length) payload.light = light;
     }
     if (action === "coach_mode") payload.mode = $("#bulk-coach").value;
+    payload.request_id = newRequestId();
     return { action, payload, device_ids: selectedIds(), group_id: $("#fleet-group-filter").value ? Number($("#fleet-group-filter").value) : undefined };
   }
 
@@ -1760,12 +1821,29 @@ async function renderFleet() {
     if (!body.device_ids.length && !body.group_id) throw new Error("Pick at least one chamber.");
     if (body.device_ids.length) delete body.group_id;
     const data = await api(path, { method: "POST", jsonBody: body });
+    const preview = path.endsWith("/preview");
     $("#bulk-results").innerHTML = (data.results || [])
-      .map((r) => `<li><strong>${escapeHtml(r.name || r.device_id)}</strong> · ${escapeHtml(r.status)}${r.error ? ` · ${escapeHtml(r.error)}` : ""}</li>`)
+      .map((r) => {
+        const label = preview ? (r.status === "ok" ? "Ready to send" : r.status) : r.status === "failed" ? "Failed" : commandStatusLabel(r.status);
+        const detail = preview ? r.error || r.message || "" : resultMessage(r);
+        return `<li><strong>${escapeHtml(r.name || r.device_id)}</strong> · ${escapeHtml(label)}${detail ? ` · ${escapeHtml(detail)}` : ""}</li>`;
+      })
       .join("");
   }
-  $("#bulk-preview").addEventListener("click", () => runBulk("/api/fleet/preview").catch(showError));
-  $("#bulk-apply").addEventListener("click", () => runBulk("/api/fleet/apply").catch(showError));
+  let bulkBusy = false;
+  async function guardedBulk(button, path) {
+    if (bulkBusy) return;
+    bulkBusy = true;
+    button.disabled = true;
+    try {
+      await runBulk(path);
+    } finally {
+      bulkBusy = false;
+      button.disabled = false;
+    }
+  }
+  $("#bulk-preview").addEventListener("click", (ev) => guardedBulk(ev.currentTarget, "/api/fleet/preview").catch(showError));
+  $("#bulk-apply").addEventListener("click", (ev) => guardedBulk(ev.currentTarget, "/api/fleet/apply").catch(showError));
 
   function paintGroups() {
     $("#group-list").innerHTML =

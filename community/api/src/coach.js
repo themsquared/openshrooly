@@ -1,4 +1,5 @@
 /** Paid Grow Coach: gating, learning, chat, photo check, alerts. */
+import { COMMAND_TTL_MS } from "./device-capabilities.js";
 
 import { laterIso, nowIso, randomToken, sha256Hex } from "./crypto.js";
 import {
@@ -356,25 +357,36 @@ export async function handleCoach(method, path, url, request, env) {
       auto: grounding.auto_tune,
       reading: grounding.current,
     });
+    let commandId = null;
     if (body.apply) {
       if (!suggestion.auto_eligible && !body.approve) {
         throw new ValidationError("Approve the change, or enable auto-tune with safe bounds.", 403);
       }
       if (!suggestion.within_bounds) throw new ValidationError("suggestion outside safe bounds", 400);
       if (body.device_id) {
-        await db.run(
+        const issued = nowIso();
+        const expiresAt = new Date(Date.parse(issued) + COMMAND_TTL_MS).toISOString();
+        const inserted = await db.run(
           "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
           [
             body.device_id,
             "setpoints",
-            JSON.stringify({ ...suggestion, source: "grow-coach", approved: true }),
-            nowIso(),
+            JSON.stringify({ ...suggestion, source: "grow-coach", approved: true, expires_at: expiresAt }),
+            issued,
             null,
           ]
         );
+        commandId = inserted?.meta?.last_row_id ?? inserted?.lastRowId ?? null;
       }
     }
-    return json({ suggestion, alerts: grounding.alerts, applied: Boolean(body.apply) });
+    // `applied` means "accepted the suggestion"; `status` is what the chamber has done (queued until it confirms).
+    return json({
+      suggestion,
+      alerts: grounding.alerts,
+      applied: Boolean(body.apply),
+      status: body.apply && body.device_id ? "queued" : null,
+      command_id: commandId,
+    });
   }
 
   if (method === "POST" && path === "/api/coach/auto-tune") {
