@@ -6,7 +6,7 @@
     "bundle-seeds": "node scripts/bundle-seeds.js",
     "dev": "npm run bundle-seeds && node server.js",
     "dev:worker": "npm run bundle-seeds && wrangler dev",
-    "coach:local": "npm run bundle-seeds && wrangler dev -c wrangler.coach-local.toml --persist-to .wrangler/coach-local --ip 127.0.0.1 --port 8787",
+    "coach:local": "npm run bundle-seeds && node scripts/coach-local-user.js && wrangler dev -c wrangler.coach-local.toml --persist-to .wrangler/coach-local --ip 127.0.0.1 --port 8787",
     "coach:local:init": "npm run bundle-seeds && node scripts/coach-local-init.js",
     "coach:local:user": "node scripts/coach-local-user.js",
     "coach:local:readings": "node scripts/coach-import-readings.js",

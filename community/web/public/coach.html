@@ -59,6 +59,9 @@
         <label>Chamber
           <select id="device"></select>
         </label>
+        <label>Profile
+          <select id="profile"></select>
+        </label>
         <label class="toggle">
           <input type="checkbox" id="auto-tune">
           Auto-tune inside safe bounds
@@ -80,7 +83,7 @@
 
         <section class="card coach-panel" aria-labelledby="chat-title">
           <h2 id="chat-title">Ask the coach</h2>
-          <p class="muted">Answers are based on this chamber’s readings, your culinary journal, and the profile library.</p>
+          <p class="muted">Answers use this chamber’s readings and the selected profile’s stage targets. Plain prose, culinary only.</p>
           <div id="chat-log" class="chat-log" aria-live="polite"></div>
           <form id="chat-form">
             <label>Message

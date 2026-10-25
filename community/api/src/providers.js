@@ -68,6 +68,15 @@ export function coachLocalEnvironment(env = {}) {
 }
 
 /**
+ * Browser-facing local tools (CORS localhost, #local= sign-in).
+ * Requires ENVIRONMENT=local and a non-prod request host. Never true on a prod host,
+ * even if ENVIRONMENT=local is leaked.
+ */
+export function localBrowserDevEnabled(env = {}, request) {
+  return coachLocalEnvironment(env) && !isProdHost(request);
+}
+
+/**
  * Local-only Workers AI REST (no wrangler [ai] binding).
  * Requires ENVIRONMENT=local plus CF_ACCOUNT_ID and WORKERS_AI_TOKEN from .dev.vars.
  * Never true when env.AI is bound or ENVIRONMENT is not local.

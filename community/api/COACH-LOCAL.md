@@ -28,13 +28,14 @@ chmod 600 .dev.vars
 cd community/api
 npm install
 npm run coach:local:init    # schema + catalog into .wrangler/coach-local
-npm run coach:local:user    # user id 1 + a Bearer token
-npm run coach:local         # wrangler dev, port 8787, fully local
+npm run coach:local         # mints a one-time sign-in link, then wrangler on :8787
 ```
 
 `COACH_BETA_USER_IDS` is `1`. If you seed a different user, change that var
-and restart. Completing stubs are off on D1, so use the printed token instead
-of magic-link email.
+and restart. Completing stubs are off on D1, so use the printed
+`http://127.0.0.1:8888/coach.html#local=…` link instead of magic-link email.
+
+`npm run coach:local:user` mints another one-time link without restarting.
 
 ## 2. Web
 
@@ -43,9 +44,9 @@ cd community/web
 npm run dev                 # http://127.0.0.1:8888
 ```
 
-In that browser, paste the one-liner the user script printed. It stores
-`openshrooly_token` and opens `/coach.html`. You should see private beta
-chat, not the public waitlist.
+Open the `#local=` URL the start script printed. The page trades the token
+at `POST /api/auth/local` (ENVIRONMENT=local and a non-prod host only) and
+stores the session. You should see private beta chat, not the public waitlist.
 
 ## 3. Real readings
 
@@ -64,8 +65,9 @@ npm run coach:local:readings -- --hub http://127.0.0.1:8090
 ```
 
 That writes `cloud_devices` + `device_telemetry` for user 1 (`local-chamber`).
-Refresh Coach and pick **LAN chamber**. Chat uses those readings. Import again
-anytime you want a newer sample.
+Refresh Coach and pick **LAN chamber**. Choose the culinary profile you are
+running so temperature and humidity advice uses that profile’s stage targets.
+Import again anytime you want a newer sample.
 
 The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
 (`GET /sensor/current_humidity`, `GET /sensor/current_temperature`, …).
@@ -78,3 +80,4 @@ The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
 - Text model: `@cf/qwen/qwen3-30b-a3b-fp8`. Override with `GROW_COACH_TEXT_MODEL`.
 - The REST adapter runs only when `ENVIRONMENT=local` **and** both
   `CF_ACCOUNT_ID` and `WORKERS_AI_TOKEN` are set **and** `env.AI` is absent.
+- `compatibility_date` is `2026-05-03` (wrangler 4.86 runtime max).

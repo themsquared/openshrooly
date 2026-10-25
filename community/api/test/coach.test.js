@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { nowIso } from "../src/crypto.js";
 import {
   buildDeviceModel,
@@ -7,18 +10,25 @@ import {
   estimateNeurons,
   estimateUsd,
   refuseRestrictedPack,
+  SAFE_BOUNDS,
   suggestSetpoints,
 } from "../src/coach-learn.js";
 import { capabilities, coachAiConfigured, coachLocalRestEnabled } from "../src/providers.js";
 import {
+  COACH_CHAT_SYSTEM_PROMPT,
   DEFAULT_TEXT_MODEL,
   createModelProvider,
   stripThinkTags,
   workersAiRestUrl,
   workersAiText,
 } from "../src/coach-models.js";
+import { pickCoachProfile, profileStageTargets, slimCulinaryProfile } from "../src/coach.js";
 import { call, callRaw, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 import { buildJpeg, toBase64 } from "./image-fixtures.js";
+
+const pearlOyster = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../../data/profiles/culinary/pearl-oyster.json"), "utf8")
+);
 
 function env() {
   return testEnv({ GROW_COACH_STUB: "1" });
@@ -371,6 +381,76 @@ test("tokens without ENVIRONMENT=local do not open Coach REST", async () => {
   assert.equal(catalog.data.beta, false);
   const chat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "hi" } });
   assert.equal(chat.status, 402);
+});
+
+test("oyster fruiting grounding uses the profile warning band, not a 14-16 C lore range", () => {
+  const fruiting = profileStageTargets(pearlOyster.stages.find((s) => s.id === "fruiting"));
+  assert.equal(fruiting.temperature_c, 16);
+  assert.equal(fruiting.temperature_hysteresis, 1);
+  assert.equal(fruiting.temperature_target_min, 15);
+  assert.equal(fruiting.temperature_target_max, 17);
+  assert.equal(fruiting.temperature_warning_min_c, 11);
+  assert.equal(fruiting.temperature_warning_max_c, 21);
+  assert.equal(fruiting.humidity_percent, 88);
+  assert.equal(fruiting.humidity_target_min, 86);
+  assert.equal(fruiting.humidity_target_max, 90);
+  assert.ok(fruiting.temperature_warning_min_c < 14);
+  assert.ok(fruiting.temperature_warning_max_c > 16);
+  assert.deepEqual(SAFE_BOUNDS.temperature_c, [16, 28]);
+  assert.deepEqual(SAFE_BOUNDS.humidity_percent, [70, 96]);
+
+  const slim = slimCulinaryProfile(pearlOyster);
+  assert.equal(slim.stages.find((s) => s.id === "fruiting").temperature_warning_max_c, 21);
+  assert.equal(pickCoachProfile([slim], "pearl-oyster").id, "pearl-oyster");
+});
+
+test("coach chat prompt is plain prose grounded in the selected profile stages", () => {
+  assert.match(COACH_CHAT_SYSTEM_PROMPT, /plain, short prose/i);
+  assert.match(COACH_CHAT_SYSTEM_PROMPT, /do not use json or markdown tables/i);
+  assert.match(COACH_CHAT_SYSTEM_PROMPT, /selected profile's per-stage/i);
+  assert.match(COACH_CHAT_SYSTEM_PROMPT, /not generic species lore/i);
+  assert.match(COACH_CHAT_SYSTEM_PROMPT, /safe bounds/i);
+  assert.doesNotMatch(COACH_CHAT_SYSTEM_PROMPT, /Be concise\.$/);
+});
+
+test("chat grounding passes pearl-oyster stage ranges and keeps the safe-bounds clamp", async () => {
+  const calls = [];
+  const ctx = privateBetaEnv({
+    ENVIRONMENT: "local",
+    CF_ACCOUNT_ID: "acc_test",
+    WORKERS_AI_TOKEN: "tok_test",
+    fetch: async (url, opts) => {
+      calls.push({ url: String(url), body: opts.body });
+      return {
+        ok: true,
+        async json() {
+          return { success: true, result: { response: "Pearl Oyster fruiting sits near 16 C, warning 11 to 21 C." } };
+        },
+      };
+    },
+  });
+  const { token, user } = await register(ctx, "oyster-coach@example.com");
+  ctx.COACH_BETA_USER_IDS = String(user.id);
+  const chat = await call(ctx, "POST", "/api/coach/chat", {
+    token,
+    body: { message: "What temperature should fruiting be?", profile_id: "pearl-oyster" },
+  });
+  assert.equal(chat.status, 200, JSON.stringify(chat.data));
+  assert.equal(calls.length, 1);
+  const sent = JSON.parse(calls[0].body);
+  assert.equal(sent.messages[0].content, COACH_CHAT_SYSTEM_PROMPT);
+  const userMsg = String(sent.messages[1].content);
+  const grounded = userMsg.match(/^Grounding:\n([\s\S]*)\n\nQuestion: /);
+  assert.ok(grounded, userMsg.slice(0, 200));
+  const grounding = JSON.parse(grounded[1]);
+  assert.equal(grounding.profile.id, "pearl-oyster");
+  const fruiting = grounding.profile.stages.find((s) => s.id === "fruiting");
+  assert.equal(fruiting.temperature_warning_min_c, 11);
+  assert.equal(fruiting.temperature_warning_max_c, 21);
+  assert.equal(fruiting.temperature_target_min, 15);
+  assert.equal(fruiting.temperature_target_max, 17);
+  assert.deepEqual(grounding.safe_bounds.temperature_c, [16, 28]);
+  assert.deepEqual(grounding.safe_bounds.humidity_percent, [70, 96]);
 });
 
 test("subscribe stays 503 for a beta user while COACH_PUBLIC is off", async () => {

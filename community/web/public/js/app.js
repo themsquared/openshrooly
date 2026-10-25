@@ -743,7 +743,19 @@ function fmtDate(iso) {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+async function consumeLocalSignIn() {
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const token = hash.get("local");
+  if (!token) return false;
+  history.replaceState(null, "", location.pathname + location.search);
+  const data = await api("/api/auth/local", { method: "POST", jsonBody: { token } });
+  if (data.access_token) setToken(data.access_token);
+  location.replace("/coach.html");
+  return true;
+}
+
 async function renderCoach() {
+  if (await consumeLocalSignIn()) return;
   const catalog = await api("/api/coach").catch((err) => {
     showCoachError(err);
     return null;
@@ -789,6 +801,7 @@ async function renderCoach() {
     claimed.map((d) => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name || d.id)}</option>`).join("");
 
   const deviceId = () => $("#device").value || "";
+  const profileId = () => $("#profile")?.value || "";
   const photosOn = Boolean((await capabilities()).photos);
   $("#photo-panel")?.classList.toggle("hidden", !photosOn);
   $("#auto-tune").checked = Boolean(catalog.auto_tune);
@@ -802,8 +815,18 @@ async function renderCoach() {
   }
 
   async function refreshModel() {
-    const qs = deviceId() ? `?device_id=${encodeURIComponent(deviceId())}` : "";
-    const data = await api(`/api/coach/model${qs}`);
+    const qs = new URLSearchParams();
+    if (deviceId()) qs.set("device_id", deviceId());
+    if (profileId()) qs.set("profile_id", profileId());
+    const data = await api(`/api/coach/model${qs.toString() ? `?${qs}` : ""}`);
+    if ($("#profile") && !$("#profile").dataset.ready) {
+      const library = data.library || [];
+      $("#profile").innerHTML =
+        `<option value="">Selected from journal</option>` +
+        library.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.id)}</option>`).join("");
+      if (data.profile?.id) $("#profile").value = data.profile.id;
+      $("#profile").dataset.ready = "1";
+    }
     const m = data.model || {};
     $("#stats").innerHTML = [
       ["Samples", m.sample_count ?? 0, 0],
@@ -828,6 +851,7 @@ async function renderCoach() {
   }
 
   $("#device").addEventListener("change", () => refreshModel().catch(showCoachError));
+  $("#profile")?.addEventListener("change", () => refreshModel().catch(showCoachError));
   $("#refresh-model").addEventListener("click", () => refreshModel().catch(showCoachError));
   $("#auto-tune").addEventListener("change", async () => {
     try {
@@ -840,7 +864,7 @@ async function renderCoach() {
     try {
       const data = await api("/api/coach/suggest", {
         method: "POST",
-        jsonBody: { device_id: deviceId() || undefined, apply: true, approve: true },
+        jsonBody: { device_id: deviceId() || undefined, profile_id: profileId() || undefined, apply: true, approve: true },
       });
       $("#suggestion").innerHTML += `<p class="muted">Queued for the chamber${data.applied ? "" : " (not applied)"}.</p>`;
     } catch (err) {
@@ -854,7 +878,10 @@ async function renderCoach() {
     $("#chat-log").insertAdjacentHTML("beforeend", `<div class="chat-bubble you">${escapeHtml(message)}</div>`);
     $("#chat-message").value = "";
     try {
-      const data = await api("/api/coach/chat", { method: "POST", jsonBody: { message, device_id: deviceId() || undefined } });
+      const data = await api("/api/coach/chat", {
+        method: "POST",
+        jsonBody: { message, device_id: deviceId() || undefined, profile_id: profileId() || undefined },
+      });
       $("#chat-log").insertAdjacentHTML("beforeend", `<div class="chat-bubble">${escapeHtml(data.reply)}</div>`);
       await refreshUsage();
     } catch (err) {

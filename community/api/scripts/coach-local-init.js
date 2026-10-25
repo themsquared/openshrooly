@@ -16,4 +16,4 @@ wranglerLocalD1(schema);
 const seed = join(dir, "seed.sql");
 writeFileSync(seed, seedSql(seeds));
 wranglerLocalD1(seed);
-console.log("Local Coach D1 is ready (schema + catalog). Next: npm run coach:local:user");
+console.log("Local Coach D1 is ready (schema + catalog). Next: npm run coach:local");

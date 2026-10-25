@@ -1,7 +1,7 @@
 /** Rate limits, Turnstile, HIBP k-anonymity, security headers. */
 
 import { hex, hmacSha256Hex, timingSafeEqual } from "./crypto.js";
-import { devStubsEnabled } from "./providers.js";
+import { devStubsEnabled, localBrowserDevEnabled } from "./providers.js";
 
 export const PROD_SITE_ORIGINS = ["https://shroomlabs.io", "https://www.shroomlabs.io"];
 const NETLIFY_PREVIEW = /^https:\/\/deploy-preview-\d+--[a-z0-9-]+\.netlify\.app$/i;
@@ -182,7 +182,9 @@ export function clientIp(request) {
 
 export function corsAllowlist(env = {}, request) {
   const origins = [...PROD_SITE_ORIGINS];
-  if (!devStubsEnabled(env, request)) return origins;
+  const stubs = devStubsEnabled(env, request);
+  const localBrowser = localBrowserDevEnabled(env, request);
+  if (!stubs && !localBrowser) return origins;
   const listed = String(env.CORS_ORIGIN || "")
     .split(",")
     .map((item) => item.trim())
@@ -190,9 +192,11 @@ export function corsAllowlist(env = {}, request) {
   for (const origin of listed) {
     if (LOCAL_DEV.test(origin) && !origins.includes(origin)) origins.push(origin);
   }
-  const requestOrigin = request?.headers?.get?.("origin") || "";
-  if (NETLIFY_PREVIEW.test(requestOrigin) && !origins.includes(requestOrigin)) {
-    origins.push(requestOrigin);
+  if (stubs) {
+    const requestOrigin = request?.headers?.get?.("origin") || "";
+    if (NETLIFY_PREVIEW.test(requestOrigin) && !origins.includes(requestOrigin)) {
+      origins.push(requestOrigin);
+    }
   }
   return origins;
 }

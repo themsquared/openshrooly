@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { capabilities, createPushProvider, devStubsEnabled, isProdHost, photosConfigured, requestHost } from "../src/providers.js";
+import {
+  capabilities,
+  createPushProvider,
+  devStubsEnabled,
+  isProdHost,
+  localBrowserDevEnabled,
+  photosConfigured,
+  requestHost,
+} from "../src/providers.js";
 import { call, register, testEnv } from "./helpers.js";
 
 function prodLike() {
@@ -24,6 +32,15 @@ function prodLike() {
     TURNSTILE_SECRET_KEY: "",
   });
 }
+
+test("local browser tools need ENVIRONMENT=local and a non-prod host", () => {
+  const local = new Request("http://127.0.0.1:8787/health");
+  const prod = new Request("https://api.shroomlabs.io/health");
+  assert.equal(localBrowserDevEnabled({ ENVIRONMENT: "local" }, local), true);
+  assert.equal(localBrowserDevEnabled({ ENVIRONMENT: "local" }, prod), false);
+  assert.equal(localBrowserDevEnabled({}, local), false);
+  assert.equal(localBrowserDevEnabled({ ENVIRONMENT: "production" }, local), false);
+});
 
 test("DEV_STUBS is refused on shroomlabs.io and api.shroomlabs.io", () => {
   const env = { DEV_STUBS: "1" };

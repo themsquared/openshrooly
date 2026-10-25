@@ -127,7 +127,58 @@ async function cacheSet(db, key, value) {
   ]);
 }
 
-async function loadGrounding(db, user, deviceId) {
+function numOrNull(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Per-stage target and warning bands from the selected culinary profile. */
+export function profileStageTargets(stage = {}) {
+  const rh = numOrNull(stage.humidity_percent);
+  const rhHyst = numOrNull(stage.humidity_hysteresis);
+  const temp = numOrNull(stage.temperature_c);
+  const tempHyst = numOrNull(stage.temperature_hysteresis);
+  return {
+    id: stage.id || null,
+    name: stage.name || null,
+    humidity_percent: rh,
+    humidity_hysteresis: rhHyst,
+    humidity_target_min: rh != null && rhHyst != null ? rh - rhHyst : rh,
+    humidity_target_max: rh != null && rhHyst != null ? rh + rhHyst : rh,
+    temperature_c: temp,
+    temperature_hysteresis: tempHyst,
+    temperature_target_min: temp != null && tempHyst != null ? temp - tempHyst : temp,
+    temperature_target_max: temp != null && tempHyst != null ? temp + tempHyst : temp,
+    temperature_warning_min_c: numOrNull(stage.temperature_warning_min_c),
+    temperature_warning_max_c: numOrNull(stage.temperature_warning_max_c),
+    duration_days: numOrNull(stage.duration_days),
+  };
+}
+
+export function slimCulinaryProfile(profile) {
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    name: profile.name,
+    species: profile.species,
+    stages: (profile.stages || []).map(profileStageTargets),
+  };
+}
+
+export function pickCoachProfile(library, requestedId, journal = []) {
+  if (requestedId && library.some((p) => p.id === requestedId)) {
+    return library.find((p) => p.id === requestedId);
+  }
+  const fromJournal = journal
+    .slice()
+    .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+    .map((row) => row.profile_id)
+    .find((id) => id && library.some((p) => p.id === id));
+  if (fromJournal) return library.find((p) => p.id === fromJournal);
+  return library[0] || null;
+}
+
+async function loadGrounding(db, user, deviceId, profileId) {
   let device = null;
   let model = { sample_count: 0 };
   let samples = [];
@@ -144,13 +195,9 @@ async function loadGrounding(db, user, deviceId) {
   const profiles = (await db.all("SELECT document FROM profiles WHERE published=1")).map((row) =>
     typeof row.document === "string" ? JSON.parse(row.document) : row.document
   );
-  const culinary = profiles.filter((p) => !isPsilocybin(p)).map((p) => ({
-    id: p.id,
-    name: p.name,
-    species: p.species,
-    stages: (p.stages || []).map((s) => ({ id: s.id, name: s.name, humidity_percent: s.humidity_percent, temperature_c: s.temperature_c })),
-  }));
-  const stage = culinary[0]?.stages?.[0] || {};
+  const culinary = profiles.filter((p) => !isPsilocybin(p)).map(slimCulinaryProfile);
+  const profile = pickCoachProfile(culinary, profileId, culinaryReports);
+  const stage = profile?.stages?.find((s) => s.id === "fruiting") || profile?.stages?.[0] || {};
   const alerts = detectAlerts(model, samples, stage);
   const settings = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
   return {
@@ -163,6 +210,7 @@ async function loadGrounding(db, user, deviceId) {
       notes: r.notes,
       days: r.days,
     })),
+    profile,
     library: culinary.slice(0, 12),
     safe_bounds: SAFE_BOUNDS,
     auto_tune: Boolean(Number(settings?.auto_tune)),
@@ -171,12 +219,13 @@ async function loadGrounding(db, user, deviceId) {
   };
 }
 
-function slimGrounding(grounding) {
+export function slimGrounding(grounding) {
   return {
     device: grounding.device,
     device_model: grounding.device_model,
     alerts: grounding.alerts,
     journal: grounding.journal,
+    profile: grounding.profile,
     library: grounding.library,
     safe_bounds: grounding.safe_bounds,
     auto_tune: grounding.auto_tune,
@@ -246,11 +295,13 @@ export async function handleCoach(method, path, url, request, env) {
 
   if (method === "GET" && path === "/api/coach/model") {
     const user = await requireCoach(request, db, env);
-    const grounding = await loadGrounding(db, user, url.searchParams.get("device_id"));
+    const grounding = await loadGrounding(db, user, url.searchParams.get("device_id"), url.searchParams.get("profile_id"));
     return json({
       device: grounding.device,
       model: grounding.device_model,
       alerts: grounding.alerts,
+      profile: grounding.profile,
+      library: grounding.library,
       suggestion: suggestSetpoints(grounding.device_model, grounding.stage, { auto: grounding.auto_tune }),
     });
   }
@@ -261,7 +312,7 @@ export async function handleCoach(method, path, url, request, env) {
     if (refuseRestrictedPack(body.profile)) {
       throw new ValidationError("Grow Coach will not auto-tune off-menu varieties.", 400);
     }
-    const grounding = await loadGrounding(db, user, body.device_id);
+    const grounding = await loadGrounding(db, user, body.device_id, body.profile_id);
     const stage = body.stage || grounding.stage;
     const suggestion = suggestSetpoints(grounding.device_model, stage, { auto: grounding.auto_tune });
     if (body.apply) {
@@ -299,8 +350,8 @@ export async function handleCoach(method, path, url, request, env) {
       throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
     }
     await assertCap(db, user.id, "chats");
-    const grounding = await loadGrounding(db, user, body.device_id);
-    const cacheKey = await sha256Hex(`chat:${user.id}:${body.device_id || ""}:${body.message || ""}`);
+    const grounding = await loadGrounding(db, user, body.device_id, body.profile_id);
+    const cacheKey = await sha256Hex(`chat:${user.id}:${body.device_id || ""}:${body.profile_id || ""}:${body.message || ""}`);
     const hit = await cacheGet(db, cacheKey);
     if (hit) return json({ ...hit, cached: true });
     const provider = createModelProvider(env, request);
