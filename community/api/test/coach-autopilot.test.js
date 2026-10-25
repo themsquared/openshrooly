@@ -665,3 +665,43 @@ test("targets come from suggestSetpoints, never invented light fields", () => {
   assert.equal(plan.next.light, undefined);
   assert.equal(plan.next.temperature_c, 23);
 });
+
+test("Coach and Autopilot read a 24h telemetry window, not every row", async () => {
+  const learn = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../src/coach-learn.js"), "utf8");
+  const coach = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../src/coach.js"), "utf8");
+  const auto = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../src/coach-autopilot.js"), "utf8");
+  const fleet = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../src/fleet.js"), "utf8");
+  assert.match(learn, /TELEMETRY_WINDOW_SQL/);
+  assert.match(learn, /ORDER BY created_at DESC LIMIT/);
+  assert.match(coach, /loadRecentTelemetry/);
+  assert.match(auto, /loadRecentTelemetry/);
+  assert.match(fleet, /loadRecentTelemetry/);
+  assert.doesNotMatch(coach, /SELECT \* FROM device_telemetry WHERE device_id=\?", \[deviceId\]/);
+  assert.doesNotMatch(auto, /SELECT \* FROM device_telemetry WHERE device_id=\?", \[device\.id\]/);
+
+  const ctx = env();
+  const { token, user } = await register(ctx, "window@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-window");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(
+    ctx,
+    "dev-window",
+    { humidity: 88, humidity_setpoint: 88, temperature: 16, temperature_setpoint: 16 },
+    new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+  );
+  const enabled = await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-window",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  assert.equal(enabled.ok, true, JSON.stringify(enabled));
+  const result = await runAutopilotForDevice(ctx.db, ctx, {
+    device: await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-window"]),
+    user,
+  });
+  assert.equal(result.paused, true);
+  assert.match(result.reason, /missing/i);
+});
+
+

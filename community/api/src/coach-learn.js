@@ -48,6 +48,26 @@ export function safeBoundsForStage(stage = {}) {
   };
 }
 
+/** Coach / Autopilot only need a recent window, not the full telemetry table. */
+export const TELEMETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const TELEMETRY_WINDOW_LIMIT = 2000;
+export const TELEMETRY_WINDOW_SQL =
+  "SELECT * FROM device_telemetry WHERE device_id=? AND created_at>=? ORDER BY created_at DESC LIMIT ?";
+
+export function telemetryWindowSince(now = Date.now(), windowMs = TELEMETRY_WINDOW_MS) {
+  return new Date(now - windowMs).toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+export async function loadRecentTelemetry(
+  db,
+  deviceId,
+  { now = Date.now(), windowMs = TELEMETRY_WINDOW_MS, limit = TELEMETRY_WINDOW_LIMIT } = {}
+) {
+  const rows =
+    (await db.all(TELEMETRY_WINDOW_SQL, [deviceId, telemetryWindowSince(now, windowMs), limit])) || [];
+  return rows.slice().sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+}
+
 export function latestReading(samples = [], now = Date.now()) {
   const parsed = parseTelemetry(samples);
   if (!parsed.length) return null;

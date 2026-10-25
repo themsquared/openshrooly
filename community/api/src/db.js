@@ -965,7 +965,22 @@ function dispatch(mode, tables, ids, sql, params) {
     return { lastRowId: row.id };
   }
   if (q.startsWith("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL")) {
-    return tables.device_commands.filter((c) => c.device_id === params[0] && !c.consumed_at);
+    let rows = tables.device_commands.filter((c) => c.device_id === params[0] && !c.consumed_at);
+    if (q.includes("ORDER BY id ASC")) rows = rows.slice().sort((a, b) => Number(a.id) - Number(b.id));
+    if (q.includes("ORDER BY id DESC")) rows = rows.slice().sort((a, b) => Number(b.id) - Number(a.id));
+    if (q.includes("LIMIT")) {
+      const limit = Number(params[1] ?? params[params.length - 1]);
+      if (Number.isFinite(limit)) rows = rows.slice(0, limit);
+    }
+    return rows;
+  }
+  if (q.startsWith("UPDATE device_commands SET consumed_at=?, payload=?")) {
+    const row = tables.device_commands.find((c) => Number(c.id) === Number(params[2]) && c.device_id === params[3]);
+    if (row) {
+      row.consumed_at = params[0];
+      row.payload = params[1];
+    }
+    return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
   }
   if (q.startsWith("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?")) {
     const row = tables.device_commands.find((c) => Number(c.id) === Number(params[1]) && c.device_id === params[2]);
@@ -994,6 +1009,13 @@ function dispatch(mode, tables, ids, sql, params) {
     tables.device_nonces.splice(idx, 1);
     return { changes: 1, meta: { changes: 1 } };
   }
+  if (q.startsWith("DELETE FROM device_telemetry WHERE device_id=? AND created_at<?")) {
+    const before = tables.device_telemetry.length;
+    tables.device_telemetry = tables.device_telemetry.filter(
+      (t) => !(t.device_id === params[0] && String(t.created_at) < String(params[1]))
+    );
+    return { changes: before - tables.device_telemetry.length, meta: { changes: before - tables.device_telemetry.length } };
+  }
   if (q.startsWith("DELETE FROM device_telemetry WHERE device_id=")) {
     const before = tables.device_telemetry.length;
     tables.device_telemetry = tables.device_telemetry.filter((t) => t.device_id !== params[0]);
@@ -1018,6 +1040,21 @@ function dispatch(mode, tables, ids, sql, params) {
     const before = tables.cloud_devices.length;
     tables.cloud_devices = tables.cloud_devices.filter((d) => d.id !== params[0]);
     return { changes: before - tables.cloud_devices.length };
+  }
+  if (q.startsWith("SELECT * FROM device_telemetry WHERE device_id=? AND created_at>=")) {
+    let rows = tables.device_telemetry.filter(
+      (t) => t.device_id === params[0] && String(t.created_at) >= String(params[1])
+    );
+    if (q.includes("ORDER BY created_at DESC")) {
+      rows = rows.slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    } else if (q.includes("ORDER BY created_at")) {
+      rows = rows.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    }
+    if (q.includes("LIMIT")) {
+      const limit = Number(params[2] ?? params[params.length - 1]);
+      if (Number.isFinite(limit)) rows = rows.slice(0, limit);
+    }
+    return rows;
   }
   if (q.startsWith("SELECT * FROM device_telemetry WHERE device_id=")) {
     return tables.device_telemetry.filter((t) => t.device_id === params[0]);

@@ -32,6 +32,7 @@ import {
   detectAlerts,
   estimateNeurons,
   latestReading,
+  loadRecentTelemetry,
   refuseRestrictedPack,
   safeBoundsForStage,
   suggestSetpoints,
@@ -196,7 +197,7 @@ async function loadGrounding(db, user, deviceId, profileId) {
     if (device && Number(device.owner_id) !== Number(user.id)) {
       throw new ValidationError("not your device", 403);
     }
-    samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [deviceId]);
+    samples = await loadRecentTelemetry(db, deviceId);
   }
   const reports = await db.all("SELECT * FROM grow_reports WHERE author_id=?", [user.id]);
   const culinaryReports = reports.filter((r) => !String(r.profile_id || "").includes("psilocybin"));
