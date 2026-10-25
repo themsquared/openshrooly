@@ -4,7 +4,16 @@ export type GrowPreset = {
   phase: string
   day: number
   total: number
-  setpoints: { humidity: number; temperature: number; sunrise: number; lightHours: number } | null
+  setpoints: {
+    humidity: number
+    temperature: number
+    sunrise: number
+    lightHours: number
+    lux?: number
+    red?: number
+    green?: number
+    blue?: number
+  } | null
 }
 
 export type DeviceSurface = 'unreachable' | 'first-run-wifi' | 'empty-grow' | 'ready'
