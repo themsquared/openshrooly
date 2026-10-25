@@ -7,15 +7,14 @@ binding = "DB"
 database_name = "shroomlabs"
 database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
 
-# R2 is not enabled on the account yet. Photo uploads for community review
-# need this bucket before you deploy. Create it first:
-#   npx wrangler r2 bucket create shroomlabs-media
-# Then uncomment the binding and attach cdn.shroomlabs.io in the dashboard.
-# Until then, local/dev uses miniflare R2 or in-memory storage, and production
-# photo routes return 503.
-# [[r2_buckets]]
-# binding = "PHOTOS"
-# bucket_name = "shroomlabs-media"
+# User photos. Create the bucket at ship time, then deploy, then flip the flag:
+#   npx wrangler r2 bucket create shroomlabs-photos
+# Binding: PHOTOS → shroomlabs-photos. Do not enable public listing or map this
+# bucket on a public hostname. Pending objects stay under pending/ and are
+# served only through /api/media. PHOTOS_ENABLED=0 until you flip it.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "shroomlabs-photos"
 
 [ai]
 binding = "AI"
@@ -23,12 +22,14 @@ binding = "AI"
 [vars]
 SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
+# Photo uploads stay off until this is "1" AND the R2 bucket exists.
+PHOTOS_ENABLED = "0"
 # Browser origins allowed to call api.shroomlabs.io with Authorization headers.
 CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
-# Not used for grow-report or coach photos. Those are served only through
-# /api/media. Pending objects live under pending/ and must never be mapped on
-# a public R2 domain. Approval (when built) copies to reports/ or coach/ and
-# deletes pending/; reject/takedown deletes the object.
+# Not used for grow-report, profile, or coach photos. Those are served only
+# through /api/media. Pending objects live under pending/ and must never be
+# mapped on a public R2 domain. Approval copies off pending/; reject/takedown
+# deletes the object.
 CDN_BASE_URL = "https://cdn.shroomlabs.io"
 # Google sign-in. The client ID is public; GOOGLE_CLIENT_SECRET is a Wrangler secret (see docs/AUTH.md).
 GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleusercontent.com"

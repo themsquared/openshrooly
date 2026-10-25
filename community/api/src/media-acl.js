@@ -26,8 +26,36 @@ export function mediaApiUrl(env, key) {
   return origin ? `${origin}${path}` : path;
 }
 
-export function pendingPhotoKey(kind, ownerToken, ext) {
-  return `pending/${kind}/${ownerToken}/${randomToken()}.${ext}`;
+export function pendingPhotoKey(kind, _ownerToken, ext) {
+  return `pending/${kind}/${randomToken()}.${ext}`;
+}
+
+export function approvedObjectKey(pendingKey) {
+  const key = String(pendingKey || "");
+  if (key.startsWith("pending/")) return key.slice("pending/".length);
+  return key.replace("/pending/", "/approved/");
+}
+
+export async function promoteStoredObject(storage, pendingKey) {
+  const nextKey = approvedObjectKey(pendingKey);
+  if (!storage || !pendingKey || nextKey === pendingKey) return pendingKey;
+  const file = await storage.get(pendingKey);
+  if (!file) return pendingKey;
+  await storage.put(nextKey, file.bytes, file.contentType);
+  await storage.delete(pendingKey);
+  return nextKey;
+}
+
+export async function replaceMediaKey(db, fromKey, toKey, status) {
+  if (!fromKey && !toKey) return;
+  if (fromKey && fromKey === toKey) {
+    await setMediaStatus(db, fromKey, status);
+    return;
+  }
+  const row = fromKey ? await getMedia(db, fromKey) : null;
+  if (fromKey) await db.run("DELETE FROM uploaded_media WHERE photo_key=?", [fromKey]);
+  if (!toKey || !row) return;
+  await insertMedia(db, { photo_key: toKey, owner_id: row.owner_id, status, kind: row.kind });
 }
 
 export async function insertMedia(db, { photo_key, owner_id, status, kind }) {

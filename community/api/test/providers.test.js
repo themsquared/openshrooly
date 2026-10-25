@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { capabilities, createPushProvider, devStubsEnabled, isProdHost, requestHost } from "../src/providers.js";
+import { capabilities, createPushProvider, devStubsEnabled, isProdHost, photosConfigured, requestHost } from "../src/providers.js";
 import { call, register, testEnv } from "./helpers.js";
 
 function prodLike() {
   return testEnv({
     DEV_STUBS: "",
+    PHOTOS_ENABLED: "0",
     AUTH_DEBUG: "1",
     OIDC_STUB: "1",
     TURNSTILE_STUB: "1",
@@ -50,6 +51,7 @@ test("stubs are inert in a prod-like config even when leftover stub flags are se
   assert.equal(caps.data.google, false);
   assert.equal(caps.data.apple, false);
   assert.equal(caps.data.payments, false);
+  assert.equal(caps.data.photos, false);
   assert.equal(caps.data.coach, false);
 
   const magic = await call(ctx, "POST", "/api/auth/magic/start", {
@@ -153,6 +155,17 @@ test("push provider stubs only when DEV_STUBS is on a non-prod host", async () =
   const dead = createPushProvider({ DEV_STUBS: "1" }, prod);
   assert.equal(dead.name, "disabled");
   assert.equal((await dead.send({ title: "hi" })).ok, false);
+});
+
+test("photos stay off without PHOTOS_ENABLED even when R2 is bound", () => {
+  const prod = new Request("https://api.shroomlabs.io/health", { headers: { host: "api.shroomlabs.io" } });
+  const bound = { PHOTOS: {}, storage: { driver: "r2" }, PHOTOS_ENABLED: "0" };
+  assert.equal(photosConfigured(bound), false);
+  assert.equal(capabilities(bound, prod).photos, false);
+  const on = { PHOTOS: {}, storage: { driver: "r2" }, PHOTOS_ENABLED: "1" };
+  assert.equal(photosConfigured(on), true);
+  assert.equal(capabilities(on, prod).photos, true);
+  assert.equal(capabilities({ DEV_STUBS: "1", storage: { driver: "memory" } }, new Request("http://127.0.0.1/health")).photos, false);
 });
 
 test("an email key turns on email but never push", async () => {

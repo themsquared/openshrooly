@@ -33,7 +33,7 @@ test("grow report photo uses sniffed type, strips metadata, and stays pending", 
   });
   assert.equal(posted.status, 201, JSON.stringify(posted.data));
   assert.equal(posted.data.photo_status, "pending");
-  assert.match(posted.data.photo_key, /^pending\/reports\/pearl-oyster\/[0-9a-f]+\.jpg$/);
+  assert.match(posted.data.photo_key, /^pending\/reports\/[0-9a-f]+\.jpg$/);
   const stored = await ctx.storage.get(posted.data.photo_key);
   assert.equal(stored.contentType, "image/jpeg");
   assert.equal(includesAscii(stored.bytes, "Exif"), false);
@@ -159,4 +159,13 @@ test("/api/media denies objects without an uploaded_media row", async () => {
   await ctx.storage.put(key, buildJpeg(), "image/jpeg");
   const res = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(key)}`);
   assert.equal(res.status, 404);
+});
+
+test("grow reports still save when PHOTOS_ENABLED is off", async () => {
+  const ctx = testEnv({ PHOTOS_ENABLED: "0" });
+  const { token } = await register(ctx, "nophoto@example.com");
+  const posted = await postReport(ctx, token, { photo: buildJpeg() });
+  assert.equal(posted.status, 201, JSON.stringify(posted.data));
+  assert.equal(posted.data.photo_key, null);
+  assert.equal(posted.data.photo_status, null);
 });

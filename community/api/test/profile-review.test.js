@@ -533,7 +533,7 @@ test("grow report photos are sanitized and stay private until approved", async (
     body: { outcome: "success", photo_base64: b64(poly), photo_type: "text/html", photo_ext: "html" },
   });
   assert.equal(report.status, 201, JSON.stringify(report.data));
-  assert.match(report.data.photo_key, /^pending\/reports\/pearl-oyster\//);
+  assert.match(report.data.photo_key, /^pending\/reports\/[0-9a-f]+\./);
   assert.equal(report.data.photo_status, "pending");
   const media = await call(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
   assert.equal(media.status, 404);
@@ -625,7 +625,7 @@ test("grow report photos stay off the profile gallery and are queued for the upl
     body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
   });
   assert.equal(report.status, 201, JSON.stringify(report.data));
-  assert.match(report.data.photo_key, /^pending\/reports\/alice-gallery\//);
+  assert.match(report.data.photo_key, /^pending\/reports\/[0-9a-f]+\./);
   const photosAfter = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", ["alice-gallery"]);
   assert.equal(photosAfter.length, photosBefore.length);
   assert.equal(
@@ -646,7 +646,12 @@ test("grow report photos stay off the profile gallery and are queued for the upl
   assert.equal(item.profile_id, "alice-gallery");
   const approved = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, { token: mod.token, body: {} });
   assert.equal(approved.status, 200, JSON.stringify(approved.data));
-  const publicAfter = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  const live = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item.report_id]);
+  assert.match(live.photo_key, /^reports\/[0-9a-f]+\./);
+  assert.notEqual(live.photo_key, report.data.photo_key);
+  const pendingGone = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  assert.equal(pendingGone.status, 404);
+  const publicAfter = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(live.photo_key)}`);
   assert.equal(publicAfter.status, 200);
   assert.equal(publicAfter.headers.get("x-content-type-options"), "nosniff");
   const stillGallery = await ctx.db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", ["alice-gallery"]);
@@ -754,16 +759,17 @@ test("moderators can remove an approved report photo and media 404s after takedo
   const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
   const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === report.data.photo_key);
   await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, { token: mod.token, body: {} });
-  const live = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  const approvedRow = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item.report_id]);
+  const live = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(approvedRow.photo_key)}`);
   assert.equal(live.status, 200);
   const rejected = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/reject`, {
     token: mod.token,
     body: { reason: "Take down this photo" },
   });
   assert.equal(rejected.status, 200, JSON.stringify(rejected.data));
-  const gone = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  const gone = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(approvedRow.photo_key)}`);
   assert.equal(gone.status, 404);
-  assert.equal(await ctx.storage.get(report.data.photo_key), null);
+  assert.equal(await ctx.storage.get(approvedRow.photo_key), null);
 
   const report2 = await call(ctx, "POST", "/api/profiles/take-oyster/reports", {
     token: alice.token,
@@ -772,12 +778,13 @@ test("moderators can remove an approved report photo and media 404s after takedo
   const queue2 = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
   const item2 = queue2.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === report2.data.photo_key);
   await call(ctx, "POST", `/api/moderation/report-photos/${item2.report_id}/approve`, { token: mod.token, body: {} });
+  const approved2 = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item2.report_id]);
   const down = await call(ctx, "POST", "/api/moderation/take-oyster/takedown", {
     token: mod.token,
     body: { reason: "Whole profile is down" },
   });
   assert.equal(down.status, 200, JSON.stringify(down.data));
-  const afterDown = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report2.data.photo_key)}`);
+  const afterDown = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(approved2.photo_key)}`);
   assert.equal(afterDown.status, 404);
 });
 
@@ -836,7 +843,8 @@ test("an approved report photo on an unpublished draft stays private", async () 
   const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === report.data.photo_key);
   assert.ok(item);
   await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, { token: mod.token, body: {} });
-  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(report.data.photo_key)}`);
+  const approvedDraft = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item.report_id]);
+  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(approvedDraft.photo_key)}`);
   assert.equal(anon.status, 404);
 });
 
@@ -1084,6 +1092,39 @@ test("owners can read their own paid profile JSON", async () => {
   assert.equal(owner.status, 200);
   assert.equal(owner.data.id, "paid-oyster");
   assert.ok(owner.data.stages);
+});
+
+test("Off-menu public photos stay behind the Off-menu gate", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "off-photo@example.com");
+  const mod = await makeModerator(ctx, "off-photo-mod@example.com");
+  const doc = draftFrom(pearl, "off-photo");
+  doc.pack = "psilocybin";
+  doc.species = "Psilocybe cubensis";
+  doc.restricted = true;
+  const published = await publishForReview(ctx, { token: owner.token, modToken: mod.token, doc, title: "Off photo" });
+  assert.equal(published.status, 200, JSON.stringify(published.data));
+  const photo = await ctx.db.one("SELECT * FROM profile_photos WHERE profile_id=?", ["off-photo"]);
+  assert.match(photo.object_key, /^profile-photos\/approved\//);
+  const on = await callRaw(ctx, "GET", `/api/public-photos/${photo.id}`);
+  assert.equal(on.status, 200);
+  ctx.SHOW_PSILOCYBIN = "0";
+  const off = await callRaw(ctx, "GET", `/api/public-photos/${photo.id}`);
+  assert.equal(off.status, 404);
+  const culinary = await call(ctx, "GET", "/api/profiles?pack=culinary");
+  assert.equal(culinary.data.some((p) => p.id === "off-photo"), false);
+});
+
+test("profile photo uploads stay off until PHOTOS_ENABLED=1", async () => {
+  const ctx = testEnv({ PHOTOS_ENABLED: "0" });
+  const { token } = await register(ctx, "flag-off@example.com");
+  const doc = draftFrom(pearl, "flag-off");
+  await call(ctx, "POST", "/api/profiles", { token, body: doc });
+  const photo = await call(ctx, "POST", "/api/profiles/flag-off/photos", {
+    token,
+    body: { photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(photo.status, 503);
 });
 
 test("takedown leaves unreviewed report photos pending for moderation", async () => {

@@ -46,8 +46,14 @@ export function paymentsConfigured(env = {}) {
   return Boolean(secret && webhook);
 }
 
+export function photosEnabled(env = {}) {
+  return String(env.PHOTOS_ENABLED || "") === "1";
+}
+
 export function photosConfigured(env = {}) {
-  return env.storage?.driver === "r2" || Boolean(env.PHOTOS);
+  if (!photosEnabled(env)) return false;
+  const driver = env.storage?.driver;
+  return driver === "r2" || driver === "memory" || Boolean(env.PHOTOS);
 }
 
 export function coachAiConfigured(env = {}) {
@@ -66,7 +72,7 @@ export function capabilities(env = {}, request) {
     google: googleConfigured(env) || stubs,
     apple: appleConfigured(env) || stubs,
     payments: paymentsConfigured(env) || stubs,
-    photos: photosConfigured(env) || stubs,
+    photos: photosConfigured(env),
     coach: coachAiConfigured(env) || stubs,
     push: pushConfigured() || stubs,
     show_psilocybin: String(env.SHOW_PSILOCYBIN ?? "1") !== "0",

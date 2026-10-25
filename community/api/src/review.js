@@ -12,7 +12,8 @@ import {
   ValidationError,
 } from "./profile-schema.js";
 import { PHOTO_MAX_COUNT, extForContentType, photoObjectKey, prescreenImage, processPhoto } from "./photos.js";
-import { insertMedia, pendingPhotoKey, setMediaStatus } from "./media-acl.js";
+import { insertMedia, pendingPhotoKey, promoteStoredObject, replaceMediaKey, setMediaStatus } from "./media-acl.js";
+import { capabilities } from "./providers.js";
 import { rateLimit, rateLimitClient } from "./security.js";
 
 export const REVIEW_DRAFT = "draft";
@@ -214,10 +215,18 @@ export async function approveReview(db, env, request, { profile, user, row, pack
     published_live: 1,
     ...confirmFields(review, normalized, { confirm: extra.moderatorPack === "culinary", actorId: user.id, at: ts }),
   });
-  await db.run("UPDATE profile_photos SET status='approved', updated_at=? WHERE profile_id=? AND withdrawn=0", [
-    nowIso(),
-    profile.id,
-  ]);
+  const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profile.id]);
+  const approvedAt = nowIso();
+  for (const photo of photos) {
+    const fromKey = photo.object_key;
+    const nextKey = await promoteStoredObject(env?.storage, fromKey);
+    await db.run("UPDATE profile_photos SET object_key=?, status='approved', updated_at=? WHERE id=?", [
+      nextKey,
+      approvedAt,
+      photo.id,
+    ]);
+    await replaceMediaKey(db, fromKey, nextKey, "approved");
+  }
   await logModeration(db, { profileId: profile.id, actorId: user.id, action: "approve", reason: "" });
   await notifyOwner(db, env, request, row, "approved", "");
   return getReview(db, profile.id);
@@ -268,6 +277,10 @@ export async function takedownReview(db, env, request, { profile, user, row, rea
     ts,
     profile.id,
   ]);
+  const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=?", [profile.id]);
+  for (const photo of photos) {
+    if (photo.object_key) await setMediaStatus(db, photo.object_key, "rejected");
+  }
   const reports = await db.all("SELECT * FROM grow_reports WHERE profile_id=?", [profile.id]);
   for (const report of reports) {
     if (!report.photo_key || report.photo_status !== "approved") continue;
@@ -334,6 +347,9 @@ export async function canServeReportPhoto(db, user, report) {
 }
 
 export async function storeReportPhoto(db, env, request, { profileId, user, raw }) {
+  if (!capabilities(env, request).photos) {
+    throw new ValidationError("Photo storage is not enabled yet. See the deploy note for the media bucket.", 503);
+  }
   if (!raw || !raw.byteLength) throw new ValidationError("Add a photo file.");
   const limited = await rateLimit(db, `report-photo:${user.id}:${rateLimitClient(request)}`, 10, 3600);
   if (!limited.ok) throw new ValidationError("Too many photo uploads this hour.", 429);
@@ -458,17 +474,19 @@ export async function reclassifyUnconfirmedLegacyBatch(db, { limit = RECLASS_BAT
   return { scanned, rewritten, lastId, done: finished };
 }
 
-export async function approveReportPhoto(db, { report, user }) {
+export async function approveReportPhoto(db, env, { report, user }) {
   if (!report || report.photo_status !== "pending") throw new ValidationError("This report photo is not waiting for review.");
-  await db.run("UPDATE grow_reports SET photo_status=? WHERE id=?", ["approved", report.id]);
-  if (report.photo_key) await setMediaStatus(db, report.photo_key, "approved");
+  const fromKey = report.photo_key;
+  const nextKey = fromKey ? await promoteStoredObject(env?.storage, fromKey) : fromKey;
+  await db.run("UPDATE grow_reports SET photo_key=?, photo_status=? WHERE id=?", [nextKey, "approved", report.id]);
+  if (fromKey) await replaceMediaKey(db, fromKey, nextKey, "approved");
   await logModeration(db, {
     profileId: report.profile_id,
     actorId: user.id,
     action: "report_photo_approve",
     reason: `uploader:${report.author_id}`,
   });
-  return { ...report, photo_status: "approved" };
+  return { ...report, photo_key: nextKey, photo_status: "approved" };
 }
 
 export async function rejectReportPhoto(db, env, { report, user, reason }) {
@@ -489,6 +507,9 @@ export async function rejectReportPhoto(db, env, { report, user, reason }) {
 }
 
 export async function storePhoto(db, env, request, { profile, user, raw, contentType }) {
+  if (!capabilities(env, request).photos) {
+    throw new ValidationError("Photo storage is not enabled yet. See the deploy note for the media bucket.", 503);
+  }
   const limited = await rateLimit(db, `photo:${user.id}:${rateLimitClient(request)}`, 10, 3600);
   if (!limited.ok) throw new ValidationError("Too many photo uploads this hour.", 429);
   const existing = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profile.id]);
@@ -499,6 +520,7 @@ export async function storePhoto(db, env, request, { profile, user, raw, content
   const pendingKey = photoObjectKey("pending");
   const stored = await env.storage.put(pendingKey, processed.bytes, processed.contentType || contentType || "image/jpeg");
   if (!stored) throw new ValidationError("Photo storage is not enabled yet. See the deploy note for the media bucket.", 503);
+  await insertMedia(db, { photo_key: pendingKey, owner_id: user.id, status: "pending", kind: "profile" });
   const ts = nowIso();
   await db.run(
     "INSERT INTO profile_photos (profile_id, object_key, content_type, width, height, status, prescreen, withdrawn, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",

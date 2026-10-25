@@ -78,6 +78,15 @@ export function dispatchReview(tables, ids, q, params) {
     }
     return ok(1);
   }
+  if (q.startsWith("UPDATE profile_photos SET object_key=")) {
+    const row = tables.profile_photos.find((r) => Number(r.id) === Number(p[2]));
+    if (row) {
+      row.object_key = p[0];
+      row.status = "approved";
+      row.updated_at = p[1];
+    }
+    return ok(row ? 1 : 0);
+  }
   if (q.startsWith("UPDATE profile_photos SET status=")) {
     for (const row of tables.profile_photos.filter((r) => r.profile_id === p[1] && Number(r.withdrawn) === 0)) {
       row.status = "approved";

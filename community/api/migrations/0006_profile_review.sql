@@ -3,9 +3,9 @@
 -- stay public without a review row. json_valid skips malformed documents so the migration can finish.
 -- confirmed_culinary_at is set only by the moderator confirm path. Legacy rows without that marker
 -- are reclassified here when the stored taxon text matches a restricted pattern.
--- Deploy note: enable the PHOTOS R2 binding before photo uploads work in production.
---   npx wrangler r2 bucket create shroomlabs-media
--- Then uncomment [[r2_buckets]] binding PHOTOS in wrangler.toml.
+-- Deploy note: create the R2 bucket at ship time, then flip PHOTOS_ENABLED.
+--   npx wrangler r2 bucket create shroomlabs-photos
+-- Binding: PHOTOS → shroomlabs-photos in wrangler.toml. Flag: PHOTOS_ENABLED=1.
 CREATE TABLE IF NOT EXISTS profile_review (
     profile_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
     status TEXT NOT NULL,

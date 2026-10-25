@@ -99,3 +99,10 @@ test("visitor-facing pages never use en or em dashes", () => {
   }
   assert.deepEqual(hits, []);
 });
+
+test("site CSP allows blob images so authenticated thumbs can render", () => {
+  const toml = readFileSync(new URL("../netlify.toml", import.meta.url), "utf8");
+  const siteCsp = toml.split("[[headers]]")[1];
+  assert.match(siteCsp, /img-src[^;]*\bblob:/);
+  assert.doesNotMatch(siteCsp, /img-src[^;]*api\.shroomlabs\.io/);
+});

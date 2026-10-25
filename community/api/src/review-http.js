@@ -1,7 +1,7 @@
 /** Review, photo, and moderator HTTP routes. */
 
 import { requireVerified, userFromRequest } from "./auth.js";
-import { stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
+import { isPsilocybin, stripCommunityAffiliates, validateProfile, ValidationError } from "./profile.js";
 import { canConfirmCulinary, classifyTaxon, reviewConfirmExtra } from "./profile-schema.js";
 import {
   approveReportPhoto,
@@ -9,6 +9,7 @@ import {
   canSeePhoto,
   getReview,
   isModerator,
+  isPublicProfile,
   listPendingReportPhotos,
   listPublicProfiles,
   logModeration,
@@ -164,6 +165,11 @@ export async function handleReview(method, path, url, request, env, { seeds, par
   if (publicPhoto && method === "GET") {
     const photo = await db.one("SELECT * FROM profile_photos WHERE id=?", [decodeURIComponent(publicPhoto[1])]);
     if (!photo || !photoIsPublic(photo)) return json({ error: "not found" }, 404);
+    const row = await db.one("SELECT * FROM profiles WHERE id=?", [photo.profile_id]);
+    if (!row || !(await isPublicProfile(db, row))) return json({ error: "not found" }, 404);
+    const profile = parseProfile(row, seeds);
+    if (!profile) return json({ error: "not found" }, 404);
+    if (isPsilocybin(profile) && String(env.SHOW_PSILOCYBIN ?? "1") === "0") return json({ error: "not found" }, 404);
     return serveStored(env, photo.object_key);
   }
 
@@ -220,7 +226,7 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const body = await readJson(request);
     const next =
       reportPhotoMatch[2] === "approve"
-        ? await approveReportPhoto(db, { report, user })
+        ? await approveReportPhoto(db, env, { report, user })
         : await rejectReportPhoto(db, env, { report, user, reason: body.reason });
     return json({ report: { id: next.id, photo_status: next.photo_status, profile_id: next.profile_id } });
   }

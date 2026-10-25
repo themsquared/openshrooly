@@ -44,8 +44,8 @@ Local `config.js` points at `http://127.0.0.1:8787`. The Worker allows `https://
 ```bash
 cd community/api
 npx wrangler d1 create shroomlabs
-# R2 is optional until the account enables it:
-# npx wrangler r2 bucket create shroomlabs-media
+# R2: create at ship time, then flip PHOTOS_ENABLED=1
+# npx wrangler r2 bucket create shroomlabs-photos
 npm run db:init
 npm run db:seed
 npm run dev:worker
@@ -62,8 +62,8 @@ npm run deploy
 npm run db:init:remote
 npm run db:seed:remote
 npx wrangler secret put COMMUNITY_SECRET
-# R2: leave unbound until the account enables R2, then create shroomlabs-media
-# and uncomment [[r2_buckets]] in wrangler.toml.
+# R2: npx wrangler r2 bucket create shroomlabs-photos
+# Binding PHOTOS is in wrangler.toml. Keep PHOTOS_ENABLED=0 until that bucket exists.
 ```
 
 Frontend (Netlify):
