@@ -30,7 +30,7 @@ Site: https://shroomlabs.io
 
 ## Off-menu Profiles
 
-Reference conditions for research and education only. Not sold. Grow Coach does not cover these.
+Reference conditions for research and education only. Not sold.
 
 Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.
 
@@ -55,4 +55,3 @@ Spore laws vary by state and country, and some US states ban spores outright. Wh
 
 - Chamber profiles for OpenShrooly.
 - Works with Shrooly devices running OpenShrooly.
-- Grow Coach is culinary only.

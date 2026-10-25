@@ -225,7 +225,7 @@ export class ProfileBuilder extends HTMLElement {
       off
         ? h("aside", { class: "legal legal-prominent", role: "note" },
             h("p", {}, PSILOCYBIN_LEGAL_NOTICE),
-            h("p", {}, "Off-menu profiles stay free. No payments, no affiliate links, and Grow Coach does not cover them.")
+            h("p", {}, "Off-menu profiles stay free. No payments and no affiliate links.")
           )
         : null
     );

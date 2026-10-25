@@ -84,8 +84,11 @@ export async function hasGrowCoach(db, user, env = {}) {
 async function requireCoach(request, db, env) {
   const { user } = await userFromRequest(request, db);
   requireVerified(user);
+  if (!(await coachAutopilotAvailable(env, db, user))) {
+    throw new ValidationError("not found", 404);
+  }
   if (!(await hasGrowCoach(db, user, env))) {
-    throw new ValidationError("Grow Coach is a $3.99/month culinary subscription.", 402);
+    throw new ValidationError("Grow Coach chat is not turned on for this account yet.", 402);
   }
   return user;
 }
@@ -264,12 +267,15 @@ export async function handleCoach(method, path, url, request, env) {
 
   if (method === "GET" && path === "/api/coach") {
     const { user } = await userFromRequest(request, db);
+    const autopilot = await coachAutopilotAvailable(env, db, user);
+    // Hidden for everyone except beta and entitled users while the flag is on.
+    if (!autopilot) return json({ available: false });
     const beta = coachBetaAccess(env, user);
     const entitled = user ? await hasGrowCoach(db, user, env) : false;
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
     const publicOn = capabilities(env, request).coach;
-    const autopilot = await coachAutopilotAvailable(env, db, user);
     return json({
+      available: true,
       product: coachCatalog(),
       entitled,
       beta,
@@ -292,6 +298,7 @@ export async function handleCoach(method, path, url, request, env) {
       throw new ValidationError("Grow Coach is not sold or marketed with off-menu varieties.", 400);
     }
     if (!coachPublicEnabled(env) || (!paymentsConfigured(env) && !devStubsEnabled(env, request))) {
+      if (!(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
       return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }
     const sessionId = `cs_test_${randomToken().slice(0, 16)}`;

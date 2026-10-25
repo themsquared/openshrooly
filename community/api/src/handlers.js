@@ -20,6 +20,7 @@ import { handleDevices } from "./devices.js";
 import { handleFleet } from "./fleet.js";
 import { coachBetaAccess, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
+import { coachAutopilotAvailable } from "./coach-autopilot.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
 import { corsAllowlist, originAllowed, rateLimit, rateLimitClient, securityHeaders, verifyPaymentWebhook } from "./security.js";
@@ -327,13 +328,18 @@ async function route(method, path, url, request, env) {
       tokens,
       entitlements,
       sessions,
-      grow_coach: {
-        entitled: await hasGrowCoach(db, user, env),
-        beta: coachBetaAccess(env, user),
-        period_end: coachSub?.period_end || null,
-        auto_tune: Boolean(Number(coachSub?.auto_tune)),
-        product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, pack: "culinary" },
-      },
+      // Grow Coach is hidden unless the server says this user can use it
+      // (flag on plus beta or entitlement). Everyone else gets no Coach details.
+      grow_coach: (await coachAutopilotAvailable(env, db, user))
+        ? {
+            available: true,
+            entitled: await hasGrowCoach(db, user, env),
+            beta: coachBetaAccess(env, user),
+            period_end: coachSub?.period_end || null,
+            auto_tune: Boolean(Number(coachSub?.auto_tune)),
+            product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, pack: "culinary" },
+          }
+        : { available: false },
       disclosure: DISCLOSURE,
     });
   }
