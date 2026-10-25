@@ -12,6 +12,7 @@ import {
   BRIDGE_KILL_FILE,
   BRIDGE_STATE_FILE,
   bridgeMode,
+  chamberAuthHeader,
   expireStaleOnLiveStart,
   httpApplyWrites,
   runBridgeCycle,
@@ -28,6 +29,47 @@ import {
 import { POLL_INTERVAL_MS, normalizeChamberUrl, readChamber } from "./coach-readings.js";
 
 export const BRIDGE_LOOP_BACKOFF_MS = 60_000;
+const DEV_VARS_PATH = join(API_ROOT, ".dev.vars");
+
+export function parseDevVars(text) {
+  const out = {};
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!key) continue;
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+    ) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+/** Copy KEY=VALUE pairs into env without replacing keys that are already set. */
+export function loadDevVarsInto(env, text) {
+  const parsed = parseDevVars(text);
+  for (const [key, value] of Object.entries(parsed)) {
+    if (env[key] !== undefined) continue;
+    env[key] = value;
+  }
+  return env;
+}
+
+export function loadDevVarsFile(env = process.env, filePath = DEV_VARS_PATH) {
+  try {
+    loadDevVarsInto(env, readFileSync(filePath, "utf8"));
+  } catch (err) {
+    if (err?.code !== "ENOENT") throw err;
+  }
+  return env;
+}
 
 function arg(name, fallback = "") {
   const prefix = `--${name}=`;
@@ -128,7 +170,7 @@ async function runOnce({ chamber, deviceId, env = process.env } = {}) {
       ),
     loadStage: async () => loadStage(deviceId),
     readChamber: async () => readChamber(chamber),
-    applyWrites: async (writes) => httpApplyWrites(chamber, writes),
+    applyWrites: async (writes) => httpApplyWrites(chamber, writes, { auth: chamberAuthHeader(env) }),
     markCommand: async (command, result) => {
       const payload = withBridgeResult(command, result);
       wranglerLocalD1Command(
@@ -139,6 +181,7 @@ async function runOnce({ chamber, deviceId, env = process.env } = {}) {
 }
 
 export async function main() {
+  loadDevVarsFile();
   const chamber = normalizeChamberUrl(arg("chamber"));
   if (!chamber) {
     console.error("Usage: node scripts/coach-local-bridge.js --chamber http://192.168.1.42 [--loop]");
@@ -148,13 +191,19 @@ export async function main() {
   const intervalSec = Number(arg("interval", String(POLL_INTERVAL_MS / 1000)));
   const intervalMs = Number.isFinite(intervalSec) && intervalSec > 0 ? intervalSec * 1000 : POLL_INTERVAL_MS;
   const looping = process.argv.includes("--loop");
+  const env = process.env;
   console.error(
-    `Coach bridge ${bridgeMode(process.env)} for ${deviceId} → ${chamber}${looping ? ` every ${intervalMs / 1000}s` : ""} (Ctrl+C to stop).`
+    `Coach bridge ${bridgeMode(env)} for ${deviceId} → ${chamber}${looping ? ` every ${intervalMs / 1000}s` : ""} (Ctrl+C to stop).`
   );
   if (existsSync(resolvePath(BRIDGE_KILL_FILE))) {
     console.error(`Kill switch on: ${BRIDGE_KILL_FILE}`);
   }
-  if (bridgeMode(process.env) === "live") {
+  if (bridgeMode(env) === "live" && !env.COACH_CHAMBER_PASSWORD) {
+    console.error(
+      "Live writes need COACH_CHAMBER_PASSWORD (the chamber web password shown on the device screen). Add it to community/api/.dev.vars; the bridge loads that file itself."
+    );
+  }
+  if (bridgeMode(env) === "live") {
     const expired = await expireStaleOnLiveStart({
       listPendingAll: async () =>
         wranglerLocalD1Rows(
@@ -174,7 +223,7 @@ export async function main() {
   await runBridgeLoop({
     looping,
     intervalMs,
-    runOnce: () => runOnce({ chamber, deviceId }),
+    runOnce: () => runOnce({ chamber, deviceId, env }),
     log: (line) => console.error(line),
   });
 }

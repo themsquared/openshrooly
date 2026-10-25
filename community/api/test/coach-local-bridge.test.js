@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BRIDGE_LOOP_BACKOFF_MS, runBridgeLoop } from "../scripts/coach-local-bridge.js";
+import { BRIDGE_LOOP_BACKOFF_MS, loadDevVarsInto, parseDevVars, runBridgeLoop } from "../scripts/coach-local-bridge.js";
 
 test("bridge --loop catches per-cycle errors, backs off 60s, and retries", async () => {
   assert.equal(BRIDGE_LOOP_BACKOFF_MS, 60_000);
@@ -51,4 +51,29 @@ test("command-marking D1 writes throw instead of process.exit", () => {
   assert.match(bridge, /runBridgeLoop/);
   assert.match(bridge, /wranglerLocalD1Command\(/);
   assert.doesNotMatch(bridge, /wranglerLocalD1Command\([\s\S]*throwOnError:\s*false/);
+  assert.match(bridge, /chamberAuthHeader\(env\)/);
+  assert.match(bridge, /loadDevVarsFile\(\)/);
+  assert.match(bridge, /Live writes need COACH_CHAMBER_PASSWORD/);
+  assert.doesNotMatch(bridge, /console\.[a-z]+\([^)]*COACH_CHAMBER_PASSWORD\)/);
+  assert.doesNotMatch(bridge, /console\.[a-z]+\([^)]*authorization/i);
+});
+
+test(".dev.vars loading fills missing keys and never overrides existing env", () => {
+  const text = [
+    "# comment",
+    "COACH_CHAMBER_PASSWORD=from-file",
+    "COACH_CHAMBER_USER=admin",
+    "ALREADY_SET=file-value",
+    "",
+    "QUOTED=\"quoted-secret\"",
+  ].join("\n");
+  assert.equal(parseDevVars(text).COACH_CHAMBER_PASSWORD, "from-file");
+  const env = { ALREADY_SET: "keep-me" };
+  loadDevVarsInto(env, text);
+  assert.equal(env.ALREADY_SET, "keep-me");
+  assert.equal(env.COACH_CHAMBER_PASSWORD, "from-file");
+  assert.equal(env.COACH_CHAMBER_USER, "admin");
+  assert.equal(env.QUOTED, "quoted-secret");
+  loadDevVarsInto(env, "COACH_CHAMBER_PASSWORD=other\n");
+  assert.equal(env.COACH_CHAMBER_PASSWORD, "from-file");
 });

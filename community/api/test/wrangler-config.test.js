@@ -87,4 +87,7 @@ test("wrangler.coach-local.toml is fully local: no AI binding, REST via .dev.var
   assert.equal(quoted(coachLocal, "FLEET_UI_ENABLED"), "1");
   assert.match(coachLocal, /\[triggers\]/);
   assert.match(coachLocal, /crons\s*=\s*\[/);
+  assert.doesNotMatch(coachLocal, /COACH_CHAMBER_PASSWORD|COACH_CHAMBER_USER/);
+  assert.doesNotMatch(deploy, /COACH_CHAMBER_PASSWORD|COACH_CHAMBER_USER/);
+  assert.doesNotMatch(local, /COACH_CHAMBER_PASSWORD|COACH_CHAMBER_USER/);
 });

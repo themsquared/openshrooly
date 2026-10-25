@@ -13,7 +13,7 @@ export const PENDING_COMMAND_SQL =
   "SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL ORDER BY id ASC LIMIT ?";
 
 const NUMBER_ENTITIES = {
-  temperature_target: ["temperature_target", "temperature__target"],
+  temperature_target: ["temperature__target", "temperature_target"],
   target_humidity: ["target_humidity"],
 };
 
@@ -159,28 +159,44 @@ export async function expireStaleOnLiveStart({
   return expired;
 }
 
-export async function httpApplyWrites(baseUrl, writes, { fetchImpl = fetch, timeoutMs = REACHABILITY_MS } = {}) {
+export function chamberAuthHeader(env = {}) {
+  const password = env.COACH_CHAMBER_PASSWORD;
+  if (!password) return null;
+  const user = env.COACH_CHAMBER_USER || "admin";
+  return `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
+}
+
+function writeFailureReason(failed = []) {
+  return failed.find((item) => item?.error)?.error || "chamber write failed";
+}
+
+export async function httpApplyWrites(baseUrl, writes, { fetchImpl = fetch, timeoutMs = REACHABILITY_MS, auth = null } = {}) {
   const applied = [];
   const failed = [];
+  const headers = auth ? { authorization: auth } : {};
   for (const write of writes) {
     let ok = false;
     let entityId = null;
+    let error = null;
     for (const id of write.entityIds) {
       const url = `${String(baseUrl).replace(/\/$/, "")}/number/${id}/set?value=${encodeURIComponent(write.value)}`;
       try {
-        const res = await fetchImpl(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
+        const res = await fetchImpl(url, { method: "POST", headers, redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
         if (res.ok) {
           ok = true;
           entityId = id;
+          error = null;
           break;
         }
-      } catch {
-        // try the next firmware id
+        error = res.status === 401 ? "chamber web password missing or wrong (401)" : `HTTP ${res.status}`;
+        if (res.status === 401 || res.status === 403) break;
+      } catch (err) {
+        error = err?.name || "network error";
       }
     }
-    (ok ? applied : failed).push({ field: write.field, value: write.value, entity_id: entityId });
+    (ok ? applied : failed).push({ field: write.field, value: write.value, entity_id: entityId, ...(ok ? {} : { error }) });
   }
-  return { ok: failed.length === 0, applied, failed };
+  return { ok: failed.length === 0, applied, failed, error: failed.length ? writeFailureReason(failed) : undefined };
 }
 
 export async function runBridgeCycle({
@@ -254,7 +270,7 @@ export async function runBridgeCycle({
   const status = apply.ok ? "sent" : "failed";
   const result = {
     status,
-    reason: apply.ok ? "applied" : apply.error || "chamber write failed",
+    reason: apply.ok ? "applied" : apply.error || writeFailureReason(apply.failed),
     writes: plan.writes,
     applied: plan.applied,
     before,
