@@ -19,30 +19,32 @@ export function brandSvg() {
   return `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
 }
 
-function navLinks(activeId = "", { idPrefix = "", hideCoach = false } = {}) {
+function navLinks(activeId = "", { idPrefix = "" } = {}) {
   return NAV_ITEMS.map((item) => {
     const current = item.id === activeId ? ' aria-current="page"' : "";
     const id = idPrefix && item.id === "coach" ? ` id="${idPrefix}coach"` : "";
-    const hidden = hideCoach && item.id === "coach" ? ' class="hidden"' : "";
-    return `<a${id} href="${item.href}"${hidden}${current}>${item.label}</a>`;
+    // Grow Coach ships hidden for everyone. app.js reveals it only when the API
+    // says this user can use Coach, and never on an Off-menu page.
+    const coach = item.id === "coach" ? ' class="hidden" data-coach-link' : "";
+    return `<a${id} href="${item.href}"${coach}${current}>${item.label}</a>`;
   }).join("");
 }
 
-/** hideCoach: Off-menu pages never promote Grow Coach. The link stays in the DOM so the chrome is identical. */
-export function renderHeader(activeId = "", { hideCoach = false } = {}) {
+/** The Coach link is always hidden in static HTML so every page shares one chrome. */
+export function renderHeader(activeId = "") {
   return `<div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header" data-chrome="header">
     <a class="brand" href="/">${brandSvg()}<span>Shroom Labs<small>${POSITIONING}</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site">${navLinks(activeId, { idPrefix: "nav-", hideCoach })}<span id="session-nav"></span></nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site">${navLinks(activeId, { idPrefix: "nav-" })}<span id="session-nav"></span></nav>
   </header>`;
 }
 
-export function renderFooter({ hideCoach = false } = {}) {
+export function renderFooter() {
   return `<footer class="site-footer" data-chrome="footer">
     <p>${POSITIONING}</p>
-    <nav class="footer-nav" aria-label="Footer">${navLinks("", { idPrefix: "footer-nav-", hideCoach })}</nav>
+    <nav class="footer-nav" aria-label="Footer">${navLinks("", { idPrefix: "footer-nav-" })}</nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>`;

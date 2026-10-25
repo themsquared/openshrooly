@@ -170,9 +170,37 @@ test("Off-menu pages carry the legal note and no prices, affiliate links, or Gro
     const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
     assert.match(main, /legal-prominent/);
     assert.doesNotMatch(main, /\$\d|affiliate|Grow Coach|coach\.html/i);
-    assert.match(html, /<a id="nav-coach" href="\/coach.html" class="hidden">/);
-    assert.match(html, /<a id="footer-nav-coach" href="\/coach.html" class="hidden">/);
+    assert.match(html, /<a id="nav-coach" href="\/coach.html" class="hidden" data-coach-link>/);
+    assert.match(html, /<a id="footer-nav-coach" href="\/coach.html" class="hidden" data-coach-link>/);
+    assert.match(html, /<body [^>]*data-coach-off/);
   }
+});
+
+test("Grow Coach is hidden by default on every static page", () => {
+  for (const file of allPages()) {
+    const html = read(file);
+    // Nav and footer links ship hidden. app.js reveals them only when /api/me says grow_coach.available.
+    for (const id of ["nav-coach", "footer-nav-coach"]) {
+      assert.match(html, new RegExp(`<a id="${id}" href="/coach.html" class="hidden" data-coach-link[ >]`), `${file} ${id}`);
+    }
+    assert.doesNotMatch(html, /\$3\.99|3\.99 (a|per) month/, `${file} prices Coach`);
+    if (file === "coach.html") continue;
+    const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
+    const visible = main.replace(/<div id="coach-billing" class="hidden">[\s\S]*?<\/div>/, "");
+    assert.doesNotMatch(visible, /Grow Coach|coach-promo/, `${file} shows Coach outside a hidden block`);
+  }
+  assert.match(read("account.html"), /<div id="coach-billing" class="hidden">/);
+  for (const file of ["llms.txt", "sitemap.xml"]) assert.doesNotMatch(read(file), /Grow Coach|coach\.html/, file);
+  for (const file of ["faq.html", "docs.html"]) {
+    const html = read(file);
+    const head = html.slice(0, html.indexOf("</head>"));
+    assert.doesNotMatch(head, /Grow Coach/, `${file} head`);
+  }
+  assert.match(meta(read("coach.html"), "name", "robots")[0], /noindex/);
+  assert.match(read("robots.txt"), /Disallow: \/coach.html/);
+  const app = readFileSync(join(PUBLIC, "js/app.js"), "utf8");
+  assert.doesNotMatch(app, /3\.99/);
+  assert.match(app, /grow_coach\?\.available/);
 });
 
 test("paid profile pages keep setpoints locked, like the API", () => {

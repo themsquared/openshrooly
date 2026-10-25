@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!--SEO_HEAD-->
   <title>Grow Coach · Shroom Labs</title>
-  <meta name="description" content="Grow Coach is a culinary coaching subscription for one chamber running OpenShrooly. $3.99 a month.">
-  <meta name="robots" content="index,follow">
+  <meta name="description" content="Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.">
+  <meta name="robots" content="noindex,nofollow">
   <link rel="canonical" href="https://shroomlabs.io/coach.html">
   <meta property="og:site_name" content="Shroom Labs">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Grow Coach · Shroom Labs">
-  <meta property="og:description" content="Grow Coach is a culinary coaching subscription for one chamber running OpenShrooly. $3.99 a month.">
+  <meta property="og:description" content="Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.">
   <meta property="og:url" content="https://shroomlabs.io/coach.html">
   <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
   <meta property="og:image:width" content="1200">
@@ -19,7 +19,7 @@
   <meta property="og:image:alt" content="Grow Coach · Shroom Labs">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Grow Coach · Shroom Labs">
-  <meta name="twitter:description" content="Grow Coach is a culinary coaching subscription for one chamber running OpenShrooly. $3.99 a month.">
+  <meta name="twitter:description" content="Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.">
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Grow Coach","item":"https://shroomlabs.io/coach.html"}]}</script>
   <!--/SEO_HEAD-->
@@ -36,20 +36,20 @@
   <header class="site-header" data-chrome="header">
     <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html" aria-current="page">Grow Coach</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html" class="hidden" data-coach-link aria-current="page">Grow Coach</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
   </header>
   <!--/CHROME_HEADER-->
   <main id="main">
-    <section class="hero coach-hero" aria-label="Grow Coach">
+    <section id="coach-hero" class="hero coach-hero hidden" aria-label="Grow Coach">
       <div class="hero-copy">
-        <p id="coach-eyebrow" class="eyebrow">Coming soon · Culinary subscription · $3.99 / month</p>
+        <p id="coach-eyebrow" class="eyebrow">Private beta · Culinary chambers only</p>
         <h1>Advice tuned to your chamber.</h1>
         <p class="lede">Grow Coach uses your device's readings and your past grows to tailor humidity and temperature advice for culinary Profiles. Photo checks come later.</p>
         <p class="muted">Sold for general home cultivation only.</p>
         <p id="coach-status" class="muted"></p>
         <p id="coach-error" class="notice hidden" role="alert"></p>
         <div id="subscribe-panel" class="hidden">
-          <button type="button" id="subscribe">Subscribe · $3.99</button>
+          <button type="button" id="subscribe">Subscribe</button>
         </div>
       </div>
     </section>
@@ -126,7 +126,7 @@
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">
     <p>Works with Shrooly devices running OpenShrooly.</p>
-    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html">Grow Coach</a><a href="/docs.html">Docs</a></nav>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html" class="hidden" data-coach-link>Grow Coach</a><a href="/docs.html">Docs</a></nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>
