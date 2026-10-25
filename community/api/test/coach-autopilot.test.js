@@ -273,6 +273,10 @@ test("Autopilot applies a stepped setpoint, logs it, and Undo restores the old v
   const payload = JSON.parse(cmds[0].payload);
   assert.equal(payload.source, "grow-coach-autopilot");
   assert.equal(payload.temperature_c, 23);
+  const exp = Date.parse(payload.expires_at);
+  assert.ok(Number.isFinite(exp));
+  assert.ok(exp - Date.now() <= AUTOPILOT_LIMITS.commandTtlMs);
+  assert.ok(exp - Date.now() > AUTOPILOT_LIMITS.commandTtlMs - 10_000);
   const apply = (run.data.actions || []).find((a) => a.action === "apply");
   assert.ok(apply);
   const undo = await call(ctx, "POST", "/api/coach/autopilot/undo", { token, body: { action_id: apply.id } });

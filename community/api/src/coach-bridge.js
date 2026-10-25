@@ -1,12 +1,12 @@
 /** Local Autopilot delivery. Re-validates queued setpoints before a LAN write. */
 
-import { commandExpired, FLEET_COMMAND_TTL_MS } from "./fleet.js";
-import { clampAutopilotSetpoints, limitAutopilotStep, setpointsMismatch, stageFromProfile } from "./coach-autopilot.js";
-import { validateStageLight } from "./profile.js";
+import { commandExpired } from "./fleet.js";
+import { AUTOPILOT_LIMITS, clampAutopilotSetpoints, limitAutopilotStep, setpointsMismatch, stageFromProfile } from "./coach-autopilot.js";
 import { REACHABILITY_MS } from "../scripts/coach-readings.js";
 
 export const BRIDGE_RATE_MS = 10 * 60 * 1000;
-export const BRIDGE_COMMAND_TTL_MS = FLEET_COMMAND_TTL_MS;
+export const BRIDGE_COMMAND_TTL_MS = AUTOPILOT_LIMITS.commandTtlMs;
+export const BRIDGE_STALE_MS = 30 * 60 * 1000;
 export const BRIDGE_KILL_FILE = ".wrangler/coach-local/BRIDGE_OFF";
 export const BRIDGE_STATE_FILE = ".wrangler/coach-local/bridge-state.json";
 export const PENDING_COMMAND_SQL =
@@ -15,12 +15,6 @@ export const PENDING_COMMAND_SQL =
 const NUMBER_ENTITIES = {
   temperature_target: ["temperature_target", "temperature__target"],
   target_humidity: ["target_humidity"],
-  sunrise_hour: ["sunrise_hour", "lights__sunrise_hour"],
-  duration_hours: ["light_hours", "lights__duration__hours_"],
-  white_led_lux: ["white_intensity", "white_led_intensity"],
-  red_percent: ["color_r", "red_led_intensity"],
-  green_percent: ["color_g", "green_led_intensity"],
-  blue_percent: ["color_b", "blue_led_intensity"],
 };
 
 function parsePayload(value, fallback = {}) {
@@ -32,6 +26,12 @@ function parsePayload(value, fallback = {}) {
   } catch {
     return fallback;
   }
+}
+
+function finite(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 export function bridgeMode(env = process.env) {
@@ -53,6 +53,21 @@ export function bridgeCommandExpired(command, now = Date.now()) {
   return now - issued > BRIDGE_COMMAND_TTL_MS;
 }
 
+export function chamberSetpointsUnreadable(reading, payload = {}) {
+  if (!reading) return "Chamber setpoints could not be read.";
+  const needTemp = payload.temperature_c != null || payload.temperature_target != null;
+  const needRh = payload.humidity_percent != null || payload.target_humidity != null;
+  const checkTemp = needTemp || !needRh;
+  const checkRh = needRh || !needTemp;
+  if (checkTemp && finite(reading.temperature_setpoint) == null) {
+    return "Chamber temperature setpoint could not be read.";
+  }
+  if (checkRh && finite(reading.humidity_setpoint) == null) {
+    return "Chamber humidity setpoint could not be read.";
+  }
+  return null;
+}
+
 function writeFor(field, value) {
   if (value == null || !Number.isFinite(Number(value))) return null;
   return { field, value: Number(value), entityIds: NUMBER_ENTITIES[field] || [field] };
@@ -64,59 +79,71 @@ export function planBridgeCommand({ command, stage = {}, reading, now = Date.now
     return { ok: false, status: "failed", reason: "Command expired.", mark: true };
   }
   const kind = String(command.kind || "");
-  if (kind !== "setpoints" && kind !== "schedule") {
-    return { ok: false, status: "failed", reason: `Refusing command kind ${kind}.`, mark: true };
+  if (kind !== "setpoints") {
+    return {
+      ok: false,
+      status: "failed",
+      reason: "Bridge accepts only setpoints until lights have step and override checks.",
+      mark: true,
+    };
   }
   const payload = parsePayload(command.payload);
+  const unread = chamberSetpointsUnreadable(reading, payload);
+  if (unread) {
+    return { ok: false, status: "failed", reason: unread, mark: true };
+  }
   const plannedFrom = payload.from || payload.planned_from || null;
-  if (plannedFrom && reading && setpointsMismatch(reading, plannedFrom, { now })) {
+  if (plannedFrom && setpointsMismatch(reading, plannedFrom, { now })) {
     return { ok: false, status: "failed", reason: "Chamber setpoint changed; manual override wins.", mark: true };
   }
 
-  if (kind === "setpoints") {
-    const proposed = {
-      temperature_c: payload.temperature_c ?? payload.temperature_target,
-      humidity_percent: payload.humidity_percent ?? payload.target_humidity,
-    };
-    const clamped = clampAutopilotSetpoints(proposed, stage);
-    const current = {
-      temperature_c: reading?.temperature_setpoint,
-      humidity_percent: reading?.humidity_setpoint,
-    };
-    const stepped = limitAutopilotStep(current, clamped);
-    const writes = [
-      writeFor("temperature_target", stepped.temperature_c),
-      writeFor("target_humidity", stepped.humidity_percent),
-    ].filter(Boolean);
-    if (!writes.length) {
-      return { ok: false, status: "failed", reason: "No allowed setpoints after clamp.", mark: true };
-    }
-    return { ok: true, status: "ready", writes, applied: stepped, payload, kind };
-  }
-
-  let light;
-  try {
-    light = validateStageLight(payload.light || payload);
-  } catch (err) {
-    return { ok: false, status: "failed", reason: err.message || "Invalid light recipe.", mark: true };
-  }
+  const proposed = {
+    temperature_c: payload.temperature_c ?? payload.temperature_target,
+    humidity_percent: payload.humidity_percent ?? payload.target_humidity,
+  };
+  const clamped = clampAutopilotSetpoints(proposed, stage);
+  const current = {
+    temperature_c: reading.temperature_setpoint,
+    humidity_percent: reading.humidity_setpoint,
+  };
+  const stepped = limitAutopilotStep(current, clamped);
   const writes = [
-    writeFor("sunrise_hour", light.sunrise_hour),
-    writeFor("duration_hours", light.duration_hours),
-    writeFor("white_led_lux", light.white_led_lux),
-    writeFor("red_percent", light.red_percent),
-    writeFor("green_percent", light.green_percent),
-    writeFor("blue_percent", light.blue_percent),
+    writeFor("temperature_target", stepped.temperature_c),
+    writeFor("target_humidity", stepped.humidity_percent),
   ].filter(Boolean);
   if (!writes.length) {
-    return { ok: false, status: "failed", reason: "Light payload is empty.", mark: true };
+    return { ok: false, status: "failed", reason: "No allowed setpoints after clamp.", mark: true };
   }
-  return { ok: true, status: "ready", writes, applied: light, payload, kind };
+  return { ok: true, status: "ready", writes, applied: stepped, payload, kind };
 }
 
 export function withBridgeResult(command, result) {
   const payload = parsePayload(command.payload);
   return { ...payload, _bridge: result };
+}
+
+export async function expireStaleOnLiveStart({
+  listPendingAll,
+  markCommand,
+  now = Date.now(),
+  staleMs = BRIDGE_STALE_MS,
+  log = () => {},
+} = {}) {
+  const pending = (await listPendingAll?.()) || [];
+  let expired = 0;
+  for (const command of pending) {
+    const issued = Date.parse(command.issued_at || "");
+    if (!Number.isFinite(issued) || now - issued <= staleMs) continue;
+    const result = {
+      status: "failed",
+      reason: "Expired on live start (older than 30 minutes).",
+      at: new Date(now).toISOString(),
+    };
+    await markCommand(command, result);
+    log({ action: "failed", reason: result.reason, command_id: command.id });
+    expired += 1;
+  }
+  return expired;
 }
 
 export async function httpApplyWrites(baseUrl, writes, { fetchImpl = fetch, timeoutMs = REACHABILITY_MS } = {}) {
@@ -175,12 +202,13 @@ export async function runBridgeCycle({
   const plan = planBridgeCommand({ command, stage: resolvedStage, reading: before, now });
   if (!plan.ok) {
     log({ action: plan.status, reason: plan.reason, command_id: command.id, before });
-    if (mode === "live" && plan.mark) {
+    if (plan.mark) {
       await markCommand(command, {
         status: "failed",
         reason: plan.reason,
         before,
         after: null,
+        sent: false,
         at: new Date(now).toISOString(),
       });
     }
@@ -188,8 +216,18 @@ export async function runBridgeCycle({
   }
 
   if (mode !== "live") {
-    log({ action: "dry-run", writes: plan.writes, command_id: command.id, before });
-    return { ok: true, mode: "dry-run", writes: plan.writes, sent: false, command_id: command.id, before };
+    await markCommand(command, {
+      status: "dry_run",
+      reason: "Dry-run; not sent.",
+      writes: plan.writes,
+      applied: plan.applied,
+      before,
+      after: null,
+      sent: false,
+      at: new Date(now).toISOString(),
+    });
+    log({ action: "dry_run", writes: plan.writes, command_id: command.id, before });
+    return { ok: true, mode: "dry-run", status: "dry_run", writes: plan.writes, sent: false, command_id: command.id, before };
   }
 
   if (rateLimited(state, now)) {
@@ -208,6 +246,7 @@ export async function runBridgeCycle({
     before,
     after,
     chamber: apply,
+    sent: apply.ok,
     at: new Date(now).toISOString(),
   };
   await markCommand(command, result);

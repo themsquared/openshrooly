@@ -1,5 +1,7 @@
 /** Parse ESPHome / hub sensor payloads into Coach telemetry JSON. */
 
+import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
+import { dirname } from "node:path";
 import { sqlQuote } from "../src/seed.js";
 
 export const CHAMBER_SENSORS = {
@@ -15,6 +17,7 @@ export const REACHABILITY_MS = 5_000;
 export const POLL_INTERVAL_MS = 60_000;
 export const ERROR_BACKOFF_MS = 5 * 60_000;
 export const READINGS_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+export const POLL_LOG_MAX_BYTES = 1_000_000;
 
 export function sensorValue(payload) {
   if (payload == null) return null;
@@ -70,6 +73,22 @@ export function pruneBeforeIso(now = Date.now(), retentionMs = READINGS_RETENTIO
 
 export function nextPollDelay(ok, intervalMs = POLL_INTERVAL_MS) {
   return ok ? intervalMs : ERROR_BACKOFF_MS;
+}
+
+/** Append a line and rotate when the file would exceed maxBytes. Checked on every write. */
+export function appendRotatedLog(filePath, line, { maxBytes = POLL_LOG_MAX_BYTES } = {}) {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const text = String(line).endsWith("\n") ? String(line) : `${line}\n`;
+  let size = 0;
+  try {
+    size = statSync(filePath).size;
+  } catch {
+    size = 0;
+  }
+  if (size > 0 && size + Buffer.byteLength(text) > maxBytes) {
+    renameSync(filePath, `${filePath}.1`);
+  }
+  appendFileSync(filePath, text);
 }
 
 export async function fetchJson(url, { timeoutMs = REACHABILITY_MS, fetchImpl = fetch } = {}) {

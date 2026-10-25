@@ -6,10 +6,11 @@ import { isPsilocybin, ValidationError, validateStageLight } from "./profile.js"
 import {
   compareReadingToStage,
   latestReading,
+  downsampleHistory,
   loadRecentTelemetry,
   parseTelemetry,
   refuseRestrictedPack,
-  TELEMETRY_WINDOW_LIMIT,
+  TELEMETRY_HISTORY_LIMIT,
 } from "./coach-learn.js";
 import {
   clampAutopilotSetpoints,
@@ -379,17 +380,12 @@ export async function handleFleet(method, path, url, request, env) {
     const samples = await loadRecentTelemetry(db, device.id, {
       now: Date.now(),
       windowMs: hours * 3600 * 1000,
-      limit: TELEMETRY_WINDOW_LIMIT,
+      limit: TELEMETRY_HISTORY_LIMIT,
     });
-    const history = parseTelemetry(samples)
-      .filter((s) => !s.created_at || s.created_at >= since)
-      .map((s) => ({
-        at: s.created_at,
-        temperature: s.temperature,
-        humidity: s.humidity,
-        temperature_setpoint: s.temperature_setpoint,
-        humidity_setpoint: s.humidity_setpoint,
-      }));
+    const history = downsampleHistory(
+      samples.filter((s) => !s.created_at || s.created_at >= since),
+      { hours }
+    );
     return json({ device: await enrichDevice(db, env, user, device), history });
   }
 

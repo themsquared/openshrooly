@@ -1,6 +1,6 @@
 /** Grow Coach Autopilot: server-side guardrails. The model never chooses setpoints. */
 
-import { nowIso } from "./crypto.js";
+import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin } from "./profile.js";
 import { coachAiConfigured, isCoachBetaUser } from "./providers.js";
 import {
@@ -30,6 +30,7 @@ export const AUTOPILOT_LIMITS = {
   jumpTemp: 8,
   jumpRh: 25,
   fanClamp: [10, 80],
+  commandTtlMs: 30 * 60 * 1000,
 };
 
 export function coachAutopilotFlagOn(env = {}) {
@@ -491,9 +492,11 @@ export function stageFromProfile(profile) {
 }
 
 async function applySetpointsCommand(db, deviceId, payload) {
+  const body = { expires_at: laterIso(AUTOPILOT_LIMITS.commandTtlMs), ...payload };
+  if (!body.expires_at) body.expires_at = laterIso(AUTOPILOT_LIMITS.commandTtlMs);
   await db.run(
     "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
-    [deviceId, "setpoints", JSON.stringify(payload), nowIso(), null]
+    [deviceId, "setpoints", JSON.stringify(body), nowIso(), null]
   );
 }
 

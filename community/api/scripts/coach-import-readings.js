@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  API_ROOT,
   COACH_LOCAL_DEVICE_ID,
   COACH_LOCAL_USER_ID,
   wranglerLocalD1,
@@ -17,6 +18,7 @@ import {
 import {
   ERROR_BACKOFF_MS,
   POLL_INTERVAL_MS,
+  appendRotatedLog,
   buildImportSql,
   fetchJson,
   nextPollDelay,
@@ -111,10 +113,10 @@ export async function persistReadings(
   return { created, document };
 }
 
-function wranglerExecSql(sql) {
+export function wranglerExecSql(sql, { quiet = false, throwOnError = false } = {}) {
   const file = join(mkdtempSync(join(tmpdir(), "shroomlabs-coach-tel-")), "telemetry.sql");
   writeFileSync(file, sql);
-  wranglerLocalD1(file);
+  wranglerLocalD1(file, { quiet, throwOnError });
 }
 
 export async function runPollOnce(opts = {}) {
@@ -157,11 +159,24 @@ export async function main(argv = process.argv) {
   const userId = Number(arg("user-id", String(COACH_LOCAL_USER_ID), argv)) || COACH_LOCAL_USER_ID;
   const intervalSec = Number(arg("interval", String(POLL_INTERVAL_MS / 1000), argv));
   const intervalMs = Number.isFinite(intervalSec) && intervalSec > 0 ? intervalSec * 1000 : POLL_INTERVAL_MS;
-  const shared = { argv, deviceId, userId, execSql: wranglerExecSql, intervalMs };
+  const pollLog = join(API_ROOT, ".wrangler/coach-local/poll.log");
+  const shared = {
+    argv,
+    deviceId,
+    userId,
+    intervalMs,
+    execSql: (sql) => wranglerExecSql(sql, { quiet: flag("poll", argv), throwOnError: flag("poll", argv) }),
+  };
 
   if (flag("poll", argv)) {
     console.error(`Polling ${arg("chamber", arg("hub", "chamber", argv), argv)} every ${intervalMs / 1000}s (Ctrl+C to stop).`);
-    await runPollLoop(shared);
+    await runPollLoop({
+      ...shared,
+      log: (line) => {
+        console.error(line);
+        appendRotatedLog(pollLog, line);
+      },
+    });
     return;
   }
 

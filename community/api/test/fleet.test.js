@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { nowIso } from "../src/crypto.js";
+import { downsampleHistory, HISTORY_MAX_POINTS } from "../src/coach-learn.js";
 import { commandExpired, deviceIsOnline, FLEET_ONLINE_MS, validateFleetChange } from "../src/fleet.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
@@ -294,4 +295,47 @@ test("deviceIsOnline uses a 15 minute window", () => {
   assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:50:00Z" }, now), true);
   assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:40:00Z" }, now), false);
   assert.equal(FLEET_ONLINE_MS, 15 * 60 * 1000);
+});
+
+test("fleet 168h history downsamples and still covers the week", async () => {
+  const now = Date.parse("2026-10-25T12:00:00Z");
+  const samples = [
+    {
+      document: JSON.stringify({ temperature: 10, humidity: 70, temperature_setpoint: 10, humidity_setpoint: 70 }),
+      created_at: new Date(now - 167 * 3600 * 1000).toISOString(),
+    },
+  ];
+  for (let i = 0; i < 2500; i++) {
+    samples.push({
+      document: JSON.stringify({ temperature: 20, humidity: 88, temperature_setpoint: 20, humidity_setpoint: 88 }),
+      created_at: new Date(now - i * 60 * 1000).toISOString(),
+    });
+  }
+  const week = downsampleHistory(samples, { hours: 168 });
+  assert.ok(week.length <= HISTORY_MAX_POINTS);
+  assert.ok(now - Date.parse(week[0].at) >= 100 * 3600 * 1000, "week view keeps the old end of the range");
+  const short = downsampleHistory(samples.slice(-40), { hours: 24 });
+  assert.equal(short.length, 40);
+
+  const ctx = env();
+  const { token, user } = await register(ctx, "week@example.com");
+  await addDevice(ctx, user.id, "dev-week");
+  await addReading(
+    ctx,
+    "dev-week",
+    { temperature: 10, humidity: 70, temperature_setpoint: 10, humidity_setpoint: 70 },
+    new Date(Date.now() - 160 * 3600 * 1000).toISOString()
+  );
+  for (let i = 0; i < 2100; i++) {
+    await addReading(
+      ctx,
+      "dev-week",
+      { temperature: 20, humidity: 88, temperature_setpoint: 20, humidity_setpoint: 88 },
+      new Date(Date.now() - i * 20 * 1000).toISOString()
+    );
+  }
+  const detail = await call(ctx, "GET", "/api/fleet/devices/dev-week?hours=168", { token });
+  assert.equal(detail.status, 200, JSON.stringify(detail.data));
+  assert.ok(detail.data.history.length <= HISTORY_MAX_POINTS);
+  assert.ok(Date.now() - Date.parse(detail.data.history[0].at) >= 100 * 3600 * 1000);
 });

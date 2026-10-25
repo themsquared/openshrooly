@@ -51,6 +51,8 @@ export function safeBoundsForStage(stage = {}) {
 /** Coach / Autopilot only need a recent window, not the full telemetry table. */
 export const TELEMETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const TELEMETRY_WINDOW_LIMIT = 2000;
+export const TELEMETRY_HISTORY_LIMIT = 20000;
+export const HISTORY_MAX_POINTS = 672;
 export const TELEMETRY_WINDOW_SQL =
   "SELECT * FROM device_telemetry WHERE device_id=? AND created_at>=? ORDER BY created_at DESC LIMIT ?";
 
@@ -66,6 +68,46 @@ export async function loadRecentTelemetry(
   const rows =
     (await db.all(TELEMETRY_WINDOW_SQL, [deviceId, telemetryWindowSince(now, windowMs), limit])) || [];
   return rows.slice().sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+}
+
+/** Bucket long telemetry ranges so a 168h view still covers the full week. */
+export function downsampleHistory(samples = [], { hours = 24, maxPoints = HISTORY_MAX_POINTS } = {}) {
+  const rows = parseTelemetry(samples)
+    .filter((s) => s.created_at)
+    .map((s) => ({
+      at: s.created_at,
+      temperature: s.temperature,
+      humidity: s.humidity,
+      temperature_setpoint: s.temperature_setpoint,
+      humidity_setpoint: s.humidity_setpoint,
+    }));
+  if (rows.length <= maxPoints) return rows;
+  const spanMs = Math.max(60_000, Number(hours) * 3600 * 1000);
+  const bucketMs = Math.max(60_000, Math.ceil(spanMs / maxPoints));
+  const buckets = new Map();
+  for (const row of rows) {
+    const t = Date.parse(row.at);
+    if (!Number.isFinite(t)) continue;
+    const key = Math.floor(t / bucketMs) * bucketMs;
+    const acc = buckets.get(key) || { rows: [] };
+    acc.rows.push(row);
+    buckets.set(key, acc);
+  }
+  function avg(values) {
+    const list = values.filter((v) => v != null && Number.isFinite(Number(v)));
+    if (!list.length) return null;
+    return list.reduce((a, b) => a + Number(b), 0) / list.length;
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, acc]) => ({
+      at: new Date(t).toISOString().replace(/\.\d+Z$/, "Z"),
+      temperature: avg(acc.rows.map((r) => r.temperature)),
+      humidity: avg(acc.rows.map((r) => r.humidity)),
+      temperature_setpoint: avg(acc.rows.map((r) => r.temperature_setpoint)),
+      humidity_setpoint: avg(acc.rows.map((r) => r.humidity_setpoint)),
+      bucket_n: acc.rows.length,
+    }));
 }
 
 export function latestReading(samples = [], now = Date.now()) {

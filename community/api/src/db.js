@@ -974,6 +974,9 @@ function dispatch(mode, tables, ids, sql, params) {
     }
     return rows;
   }
+  if (q.startsWith("SELECT * FROM device_commands WHERE device_id=")) {
+    return tables.device_commands.filter((c) => c.device_id === params[0]);
+  }
   if (q.startsWith("UPDATE device_commands SET consumed_at=?, payload=?")) {
     const row = tables.device_commands.find((c) => Number(c.id) === Number(params[2]) && c.device_id === params[3]);
     if (row) {
