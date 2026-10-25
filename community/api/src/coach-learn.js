@@ -239,6 +239,15 @@ export function stageTemperatureTargetRange(stage = {}) {
   return null;
 }
 
+export function stageHumidityTargetRange(stage = {}) {
+  const center = num(stage.humidity_percent);
+  const lo = num(stage.humidity_target_min);
+  const hi = num(stage.humidity_target_max);
+  if (lo != null && hi != null && lo <= hi) return [lo, hi];
+  if (center != null) return [center, center];
+  return null;
+}
+
 export function suggestSetpoints(model, stage = {}, { auto = false, reading = null } = {}) {
   const bounds = safeBoundsForStage(stage);
   const targetRange = stageTemperatureTargetRange(stage);

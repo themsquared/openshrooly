@@ -1,6 +1,13 @@
 /** Paid Grow Coach: gating, learning, chat, photo check, alerts. */
 
 import { laterIso, nowIso, randomToken, sha256Hex } from "./crypto.js";
+import {
+  coachAutopilotFlagOn,
+  getAutopilotStatus,
+  runAutopilotForDevice,
+  setDeviceAutopilotMode,
+  undoAutopilotAction,
+} from "./coach-autopilot.js";
 import { requireVerified, userFromRequest } from "./auth.js";
 import { ValidationError, isPsilocybin } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
@@ -258,6 +265,7 @@ export async function handleCoach(method, path, url, request, env) {
       period_end: sub?.period_end || null,
       waitlist: !entitled && !publicOn,
       preview: !entitled && !publicOn,
+      autopilot: coachAutopilotFlagOn(env) && (entitled || beta),
       marketing: publicOn || entitled
         ? "Culinary chambers only. Not sold or marketed with off-menu varieties."
         : "Coming soon. Chat and checkout open at launch. Not sold with off-menu varieties.",
@@ -355,6 +363,47 @@ export async function handleCoach(method, path, url, request, env) {
     const body = await request.json().catch(() => ({}));
     await db.run("UPDATE coach_subs SET auto_tune=? WHERE user_id=?", [body.enabled ? 1 : 0, user.id]);
     return json({ auto_tune: Boolean(body.enabled) });
+  }
+
+  if (method === "GET" && path === "/api/coach/autopilot") {
+    const user = await requireCoach(request, db, env);
+    const result = await getAutopilotStatus(db, env, user, url.searchParams.get("device_id"));
+    if (result.error) return json({ error: result.error }, result.status || 404);
+    return json(result);
+  }
+
+  if (method === "POST" && path === "/api/coach/autopilot/mode") {
+    const user = await requireCoach(request, db, env);
+    const body = await request.json().catch(() => ({}));
+    if (!body.device_id) throw new ValidationError("Pick a chamber first.", 400);
+    const result = await setDeviceAutopilotMode(db, env, user, {
+      deviceId: body.device_id,
+      mode: body.mode,
+      profileId: body.profile_id,
+    });
+    if (result.error) return json({ error: result.error }, result.status || 400);
+    return json(result);
+  }
+
+  if (method === "POST" && path === "/api/coach/autopilot/run") {
+    const user = await requireCoach(request, db, env);
+    const body = await request.json().catch(() => ({}));
+    if (!coachAutopilotFlagOn(env)) return json({ error: "not found" }, 404);
+    if (!body.device_id) throw new ValidationError("Pick a chamber first.", 400);
+    const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [body.device_id]);
+    if (!device || Number(device.owner_id) !== Number(user.id)) return json({ error: "not found" }, 404);
+    const result = await runAutopilotForDevice(db, env, { device, user });
+    const status = await getAutopilotStatus(db, env, user, body.device_id);
+    return json({ ok: Boolean(result.applied), ...status, ...result });
+  }
+
+  if (method === "POST" && path === "/api/coach/autopilot/undo") {
+    const user = await requireCoach(request, db, env);
+    const body = await request.json().catch(() => ({}));
+    if (!body.action_id) throw new ValidationError("Pick an action to undo.", 400);
+    const result = await undoAutopilotAction(db, env, user, body.action_id);
+    if (result.error) return json({ error: result.error }, result.status || 400);
+    return json(result);
   }
 
   if (method === "POST" && path === "/api/coach/chat") {

@@ -48,6 +48,8 @@ test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
   assert.equal(quoted(deploy, "WORKERS_AI_TOKEN"), null);
   assert.doesNotMatch(deploy, /ENVIRONMENT\s*=\s*"local"/);
   assert.doesNotMatch(deploy, /WORKERS_AI_TOKEN/);
+  assert.equal(quoted(deploy, "COACH_AUTOPILOT_ENABLED"), null);
+  assert.doesNotMatch(deploy, /COACH_AUTOPILOT_ENABLED/);
   assert.doesNotMatch(quoted(deploy, "CORS_ORIGIN") || "", /localhost|127\.0\.0\.1/);
   assert.equal(quoted(deploy, "name"), "shroomlabs-api");
   assert.equal(quoted(tableBlock(deploy, "[[d1_databases]]"), "database_id"), quoted(tableBlock(local, "[[d1_databases]]"), "database_id"));
@@ -72,4 +74,7 @@ test("wrangler.coach-local.toml is fully local: no AI binding, REST via .dev.var
   assert.ok(compat, "compatibility_date is required");
   assert.ok(compat <= "2026-05-03", `compatibility_date ${compat} exceeds wrangler 4.86 max 2026-05-03`);
   assert.doesNotMatch(coachLocal, /api\.shroomlabs\.io/);
+  assert.equal(quoted(coachLocal, "COACH_AUTOPILOT_ENABLED"), "1");
+  assert.match(coachLocal, /\[triggers\]/);
+  assert.match(coachLocal, /crons\s*=\s*\[/);
 });

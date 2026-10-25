@@ -33,6 +33,8 @@ export function createMemoryDb() {
     coach_subs: [],
     coach_usage: [],
     coach_cache: [],
+    coach_device_mode: [],
+    coach_autopilot_log: [],
     totp_pending: [],
     payment_events: [],
     profile_review: [],
@@ -57,6 +59,7 @@ export function createMemoryDb() {
     device_certs: 1,
     device_commands: 1,
     device_telemetry: 1,
+    coach_autopilot_log: 1,
     profile_photos: 1,
     moderation_log: 1,
     profile_reports: 1,
@@ -1064,6 +1067,83 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("SELECT * FROM coach_cache WHERE cache_key=")) {
     return tables.coach_cache.filter((c) => c.cache_key === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM coach_device_mode WHERE device_id=")) {
+    return tables.coach_device_mode.filter((r) => r.device_id === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM coach_device_mode WHERE mode=")) {
+    return tables.coach_device_mode.filter((r) => r.mode === params[0]);
+  }
+  if (q.startsWith("SELECT * FROM coach_device_mode WHERE user_id=")) {
+    return tables.coach_device_mode.filter((r) => Number(r.user_id) === Number(params[0]));
+  }
+  if (q.startsWith("INSERT INTO coach_device_mode")) {
+    tables.coach_device_mode.push({
+      device_id: params[0],
+      user_id: params[1],
+      mode: params[2],
+      paused: params[3],
+      pause_reason: params[4],
+      pause_until: params[5],
+      profile_id: params[6],
+      last_change_at: params[7],
+      changes_day: params[8],
+      changes_count: params[9],
+      last_setpoints: params[10],
+      last_manual_at: params[11],
+      updated_at: params[12],
+    });
+    return {};
+  }
+  if (q.startsWith("UPDATE coach_device_mode SET")) {
+    const row = tables.coach_device_mode.find((r) => r.device_id === params[11]);
+    if (row) {
+      row.mode = params[0];
+      row.paused = params[1];
+      row.pause_reason = params[2];
+      row.pause_until = params[3];
+      row.profile_id = params[4];
+      row.last_change_at = params[5];
+      row.changes_day = params[6];
+      row.changes_count = params[7];
+      row.last_setpoints = params[8];
+      row.last_manual_at = params[9];
+      row.updated_at = params[10];
+    }
+    return {};
+  }
+  if (q.startsWith("INSERT INTO coach_autopilot_log")) {
+    const row = {
+      id: ids.coach_autopilot_log++,
+      device_id: params[0],
+      user_id: params[1],
+      action: params[2],
+      old_value: params[3],
+      new_value: params[4],
+      reason: params[5],
+      readings: params[6],
+      undone_at: params[7],
+      created_at: params[8],
+    };
+    tables.coach_autopilot_log.push(row);
+    return { lastRowId: row.id };
+  }
+  if (q.startsWith("SELECT * FROM coach_autopilot_log WHERE device_id=")) {
+    let rows = tables.coach_autopilot_log.filter((r) => r.device_id === params[0]);
+    if (q.includes("ORDER BY id DESC")) rows = rows.slice().sort((a, b) => Number(b.id) - Number(a.id));
+    if (q.includes("LIMIT")) {
+      const limit = Number(params[1] ?? params[params.length - 1]);
+      if (Number.isFinite(limit)) rows = rows.slice(0, limit);
+    }
+    return rows;
+  }
+  if (q.startsWith("SELECT * FROM coach_autopilot_log WHERE id=")) {
+    return tables.coach_autopilot_log.filter((r) => Number(r.id) === Number(params[0]));
+  }
+  if (q.startsWith("UPDATE coach_autopilot_log SET undone_at=")) {
+    const row = tables.coach_autopilot_log.find((r) => Number(r.id) === Number(params[1]));
+    if (row) row.undone_at = params[0];
+    return {};
   }
   if (q.startsWith("INSERT INTO device_telemetry")) {
     tables.device_telemetry.push({
