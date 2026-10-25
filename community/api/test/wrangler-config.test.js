@@ -48,6 +48,7 @@ test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
   assert.equal(quoted(deploy, "WORKERS_AI_TOKEN"), null);
   assert.doesNotMatch(deploy, /ENVIRONMENT\s*=\s*"local"/);
   assert.doesNotMatch(deploy, /WORKERS_AI_TOKEN/);
+  assert.doesNotMatch(quoted(deploy, "CORS_ORIGIN") || "", /localhost|127\.0\.0\.1/);
   assert.equal(quoted(deploy, "name"), "shroomlabs-api");
   assert.equal(quoted(tableBlock(deploy, "[[d1_databases]]"), "database_id"), quoted(tableBlock(local, "[[d1_databases]]"), "database_id"));
 });
@@ -66,5 +67,9 @@ test("wrangler.coach-local.toml is fully local: no AI binding, REST via .dev.var
   assert.equal(quoted(coachLocal, "WORKERS_AI_TOKEN"), null);
   assert.equal(quoted(tableBlock(coachLocal, "[[d1_databases]]"), "database_name"), "shroomlabs-coach-local");
   assert.equal(quoted(coachLocal, "GROW_COACH_TEXT_MODEL"), "@cf/qwen/qwen3-30b-a3b-fp8");
+  assert.equal(quoted(coachLocal, "CORS_ORIGIN"), "http://127.0.0.1:8888,http://localhost:8888");
+  const compat = quoted(coachLocal, "compatibility_date");
+  assert.ok(compat, "compatibility_date is required");
+  assert.ok(compat <= "2026-05-03", `compatibility_date ${compat} exceeds wrangler 4.86 max 2026-05-03`);
   assert.doesNotMatch(coachLocal, /api\.shroomlabs\.io/);
 });

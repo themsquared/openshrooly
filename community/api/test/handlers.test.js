@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { laterIso, nowIso, randomToken, sha256Hex } from "../src/crypto.js";
 import { allowedOrigins, pickCorsOrigin, withCors } from "../src/handlers.js";
 import { assertPublicHandle, call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
@@ -67,6 +68,42 @@ test("CORS allows shroomlabs.io and local frontend", async () => {
   const res = withCors(new Response("ok"), ctx, request);
   assert.equal(res.headers.get("access-control-allow-origin"), "https://shroomlabs.io");
   assert.ok(res.headers.get("content-security-policy"));
+});
+
+const LOCAL_CORS = "http://127.0.0.1:8888,http://localhost:8888";
+
+test("ENVIRONMENT=local allows CORS_ORIGIN localhost on a non-prod host", () => {
+  const ctx = { ENVIRONMENT: "local", CORS_ORIGIN: LOCAL_CORS };
+  const request = new Request("http://127.0.0.1:8787/health", {
+    headers: { origin: "http://127.0.0.1:8888" },
+  });
+  const origins = allowedOrigins(ctx, request);
+  assert.ok(origins.includes("http://127.0.0.1:8888"));
+  assert.ok(origins.includes("http://localhost:8888"));
+  assert.equal(pickCorsOrigin(ctx, request), "http://127.0.0.1:8888");
+  const res = withCors(new Response("ok"), ctx, request);
+  assert.equal(res.headers.get("access-control-allow-origin"), "http://127.0.0.1:8888");
+});
+
+test("ENVIRONMENT=local on a prod host never adds localhost CORS", () => {
+  const ctx = { ENVIRONMENT: "local", CORS_ORIGIN: LOCAL_CORS };
+  for (const host of ["api.shroomlabs.io", "shroomlabs.io", "www.shroomlabs.io"]) {
+    const request = new Request(`https://${host}/health`, {
+      headers: { origin: "http://127.0.0.1:8888" },
+    });
+    const origins = allowedOrigins(ctx, request);
+    assert.deepEqual(origins, ["https://shroomlabs.io", "https://www.shroomlabs.io"]);
+    assert.ok(!origins.some((origin) => /localhost|127\.0\.0\.1/.test(origin)));
+  }
+});
+
+test("prod config without ENVIRONMENT never includes localhost origins", () => {
+  const ctx = { CORS_ORIGIN: LOCAL_CORS };
+  for (const url of ["http://127.0.0.1:8787/health", "https://api.shroomlabs.io/health"]) {
+    const origins = allowedOrigins(ctx, new Request(url));
+    assert.deepEqual(origins, ["https://shroomlabs.io", "https://www.shroomlabs.io"]);
+    assert.ok(!origins.some((origin) => /localhost|127\.0\.0\.1/.test(origin)));
+  }
 });
 
 test("prod CORS never reflects localhost even when CORS_ORIGIN lists it", () => {
@@ -216,4 +253,52 @@ test("non-Error throws also get the generic 500", async () => {
   }
   assert.equal(res.status, 500);
   assert.ok(!JSON.stringify(res.data).includes("raw string detail"));
+});
+
+async function mintLocalLink(ctx, email) {
+  const token = randomToken() + randomToken();
+  await ctx.db.run(
+    "INSERT INTO magic_links (email, token_hash, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    [email, await sha256Hex(token), "local", laterIso(60 * 60 * 1000), nowIso()]
+  );
+  return token;
+}
+
+test("POST /api/auth/local signs in on ENVIRONMENT=local and a non-prod host", async () => {
+  const ctx = testEnv({ ENVIRONMENT: "local" });
+  const { user } = await register(ctx, "coach-local@localhost");
+  const token = await mintLocalLink(ctx, user.email);
+  const res = await call(ctx, "POST", "/api/auth/local", { body: { token }, host: "127.0.0.1" });
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.ok(res.data.access_token);
+  assert.equal(res.data.user.email, "coach-local@localhost");
+
+  const reuse = await call(ctx, "POST", "/api/auth/local", { body: { token }, host: "127.0.0.1" });
+  assert.equal(reuse.status, 401);
+});
+
+test("POST /api/auth/local is impossible on prod hosts and without ENVIRONMENT=local", async () => {
+  const local = testEnv({ ENVIRONMENT: "local" });
+  const { user } = await register(local, "coach-local@localhost");
+  const leaked = await mintLocalLink(local, user.email);
+  for (const host of ["api.shroomlabs.io", "shroomlabs.io", "www.shroomlabs.io"]) {
+    const blocked = await call(local, "POST", "/api/auth/local", { body: { token: leaked }, host });
+    assert.equal(blocked.status, 404, host);
+    assert.equal(blocked.data.error, "not found");
+    assert.equal(blocked.data.access_token, undefined);
+  }
+
+  const unused = await mintLocalLink(local, user.email);
+  const noEnv = testEnv();
+  const { user: other } = await register(noEnv, "coach-local@localhost");
+  await noEnv.db.run(
+    "INSERT INTO magic_links (email, token_hash, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    [other.email, await sha256Hex(unused), "local", laterIso(60 * 60 * 1000), nowIso()]
+  );
+  const refused = await call(noEnv, "POST", "/api/auth/local", { body: { token: unused }, host: "127.0.0.1" });
+  assert.equal(refused.status, 404);
+  assert.equal(refused.data.access_token, undefined);
+
+  const still = await call(local, "POST", "/api/auth/local", { body: { token: unused }, host: "127.0.0.1" });
+  assert.equal(still.status, 200, JSON.stringify(still.data));
 });

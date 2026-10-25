@@ -15,7 +15,13 @@ import {
   clockMs,
 } from "./crypto.js";
 import { sendEmail } from "./email.js";
-import { appleConfigured, comingSoonBody, devStubsEnabled, googleConfigured } from "./providers.js";
+import {
+  appleConfigured,
+  comingSoonBody,
+  devStubsEnabled,
+  googleConfigured,
+  localBrowserDevEnabled,
+} from "./providers.js";
 import { renderSignInEmail } from "./email-layout.js";
 import { clientIp, originAllowed, passwordPwned, rateLimit, rateLimitClient, verifyTurnstile } from "./security.js";
 import { ValidationError } from "./profile.js";
@@ -250,6 +256,30 @@ export async function handleAuth(method, path, url, request, env) {
     await db.run("UPDATE users SET email_verified=1 WHERE id=?", [user.id]);
     const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
     await audit(db, fresh.id, "magic_complete", row.email, request);
+    return completeSignIn(db, fresh, request, env, body);
+  }
+
+  if (method === "POST" && path === "/api/auth/local") {
+    if (!localBrowserDevEnabled(env, request)) return json({ error: "not found" }, 404);
+    const limited = await rateLimit(db, `local-auth:${rateLimitClient(request)}`, 10, 900);
+    if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
+    const body = await request.json().catch(() => ({}));
+    const token = String(body.token || url.searchParams.get("token") || "");
+    const tokenHash = await sha256Hex(token);
+    const now = nowIso();
+    const consumed = await db.run(
+      "UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at > ? AND purpose=?",
+      [now, tokenHash, now, "local"]
+    );
+    if (Number(consumed?.meta?.changes ?? consumed?.changes ?? 0) !== 1) {
+      return json({ error: "Link expired or already used." }, 401);
+    }
+    const row = await db.one("SELECT * FROM magic_links WHERE token_hash=?", [tokenHash]);
+    const user = row?.email ? await db.one("SELECT * FROM users WHERE email=?", [row.email]) : null;
+    if (!user) return json({ error: "Link expired or already used." }, 401);
+    await db.run("UPDATE users SET email_verified=1 WHERE id=?", [user.id]);
+    const fresh = await db.one("SELECT * FROM users WHERE id=?", [user.id]);
+    await audit(db, fresh.id, "local_sign_in", row.email, request);
     return completeSignIn(db, fresh, request, env, body);
   }
 
