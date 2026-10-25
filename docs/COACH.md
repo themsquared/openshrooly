@@ -25,7 +25,8 @@ Cloud control is still opt-in. Coach can only *queue* setpoints; the chamber app
 | `GROW_COACH_PROVIDER` / flags | Backend |
 | --- | --- |
 | `stub` or `GROW_COACH_STUB=1` | Deterministic replies (tests + local Node) |
-| `workers-ai` + `env.AI` | Cloudflare Workers AI (`wrangler.coach-local.toml` for Mac beta) |
+| `workers-ai` + `env.AI` | Cloudflare Workers AI binding (production) |
+| `ENVIRONMENT=local` + `CF_ACCOUNT_ID` + `WORKERS_AI_TOKEN`, no `AI` | Workers AI REST (Mac beta only; see `COACH-LOCAL.md`) |
 | anything else without `AI` | stub |
 
 Defaults: text `@cf/qwen/qwen3-30b-a3b-fp8`, vision `@cf/meta/llama-3.2-11b-vision-instruct`. Swap with `GROW_COACH_TEXT_MODEL` / `GROW_COACH_VISION_MODEL`. Qwen3 may return OpenAI-style `choices` or a `response` field and may wrap reasoning in `<think>`; the Worker strips that before returning or storing.
