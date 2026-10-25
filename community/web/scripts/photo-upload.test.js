@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   encodePhotoForUpload,
   fetchAuthedImageUrl,
@@ -60,6 +61,15 @@ test("profile and moderate pages revoke blob thumbs and do not use a dead pendin
   assert.match(app, /reportPhotoUrl\(r\.photo_key\)/);
   assert.match(app, /Your report photo awaiting review/);
   assert.match(app, /bindBlobUrlCleanup\(\)/);
+});
+
+test("report and builder photos stay inside the column on phones", () => {
+  const style = readFileSync(new URL("../public/css/style.css", import.meta.url), "utf8");
+  const builder = readFileSync(new URL("../public/css/profile-builder.css", import.meta.url), "utf8");
+  assert.match(style, /#reports img\s*\{[^}]*max-width:\s*100%/);
+  assert.match(style, /#reports img\s*\{[^}]*height:\s*auto/);
+  assert.match(builder, /\.pb-photos img\s*\{[^}]*max-width:\s*100%/);
+  assert.match(builder, /\.pb-photos img\s*\{[^}]*height:\s*auto/);
 });
 
 test("encodePhotoForUpload downscales using EXIF-aware bitmap bounds", async () => {

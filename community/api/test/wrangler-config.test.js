@@ -32,15 +32,19 @@ function r2Photos(src) {
   return null;
 }
 
-test("wrangler.toml and wrangler.deploy.toml agree on PHOTOS, PHOTOS_ENABLED, and [ai]", () => {
-  const localPhotos = r2Photos(local);
-  const deployPhotos = r2Photos(deploy);
-  assert.deepEqual(localPhotos, { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
-  assert.deepEqual(deployPhotos, localPhotos);
+function hasAiTable(src) {
+  return /(?:^|\n)\[ai\]\s*\n/.test(src);
+}
+
+test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
+  assert.deepEqual(r2Photos(deploy), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
+  assert.equal(quoted(deploy, "PHOTOS_ENABLED"), "1");
+  assert.equal(hasAiTable(deploy), false);
+  assert.equal(quoted(deploy, "name"), "shroomlabs-api");
+  assert.equal(quoted(tableBlock(deploy, "[[d1_databases]]"), "database_id"), quoted(tableBlock(local, "[[d1_databases]]"), "database_id"));
+});
+
+test("wrangler.toml keeps local photos off and may bind AI for coach stubs", () => {
+  assert.deepEqual(r2Photos(local), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
   assert.equal(quoted(local, "PHOTOS_ENABLED"), "0");
-  assert.equal(quoted(deploy, "PHOTOS_ENABLED"), quoted(local, "PHOTOS_ENABLED"));
-  assert.equal(quoted(tableBlock(local, "[ai]"), "binding"), "AI");
-  assert.equal(quoted(tableBlock(deploy, "[ai]"), "binding"), quoted(tableBlock(local, "[ai]"), "binding"));
-  assert.equal(quoted(local, "name"), quoted(deploy, "name"));
-  assert.equal(quoted(tableBlock(local, "[[d1_databases]]"), "database_id"), quoted(tableBlock(deploy, "[[d1_databases]]"), "database_id"));
 });

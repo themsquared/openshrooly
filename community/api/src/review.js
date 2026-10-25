@@ -510,8 +510,8 @@ async function promotePhoto(db, storage, { fromKey, update }) {
   if (!fromKey) return fromKey;
   const { nextKey, missing } = await copyApprovedObject(storage, fromKey);
   if (missing) throw new ValidationError("That photo is missing from storage.", 500);
-  await update(nextKey);
   await replaceMediaKey(db, fromKey, nextKey, "approved");
+  await update(nextKey);
   if (fromKey !== nextKey) await deleteStoredObject(storage, fromKey);
   return nextKey;
 }

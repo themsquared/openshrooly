@@ -84,8 +84,9 @@ export async function finishApprovedObject(storage, currentKey) {
 }
 
 /**
- * Rewrite the ACL row after a copy. Inserts the new key first so a crash
- * cannot leave the DB pointing at a key with no uploaded_media row.
+ * Rewrite the ACL row after a copy and before the report/profile row so a
+ * crash between the two writes can retry: the approved key is already
+ * fetchable and the pending row is still waiting.
  */
 export async function replaceMediaKey(db, fromKey, toKey, status) {
   if (!fromKey && !toKey) return;

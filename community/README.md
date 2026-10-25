@@ -63,7 +63,7 @@ npm run db:init:remote
 npm run db:seed:remote
 npx wrangler secret put COMMUNITY_SECRET -c wrangler.deploy.toml
 # R2: npx wrangler r2 bucket create shroomlabs-photos
-# Binding PHOTOS is in wrangler.toml and wrangler.deploy.toml. Keep PHOTOS_ENABLED=0 until that bucket exists.
+# Binding PHOTOS is in wrangler.toml and wrangler.deploy.toml. Prod has PHOTOS_ENABLED=1; local stays 0.
 ```
 
 Frontend (Netlify):
