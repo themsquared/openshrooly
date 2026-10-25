@@ -34,6 +34,7 @@ import {
   isPublicProfile,
   canSeePhoto,
   canServeReportPhoto,
+  offmenuVisible,
   photoIsPublic,
   publicDocument,
   reportPhotoApproved,
@@ -568,12 +569,15 @@ async function route(method, path, url, request, env) {
     const kind = sniffImage(bytes);
     if (!kind) return json({ error: "not found" }, 404);
     const gallery = await db.one("SELECT * FROM profile_photos WHERE object_key=?", [key]);
-    if (gallery && !photoIsPublic(gallery)) {
+    if (gallery) {
       const ownerRow = await db.one("SELECT * FROM profiles WHERE id=?", [gallery.profile_id]);
       if (!canSeePhoto(gallery, viewer, ownerRow?.author_id)) return json({ error: "not found" }, 404);
+      if (!(await offmenuVisible(db, env, viewer, ownerRow, { pending: !photoIsPublic(gallery) }))) {
+        return json({ error: "not found" }, 404);
+      }
     }
     const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
-    if (report && !(await canServeReportPhoto(db, viewer, report))) return json({ error: "not found" }, 404);
+    if (report && !(await canServeReportPhoto(db, env, viewer, report))) return json({ error: "not found" }, 404);
     const headers = {
       "content-type": PHOTO_TYPES[kind],
       "x-content-type-options": "nosniff",

@@ -4,7 +4,7 @@ import { renderProfileCards } from "./profile-cards.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
-import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl } from "./photo-upload.js";
+import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl, revokeTrackedBlobUrls } from "./photo-upload.js";
 import { queueItemHtml } from "./moderate-queue.js";
 
 function cfg() {
@@ -122,6 +122,7 @@ async function renderHome() {
 }
 
 async function renderProfile() {
+  bindBlobUrlCleanup();
   const id = profileIdFromLocation();
   if (!id) return;
   const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
@@ -233,15 +234,20 @@ async function renderProfile() {
   $("#ratings").innerHTML =
     data.ratings.map((r) => `<li>${escapeHtml(r.username)} · ${r.stars}/5 · ${escapeHtml(r.comment || "")}</li>`).join("") ||
     "<li class='muted'>No ratings yet.</li>";
-  $("#reports").innerHTML =
-    data.reports
-      .map((r) => {
-        const href = mediaUrl(r.photo_key, r.photo_url);
-        const photo = href ? ` <a href="${href}">photo</a>` : "";
-        const review = r.photo_status === "pending" && href ? " <span class='muted'>Awaiting review</span>" : "";
-        return `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}${review}</li>`;
-      })
-      .join("") || "<li class='muted'>No community reports yet.</li>";
+  const reportItems = [];
+  for (const r of data.reports) {
+    let photo = "";
+    if (r.photo_status === "pending" && r.photo_key) {
+      const src = await reportPhotoUrl(r.photo_key);
+      if (src) photo = ` <img src="${src}" alt="Your report photo awaiting review">`;
+      photo += " <span class='muted'>Awaiting review</span>";
+    } else {
+      const href = mediaUrl(r.photo_key, r.photo_url);
+      if (href) photo = ` <a href="${href}">photo</a>`;
+    }
+    reportItems.push(`<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}</li>`);
+  }
+  $("#reports").innerHTML = reportItems.join("") || "<li class='muted'>No community reports yet.</li>";
 
   $("#rate")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -598,7 +604,17 @@ async function renderPublish() {
   });
 }
 
+function bindBlobUrlCleanup() {
+  if (bindBlobUrlCleanup.bound) return;
+  bindBlobUrlCleanup.bound = true;
+  const revoke = () => revokeTrackedBlobUrls();
+  window.addEventListener("pagehide", revoke);
+  window.addEventListener("beforeunload", revoke);
+}
+
 async function renderModerate() {
+  bindBlobUrlCleanup();
+  revokeTrackedBlobUrls();
   if (!getToken()) {
     location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;

@@ -1,3 +1,6 @@
+# Local / wrangler dev. Production deploy uses wrangler.deploy.toml.
+# Keep the PHOTOS binding, PHOTOS_ENABLED, and the AI binding in lockstep
+# (see test/wrangler-config.test.js).
 name = "shroomlabs-api"
 main = "src/index.js"
 compatibility_date = "2026-10-01"

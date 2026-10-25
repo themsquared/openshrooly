@@ -1150,3 +1150,71 @@ test("takedown leaves unreviewed report photos pending for moderation", async ()
   const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
   assert.ok(queue.data.items.some((entry) => entry.kind === "report-photo" && entry.photo_key === report.data.photo_key));
 });
+
+test("report photo approve copies first and is safe to retry after a failed delete", async () => {
+  const ctx = testEnv();
+  const mallory = await register(ctx, "retry-rep@example.com");
+  const mod = await makeModerator(ctx, "retry-rep-mod@example.com");
+  const report = await call(ctx, "POST", "/api/profiles/chestnut/reports", {
+    token: mallory.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  const pendingKey = report.data.photo_key;
+  const real = ctx.storage;
+  let deletes = 0;
+  ctx.storage = {
+    driver: "memory",
+    put: (key, bytes, type) => real.put(key, bytes, type),
+    get: (key) => real.get(key),
+    async delete(key) {
+      deletes += 1;
+      if (deletes === 1 && String(key).startsWith("pending/")) throw new Error("transient");
+      return real.delete(key);
+    },
+  };
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === pendingKey);
+  const first = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, {
+    token: mod.token,
+    body: {},
+  });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  const live = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item.report_id]);
+  assert.match(live.photo_key, /^reports\/[0-9a-f]+\./);
+  assert.notEqual(live.photo_key, pendingKey);
+  assert.ok(await ctx.storage.get(live.photo_key));
+  const retry = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, {
+    token: mod.token,
+    body: {},
+  });
+  assert.equal(retry.status, 200, JSON.stringify(retry.data));
+  assert.equal(await ctx.storage.get(pendingKey), null);
+  assert.ok(await ctx.storage.get(live.photo_key));
+  const publicAfter = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(live.photo_key)}`);
+  assert.equal(publicAfter.status, 200);
+});
+
+test("/api/media hides Off-menu photos when SHOW_PSILOCYBIN is off", async () => {
+  const ctx = testEnv();
+  const owner = await register(ctx, "off-media@example.com");
+  const stranger = await register(ctx, "off-media-stranger@example.com");
+  const mod = await makeModerator(ctx, "off-media-mod@example.com");
+  const doc = draftFrom(pearl, "off-media");
+  doc.pack = "psilocybin";
+  doc.species = "Psilocybe cubensis";
+  doc.restricted = true;
+  const published = await publishForReview(ctx, { token: owner.token, modToken: mod.token, doc, title: "Off media" });
+  assert.equal(published.status, 200, JSON.stringify(published.data));
+  const photo = await ctx.db.one("SELECT * FROM profile_photos WHERE profile_id=?", ["off-media"]);
+  ctx.SHOW_PSILOCYBIN = "0";
+  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.object_key)}`);
+  assert.equal(anon.status, 404);
+  const other = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.object_key)}`, { token: stranger.token });
+  assert.equal(other.status, 404);
+  const ownerGet = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.object_key)}`, { token: owner.token });
+  assert.equal(ownerGet.status, 200);
+  const modGet = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.object_key)}`, { token: mod.token });
+  assert.equal(modGet.status, 200);
+});
+

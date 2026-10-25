@@ -29,7 +29,7 @@ Before production photo uploads work:
 
 1. `npx wrangler r2 bucket create shroomlabs-photos`
 2. Deploy the Worker so the `PHOTOS` binding attaches. Do **not** enable public listing or map this bucket on a public hostname.
-3. Flip `[vars] PHOTOS_ENABLED = "1"` in `community/api/wrangler.toml` (or set the same var in the dashboard) and redeploy.
+3. Flip `[vars] PHOTOS_ENABLED = "1"` in both `community/api/wrangler.toml` and `community/api/wrangler.deploy.toml` (or set the same var in the dashboard) and redeploy.
 
 User photos are served only through `/api/media`. `cdn.shroomlabs.io` is not used for grow-report, profile, or coach uploads. Pending objects live under `pending/` and are copied off that prefix on approve.
 

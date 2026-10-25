@@ -161,6 +161,39 @@ test("/api/media denies objects without an uploaded_media row", async () => {
   assert.equal(res.status, 404);
 });
 
+test("pending report photos stay visible to the uploader when Off-menu is hidden", async () => {
+  const ctx = testEnv({ SHOW_PSILOCYBIN: "0" });
+  const { token } = await register(ctx, "off-uploader@example.com");
+  const posted = await postReport(ctx, token, { photo: buildJpeg(), profileId: "golden-teacher" });
+  assert.equal(posted.status, 201, JSON.stringify(posted.data));
+  const owner = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(posted.data.photo_key)}`, { token });
+  assert.equal(owner.status, 200);
+  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(posted.data.photo_key)}`);
+  assert.equal(anon.status, 404);
+});
+
+test("approved Off-menu report photos stay behind SHOW_PSILOCYBIN", async () => {
+  const ctx = testEnv();
+  const grower = await register(ctx, "off-approved@example.com");
+  const staff = await register(ctx, "off-approved-mod@example.com");
+  (await ctx.db.one("SELECT * FROM users WHERE id=?", [staff.user.id])).role = "moderator";
+  const posted = await postReport(ctx, grower.token, { photo: buildJpeg(), profileId: "golden-teacher" });
+  const report = await ctx.db.one("SELECT * FROM grow_reports WHERE photo_key=?", [posted.data.photo_key]);
+  const approved = await call(ctx, "POST", `/api/moderation/report-photos/${report.id}/approve`, {
+    token: staff.token,
+    body: {},
+  });
+  assert.equal(approved.status, 200, JSON.stringify(approved.data));
+  const live = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [report.id]);
+  const on = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(live.photo_key)}`);
+  assert.equal(on.status, 200);
+  ctx.SHOW_PSILOCYBIN = "0";
+  const off = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(live.photo_key)}`);
+  assert.equal(off.status, 404);
+  const uploader = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(live.photo_key)}`, { token: grower.token });
+  assert.equal(uploader.status, 404);
+});
+
 test("grow reports still save when PHOTOS_ENABLED is off", async () => {
   const ctx = testEnv({ PHOTOS_ENABLED: "0" });
   const { token } = await register(ctx, "nophoto@example.com");

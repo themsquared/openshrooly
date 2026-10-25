@@ -57,13 +57,13 @@ API (Cloudflare):
 
 ```bash
 cd community/api
-# Worker name shroomlabs-api, D1 shroomlabs, route api.shroomlabs.io — see wrangler.toml
+# Worker name shroomlabs-api, D1 shroomlabs, route api.shroomlabs.io — see wrangler.deploy.toml
 npm run deploy
 npm run db:init:remote
 npm run db:seed:remote
-npx wrangler secret put COMMUNITY_SECRET
+npx wrangler secret put COMMUNITY_SECRET -c wrangler.deploy.toml
 # R2: npx wrangler r2 bucket create shroomlabs-photos
-# Binding PHOTOS is in wrangler.toml. Keep PHOTOS_ENABLED=0 until that bucket exists.
+# Binding PHOTOS is in wrangler.toml and wrangler.deploy.toml. Keep PHOTOS_ENABLED=0 until that bucket exists.
 ```
 
 Frontend (Netlify):
