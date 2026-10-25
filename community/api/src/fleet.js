@@ -2,27 +2,61 @@
 
 import { laterIso, nowIso } from "./crypto.js";
 import { requireVerified, userFromRequest } from "./auth.js";
-import { isPsilocybin, ValidationError, validateStageLight } from "./profile.js";
+import { isPsilocybin, normalizeStoredProfileLight, ValidationError, validateStageLight } from "./profile.js";
 import {
   compareReadingToStage,
   latestReading,
   downsampleHistory,
   loadRecentTelemetry,
-  parseTelemetry,
   refuseRestrictedPack,
   TELEMETRY_HISTORY_LIMIT,
 } from "./coach-learn.js";
 import {
   clampAutopilotSetpoints,
+  coachAutopilotAvailable,
   coachAutopilotFlagOn,
   getDeviceMode,
   noteManualSetpointCommand,
+  rememberDeviceProfile,
   setDeviceAutopilotMode,
 } from "./coach-autopilot.js";
 import { fleetUiEnabled } from "./providers.js";
+import { SQL as ALERT_SQL } from "./alerts/store.js";
+import { growStage, readRules } from "./alerts/rules.js";
 
 export const FLEET_ONLINE_MS = 15 * 60 * 1000;
 export const FLEET_COMMAND_TTL_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_DEVICE_TYPE = "shrooly_chamber";
+
+/** Commands the local chamber UI can do that the cloud channel cannot send yet. */
+export const LOCAL_ONLY_CONTROLS = [
+  { id: "water_calibration", label: "Water calibration", note: "Empty-tank calibration has to run on the chamber." },
+  { id: "humidifier_speed", label: "Humidifier speed", note: "Cloud writes humidity target, not humidifier speed." },
+  { id: "humidity_hysteresis", label: "Humidity band", note: "The humidity on/off band is set on the chamber." },
+  { id: "air_period", label: "Air exchange period", note: "Cloud can set fan speed. Period and run time stay on the chamber." },
+  { id: "temperature_enable", label: "Temperature control switch", note: "Turning heater requests on or off stays on the chamber." },
+  { id: "temperature_hysteresis", label: "Temperature band", note: "The temperature on/off band is set on the chamber." },
+  { id: "temperature_warnings", label: "Temperature warnings", note: "Local warning limits stay on the chamber. Account alerts use their own rules." },
+  { id: "display", label: "Display flip", note: "The e-paper flip switch is on the chamber." },
+  { id: "timezone", label: "Timezone", note: "Chamber clock timezone is set on the chamber." },
+  { id: "firmware", label: "Software update", note: "Updates install from the chamber page or USB." },
+  { id: "wifi", label: "Wi-Fi", note: "Network setup stays on the chamber." },
+];
+
+export const CLOUD_CONTROLS = [
+  { id: "setpoints", label: "Temperature and humidity targets" },
+  { id: "fan", label: "Fan speed" },
+  { id: "light", label: "Light schedule and color" },
+  { id: "profile", label: "Profile and grow phase" },
+  { id: "name", label: "Device name" },
+  { id: "grow", label: "Grow start day" },
+];
+
+export function deviceTypeLabel(type) {
+  const id = String(type || DEFAULT_DEVICE_TYPE);
+  if (id === "shrooly_chamber") return "Shrooly chamber";
+  return id.replaceAll("_", " ");
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -106,14 +140,24 @@ async function loadProfile(db, user, profileId) {
   const owned = user && row.author_id != null && Number(row.author_id) === Number(user.id);
   if (!published && !owned) return null;
   const doc = typeof row.document === "string" ? JSON.parse(row.document) : row.document;
-  return doc ? { ...doc, id: doc.id || row.id } : null;
+  return doc ? normalizeStoredProfileLight({ ...doc, id: doc.id || row.id }) : null;
 }
 
-async function requireFleetUser(request, db, env) {
-  if (!fleetUiEnabled(env)) return { error: json({ error: "not found" }, 404) };
+async function requireUser(request, db) {
   const { user } = await userFromRequest(request, db);
+  if (!user) throw new ValidationError("sign in required", 401);
+  return { user };
+}
+
+async function requireSignedInUser(request, db) {
+  const { user } = await requireUser(request, db);
   requireVerified(user);
   return { user };
+}
+
+async function requireFleetTools(request, db, env) {
+  if (!fleetUiEnabled(env)) return { error: json({ error: "not found" }, 404) };
+  return requireSignedInUser(request, db);
 }
 
 async function ownedDevice(db, user, deviceId) {
@@ -156,52 +200,108 @@ function fleetAlerts({ device, reading, stage, now }) {
   return alerts;
 }
 
-export async function enrichDevice(db, env, user, device, { now = Date.now() } = {}) {
+function todayUtc(now = Date.now()) {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
+function growFromProfile(profile, stage, { day = null, startedOn = null } = {}) {
+  const stages = Array.isArray(profile?.stages) ? profile.stages : [];
+  const total = stages.reduce((sum, item) => sum + (Number(item.duration_days) || 0), 0) || null;
+  return {
+    day: day != null && Number.isFinite(Number(day)) ? Number(day) : null,
+    phase: stage?.name || stage?.id || null,
+    started_on: startedOn || null,
+    total_days: total,
+    stages: stages.map((item) => ({ id: item.id, name: item.name || item.id, duration_days: Number(item.duration_days) || 0 })),
+  };
+}
+
+async function loadGrowTracking(db, user, device, modeRow, current, now) {
+  const rulesRow = await db.one(ALERT_SQL.rulesGet, [device.id]);
+  const rules = readRules(rulesRow?.document);
+  const trackedId = rules.grow?.profile_id || modeRow.profile_id;
+  const profile = await loadProfile(db, user, trackedId);
+  const tracked = profile && rules.grow?.started_on ? growStage(profile, rules.grow.started_on, todayUtc(now)) : null;
+  const stageId = tracked?.stage?.id || current?.stage || null;
+  const stage = stageFromProfile(profile, stageId);
+  const day = tracked?.day ?? current?.grow_day ?? null;
+  return {
+    profile,
+    stage,
+    grow: growFromProfile(profile, stage, { day, startedOn: rules.grow?.started_on || null }),
+  };
+}
+
+/**
+ * Coach details ride on the device payload only for users who can use Coach
+ * (flag on plus beta or entitlement). Everyone else never sees Coach state.
+ * Pass `coachAvailable` when enriching many devices to check access once.
+ */
+export async function enrichDevice(db, env, user, device, { now = Date.now(), coachAvailable } = {}) {
   const samples = await loadRecentTelemetry(db, device.id, { now });
-  const parsed = parseTelemetry(samples);
   const current = latestReading(samples, now);
   const latestDoc = samples.length
     ? parseJson(samples.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))).at(-1).document, {})
     : {};
   const modeRow = await getDeviceMode(db, device.id, user.id);
-  const profile = await loadProfile(db, user, modeRow.profile_id);
+  const tracked = await loadGrowTracking(db, user, device, modeRow, current, now);
+  const profile = tracked.profile;
+  const stage = tracked.stage;
   const offMenu = Boolean(profile && (isPsilocybin(profile) || refuseRestrictedPack(profile)));
-  const stage = stageFromProfile(profile, current?.stage);
   const certs = await db.all("SELECT * FROM device_certs WHERE device_id=?", [device.id]);
   const activeCert = (certs || [])
     .filter((c) => c.status === "active")
     .sort((a, b) => String(b.not_after || "").localeCompare(String(a.not_after || "")))[0];
+  const showCoach = !offMenu && (coachAvailable ?? (await coachAutopilotAvailable(env, db, user)));
   const coach =
-    offMenu || !coachAutopilotFlagOn(env)
+    !showCoach
       ? null
       : {
           mode: modeRow.mode,
           status: Number(modeRow.paused) ? "paused" : modeRow.mode,
           pause_reason: modeRow.pause_reason || null,
         };
+  const linked = device.status === "active" || device.status === "claimed";
+  const online = deviceIsOnline(device, now);
+  const deviceType = device.device_type || DEFAULT_DEVICE_TYPE;
   return {
     id: device.id,
     name: device.name,
     status: device.status,
     owner_id: device.owner_id,
     last_seen_at: device.last_seen_at,
-    online: deviceIsOnline(device, now),
+    device_type: deviceType,
+    device_type_label: deviceTypeLabel(deviceType),
+    online,
+    linked,
+    controllable: linked && device.status === "active",
     reading: current
       ? {
           temperature: current.temperature,
           humidity: current.humidity,
           temperature_setpoint: current.temperature_setpoint,
           humidity_setpoint: current.humidity_setpoint,
+          fan_speed: current.fan_speed,
+          water_level: current.water_level,
           reading_at: current.reading_at,
           age_seconds: current.age_seconds,
         }
       : null,
-    profile: profile ? { id: profile.id, name: profile.name, pack: profile.pack || "culinary" } : null,
+    profile: profile
+      ? {
+          id: profile.id,
+          name: profile.name,
+          pack: profile.pack || "culinary",
+          species: profile.species || "",
+          strain: profile.strain || "",
+        }
+      : null,
     stage: stage.id ? { id: stage.id, name: stage.name || stage.id } : null,
+    grow: tracked.grow,
     setpoints: {
       temperature_c: current?.temperature_setpoint ?? parseJson(modeRow.last_setpoints, {})?.temperature_c ?? null,
       humidity_percent: current?.humidity_setpoint ?? parseJson(modeRow.last_setpoints, {})?.humidity_percent ?? null,
-      fan_speed_percent: parseJson(modeRow.last_setpoints, {})?.fan_speed_percent ?? null,
+      fan_speed_percent: current?.fan_speed ?? parseJson(modeRow.last_setpoints, {})?.fan_speed_percent ?? null,
     },
     light: lightFromStage(stage),
     coach,
@@ -210,6 +310,8 @@ export async function enrichDevice(db, env, user, device, { now = Date.now() } =
     alerts: fleetAlerts({ device, reading: current, stage, now }),
     group_ids: await groupIdsForDevice(db, user.id, device.id),
     off_menu: offMenu,
+    cloud_controls: CLOUD_CONTROLS,
+    local_only: LOCAL_ONLY_CONTROLS,
   };
 }
 
@@ -330,6 +432,9 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
   if (plan.kind === "setpoints") {
     await noteManualSetpointCommand(db, device, { ...plan.payload, source: "fleet" });
   }
+  if (plan.kind === "apply_profile" && plan.payload.profile_id) {
+    await rememberDeviceProfile(db, device.id, user.id, plan.payload.profile_id);
+  }
   return { device_id: device.id, name: device.name, status, preview: plan.preview };
 }
 
@@ -362,14 +467,15 @@ export async function handleFleet(method, path, url, request, env) {
     return json({ available: fleetUiEnabled(env), signed_in: Boolean(user) });
   }
 
-  const gate = await requireFleetUser(request, db, env);
-  if (gate.error) return gate.error;
-  const user = gate.user;
+  const reader = await requireUser(request, db);
+  const user = reader.user;
+  const write = () => requireVerified(user);
 
   if (method === "GET" && path === "/api/fleet/devices") {
     const rows = await db.all("SELECT * FROM cloud_devices WHERE owner_id=?", [user.id]);
     const devices = [];
-    for (const row of rows || []) devices.push(await enrichDevice(db, env, user, row));
+    const coachAvailable = await coachAutopilotAvailable(env, db, user);
+    for (const row of rows || []) devices.push(await enrichDevice(db, env, user, row, { coachAvailable }));
     return json({ devices });
   }
 
@@ -392,6 +498,7 @@ export async function handleFleet(method, path, url, request, env) {
   }
 
   if (detail && method === "PATCH") {
+    write();
     const device = await ownedDevice(db, user, decodeURIComponent(detail[1]));
     if (!device) return json({ error: "not your device" }, 403);
     const body = await request.json().catch(() => ({}));
@@ -404,6 +511,7 @@ export async function handleFleet(method, path, url, request, env) {
 
   const unlink = path.match(/^\/api\/fleet\/devices\/([^/]+)\/unlink$/);
   if (unlink && method === "POST") {
+    write();
     const device = await ownedDevice(db, user, decodeURIComponent(unlink[1]));
     if (!device) return json({ error: "not your device" }, 403);
     const body = await request.json().catch(() => ({}));
@@ -419,6 +527,53 @@ export async function handleFleet(method, path, url, request, env) {
     if (!res.ok) return json({ error: res.error || "Could not unlink." }, res.status || 400);
     return json({ ok: true, device_id: device.id, status: "revoked" });
   }
+
+  const deviceAction = path.match(/^\/api\/fleet\/devices\/([^/]+)\/(preview|apply)$/);
+  if (deviceAction && method === "POST") {
+    write();
+    const device = await ownedDevice(db, user, decodeURIComponent(deviceAction[1]));
+    if (!device) return json({ error: "not your device" }, 403);
+    const body = await request.json().catch(() => ({}));
+    const now = Date.now();
+    if (deviceAction[2] === "preview") {
+      const modeRow = await getDeviceMode(db, device.id, user.id);
+      const profile = await loadProfile(db, user, body.payload?.profile_id || modeRow.profile_id);
+      const samples = await loadRecentTelemetry(db, device.id, { now });
+      const current = latestReading(samples, now);
+      const stage = stageFromProfile(profile, body.payload?.stage || current?.stage);
+      const plan = validateFleetChange({
+        action: body.action,
+        payload: body.payload || {},
+        profile,
+        stage,
+        currentSetpoints: { temperature_c: current?.temperature_setpoint, humidity_percent: current?.humidity_setpoint },
+      });
+      return json({
+        scope: "device",
+        results: [
+          {
+            device_id: device.id,
+            name: device.name,
+            status: plan.ok ? "ok" : "failed",
+            error: plan.error || null,
+            preview: plan.preview || null,
+          },
+        ],
+      });
+    }
+    const result = await applyOne(db, env, user, device, { action: body.action, payload: body.payload || {} }, now);
+    await writeAudit(db, user, {
+      action: body.action,
+      scope: "device",
+      target: device.id,
+      preview: body.payload || {},
+      results: [result],
+    });
+    return json({ scope: "device", results: [result] });
+  }
+
+  const tools = await requireFleetTools(request, db, env);
+  if (tools.error) return tools.error;
 
   if (method === "GET" && path === "/api/fleet/groups") {
     const groups = await db.all("SELECT * FROM device_groups WHERE owner_id=?", [user.id]);

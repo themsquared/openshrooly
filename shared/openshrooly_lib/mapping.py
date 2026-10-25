@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -57,28 +58,35 @@ ENTITY_CANDIDATES: dict[str, tuple[str, ...]] = {
 }
 
 
+WHITE_MAX_LUX = 4000
+
+
 def brightness_percent_to_lux(percent: float) -> int:
     """Inverse of lighting_control_manager.yaml lux_to_brightness.
 
     At or below 20% the firmware uses a linear fit: 20% is 92 lux.
     Above 20% it uses lux = 0.02307 * brightness^2.768.
+    The white entity tops out at 4000 lux (about 78%), so higher values clamp.
+    Rounds half up so it matches whitePercentToLux in profile-schema.js.
     """
-    pct = float(percent)
-    if pct <= 0:
+    pct = min(100.0, float(percent))
+    if not pct > 0:
         return 0
     if pct <= 20:
-        return int(round((pct / 20.0) * 92.0))
-    return int(round(0.02307 * (pct**2.768)))
+        lux = (pct / 20.0) * 92.0
+    else:
+        lux = 0.02307 * (pct**2.768)
+    return min(WHITE_MAX_LUX, int(math.floor(lux + 0.5)))
 
 
 def lux_to_brightness_percent(lux: float) -> float:
     """Same curve the firmware applies to the white channel."""
-    value = float(lux)
-    if value <= 0:
+    value = min(float(WHITE_MAX_LUX), float(lux))
+    if not value > 0:
         return 0.0
     if value <= 92:
         return (value / 92.0) * 20.0
-    return (value / 0.02307) ** (1.0 / 2.768)
+    return min(100.0, (value / 0.02307) ** (1.0 / 2.768))
 
 
 def phase_to_schedule(phase: LightPhase, sunrise_hour: int = 8) -> LightSchedule:

@@ -12,6 +12,7 @@
     "coach:local:readings": "node scripts/coach-import-readings.js",
     "coach:local:poll": "node scripts/coach-import-readings.js --poll",
     "coach:local:bridge": "node scripts/coach-local-bridge.js",
+    "coach:local:cron": "bash scripts/coach-local-cron.sh",
     "test": "npm run bundle-seeds && node --test test/*.test.js",
     "db:init": "wrangler d1 execute shroomlabs --file=schema.sql",
     "db:init:remote": "wrangler d1 execute shroomlabs --remote --file=schema.sql",

@@ -83,6 +83,10 @@
       const bool hours_zero_while_on = light_wanted && raw_hours <= 0.0f;
       float used_hours = raw_hours;
       bool used_default_hours = false;
+      // Write 12 h back so the entity matches what runs. Each write requeues this
+      // script through light_hours set_action, so cap the attempts in case a write
+      // does not take. NaN needs its own check: fabsf(NaN - 12) > 0.01 is false.
+      static uint8_t hours_fix_attempts = 0;
       if (hours_missing || hours_zero_while_on) {
         used_hours = 12.0f;
         used_default_hours = true;
@@ -91,11 +95,15 @@
           ESP_LOGW("shrooly", "Light duration is 0 or unset while lux/RGB is on; using 12 h");
           warned_missing_duration = true;
         }
-        if (fabsf(raw_hours - 12.0f) > 0.01f) {
+        const bool needs_write = !std::isfinite(raw_hours) || fabsf(raw_hours - 12.0f) > 0.01f;
+        if (needs_write && hours_fix_attempts < 3) {
+          hours_fix_attempts++;
           auto fix = id(light_hours).make_call();
           fix.set_value(12.0f);
           fix.perform();
         }
+      } else {
+        hours_fix_attempts = 0;
       }
       const int start_min = sunrise_h * 60;
       const int duration_min = (int)(used_hours * 60);

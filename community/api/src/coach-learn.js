@@ -125,6 +125,10 @@ export function latestReading(samples = [], now = Date.now()) {
     temperature: latest.temperature,
     humidity_setpoint: latest.humidity_setpoint,
     temperature_setpoint: latest.temperature_setpoint,
+    fan_speed: latest.fan_speed,
+    water_level: latest.water_level,
+    stage: latest.stage || "",
+    grow_day: latest.grow_day,
     reading_at: latest.created_at || null,
     age_seconds: Number.isFinite(at) ? Math.max(0, Math.round((now - at) / 1000)) : null,
   };
@@ -220,11 +224,12 @@ export function parseTelemetry(rows = []) {
         humidity_setpoint: num(doc.humidity_setpoint ?? doc.target_humidity),
         temperature_setpoint: num(doc.temperature_setpoint ?? doc.target_temperature ?? doc.temperature_target),
         fan_speed: num(doc.fan_speed ?? doc.fan_speed_percent),
-        water_level: num(doc.water_level ?? doc.water),
+        water_level: num(doc.water_level ?? doc.water ?? doc.water_level_percent),
         temperature_calibration: num(
           doc.temperature_calibration ?? doc.temp_calibration_c ?? doc.calibration_c
         ),
-        stage: doc.stage || doc.stage_id || "",
+        stage: doc.stage || doc.stage_id || doc.grow_phase || "",
+        grow_day: num(doc.grow_day ?? doc.day),
         created_at: row.created_at || doc.created_at || "",
       };
     })

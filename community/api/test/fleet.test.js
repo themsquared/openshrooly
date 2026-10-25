@@ -71,13 +71,26 @@ test("0008 migration is additive CREATE TABLE/INDEX only", () => {
   assert.match(MIGRATION, /owner_id/);
 });
 
-test("kill switch hides fleet APIs", async () => {
+test("kill switch hides fleet bulk tools and leaves the Devices path on", async () => {
   const ctx = env({ FLEET_UI_ENABLED: "0" });
-  const { token } = await register(ctx, "off@example.com");
+  const { token, user } = await register(ctx, "off@example.com");
+  await addDevice(ctx, user.id, "dev-off-flag");
   const catalog = await call(ctx, "GET", "/api/fleet", { token });
   assert.equal(catalog.data.available, false);
   const list = await call(ctx, "GET", "/api/fleet/devices", { token });
-  assert.equal(list.status, 404);
+  assert.equal(list.status, 200);
+  assert.equal(list.data.devices.length, 1);
+  assert.equal(list.data.devices[0].device_type, "shrooly_chamber");
+  assert.equal(list.data.devices[0].device_type_label, "Shrooly chamber");
+  const groups = await call(ctx, "GET", "/api/fleet/groups", { token });
+  assert.equal(groups.status, 404);
+  const bulk = await call(ctx, "POST", "/api/fleet/apply", {
+    token,
+    body: { action: "setpoints", device_ids: ["dev-off-flag"], payload: { temperature_c: 18 } },
+  });
+  assert.equal(bulk.status, 404);
+  const audit = await call(ctx, "GET", "/api/fleet/audit", { token });
+  assert.equal(audit.status, 404);
 });
 
 test("users only see and manage their own chambers", async () => {
@@ -347,4 +360,128 @@ test("fleet 168h history downsamples and still covers the week", async () => {
   assert.equal(detail.status, 200, JSON.stringify(detail.data));
   assert.ok(detail.data.history.length <= HISTORY_MAX_POINTS);
   assert.ok(Date.now() - Date.parse(detail.data.history[0].at) >= 100 * 3600 * 1000);
+});
+
+test("device identity includes type, species, and grow day without the fleet flag", async () => {
+  const ctx = env({ FLEET_UI_ENABLED: "0" });
+  const { token, user } = await register(ctx, "id@example.com");
+  await addDevice(ctx, user.id, "dev-id");
+  await addProfile(ctx, user.id, pearlOyster);
+  await addReading(ctx, "dev-id", {
+    temperature: 16,
+    humidity: 88,
+    temperature_setpoint: 16,
+    humidity_setpoint: 88,
+    stage: "fruiting",
+    grow_day: 6,
+    water_level: 42,
+    fan_speed: 30,
+  });
+  const applied = await call(ctx, "POST", "/api/fleet/devices/dev-id/apply", {
+    token,
+    body: { action: "profile", payload: { profile_id: pearlOyster.id, stage: "fruiting" } },
+  });
+  assert.equal(applied.status, 200, JSON.stringify(applied.data));
+  assert.equal(applied.data.results[0].status, "applied");
+  const detail = await call(ctx, "GET", "/api/fleet/devices/dev-id", { token });
+  assert.equal(detail.status, 200, JSON.stringify(detail.data));
+  const d = detail.data.device;
+  assert.equal(d.device_type, "shrooly_chamber");
+  assert.equal(d.device_type_label, "Shrooly chamber");
+  assert.equal(d.profile.id, pearlOyster.id);
+  assert.equal(d.profile.species, pearlOyster.species);
+  assert.equal(d.profile.name, pearlOyster.name);
+  assert.equal(d.stage.id, "fruiting");
+  assert.equal(d.grow.day, 6);
+  assert.equal(d.grow.phase, d.stage.name);
+  assert.equal(d.reading.water_level, 42);
+  assert.ok(Array.isArray(d.cloud_controls));
+  assert.ok(d.local_only.some((item) => item.id === "water_calibration"));
+});
+
+test("device payload hides Coach from users without Coach beta or entitlement", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "nocoach@example.com");
+  await addDevice(ctx, user.id, "dev-nocoach");
+  const detail = await call(ctx, "GET", "/api/fleet/devices/dev-nocoach", { token });
+  assert.equal(detail.status, 200, JSON.stringify(detail.data));
+  assert.equal(detail.data.device.coach, null);
+  const list = await call(ctx, "GET", "/api/fleet/devices", { token });
+  assert.equal(list.data.devices[0].coach, null);
+
+  await grantCoach(ctx, token);
+  const entitled = await call(ctx, "GET", "/api/fleet/devices/dev-nocoach", { token });
+  assert.equal(entitled.data.device.coach?.mode, "advisor");
+
+  const betaCtx = env();
+  const beta = await register(betaCtx, "beta@example.com");
+  betaCtx.COACH_BETA_USER_IDS = String(beta.user.id);
+  await addDevice(betaCtx, beta.user.id, "dev-beta");
+  const betaList = await call(betaCtx, "GET", "/api/fleet/devices", { token: beta.token });
+  assert.equal(betaList.data.devices[0].coach?.mode, "advisor");
+
+  const flagOff = env({ COACH_AUTOPILOT_ENABLED: "0" });
+  const off = await register(flagOff, "flagoff@example.com");
+  flagOff.COACH_BETA_USER_IDS = String(off.user.id);
+  await addDevice(flagOff, off.user.id, "dev-flagoff");
+  const offDetail = await call(flagOff, "GET", "/api/fleet/devices/dev-flagoff", { token: off.token });
+  assert.equal(offDetail.data.device.coach, null);
+});
+
+test("single-device apply checks ownership, clamps, and queues when offline", async () => {
+  const ctx = env({ FLEET_UI_ENABLED: "0" });
+  const owner = await register(ctx, "own@example.com");
+  const other = await register(ctx, "thief@example.com");
+  await addDevice(ctx, owner.user.id, "dev-hot", { lastSeen: nowIso() });
+  await addDevice(ctx, owner.user.id, "dev-quiet", { lastSeen: new Date(Date.now() - 40 * 60 * 1000).toISOString() });
+  await addDevice(ctx, owner.user.id, "dev-revoked", { status: "revoked" });
+  await addReading(ctx, "dev-hot", { temperature: 22, humidity: 88, temperature_setpoint: 22, humidity_setpoint: 88 });
+  await addReading(ctx, "dev-quiet", { temperature: 18, humidity: 90, temperature_setpoint: 18, humidity_setpoint: 90 });
+  await addProfile(ctx, owner.user.id, pearlOyster);
+
+  const sneak = await call(ctx, "POST", "/api/fleet/devices/dev-hot/apply", {
+    token: other.token,
+    body: { action: "setpoints", payload: { temperature_c: 18 } },
+  });
+  assert.equal(sneak.status, 403);
+
+  const preview = await call(ctx, "POST", "/api/fleet/devices/dev-hot/preview", {
+    token: owner.token,
+    body: { action: "setpoints", payload: { temperature_c: 40, humidity_percent: 99 } },
+  });
+  assert.equal(preview.status, 200, JSON.stringify(preview.data));
+  assert.ok(preview.data.results[0].preview.to.temperature_c <= 32);
+  assert.ok(preview.data.results[0].preview.to.humidity_percent <= 98);
+
+  const hot = await call(ctx, "POST", "/api/fleet/devices/dev-hot/apply", {
+    token: owner.token,
+    body: { action: "setpoints", payload: { temperature_c: 18, humidity_percent: 88 } },
+  });
+  assert.equal(hot.data.results[0].status, "applied");
+
+  const quiet = await call(ctx, "POST", "/api/fleet/devices/dev-quiet/apply", {
+    token: owner.token,
+    body: { action: "setpoints", payload: { temperature_c: 18 } },
+  });
+  assert.equal(quiet.data.results[0].status, "queued");
+
+  const dead = await call(ctx, "POST", "/api/fleet/devices/dev-revoked/apply", {
+    token: owner.token,
+    body: { action: "setpoints", payload: { temperature_c: 18 } },
+  });
+  assert.equal(dead.data.results[0].status, "failed");
+  assert.match(dead.data.results[0].error, /unlinked/i);
+});
+
+test("claimed but unlinked chambers cannot take a cloud write", async () => {
+  const ctx = env({ FLEET_UI_ENABLED: "0" });
+  const { token, user } = await register(ctx, "claim@example.com");
+  await addDevice(ctx, user.id, "dev-claim", { status: "claimed" });
+  const applied = await call(ctx, "POST", "/api/fleet/devices/dev-claim/apply", {
+    token,
+    body: { action: "setpoints", payload: { temperature_c: 18 } },
+  });
+  assert.equal(applied.status, 200, JSON.stringify(applied.data));
+  assert.equal(applied.data.results[0].status, "failed");
+  assert.match(applied.data.results[0].error, /not linked/i);
 });

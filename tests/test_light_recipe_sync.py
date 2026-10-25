@@ -152,3 +152,12 @@ def test_corrected_citations_match_the_papers():
     assert lions.phases["fruiting"].white_brightness_percent == 26
     assert "Firth" not in lions.why
     assert all("Firth" not in note.title and "Firth" not in note.detail for note in lions.sources)
+
+
+def test_white_curve_matches_the_web_builder_and_clamps_to_the_entity_max():
+    # Same points as whitePercentToLux in community/api/test/profile.test.js.
+    expected = {0: 0, 10: 46, 20: 92, 26: 190, 37: 506, 51: 1229, 78: 3984, 79: 4000, 100: 4000}
+    for pct, lux in expected.items():
+        assert brightness_percent_to_lux(pct) == lux
+    assert 78 < lux_to_brightness_percent(4000) < 78.5
+    assert lux_to_brightness_percent(10000) == lux_to_brightness_percent(4000)

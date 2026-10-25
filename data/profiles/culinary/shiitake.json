@@ -68,11 +68,11 @@
       "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 0,
-        "white_led_lux": 0,
+        "duration_hours": 12,
+        "white_led_lux": 190,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "fan": {
         "period_min": 45,
@@ -167,7 +167,7 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Colonization and the browning rest stay dark (mycelium grows faster without strong light). Fruiting uses 12 h and the general 20% white / blue mix. Leatham found blue helped only on high-calcium media and suppressed fruiting on low-calcium media. Kim 2024 applied blue during incubation, not fruiting. No shiitake-specific fruiting lux for this chamber was found.",
+    "why": "Colonization stays dark (mycelium grows faster without strong light). The browning rest gets low light: 12 h at 26% white (about 200 lux) with the general blue mix. Browning of the block skin is light induced (Yoo 2019). Kim 2024 browned blocks under 40 to 60 days of blue or white light and cites high browning efficiency at 200 lux. Koo 2018 saw less browning at the highest intensities tested. Cold shock stays dark. Fruiting uses 12 h and the general 20% white / blue mix. Leatham found blue helped only on high-calcium media and suppressed fruiting on low-calcium media. Kim 2024 applied blue during incubation, not fruiting. No shiitake-specific fruiting lux for this chamber was found.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
@@ -177,8 +177,18 @@
       },
       {
         "title": "Kim 2024 shiitake blue light",
-        "detail": "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). Blue light was applied during incubation, not during fruiting. Yield and ergothioneine rose versus white in two cultivars. This recipe does not treat that as a fruiting-stage blue mix.",
+        "detail": "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). Blocks were incubated 60 days in the dark, then 40 to 60 days under blue or white LED at 4 umol/m2/s, and browning happened in that light period. The paper cites Park et al. 2017 (J. Mushrooms 15) for high browning efficiency at 200 lux regardless of light source. Blue light was applied during incubation, not during fruiting. Yield and ergothioneine rose versus white in two cultivars. This recipe does not treat that as a fruiting-stage blue mix.",
         "url": "https://doi.org/10.1080/12298093.2024.2430052"
+      },
+      {
+        "title": "Koo 2018 shiitake browning LED",
+        "detail": "Jinmo Koo et al., Browning technology for shiitake in sawdust using LED source, Journal of Mushrooms 16(4) (2018). Light was used to induce browning on a 1 h on, 1 h off cycle at 20 C for 60 days. The best browning came at 1.5 umol/m2/s red and blue LED; the strongest settings tested (20.5 umol/m2/s and 300 lux fluorescent) browned less. The chamber has one daily light window, so 12 h at about 200 lux stands in for that cycle.",
+        "url": "https://www.earticle.net/Article/A348305"
+      },
+      {
+        "title": "Yoo 2019 shiitake browning transcriptome",
+        "detail": "Sung-Il Yoo et al., Comparative transcriptome analysis identified candidate genes involved in mycelium browning in Lentinula edodes, BMC Genomics 20 (2019). Describes light-induced brown film formation on the mycelium as an important process for shiitake yield and quality.",
+        "url": "https://doi.org/10.1186/s12864-019-5509-4"
       },
       {
         "title": "Stamets",
@@ -210,11 +220,11 @@
         "blue_percent": 80
       },
       "browning": {
-        "photoperiod_hours": 0,
-        "white_brightness_percent": 0,
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 26,
         "red_percent": 0,
         "green_percent": 0,
-        "blue_percent": 0
+        "blue_percent": 80
       },
       "cold_shock": {
         "photoperiod_hours": 0,

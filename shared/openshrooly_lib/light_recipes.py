@@ -118,10 +118,31 @@ KIM_2024_SHIITAKE = _src(
     "Kim 2024 shiitake blue light",
     "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and "
     "Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). "
-    "Blue light was applied during incubation, not during fruiting. Yield and "
-    "ergothioneine rose versus white in two cultivars. This recipe does not treat that "
-    "as a fruiting-stage blue mix.",
+    "Blocks were incubated 60 days in the dark, then 40 to 60 days under blue or white "
+    "LED at 4 umol/m2/s, and browning happened in that light period. The paper cites "
+    "Park et al. 2017 (J. Mushrooms 15) for high browning efficiency at 200 lux "
+    "regardless of light source. Blue light was applied during incubation, not during "
+    "fruiting. Yield and ergothioneine rose versus white in two cultivars. This recipe "
+    "does not treat that as a fruiting-stage blue mix.",
     "https://doi.org/10.1080/12298093.2024.2430052",
+)
+KOO_2018_BROWNING = _src(
+    "Koo 2018 shiitake browning LED",
+    "Jinmo Koo et al., Browning technology for shiitake in sawdust using LED source, "
+    "Journal of Mushrooms 16(4) (2018). Light was used to induce browning on a 1 h "
+    "on, 1 h off cycle at 20 C for 60 days. The best browning came at 1.5 umol/m2/s "
+    "red and blue LED; the strongest settings tested (20.5 umol/m2/s and 300 lux "
+    "fluorescent) browned less. The chamber has one daily light window, so 12 h at "
+    "about 200 lux stands in for that cycle.",
+    "https://www.earticle.net/Article/A348305",
+)
+YOO_2019_BROWNING = _src(
+    "Yoo 2019 shiitake browning transcriptome",
+    "Sung-Il Yoo et al., Comparative transcriptome analysis identified candidate genes "
+    "involved in mycelium browning in Lentinula edodes, BMC Genomics 20 (2019). "
+    "Describes light-induced brown film formation on the mycelium as an important "
+    "process for shiitake yield and quality.",
+    "https://doi.org/10.1186/s12864-019-5509-4",
 )
 JOZIFEK_2025 = _src(
     "Jozifek et al. 2025",
@@ -294,14 +315,27 @@ RECIPES: dict[str, LightRecipe] = {
         LUX_200,
     ),
     "shiitake": _recipe(
-        "Colonization and the browning rest stay dark (mycelium grows faster without "
-        "strong light). Fruiting uses 12 h and the general 20% white / blue mix. Leatham "
-        "found blue helped only on high-calcium media and suppressed fruiting on "
-        "low-calcium media. Kim 2024 applied blue during incubation, not fruiting. No "
-        "shiitake-specific fruiting lux for this chamber was found.",
-        [LEATHAM_1987, KIM_2024_SHIITAKE, STAMETS_BOOK, SAKAMOTO_2018, GENERAL_DEFAULT],
+        "Colonization stays dark (mycelium grows faster without strong light). The "
+        "browning rest gets low light: 12 h at 26% white (about 200 lux) with the "
+        "general blue mix. Browning of the block skin is light induced (Yoo 2019). Kim "
+        "2024 browned blocks under 40 to 60 days of blue or white light and cites high "
+        "browning efficiency at 200 lux. Koo 2018 saw less browning at the highest "
+        "intensities tested. Cold shock stays dark. Fruiting uses 12 h and the general "
+        "20% white / blue mix. Leatham found blue helped only on high-calcium media and "
+        "suppressed fruiting on low-calcium media. Kim 2024 applied blue during "
+        "incubation, not fruiting. No shiitake-specific fruiting lux for this chamber "
+        "was found.",
+        [
+            LEATHAM_1987,
+            KIM_2024_SHIITAKE,
+            KOO_2018_BROWNING,
+            YOO_2019_BROWNING,
+            STAMETS_BOOK,
+            SAKAMOTO_2018,
+            GENERAL_DEFAULT,
+        ],
         GENERAL_FRUITING,
-        browning=DARK,
+        browning=LUX_200,
         cold_shock=DARK,
     ),
     "reishi": _recipe(

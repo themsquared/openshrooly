@@ -7,7 +7,9 @@ import {
   isPsilocybin,
   serveProfileDocument,
   stripCommunityAffiliates,
+  normalizeStoredProfileLight,
   validateProfile,
+  validateStoredProfile,
   ValidationError,
 } from "./profile.js";
 import { reviewConfirmExtra, slugify } from "./profile-schema.js";
@@ -436,7 +438,7 @@ async function route(method, path, url, request, env) {
     const source = staff ? forkWorking : publicDocument(forkRow, forkReview, forkWorking);
     if (!source) throw new ValidationError("not found", 404);
     if (!(await canRead(db, user, source))) return json({ error: "purchase required" }, 402);
-    const forked = structuredClone(source);
+    const forked = normalizeStoredProfileLight(source);
     forked.id = await nextForkId(db, source.id, user.username);
     forked.name = `${source.name} (fork)`;
     forked.fork_of = source.id;
@@ -612,8 +614,9 @@ async function route(method, path, url, request, env) {
     }
     const mine = await db.all("SELECT * FROM profiles WHERE author_id=?", [user.id]);
     for (const row of mine) {
-      const profile = parseProfile(row);
-      if (!profile) continue;
+      const stored = parseProfile(row);
+      if (!stored) continue;
+      const profile = normalizeStoredProfileLight(stored);
       if (!exported.some((p) => p.id === profile.id)) exported.push(profile);
     }
     return json({ profiles: exported, hub_user: user.username });
@@ -755,7 +758,7 @@ async function profileForAction(db, user, row) {
   const staff = isModerator(user) || (user && Number(user.id) === Number(row.author_id));
   const doc = staff ? working : publicDocument(row, review, working);
   if (!doc) throw new ValidationError("not found", 404);
-  return validateProfile(doc, serveExtra(review, working));
+  return validateStoredProfile(doc, serveExtra(review, working));
 }
 
 async function requireProfile(db, profileId) {
@@ -764,7 +767,7 @@ async function requireProfile(db, profileId) {
   const working = parseProfile(row);
   if (!working) throw new ValidationError("profile not found", 404);
   const review = await getReview(db, profileId);
-  return validateProfile(working, serveExtra(review, working));
+  return validateStoredProfile(working, serveExtra(review, working));
 }
 
 async function showProfile(request, db, env, profileId) {
