@@ -7,6 +7,7 @@ import {
   COACH_ITEM,
   buildDeviceModel,
   latestReading,
+  loadRecentTelemetry,
   parseTelemetry,
   refuseRestrictedPack,
   stageHumidityTargetRange,
@@ -483,7 +484,7 @@ function expandStage(stage = {}) {
   };
 }
 
-function stageFromProfile(profile) {
+export function stageFromProfile(profile) {
   if (!profile) return {};
   const stages = profile.stages || [];
   return expandStage(stages.find((s) => s.id === "fruiting") || stages[0] || {});
@@ -531,7 +532,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     await writeDeviceMode(db, state);
   }
 
-  const samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id]);
+  const samples = await loadRecentTelemetry(db, device.id, { now });
   const parsed = parseTelemetry(samples).slice().sort((a, b) => Date.parse(a.created_at || 0) - Date.parse(b.created_at || 0));
   const current = latestReading(samples, now);
   const previous = parsed.length > 1 ? parsed[parsed.length - 2] : null;
@@ -582,6 +583,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
 
   await applySetpointsCommand(db, device.id, {
     ...plan.next,
+    from: currentSetpoints,
     source: "grow-coach-autopilot",
     approved: true,
   });
@@ -639,7 +641,12 @@ export async function undoAutopilotAction(db, env, user, actionId) {
   const state = await getDeviceMode(db, row.device_id, user.id);
   const resolved = await resolveAllowedProfile(db, state.profile_id);
   const restored = clampAutopilotSetpoints(oldValue, stageFromProfile(resolved.profile));
-  await applySetpointsCommand(db, row.device_id, { ...restored, source: "grow-coach-autopilot-undo", approved: true });
+  await applySetpointsCommand(db, row.device_id, {
+    ...restored,
+    from: parseJson(row.new_value),
+    source: "grow-coach-autopilot-undo",
+    approved: true,
+  });
   await db.run("UPDATE coach_autopilot_log SET undone_at=? WHERE id=?", [nowIso(), row.id]);
   await addLog(db, {
     device_id: row.device_id,

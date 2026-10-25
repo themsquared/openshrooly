@@ -30,3 +30,33 @@ export function wranglerLocalD1(file) {
   );
   if (result.status) process.exit(result.status);
 }
+
+export function wranglerLocalD1Command(sql, { json = false } = {}) {
+  const args = [
+    "wrangler",
+    "d1",
+    "execute",
+    COACH_LOCAL_DB,
+    "--local",
+    "-c",
+    COACH_LOCAL_CONFIG,
+    "--persist-to",
+    COACH_LOCAL_PERSIST,
+    "--command",
+    sql,
+  ];
+  if (json) args.push("--json");
+  const result = spawnSync("npx", args, { encoding: "utf8", cwd: API_ROOT });
+  if (result.status) {
+    if (result.stderr) process.stderr.write(result.stderr);
+    process.exit(result.status);
+  }
+  return result.stdout || "";
+}
+
+export function wranglerLocalD1Rows(sql) {
+  const raw = wranglerLocalD1Command(sql, { json: true });
+  const parsed = raw.trim() ? JSON.parse(raw) : [];
+  const batch = Array.isArray(parsed) ? parsed[0] : parsed;
+  return batch?.results || batch?.result?.[0]?.results || [];
+}

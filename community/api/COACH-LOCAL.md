@@ -50,7 +50,9 @@ stores the session. You should see private beta chat, not the public waitlist.
 
 ## 3. Real readings
 
-One-shot import of the chamber’s current sensors (ESPHome REST):
+One-shot upsert of the chamber’s current sensors (ESPHome REST). A second
+import updates `last_seen_at` and inserts a reading — it never deletes the
+device row (that used to cascade-wipe readings, commands, and alerts).
 
 ```bash
 cd community/api
@@ -64,13 +66,46 @@ Or ask the local hub which chamber it has, then hit that IP:
 npm run coach:local:readings -- --hub http://127.0.0.1:8090
 ```
 
+Poll instead of the untracked Mac `coach-poller.sh` / `coach-poll-once.mjs`
+helpers. GET-only, 5s reachability timeout, 5 minute backoff on error,
+14-day raw retention (pruned on each poll):
+
+```bash
+# start (Ctrl+C to stop)
+npm run coach:local:poll -- --chamber http://192.168.1.42
+# optional: --interval=30  (seconds, default 60)
+```
+
 That writes `cloud_devices` + `device_telemetry` for user 1 (`local-chamber`).
 Refresh Coach and pick **LAN chamber**. Choose the culinary profile you are
 running so temperature and humidity advice uses that profile’s stage targets.
-Import again anytime you want a newer sample.
+
+Coach and Autopilot queries use the last 24 hours (`ORDER BY created_at DESC
+LIMIT`), not the full table.
 
 The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
 (`GET /sensor/current_humidity`, `GET /sensor/current_temperature`, …).
+
+## 4. Local Autopilot delivery
+
+The Worker only queues `device_commands`. This Node bridge applies one pending
+setpoint command to the chamber’s local HTTP API (the same
+`POST /number/…/set` paths the hub uses). It re-validates global clamps,
+profile stage range, and step limits; lights only if they pass the light
+schema; expired or manually overridden commands are refused.
+
+Dry-run is the default (`DRY_RUN=1`): it GETs a reading, logs the writes, and
+marks nothing sent. Live writes need `COACH_BRIDGE_LIVE=1` and not `DRY_RUN=1`.
+Live: one command per cycle, at most one write per 10 minutes, GET before and
+after. Kill switch: `touch .wrangler/coach-local/BRIDGE_OFF`.
+
+```bash
+# start dry-run (Ctrl+C to stop)
+npm run coach:local:bridge -- --chamber http://192.168.1.42 --loop
+
+# live (still rate-limited; stop with Ctrl+C or the kill file)
+COACH_BRIDGE_LIVE=1 npm run coach:local:bridge -- --chamber http://192.168.1.42 --loop
+```
 
 ## Notes
 

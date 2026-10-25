@@ -182,12 +182,12 @@ test("approved suggestion can queue setpoints; body auto flag cannot skip approv
   await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
     "dev-auto",
     JSON.stringify({ humidity: 82, humidity_setpoint: 90, temperature: 21.4, temperature_setpoint: 20 }),
-    "2026-10-01T00:00:00Z",
+    new Date(Date.now() - 40 * 60 * 1000).toISOString(),
   ]);
   await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
     "dev-auto",
     JSON.stringify({ humidity: 83, humidity_setpoint: 90, temperature: 21.6, temperature_setpoint: 20 }),
-    "2026-10-01T01:00:00Z",
+    new Date(Date.now() - 10 * 60 * 1000).toISOString(),
   ]);
   const enabled = await call(ctx, "POST", "/api/coach/auto-tune", { token, body: { enabled: true } });
   assert.equal(enabled.status, 200);
@@ -602,7 +602,7 @@ test("chat grounding includes the latest reading and flags pearl fruiting above 
   await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
     "dev-hot",
     JSON.stringify({ humidity: 88, humidity_setpoint: 88, temperature: 22.9, temperature_setpoint: 24 }),
-    "2026-10-25T02:50:00Z",
+    nowIso(),
   ]);
   const chat = await call(ctx, "POST", "/api/coach/chat", {
     token,

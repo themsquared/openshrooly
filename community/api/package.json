@@ -10,6 +10,8 @@
     "coach:local:init": "npm run bundle-seeds && node scripts/coach-local-init.js",
     "coach:local:user": "node scripts/coach-local-user.js",
     "coach:local:readings": "node scripts/coach-import-readings.js",
+    "coach:local:poll": "node scripts/coach-import-readings.js --poll",
+    "coach:local:bridge": "node scripts/coach-local-bridge.js",
     "test": "npm run bundle-seeds && node --test test/*.test.js",
     "db:init": "wrangler d1 execute shroomlabs --file=schema.sql",
     "db:init:remote": "wrangler d1 execute shroomlabs --remote --file=schema.sql",

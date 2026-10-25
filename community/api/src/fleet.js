@@ -3,7 +3,14 @@
 import { laterIso, nowIso } from "./crypto.js";
 import { requireVerified, userFromRequest } from "./auth.js";
 import { isPsilocybin, ValidationError, validateStageLight } from "./profile.js";
-import { compareReadingToStage, latestReading, parseTelemetry, refuseRestrictedPack } from "./coach-learn.js";
+import {
+  compareReadingToStage,
+  latestReading,
+  loadRecentTelemetry,
+  parseTelemetry,
+  refuseRestrictedPack,
+  TELEMETRY_WINDOW_LIMIT,
+} from "./coach-learn.js";
 import {
   clampAutopilotSetpoints,
   coachAutopilotFlagOn,
@@ -149,7 +156,7 @@ function fleetAlerts({ device, reading, stage, now }) {
 }
 
 export async function enrichDevice(db, env, user, device, { now = Date.now() } = {}) {
-  const samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id]);
+  const samples = await loadRecentTelemetry(db, device.id, { now });
   const parsed = parseTelemetry(samples);
   const current = latestReading(samples, now);
   const latestDoc = samples.length
@@ -292,7 +299,7 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
   const modeRow = await getDeviceMode(db, device.id, user.id);
   const profileId = payload.profile_id || modeRow.profile_id;
   const profile = await loadProfile(db, user, profileId);
-  const samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id]);
+  const samples = await loadRecentTelemetry(db, device.id, { now });
   const current = latestReading(samples, now);
   const stage = stageFromProfile(profile, payload.stage || current?.stage);
   const currentSetpoints = {
@@ -369,7 +376,11 @@ export async function handleFleet(method, path, url, request, env) {
     if (!device) return json({ error: "not your device" }, 403);
     const hours = Math.min(168, Math.max(1, Number(url.searchParams.get("hours")) || 24));
     const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
-    const samples = (await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id])) || [];
+    const samples = await loadRecentTelemetry(db, device.id, {
+      now: Date.now(),
+      windowMs: hours * 3600 * 1000,
+      limit: TELEMETRY_WINDOW_LIMIT,
+    });
     const history = parseTelemetry(samples)
       .filter((s) => !s.created_at || s.created_at >= since)
       .map((s) => ({
@@ -496,7 +507,7 @@ export async function handleFleet(method, path, url, request, env) {
       if (path.endsWith("/preview")) {
         const modeRow = await getDeviceMode(db, device.id, user.id);
         const profile = await loadProfile(db, user, body.payload?.profile_id || modeRow.profile_id);
-        const samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id]);
+        const samples = await loadRecentTelemetry(db, device.id, { now });
         const current = latestReading(samples, now);
         const stage = stageFromProfile(profile, body.payload?.stage || current?.stage);
         const plan = validateFleetChange({
