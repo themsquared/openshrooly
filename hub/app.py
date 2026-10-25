@@ -22,7 +22,7 @@ from openshrooly_lib.catalog import load_seed_profiles  # noqa: E402
 from openshrooly_lib.device import ESPHomeDeviceClient  # noqa: E402
 from openshrooly_lib.mapping import commands_as_preview  # noqa: E402
 from openshrooly_lib.models import GrowReport, MushroomProfile  # noqa: E402
-from openshrooly_lib.schema import ValidationError, validate_profile  # noqa: E402
+from openshrooly_lib.schema import ValidationError, validate_profile, validate_stored_profile  # noqa: E402
 from openshrooly_lib.sync import build_push  # noqa: E402
 from openshrooly_lib.webutil import json_dumps  # noqa: E402
 
@@ -59,21 +59,21 @@ def seed_library(conn) -> None:
 
 def all_profiles(conn) -> list[MushroomProfile]:
     rows = conn.execute("SELECT document FROM profiles ORDER BY id").fetchall()
-    return [validate_profile(json.loads(row["document"])) for row in rows]
+    return [validate_stored_profile(json.loads(row["document"])) for row in rows]
 
 
 def authored_profiles(conn) -> list[MushroomProfile]:
     rows = conn.execute(
         "SELECT document FROM profiles WHERE source NOT IN ('seed', 'community') ORDER BY id"
     ).fetchall()
-    return [validate_profile(json.loads(row["document"])) for row in rows]
+    return [validate_stored_profile(json.loads(row["document"])) for row in rows]
 
 
 def get_profile(conn, profile_id: str) -> MushroomProfile:
     row = conn.execute("SELECT document FROM profiles WHERE id=?", (profile_id,)).fetchone()
     if not row:
         raise HTTPException(404, "profile not found")
-    return validate_profile(json.loads(row["document"]))
+    return validate_stored_profile(json.loads(row["document"]))
 
 
 PUBLIC_DEVICE_FIELDS = (
