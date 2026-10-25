@@ -310,7 +310,10 @@ export async function handleCoach(method, path, url, request, env) {
       alerts: grounding.alerts,
       profile: grounding.profile,
       library: grounding.library,
-      suggestion: suggestSetpoints(grounding.device_model, grounding.stage, { auto: grounding.auto_tune }),
+      suggestion: suggestSetpoints(grounding.device_model, grounding.stage, {
+        auto: grounding.auto_tune,
+        reading: grounding.current,
+      }),
     });
   }
 
@@ -322,7 +325,10 @@ export async function handleCoach(method, path, url, request, env) {
     }
     const grounding = await loadGrounding(db, user, body.device_id, body.profile_id);
     const stage = body.stage || grounding.stage;
-    const suggestion = suggestSetpoints(grounding.device_model, stage, { auto: grounding.auto_tune });
+    const suggestion = suggestSetpoints(grounding.device_model, stage, {
+      auto: grounding.auto_tune,
+      reading: grounding.current,
+    });
     if (body.apply) {
       if (!suggestion.auto_eligible && !body.approve) {
         throw new ValidationError("Approve the change, or enable auto-tune with safe bounds.", 403);

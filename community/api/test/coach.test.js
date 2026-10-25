@@ -12,6 +12,7 @@ import {
   estimateUsd,
   latestReading,
   refuseRestrictedPack,
+  stageTemperatureTargetRange,
   SAFE_BOUNDS,
   safeBoundsForStage,
   suggestSetpoints,
@@ -66,7 +67,7 @@ test("device learning raises humidity when the chamber droops and stays in bound
   const suggestion = suggestSetpoints(model, { humidity_percent: 90, temperature_c: 20, fan: { speed_percent: 30 } }, { auto: true });
   assert.ok(suggestion.humidity_percent > 90);
   assert.ok(suggestion.humidity_percent <= 96);
-  assert.ok(suggestion.temperature_c < 20);
+  assert.equal(suggestion.temperature_c, 20);
   assert.equal(suggestion.within_bounds, true);
   assert.equal(suggestion.auto_eligible, true);
 });
@@ -86,7 +87,7 @@ test("device learning lowers humidity when the chamber runs wet and ignores rest
   const suggestion = suggestSetpoints(model, { humidity_percent: 90, temperature_c: 20 });
   assert.ok(suggestion.humidity_percent < 90);
   assert.ok(suggestion.humidity_percent >= 70);
-  assert.ok(suggestion.temperature_c > 20);
+  assert.equal(suggestion.temperature_c, 20);
 });
 
 test("alerts fire for humidity trouble, harvest window, and stalled colonization", () => {
@@ -488,9 +489,12 @@ test("latest reading 22.9 C with a 24 C setpoint is above pearl fruiting's 21 C 
 test("safe bounds follow profile warning bands so pearl 15 C and king/blue 14 C are reachable", () => {
   const pearl = profileStageTargets(pearlOyster.stages.find((s) => s.id === "fruiting"));
   assert.deepEqual(safeBoundsForStage(pearl).temperature_c, [11, 21]);
-  const pearlCool = suggestSetpoints({ humidity_droop: 0, humidity_error: 0, temperature_offset: 1 }, pearl);
-  assert.equal(pearlCool.temperature_c, 15);
-  assert.equal(pearlCool.within_bounds, true);
+  const ignoredGap = suggestSetpoints({ humidity_droop: 0, humidity_error: 0, temperature_offset: 1.2 }, pearl);
+  assert.equal(ignoredGap.temperature_c, 16);
+  const pearlCal = suggestSetpoints({ humidity_droop: 0, humidity_error: 0, temperature_calibration: 1 }, pearl);
+  assert.equal(pearlCal.temperature_c, 15);
+  assert.equal(pearlCal.within_bounds, true);
+  assert.equal(suggestSetpoints({ temperature_calibration: 8 }, pearl).temperature_c, 15);
 
   const kingFruit = { temperature_c: 14, temperature_warning_min_c: 11, temperature_warning_max_c: 19, humidity_percent: 88 };
   const blueFruit = { temperature_c: 14, temperature_warning_min_c: 10, temperature_warning_max_c: 20, humidity_percent: 88 };
@@ -499,6 +503,45 @@ test("safe bounds follow profile warning bands so pearl 15 C and king/blue 14 C 
   assert.equal(suggestSetpoints({ sample_count: 0 }, kingFruit).temperature_c, 14);
   assert.equal(suggestSetpoints({ sample_count: 0 }, blueFruit).temperature_c, 14);
   assert.deepEqual(safeBoundsForStage({ temperature_warning_min_c: 5, temperature_warning_max_c: 40 }).temperature_c, [10, 32]);
+});
+
+test("pearl fruiting 22.76 C vs 24 C setpoint suggests 16 C and says the chamber is running warm", () => {
+  const pearl = profileStageTargets(pearlOyster.stages.find((s) => s.id === "fruiting"));
+  assert.deepEqual(stageTemperatureTargetRange(pearl), [15, 17]);
+  const samples = [
+    {
+      document: { humidity: 88, humidity_setpoint: 88, temperature: 22.76, temperature_setpoint: 24 },
+      created_at: "2026-10-25T03:10:00Z",
+    },
+  ];
+  const model = buildDeviceModel(samples);
+  assert.ok(model.temperature_offset < 0);
+  const suggestion = suggestSetpoints(model, pearl, { reading: latestReading(samples) });
+  assert.equal(suggestion.temperature_c, 16);
+  assert.ok(suggestion.temperature_c >= 15 && suggestion.temperature_c <= 17);
+  assert.match(suggestion.reasons.join(" "), /running warm/i);
+  assert.match(suggestion.reasons.join(" "), /Lower the setpoint/i);
+  assert.doesNotMatch(suggestion.reasons.join(" "), /runs cool/i);
+  assert.doesNotMatch(suggestion.reasons.join(" "), /running cool/i);
+});
+
+test("pearl fruiting that is too cold suggests 16 C and says the chamber is running cool", () => {
+  const pearl = profileStageTargets(pearlOyster.stages.find((s) => s.id === "fruiting"));
+  const samples = [
+    {
+      document: { humidity: 88, humidity_setpoint: 88, temperature: 12.4, temperature_setpoint: 11 },
+      created_at: "2026-10-25T03:10:00Z",
+    },
+  ];
+  const model = buildDeviceModel(samples);
+  assert.ok(model.temperature_offset > 0);
+  const suggestion = suggestSetpoints(model, pearl, { reading: latestReading(samples) });
+  assert.equal(suggestion.temperature_c, 16);
+  assert.ok(suggestion.temperature_c >= 15 && suggestion.temperature_c <= 17);
+  assert.match(suggestion.reasons.join(" "), /running cool/i);
+  assert.match(suggestion.reasons.join(" "), /Raise the setpoint/i);
+  assert.doesNotMatch(suggestion.reasons.join(" "), /running warm/i);
+  assert.doesNotMatch(suggestion.reasons.join(" "), /runs cool/i);
 });
 
 test("chat grounding includes the latest reading and flags pearl fruiting above 21 C", async () => {
