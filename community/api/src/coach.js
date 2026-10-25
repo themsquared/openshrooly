@@ -367,7 +367,9 @@ export async function handleCoach(method, path, url, request, env) {
 
   if (method === "GET" && path === "/api/coach/autopilot") {
     const user = await requireCoach(request, db, env);
-    return json(await getAutopilotStatus(db, env, user, url.searchParams.get("device_id")));
+    const result = await getAutopilotStatus(db, env, user, url.searchParams.get("device_id"));
+    if (result.error) return json({ error: result.error }, result.status || 404);
+    return json(result);
   }
 
   if (method === "POST" && path === "/api/coach/autopilot/mode") {
@@ -389,9 +391,10 @@ export async function handleCoach(method, path, url, request, env) {
     if (!coachAutopilotFlagOn(env)) return json({ error: "not found" }, 404);
     if (!body.device_id) throw new ValidationError("Pick a chamber first.", 400);
     const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [body.device_id]);
-    if (!device || Number(device.owner_id) !== Number(user.id)) throw new ValidationError("not your device", 403);
-    const result = await runAutopilotForDevice(db, env, { device, user, force: true });
-    return json({ ok: true, ...result, ...(await getAutopilotStatus(db, env, user, body.device_id)) });
+    if (!device || Number(device.owner_id) !== Number(user.id)) return json({ error: "not found" }, 404);
+    const result = await runAutopilotForDevice(db, env, { device, user });
+    const status = await getAutopilotStatus(db, env, user, body.device_id);
+    return json({ ok: Boolean(result.applied), ...status, ...result });
   }
 
   if (method === "POST" && path === "/api/coach/autopilot/undo") {

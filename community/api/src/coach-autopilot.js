@@ -123,6 +123,30 @@ export function dailyChangeCount(state = {}, now = Date.now()) {
   return Number(state.changes_count || 0);
 }
 
+export function nextChangeEligibleAt(state = {}, now = Date.now()) {
+  const intervalAt = nextEligibleAt(state, now);
+  if (dailyChangeCount(state, now) < AUTOPILOT_LIMITS.dailyCap) return intervalAt;
+  const day = state.changes_day || new Date(now).toISOString().slice(0, 10);
+  const dayStart = Date.parse(`${day}T00:00:00Z`);
+  const tomorrow = Number.isFinite(dayStart) ? dayStart + 24 * 60 * 60 * 1000 : intervalAt;
+  return Math.max(intervalAt, tomorrow);
+}
+
+export function setpointsMismatch(reading = {}, last = {}, { now = Date.now(), lastChangeAt = null } = {}) {
+  if (!last || (last.temperature_c == null && last.humidity_percent == null)) return false;
+  if (lastChangeAt) {
+    const applied = Date.parse(lastChangeAt);
+    if (Number.isFinite(applied) && now - applied < AUTOPILOT_LIMITS.staleMs) return false;
+  }
+  const reportedTemp = num(reading.temperature_setpoint);
+  const reportedRh = num(reading.humidity_setpoint);
+  const lastTemp = num(last.temperature_c);
+  const lastRh = num(last.humidity_percent);
+  if (reportedTemp != null && lastTemp != null && Math.abs(reportedTemp - lastTemp) > 0.15) return true;
+  if (reportedRh != null && lastRh != null && Math.abs(reportedRh - lastRh) > 0.6) return true;
+  return false;
+}
+
 export function evaluateAutopilotPause({ reading, previous, device, now = Date.now() } = {}) {
   const status = String(device?.status || "");
   const seen = device?.last_seen_at ? Date.parse(device.last_seen_at) : NaN;
@@ -159,13 +183,23 @@ export function evaluateAutopilotPause({ reading, previous, device, now = Date.n
   return { pause: false };
 }
 
+function blockedUntil(reason, waitUntil) {
+  const when = waitUntil ? new Date(waitUntil).toISOString() : null;
+  return {
+    ok: false,
+    waitUntil,
+    next_eligible_at: when,
+    reason: when ? `${reason} Next eligible at ${when}.` : reason,
+  };
+}
+
 export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage = {}, state = {}, now = Date.now() } = {}) {
   const intervalAt = nextEligibleAt(state, now);
   if (now < intervalAt) {
-    return { ok: false, waitUntil: intervalAt, reason: "Waiting for the minimum interval between changes." };
+    return blockedUntil("Waiting for the minimum interval between changes.", intervalAt);
   }
   if (dailyChangeCount(state, now) >= AUTOPILOT_LIMITS.dailyCap) {
-    return { ok: false, waitUntil: intervalAt, reason: "Daily Autopilot change cap reached." };
+    return blockedUntil("Daily Autopilot change cap reached.", nextChangeEligibleAt(state, now));
   }
   const allowed = {
     temperature_c: suggestion?.temperature_c,
@@ -178,7 +212,7 @@ export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage =
     (stepped.temperature_c != null && stepped.temperature_c !== currentSetpoints.temperature_c) ||
     (stepped.humidity_percent != null && stepped.humidity_percent !== currentSetpoints.humidity_percent) ||
     (stepped.fan_speed_percent != null && stepped.fan_speed_percent !== currentSetpoints.fan_speed_percent);
-  if (!changed) return { ok: false, reason: "Already at the profile target." };
+  if (!changed) return { ok: false, reason: "Already at the profile target.", next_eligible_at: null };
   return {
     ok: true,
     next: stepped,
@@ -282,12 +316,11 @@ async function addLog(db, row) {
 }
 
 export async function listAutopilotActions(db, deviceId, limit = 12) {
-  const rows = await db.all("SELECT * FROM coach_autopilot_log WHERE device_id=?", [deviceId]);
-  return (rows || [])
-    .slice()
-    .sort((a, b) => Number(b.id) - Number(a.id))
-    .slice(0, limit)
-    .map((row) => ({
+  const rows = await db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", [
+    deviceId,
+    limit,
+  ]);
+  return (rows || []).map((row) => ({
       id: row.id,
       action: row.action,
       old_value: parseJson(row.old_value),
@@ -320,7 +353,7 @@ function publicStatus(state, now = Date.now()) {
       next_eligible_at: Number.isFinite(pauseUntil) ? new Date(pauseUntil).toISOString() : null,
     };
   }
-  const eligible = nextEligibleAt(state, now);
+  const eligible = nextChangeEligibleAt(state, now);
   return {
     mode: "autopilot",
     status: "active",
@@ -331,9 +364,14 @@ function publicStatus(state, now = Date.now()) {
 }
 
 export async function getAutopilotStatus(db, env, user, deviceId) {
+  if (!coachAutopilotFlagOn(env)) return { error: "not found", status: 404 };
   const available = await coachAutopilotAvailable(env, db, user);
   if (!deviceId) {
     return { available, mode: "advisor", status: "advisor", actions: [] };
+  }
+  const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [deviceId]);
+  if (!device || Number(device.owner_id) !== Number(user.id)) {
+    return { error: "not found", status: 404 };
   }
   const state = await getDeviceMode(db, deviceId, user.id);
   return {
@@ -342,6 +380,31 @@ export async function getAutopilotStatus(db, env, user, deviceId) {
     profile_id: state.profile_id,
     actions: available ? await listAutopilotActions(db, deviceId) : [],
   };
+}
+
+export async function resolveAllowedProfile(db, profileId) {
+  if (!profileId) return { error: "Pick a published culinary profile first.", status: 400 };
+  if (refuseRestrictedPack({ pack: profileId, tags: [] })) {
+    return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
+  }
+  const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
+  if (!row || !Number(row.published)) {
+    return { error: "Pick a published culinary profile first.", status: 400 };
+  }
+  let doc = row.document;
+  if (typeof doc === "string") {
+    try {
+      doc = JSON.parse(doc);
+    } catch {
+      doc = null;
+    }
+  }
+  if (!doc) return { error: "Pick a published culinary profile first.", status: 400 };
+  const profile = { ...doc, id: doc.id || row.id };
+  if (isPsilocybin(profile) || refuseRestrictedPack(profile)) {
+    return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
+  }
+  return { profile };
 }
 
 export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, profileId } = {}) {
@@ -353,17 +416,12 @@ export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, pr
     return { error: "not your device", status: 403 };
   }
   const nextMode = mode === "autopilot" ? "autopilot" : "advisor";
-  if (nextMode === "autopilot" && refuseRestrictedPack({ pack: profileId, tags: [] })) {
-    return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
-  }
-  if (nextMode === "autopilot" && profileId) {
-    const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
-    const doc = row ? (typeof row.document === "string" ? JSON.parse(row.document) : row.document) : null;
-    if (doc && (isPsilocybin(doc) || refuseRestrictedPack(doc))) {
-      return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
-    }
-  }
   const state = await getDeviceMode(db, deviceId, user.id);
+  if (nextMode === "autopilot" || profileId) {
+    const resolved = await resolveAllowedProfile(db, profileId || (nextMode === "autopilot" ? state.profile_id : null));
+    if (resolved.error) return resolved;
+    state.profile_id = resolved.profile.id;
+  }
   if (nextMode === "autopilot") {
     const until = state.pause_until ? Date.parse(state.pause_until) : NaN;
     if (Number(state.paused) && Number.isFinite(until) && until > Date.now()) {
@@ -374,9 +432,8 @@ export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, pr
     state.pause_until = null;
   }
   state.mode = nextMode;
-  state.profile_id = profileId || state.profile_id;
   await writeDeviceMode(db, state);
-  return { ok: true, ...publicStatus(state) };
+  return { ok: true, ...publicStatus(state), profile_id: state.profile_id };
 }
 
 export async function pauseForManualOverride(db, deviceId, userId, now = Date.now()) {
@@ -409,13 +466,6 @@ export async function noteManualSetpointCommand(db, device, payload) {
   await pauseForManualOverride(db, device.id, device.owner_id);
 }
 
-async function slimPublished(db) {
-  const rows = await db.all("SELECT document FROM profiles WHERE published=1");
-  return (rows || [])
-    .map((row) => (typeof row.document === "string" ? JSON.parse(row.document) : row.document))
-    .filter((p) => p && !isPsilocybin(p) && !refuseRestrictedPack(p));
-}
-
 function expandStage(stage = {}) {
   const rh = num(stage.humidity_percent);
   const rhHyst = num(stage.humidity_hysteresis);
@@ -443,7 +493,25 @@ async function applySetpointsCommand(db, deviceId, payload) {
   );
 }
 
-export async function runAutopilotForDevice(db, env, { device, user, now = Date.now(), force = false } = {}) {
+async function pauseAutopilot(db, state, user, reason, readings = null, { until = null, lastManualAt = null } = {}) {
+  state.mode = "advisor";
+  state.paused = 1;
+  state.pause_reason = reason;
+  state.pause_until = until;
+  if (lastManualAt) state.last_manual_at = lastManualAt;
+  await writeDeviceMode(db, state);
+  await addLog(db, {
+    device_id: state.device_id,
+    user_id: user.id,
+    action: "pause",
+    old_value: null,
+    new_value: null,
+    reason,
+    readings,
+  });
+}
+
+export async function runAutopilotForDevice(db, env, { device, user, now = Date.now() } = {}) {
   if (!coachAutopilotFlagOn(env)) return { skipped: "kill_switch" };
   if (!(await coachAutopilotAvailable(env, db, user))) return { skipped: "not_entitled" };
   const state = await getDeviceMode(db, device.id, user.id);
@@ -466,37 +534,28 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   const previous = parsed.length > 1 ? parsed[parsed.length - 2] : null;
   const pause = evaluateAutopilotPause({ reading: current, previous, device, now });
   if (pause.pause) {
-    state.mode = "advisor";
-    state.paused = 1;
-    state.pause_reason = pause.reason;
-    state.pause_until = null;
-    await writeDeviceMode(db, state);
-    await addLog(db, {
-      device_id: device.id,
-      user_id: user.id,
-      action: "pause",
-      old_value: null,
-      new_value: null,
-      reason: pause.reason,
-      readings: current,
-    });
+    await pauseAutopilot(db, state, user, pause.reason, current);
     return { paused: true, reason: pause.reason, flipped_to: "advisor" };
   }
 
-  const library = await slimPublished(db);
-  const profile = library.find((p) => p.id === state.profile_id) || library[0] || null;
-  if (profile && refuseRestrictedPack(profile)) {
-    state.mode = "advisor";
-    state.paused = 1;
-    state.pause_reason = "Autopilot is not available for off-menu varieties.";
-    await writeDeviceMode(db, state);
-    return { skipped: "off_menu" };
+  const last = parseJson(state.last_setpoints, {});
+  if (setpointsMismatch(current, last, { now, lastChangeAt: state.last_change_at })) {
+    await pauseForManualOverride(db, device.id, user.id, now);
+    const paused = await getDeviceMode(db, device.id, user.id);
+    return { paused: true, reason: paused.pause_reason, flipped_to: "advisor" };
   }
+
+  const resolved = await resolveAllowedProfile(db, state.profile_id);
+  if (resolved.error || !resolved.profile) {
+    const reason = "The selected profile is missing or not allowed.";
+    await pauseAutopilot(db, state, user, reason, current);
+    return { paused: true, reason, flipped_to: "advisor" };
+  }
+  const profile = resolved.profile;
   const stage = stageFromProfile(profile);
   const reports = await db.all("SELECT * FROM grow_reports WHERE author_id=?", [user.id]);
   const model = buildDeviceModel(samples, reports.filter((r) => !String(r.profile_id || "").includes("psilocybin")));
   const suggestion = suggestSetpoints(model, stage, { reading: current });
-  const last = parseJson(state.last_setpoints, {});
   const currentSetpoints = {
     temperature_c: current.temperature_setpoint ?? last.temperature_c,
     humidity_percent: current.humidity_setpoint ?? last.humidity_percent,
@@ -506,10 +565,17 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     suggestion,
     currentSetpoints,
     stage,
-    state: force ? { ...state, last_change_at: null, changes_count: 0, changes_day: null } : state,
+    state,
     now,
   });
-  if (!plan.ok) return { skipped: "no_change", reason: plan.reason, waitUntil: plan.waitUntil || null };
+  if (!plan.ok) {
+    return {
+      skipped: "no_change",
+      reason: plan.reason,
+      waitUntil: plan.waitUntil || null,
+      next_eligible_at: plan.next_eligible_at || null,
+    };
+  }
 
   await applySetpointsCommand(db, device.id, {
     ...plan.next,
@@ -561,23 +627,26 @@ export async function undoAutopilotAction(db, env, user, actionId) {
   }
   const row = await db.one("SELECT * FROM coach_autopilot_log WHERE id=?", [actionId]);
   if (!row || Number(row.user_id) !== Number(user.id)) return { error: "not found", status: 404 };
+  const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [row.device_id]);
+  if (!device || Number(device.owner_id) !== Number(user.id)) return { error: "not found", status: 404 };
   if (row.undone_at) return { error: "Already undone.", status: 400 };
   if (row.action !== "apply") return { error: "Only applied changes can be undone.", status: 400 };
   const oldValue = parseJson(row.old_value);
   if (!oldValue) return { error: "Nothing to restore.", status: 400 };
-  await applySetpointsCommand(db, row.device_id, { ...oldValue, source: "grow-coach-autopilot-undo", approved: true });
+  const state = await getDeviceMode(db, row.device_id, user.id);
+  const restored = clampAutopilotSetpoints(oldValue, {});
+  await applySetpointsCommand(db, row.device_id, { ...restored, source: "grow-coach-autopilot-undo", approved: true });
   await db.run("UPDATE coach_autopilot_log SET undone_at=? WHERE id=?", [nowIso(), row.id]);
   await addLog(db, {
     device_id: row.device_id,
     user_id: user.id,
     action: "undo",
     old_value: parseJson(row.new_value),
-    new_value: oldValue,
+    new_value: restored,
     reason: "Undo restored the previous setpoints.",
     readings: parseJson(row.readings),
   });
-  const state = await getDeviceMode(db, row.device_id, user.id);
-  state.last_setpoints = oldValue;
+  state.last_setpoints = restored;
   await writeDeviceMode(db, state);
-  return { ok: true, restored: oldValue };
+  return { ok: true, restored };
 }

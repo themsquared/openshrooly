@@ -858,9 +858,12 @@ async function renderCoach() {
     return new Date(at).toLocaleString([], { hour: "numeric", minute: "2-digit" });
   }
 
+  let coachMode = "advisor";
+
   async function refreshAutopilot() {
     if (!autopilotOn) return;
     if (!deviceId()) {
+      coachMode = "advisor";
       setModeButtons("advisor");
       $("#mode-status").textContent = "Pick a chamber to use Autopilot.";
       $("#run-autopilot")?.classList.add("hidden");
@@ -868,6 +871,7 @@ async function renderCoach() {
       return;
     }
     const data = await api(`/api/coach/autopilot?device_id=${encodeURIComponent(deviceId())}`);
+    coachMode = data.mode || "advisor";
     setModeButtons(data.mode);
     if (data.status === "paused") {
       const until = formatEligible(data.pause_until || data.next_eligible_at);
@@ -906,7 +910,20 @@ async function renderCoach() {
     refreshModel().catch(showCoachError);
     refreshAutopilot().catch(showCoachError);
   });
-  $("#profile")?.addEventListener("change", () => refreshModel().catch(showCoachError));
+  $("#profile")?.addEventListener("change", async () => {
+    try {
+      await refreshModel();
+      if (autopilotOn && coachMode === "autopilot" && deviceId() && profileId()) {
+        await api("/api/coach/autopilot/mode", {
+          method: "POST",
+          jsonBody: { device_id: deviceId(), mode: "autopilot", profile_id: profileId() },
+        });
+        await refreshAutopilot();
+      }
+    } catch (err) {
+      showCoachError(err);
+    }
+  });
   $("#refresh-model").addEventListener("click", () => refreshModel().catch(showCoachError));
   $("#auto-tune").addEventListener("change", async () => {
     try {
@@ -920,6 +937,10 @@ async function renderCoach() {
       showCoachError(new Error("Pick a chamber first."));
       return;
     }
+    if (mode === "autopilot" && !profileId()) {
+      showCoachError(new Error("Pick a published culinary profile first."));
+      return;
+    }
     await api("/api/coach/autopilot/mode", {
       method: "POST",
       jsonBody: { device_id: deviceId(), mode, profile_id: profileId() || undefined },
@@ -930,7 +951,8 @@ async function renderCoach() {
   $("#mode-autopilot")?.addEventListener("click", () => setCoachMode("autopilot").catch(showCoachError));
   $("#run-autopilot")?.addEventListener("click", async () => {
     try {
-      await api("/api/coach/autopilot/run", { method: "POST", jsonBody: { device_id: deviceId() } });
+      const data = await api("/api/coach/autopilot/run", { method: "POST", jsonBody: { device_id: deviceId() } });
+      if (!data.applied && data.reason) showCoachError(new Error(data.reason));
       await refreshModel();
       await refreshAutopilot();
     } catch (err) {

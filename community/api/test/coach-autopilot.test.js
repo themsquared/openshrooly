@@ -9,11 +9,13 @@ import {
   clampAutopilotSetpoints,
   coachAutopilotFlagOn,
   evaluateAutopilotPause,
+  getDeviceMode,
   limitAutopilotStep,
   planAutopilotChange,
   runAutopilotForDevice,
   runAutopilotPass,
   setDeviceAutopilotMode,
+  setpointsMismatch,
 } from "../src/coach-autopilot.js";
 import { suggestSetpoints } from "../src/coach-learn.js";
 import { profileStageTargets } from "../src/coach.js";
@@ -57,6 +59,13 @@ async function addReading(ctx, deviceId, doc, createdAt = nowIso()) {
     JSON.stringify(doc),
     createdAt,
   ]);
+}
+
+async function addPublishedProfile(ctx, userId, profile = pearlOyster) {
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [profile.id, JSON.stringify(profile), userId, 1, nowIso(), nowIso()]
+  );
 }
 
 function statements(sql) {
@@ -120,6 +129,8 @@ test("interval and daily cap block further changes", () => {
   });
   assert.equal(interval.ok, false);
   assert.match(interval.reason, /minimum interval/i);
+  assert.match(interval.reason, /Next eligible at 2026-10-25T12:30:00.000Z/);
+  assert.equal(interval.next_eligible_at, "2026-10-25T12:30:00.000Z");
   const cap = planAutopilotChange({
     suggestion,
     currentSetpoints: current,
@@ -129,6 +140,8 @@ test("interval and daily cap block further changes", () => {
   });
   assert.equal(cap.ok, false);
   assert.match(cap.reason, /daily/i);
+  assert.match(cap.reason, /Next eligible at 2026-10-26T00:00:00.000Z/);
+  assert.equal(cap.next_eligible_at, "2026-10-26T00:00:00.000Z");
   const ok = planAutopilotChange({ suggestion, currentSetpoints: current, stage: fruiting, state: {}, now });
   assert.equal(ok.ok, true);
   assert.equal(ok.next.temperature_c, 23);
@@ -190,14 +203,16 @@ test("catalog hides Autopilot unless the kill switch is on", async () => {
   assert.equal(shown.data.autopilot, true);
 });
 
-test("kill switch returns 404 for mode, run, and undo", async () => {
+test("kill switch returns 404 for GET, mode, run, and undo", async () => {
   const ctx = env({ COACH_AUTOPILOT_ENABLED: "0" });
   const { token, user } = await register(ctx, "kill@example.com");
   await subscribe(ctx, token);
   await addDevice(ctx, user.id, "dev-kill");
+  const get = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-kill", { token });
+  assert.equal(get.status, 404);
   const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", {
     token,
-    body: { device_id: "dev-kill", mode: "autopilot" },
+    body: { device_id: "dev-kill", mode: "autopilot", profile_id: pearlOyster.id },
   });
   assert.equal(mode.status, 404);
   const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-kill" } });
@@ -235,10 +250,7 @@ test("Autopilot applies a stepped setpoint, logs it, and Undo restores the old v
   const { token, user } = await register(ctx, "auto@example.com");
   await subscribe(ctx, token);
   await addDevice(ctx, user.id, "dev-auto");
-  await ctx.db.run(
-    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [pearlOyster.id, JSON.stringify(pearlOyster), user.id, 1, nowIso(), nowIso()]
-  );
+  await addPublishedProfile(ctx, user.id);
   await addReading(ctx, "dev-auto", {
     humidity: 88,
     humidity_setpoint: 90,
@@ -277,13 +289,19 @@ test("stale readings flip Autopilot back to Advisor with a visible reason", asyn
   const { token, user } = await register(ctx, "stale@example.com");
   await subscribe(ctx, token);
   await addDevice(ctx, user.id, "dev-stale");
+  await addPublishedProfile(ctx, user.id);
   await addReading(
     ctx,
     "dev-stale",
     { humidity: 88, humidity_setpoint: 90, temperature: 20, temperature_setpoint: 20 },
     new Date(Date.now() - 20 * 60 * 1000).toISOString()
   );
-  await setDeviceAutopilotMode(ctx.db, ctx, user, { deviceId: "dev-stale", mode: "autopilot" });
+  const enabled = await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-stale",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  assert.equal(enabled.ok, true, JSON.stringify(enabled));
   const result = await runAutopilotForDevice(ctx.db, ctx, {
     device: await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-stale"]),
     user,
@@ -302,10 +320,11 @@ test("a manual setpoint change pauses Autopilot for 12 hours", async () => {
   const { token, user } = await register(ctx, "manual@example.com");
   await subscribe(ctx, token);
   await addDevice(ctx, user.id, "dev-manual");
+  await addPublishedProfile(ctx, user.id);
   await addReading(ctx, "dev-manual", { humidity: 88, humidity_setpoint: 90, temperature: 20, temperature_setpoint: 20 });
   const on = await call(ctx, "POST", "/api/coach/autopilot/mode", {
     token,
-    body: { device_id: "dev-manual", mode: "autopilot" },
+    body: { device_id: "dev-manual", mode: "autopilot", profile_id: pearlOyster.id },
   });
   assert.equal(on.status, 200);
   const cmd = await call(ctx, "POST", "/api/devices/dev-manual/commands", {
@@ -321,9 +340,299 @@ test("a manual setpoint change pauses Autopilot for 12 hours", async () => {
   assert.ok(until - Date.now() > 11 * 60 * 60 * 1000);
   const again = await call(ctx, "POST", "/api/coach/autopilot/mode", {
     token,
-    body: { device_id: "dev-manual", mode: "autopilot" },
+    body: { device_id: "dev-manual", mode: "autopilot", profile_id: pearlOyster.id },
   });
   assert.equal(again.status, 409);
+});
+
+test("enabling Autopilot requires a published culinary profile", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "noprof@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-noprof");
+  const missing = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-noprof", mode: "autopilot" },
+  });
+  assert.equal(missing.status, 400);
+  assert.match(missing.data.error, /profile/i);
+  await ctx.db.run(
+    "INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      "draft-oyster",
+      JSON.stringify({ id: "draft-oyster", pack: "culinary", stages: [] }),
+      user.id,
+      0,
+      nowIso(),
+      nowIso(),
+    ]
+  );
+  const unpublished = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-noprof", mode: "autopilot", profile_id: "draft-oyster" },
+  });
+  assert.equal(unpublished.status, 400);
+  assert.match(unpublished.data.error, /profile/i);
+});
+
+test("GET, run, and undo require the current owner", async () => {
+  const ctx = env();
+  const owner = await register(ctx, "owner@example.com");
+  const other = await register(ctx, "other@example.com");
+  await subscribe(ctx, owner.token);
+  await subscribe(ctx, other.token);
+  await addDevice(ctx, owner.user.id, "dev-own");
+  await addPublishedProfile(ctx, owner.user.id);
+  await addReading(ctx, "dev-own", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token: owner.token,
+    body: { device_id: "dev-own", mode: "autopilot", profile_id: pearlOyster.id },
+  });
+  assert.equal(mode.status, 200, JSON.stringify(mode.data));
+  const run = await call(ctx, "POST", "/api/coach/autopilot/run", {
+    token: owner.token,
+    body: { device_id: "dev-own" },
+  });
+  assert.equal(run.status, 200, JSON.stringify(run.data));
+  assert.equal(run.data.applied, true);
+  const apply = (run.data.actions || []).find((a) => a.action === "apply");
+  assert.ok(apply);
+
+  const strangerGet = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-own", { token: other.token });
+  assert.equal(strangerGet.status, 404);
+  const strangerRun = await call(ctx, "POST", "/api/coach/autopilot/run", {
+    token: other.token,
+    body: { device_id: "dev-own" },
+  });
+  assert.equal(strangerRun.status, 404);
+  const strangerUndo = await call(ctx, "POST", "/api/coach/autopilot/undo", {
+    token: other.token,
+    body: { action_id: apply.id },
+  });
+  assert.equal(strangerUndo.status, 404);
+
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-own"]);
+  device.owner_id = other.user.id;
+  const previousGet = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-own", { token: owner.token });
+  assert.equal(previousGet.status, 404);
+  const previousRun = await call(ctx, "POST", "/api/coach/autopilot/run", {
+    token: owner.token,
+    body: { device_id: "dev-own" },
+  });
+  assert.equal(previousRun.status, 404);
+  const previousUndo = await call(ctx, "POST", "/api/coach/autopilot/undo", {
+    token: owner.token,
+    body: { action_id: apply.id },
+  });
+  assert.equal(previousUndo.status, 404);
+});
+
+test("force-run still respects the interval and daily cap", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "force@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-force");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-force", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-force", mode: "autopilot", profile_id: pearlOyster.id },
+  });
+  assert.equal(mode.status, 200, JSON.stringify(mode.data));
+  const first = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-force" } });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  assert.equal(first.data.applied, true);
+  const again = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-force" } });
+  assert.equal(again.status, 200, JSON.stringify(again.data));
+  assert.equal(again.data.applied, undefined);
+  assert.match(again.data.reason, /minimum interval/i);
+  assert.match(again.data.reason, /Next eligible at/i);
+  assert.ok(again.data.next_eligible_at);
+
+  const row = await ctx.db.one("SELECT * FROM coach_device_mode WHERE device_id=?", ["dev-force"]);
+  row.last_change_at = null;
+  row.last_setpoints = JSON.stringify({ temperature_c: 24, humidity_percent: 90, fan_speed_percent: 30 });
+  row.changes_day = new Date().toISOString().slice(0, 10);
+  row.changes_count = AUTOPILOT_LIMITS.dailyCap;
+  const capped = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-force" } });
+  assert.equal(capped.status, 200, JSON.stringify(capped.data));
+  assert.equal(capped.data.applied, undefined);
+  assert.match(capped.data.reason, /daily/i);
+  assert.match(capped.data.reason, /Next eligible at/i);
+  const cmds = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-force"]);
+  assert.equal(cmds.length, 1);
+});
+
+test("a missing profile pauses Autopilot and reverts to Advisor", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "gone@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-gone");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-gone", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  const enabled = await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-gone",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  assert.equal(enabled.ok, true, JSON.stringify(enabled));
+  const saved = await getDeviceMode(ctx.db, "dev-gone", user.id);
+  saved.profile_id = "does-not-exist";
+  const result = await runAutopilotForDevice(ctx.db, ctx, {
+    device: await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-gone"]),
+    user,
+  });
+  assert.equal(result.paused, true);
+  assert.equal(result.flipped_to, "advisor");
+  assert.match(result.reason, /profile/i);
+  const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-gone", { token });
+  assert.equal(status.data.mode, "advisor");
+  assert.equal(status.data.status, "paused");
+  assert.match(status.data.pause_reason, /profile/i);
+});
+
+test("reported setpoints that differ from last_setpoints pause for 12 hours", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "lan@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-lan");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-lan", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  const enabled = await setDeviceAutopilotMode(ctx.db, ctx, user, {
+    deviceId: "dev-lan",
+    mode: "autopilot",
+    profileId: pearlOyster.id,
+  });
+  assert.equal(enabled.ok, true, JSON.stringify(enabled));
+  const t0 = Date.now();
+  const first = await runAutopilotForDevice(ctx.db, ctx, {
+    device: await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-lan"]),
+    user,
+    now: t0,
+  });
+  assert.equal(first.applied, true, JSON.stringify(first));
+  const t1 = t0 + 20 * 60 * 1000;
+  await addReading(
+    ctx,
+    "dev-lan",
+    { humidity: 88, humidity_setpoint: 80, temperature: 22, temperature_setpoint: 18 },
+    new Date(t1).toISOString()
+  );
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-lan"]);
+  device.last_seen_at = new Date(t1).toISOString();
+  const second = await runAutopilotForDevice(ctx.db, ctx, {
+    device,
+    user,
+    now: t1,
+  });
+  assert.equal(second.paused, true);
+  assert.equal(second.flipped_to, "advisor");
+  assert.match(second.reason, /you changed a setpoint/i);
+  const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-lan", { token });
+  assert.equal(status.data.mode, "advisor");
+  assert.equal(status.data.status, "paused");
+  assert.match(status.data.pause_reason, /you changed a setpoint/i);
+});
+
+test("setpointsMismatch ignores a just-applied command and detects a LAN change", () => {
+  const last = { temperature_c: 23, humidity_percent: 87 };
+  const reading = { temperature_setpoint: 18, humidity_setpoint: 80 };
+  const now = Date.parse("2026-10-25T12:20:00Z");
+  assert.equal(setpointsMismatch(reading, last, { now, lastChangeAt: "2026-10-25T12:10:00Z" }), false);
+  assert.equal(setpointsMismatch(reading, last, { now, lastChangeAt: "2026-10-25T12:00:00Z" }), true);
+  assert.equal(setpointsMismatch(reading, {}, { now }), false);
+});
+
+test("Undo stays allowed while paused, clamps, queues, and logs", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "undo-pause@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-undo");
+  await addPublishedProfile(ctx, user.id);
+  await addReading(ctx, "dev-undo", {
+    humidity: 88,
+    humidity_setpoint: 90,
+    temperature: 22.76,
+    temperature_setpoint: 24,
+  });
+  const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-undo", mode: "autopilot", profile_id: pearlOyster.id },
+  });
+  assert.equal(mode.status, 200, JSON.stringify(mode.data));
+  const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-undo" } });
+  assert.equal(run.data.applied, true, JSON.stringify(run.data));
+  const apply = (run.data.actions || []).find((a) => a.action === "apply");
+  const log = await ctx.db.one("SELECT * FROM coach_autopilot_log WHERE id=?", [apply.id]);
+  log.old_value = JSON.stringify({ temperature_c: 5, humidity_percent: 99, fan_speed_percent: 5 });
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-undo"]);
+  device.status = "claimed";
+  device.last_seen_at = "2026-10-24T00:00:00Z";
+  const saved = await getDeviceMode(ctx.db, "dev-undo", user.id);
+  saved.mode = "advisor";
+  saved.paused = 1;
+  saved.pause_reason = "You changed a setpoint. Autopilot is paused for 12 hours.";
+  saved.pause_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+  const undo = await call(ctx, "POST", "/api/coach/autopilot/undo", { token, body: { action_id: apply.id } });
+  assert.equal(undo.status, 200, JSON.stringify(undo.data));
+  assert.equal(undo.data.restored.temperature_c, 10);
+  assert.equal(undo.data.restored.humidity_percent, 98);
+  assert.equal(undo.data.restored.fan_speed_percent, 10);
+  const cmds = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-undo"]);
+  assert.equal(cmds.length, 2);
+  assert.equal(JSON.parse(cmds[1].payload).source, "grow-coach-autopilot-undo");
+  const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-undo", { token });
+  assert.equal(status.data.status, "paused");
+  assert.ok((status.data.actions || []).some((a) => a.action === "undo"));
+});
+
+test("changing the profile while Autopilot is on updates the saved profile_id", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "picker@example.com");
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, "dev-pick");
+  await addPublishedProfile(ctx, user.id);
+  const other = {
+    id: "elm-oyster",
+    name: "Elm Oyster",
+    pack: "culinary",
+    tags: ["culinary"],
+    stages: [{ id: "fruiting", temperature_c: 18, humidity_percent: 90 }],
+  };
+  await addPublishedProfile(ctx, user.id, other);
+  const on = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-pick", mode: "autopilot", profile_id: pearlOyster.id },
+  });
+  assert.equal(on.status, 200, JSON.stringify(on.data));
+  const changed = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-pick", mode: "autopilot", profile_id: other.id },
+  });
+  assert.equal(changed.status, 200, JSON.stringify(changed.data));
+  const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-pick", { token });
+  assert.equal(status.data.profile_id, other.id);
+  assert.equal(status.data.mode, "autopilot");
 });
 
 test("targets come from suggestSetpoints, never invented light fields", () => {
