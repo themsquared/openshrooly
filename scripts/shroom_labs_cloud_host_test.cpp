@@ -1763,6 +1763,36 @@ int main() {
   expect(retry_tel.find("\"ack_command_id\":9") != std::string::npos, "retried ack keeps command id");
   expect(!engCadence.ack_waiting(), "ack cleared after successful resend");
 
+  HostStore storeBeat;
+  ScriptTransport trBeat;
+  FakeChamber chamberBeat;
+  chamberBeat.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberBeat.h_range = {true, 30.f, 100.f, 0.5f};
+  trBeat.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+  trBeat.inbox_status = 200;
+  trBeat.inbox_body = inbox_apply;
+  trBeat.telemetry_status = 500;
+  CloudEngine engBeat(&trBeat, &clk, &storeBeat, &crypto);
+  engBeat.set_chamber(&chamberBeat);
+  clk.now = 350000;
+  clk.wall = parse_iso8601_ms("2026-10-25T16:00:00Z");
+  engBeat.connect();
+  engBeat.csr_now();
+  expect(engBeat.probe_now(), "heartbeat-ack first apply");
+  expect(engBeat.ack_waiting(), "heartbeat-ack kept after tel fail");
+  trBeat.inbox_body = "{\"commands\":[]}";
+  trBeat.telemetry_status = 200;
+  std::string beat_tel;
+  trBeat.hook = [&](const HttpRequest &req) {
+    if (req.url.find("/telemetry") != std::string::npos)
+      beat_tel = req.body;
+  };
+  clk.now = engBeat.next_telemetry_ms();
+  expect(engBeat.probe_now(), "heartbeat probe with no new ack");
+  expect(beat_tel.find("\"ack_status\":\"applied\"") != std::string::npos, "heartbeat carries kept ack");
+  expect(beat_tel.find("\"ack_command_id\":9") != std::string::npos, "heartbeat kept ack id");
+  expect(!engBeat.ack_waiting(), "kept ack cleared only after carried post");
+
   HostStore store503;
   ScriptTransport tr503;
   tr503.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};

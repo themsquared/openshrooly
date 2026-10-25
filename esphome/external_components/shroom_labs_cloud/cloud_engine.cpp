@@ -1063,15 +1063,26 @@ bool CloudEngine::process_inbox_(const std::string &body) {
     ack_reason = reason;
     break;
   }
+  if (ack_status.empty()) {
+    std::lock_guard<std::mutex> g(lock_);
+    if (pending_ack_) {
+      ack_id = pending_ack_id_;
+      ack_status = pending_ack_status_;
+      ack_reason = pending_ack_reason_;
+      reading = pending_ack_reading_;
+    }
+  }
   const bool heartbeat = chamber_ != nullptr && next_telemetry_ms_ != 0 && time_reached(now_(), next_telemetry_ms_);
-  if (!ack_status.empty() || heartbeat) {
-    if (post_telemetry_(reading, ack_id, ack_status.empty() ? nullptr : ack_status.c_str(),
-                        ack_reason.empty() ? nullptr : ack_reason.c_str())) {
+  const bool carried_ack = !ack_status.empty();
+  if (carried_ack || heartbeat) {
+    if (post_telemetry_(reading, ack_id, carried_ack ? ack_status.c_str() : nullptr,
+                        carried_ack && !ack_reason.empty() ? ack_reason.c_str() : nullptr)) {
       std::lock_guard<std::mutex> g(lock_);
-      pending_ack_ = false;
+      if (carried_ack)
+        pending_ack_ = false;
       next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     } else {
-      if (!ack_status.empty()) {
+      if (carried_ack) {
         std::lock_guard<std::mutex> g(lock_);
         keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
       }
