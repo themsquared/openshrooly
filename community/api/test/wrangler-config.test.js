@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = dirname(fileURLToPath(import.meta.url));
 const local = readFileSync(join(root, "../wrangler.toml"), "utf8");
 const deploy = readFileSync(join(root, "../wrangler.deploy.toml"), "utf8");
+const coachLocal = readFileSync(join(root, "../wrangler.coach-local.toml"), "utf8");
 
 function quoted(block, key) {
   const match = block.match(new RegExp(`^${key}\\s*=\\s*"([^"]*)"`, "m"));
@@ -36,13 +37,12 @@ function hasAiTable(src) {
   return /(?:^|\n)\[ai\]\s*\n/.test(src);
 }
 
-test("wrangler.deploy.toml matches prod: photos on, AI bound, Coach private beta", () => {
+test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
   assert.deepEqual(r2Photos(deploy), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
   assert.equal(quoted(deploy, "PHOTOS_ENABLED"), "1");
-  assert.equal(hasAiTable(deploy), true);
-  assert.equal(quoted(tableBlock(deploy, "[ai]"), "binding"), "AI");
-  assert.equal(quoted(deploy, "COACH_PUBLIC"), "0");
-  assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), "82");
+  assert.equal(hasAiTable(deploy), false);
+  assert.equal(quoted(deploy, "COACH_PUBLIC"), null);
+  assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), null);
   assert.equal(quoted(deploy, "name"), "shroomlabs-api");
   assert.equal(quoted(tableBlock(deploy, "[[d1_databases]]"), "database_id"), quoted(tableBlock(local, "[[d1_databases]]"), "database_id"));
 });
@@ -50,4 +50,14 @@ test("wrangler.deploy.toml matches prod: photos on, AI bound, Coach private beta
 test("wrangler.toml keeps local photos off and may bind AI for coach stubs", () => {
   assert.deepEqual(r2Photos(local), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
   assert.equal(quoted(local, "PHOTOS_ENABLED"), "0");
+});
+
+test("wrangler.coach-local.toml binds AI and a local D1 for private beta", () => {
+  assert.equal(hasAiTable(coachLocal), true);
+  assert.equal(quoted(tableBlock(coachLocal, "[ai]"), "binding"), "AI");
+  assert.equal(quoted(coachLocal, "COACH_PUBLIC"), "0");
+  assert.equal(quoted(coachLocal, "COACH_BETA_USER_IDS"), "1");
+  assert.equal(quoted(tableBlock(coachLocal, "[[d1_databases]]"), "database_name"), "shroomlabs-coach-local");
+  assert.equal(quoted(coachLocal, "GROW_COACH_TEXT_MODEL"), "@cf/qwen/qwen3-30b-a3b-fp8");
+  assert.doesNotMatch(coachLocal, /api\.shroomlabs\.io/);
 });

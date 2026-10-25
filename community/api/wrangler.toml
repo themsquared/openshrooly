@@ -1,6 +1,7 @@
 # Local / wrangler dev. Production deploy uses wrangler.deploy.toml.
-# Prod photos are on, AI is bound, Coach is private beta (COACH_PUBLIC=0).
-# Do not copy local PHOTOS_ENABLED=0 onto deploy (see test/wrangler-config.test.js).
+# Prod photos are on and have no AI binding; do not copy those from here
+# (see test/wrangler-config.test.js). Grow Coach private beta uses
+# wrangler.coach-local.toml — see COACH-LOCAL.md.
 name = "shroomlabs-api"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
@@ -27,8 +28,6 @@ SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
 # Photo uploads stay off until this is "1" AND the R2 bucket exists.
 PHOTOS_ENABLED = "0"
-COACH_PUBLIC = "0"
-COACH_BETA_USER_IDS = ""
 # Browser origins allowed to call api.shroomlabs.io with Authorization headers.
 CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
 # Not used for grow-report, profile, or coach photos. Those are served only

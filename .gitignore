@@ -27,6 +27,7 @@ community/web/node_modules/
 bridge/node_modules/
 bridge/data/
 community/api/src/seeds.json
+community/api/.wrangler/
 
 # Netlify CLI local state
 .netlify/
