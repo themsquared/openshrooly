@@ -4,22 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!--SEO_HEAD-->
-  <title>Chamber alerts · Shroom Labs</title>
-  <meta name="description" content="Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts.">
+  <title>Device · Shroom Labs</title>
+  <meta name="description" content="Live stats, grow identity, and chamber controls for one of your Shroom Labs devices.">
   <meta name="robots" content="noindex,follow">
   <link rel="canonical" href="https://shroomlabs.io/device.html">
   <meta property="og:site_name" content="Shroom Labs">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Chamber alerts · Shroom Labs">
-  <meta property="og:description" content="Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts.">
+  <meta property="og:title" content="Device · Shroom Labs">
+  <meta property="og:description" content="Live stats, grow identity, and chamber controls for one of your Shroom Labs devices.">
   <meta property="og:url" content="https://shroomlabs.io/device.html">
   <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Chamber alerts · Shroom Labs">
+  <meta property="og:image:alt" content="Device · Shroom Labs">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Chamber alerts · Shroom Labs">
-  <meta name="twitter:description" content="Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts.">
+  <meta name="twitter:title" content="Device · Shroom Labs">
+  <meta name="twitter:description" content="Live stats, grow identity, and chamber controls for one of your Shroom Labs devices.">
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
@@ -39,12 +39,14 @@
   </header>
   <!--/CHROME_HEADER-->
   <main id="main">
-    <p class="back-link"><a href="/account.html#alerts">Back to account</a></p>
-    <h1 id="device-name">Chamber alerts</h1>
+    <p class="back-link"><a href="/devices.html">Back to devices</a></p>
+    <h1 id="device-name">Device</h1>
     <p id="device-meta" class="muted"></p>
     <p id="device-error" class="notice hidden" role="alert"></p>
     <p id="device-status" class="notice hidden"></p>
+    <div id="device-dash" class="hidden"></div>
     <div id="device-body" class="hidden">
+      <h2 id="alerts-title">Alerts</h2>
       <ul id="device-states" class="state-chips" aria-label="Current alert state"></ul>
       <form id="rules-form" class="card alert-form">
         <fieldset>
@@ -86,28 +88,6 @@
           <button type="submit">Save chamber alerts</button>
           <span id="rules-msg" class="muted" role="status"></span>
         </div>
-      </form>
-      <form id="light-form" class="card alert-form">
-        <fieldset>
-          <legend>Light schedule</legend>
-          <p class="muted">Duration is required when the light is on. 0 hours is only for a dark stage with lux 0 and RGB 0.</p>
-          <p id="light-summary" class="muted">Light on 08:00 to 20:00</p>
-          <div class="row">
-            <label>Sunrise hour <input type="number" name="sunrise_hour" id="light-sunrise" min="0" max="23" step="1" value="8"></label>
-            <label>Duration hours <input type="number" name="duration_hours" id="light-duration" min="0" max="24" step="0.25" value="12" required></label>
-            <label>White lux <input type="number" name="white_led_lux" id="light-lux" min="0" max="4000" step="1" value="92"></label>
-          </div>
-          <div class="row">
-            <label>Red % <input type="number" name="red_percent" id="light-red" min="0" max="100" step="1" value="0"></label>
-            <label>Green % <input type="number" name="green_percent" id="light-green" min="0" max="100" step="1" value="0"></label>
-            <label>Blue % <input type="number" name="blue_percent" id="light-blue" min="0" max="100" step="1" value="80"></label>
-          </div>
-          <p id="light-error" class="notice hidden" role="alert"></p>
-          <div class="form-actions">
-            <button type="submit">Send light schedule</button>
-            <span id="light-msg" class="muted" role="status"></span>
-          </div>
-        </fieldset>
       </form>
       <h2>Recent alerts for this chamber</h2>
       <ul id="device-alerts" class="alert-feed"></ul>

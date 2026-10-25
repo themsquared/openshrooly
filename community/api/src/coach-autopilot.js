@@ -1,7 +1,7 @@
 /** Grow Coach Autopilot: server-side guardrails. The model never chooses setpoints. */
 
 import { laterIso, nowIso } from "./crypto.js";
-import { isPsilocybin } from "./profile.js";
+import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { isCoachBetaUser } from "./providers.js";
 import {
   COACH_ITEM,
@@ -332,6 +332,13 @@ export async function getDeviceMode(db, deviceId, userId) {
   return row || emptyMode(deviceId, userId);
 }
 
+export async function rememberDeviceProfile(db, deviceId, userId, profileId) {
+  const state = await getDeviceMode(db, deviceId, userId);
+  state.user_id = userId;
+  state.profile_id = profileId || null;
+  return writeDeviceMode(db, state);
+}
+
 async function writeDeviceMode(db, row) {
   const existing = await db.one("SELECT * FROM coach_device_mode WHERE device_id=?", [row.device_id]);
   const updated = { ...row, updated_at: nowIso() };
@@ -499,7 +506,7 @@ export async function resolveAllowedProfile(db, profileId) {
     }
   }
   if (!doc) return { error: "Pick a published culinary profile first.", status: 400 };
-  const profile = { ...doc, id: doc.id || row.id };
+  const profile = normalizeStoredProfileLight({ ...doc, id: doc.id || row.id });
   if (isPsilocybin(profile) || refuseRestrictedPack(profile)) {
     return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
   }

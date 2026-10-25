@@ -568,8 +568,9 @@ export const PAGES = {
   "login.html": { active: "", path: "/login.html", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and claim a chamber. No password." },
   "register.html": { active: "", path: "/register.html", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and claim a chamber. No password." },
   "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs sessions, home hub, claimed chambers, alerts, Grow Coach, and purchases." },
-  "device.html": { active: "", path: "/device.html", robots: PRIVATE, title: "Chamber alerts · Shroom Labs", description: "Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts." },
-  "fleet.html": { active: "", path: "/fleet.html", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "See and manage the chambers linked to your Shroom Labs account." },
+  "devices.html": { active: "", path: "/devices.html", robots: PRIVATE, title: "Devices · Shroom Labs", description: "See the chambers linked to your Shroom Labs account, with species, live readings, and grow status." },
+  "device.html": { active: "", path: "/device.html", robots: PRIVATE, title: "Device · Shroom Labs", description: "Live stats, grow identity, and chamber controls for one of your Shroom Labs devices." },
+  "fleet.html": { active: "", path: "/fleet.html", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "Bulk tools for the chambers linked to your Shroom Labs account." },
   "alerts-unsub.html": { active: "", path: "/alerts-unsub.html", robots: PRIVATE, title: "Alert emails · Shroom Labs", description: "Turn off Shroom Labs alert emails with one click. Alerts still show in your account." },
   "publish.html": { active: "", path: "/publish.html", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Build a mushroom grow profile for your chambers, or send it to the Shroom Labs library." },
   "moderate.html": { active: "", path: "/moderate.html", robots: "noindex,nofollow", title: "Review queue · Shroom Labs", description: "Moderator queue for community mushroom grow profiles." },
@@ -579,7 +580,7 @@ export const PAGES = {
 };
 
 export function renderRobots() {
-  return `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /moderate.html\nDisallow: /device.html\nDisallow: /fleet.html\nDisallow: /alerts-unsub.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`;
+  return `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /moderate.html\nDisallow: /device.html\nDisallow: /devices.html\nDisallow: /fleet.html\nDisallow: /alerts-unsub.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`;
 }
 
 export function writeSeoFiles(dir = PUBLIC) {

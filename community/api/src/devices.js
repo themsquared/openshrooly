@@ -103,6 +103,7 @@ function publicDevice(row) {
     owner_id: row.owner_id,
     cloud_enabled: Boolean(Number(row.cloud_enabled)),
     last_seen_at: row.last_seen_at,
+    device_type: row.device_type || "shrooly_chamber",
     created_at: row.created_at,
   };
 }

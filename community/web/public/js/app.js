@@ -7,6 +7,18 @@ import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_
 import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl, revokeTrackedBlobUrls } from "./photo-upload.js";
 import { queueItemHtml } from "./moderate-queue.js";
 import { escapeHtml, renderSafeMarkdown, safeDisplay } from "./safe-markdown.js";
+import {
+  coachLine,
+  drawHistoryChart,
+  growLine,
+  lastSeenLine,
+  renderControls,
+  renderDeviceCards,
+  renderGauges,
+  renderIdentity,
+  renderReadonlyNotes,
+  speciesLine,
+} from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 
 function cfg() {
@@ -107,7 +119,8 @@ function renderNav() {
       <summary>Account</summary>
       <div class="account-menu-links">
         <a href="/account.html">Account</a>
-        <a href="/fleet.html" id="nav-fleet" class="hidden">Chambers</a>
+        <a href="/devices.html">Devices</a>
+        <a href="/fleet.html" id="nav-fleet" class="hidden">Bulk tools</a>
         <a href="/publish.html">Build a profile</a>
         <a href="/moderate.html" id="nav-moderate" class="hidden">Review queue</a>
         <button class="link" id="logout" type="button">Log out</button>
@@ -496,29 +509,8 @@ async function renderAccount() {
       if (caps.fleet) $("#fleet-link")?.classList.remove("hidden");
     })
     .catch(() => {});
-  const devices = await api("/api/devices").catch(() => ({ devices: [] }));
-  $("#devices").innerHTML =
-    (devices.devices || [])
-      .map(
-        (d) => `<li id="device-${escapeHtml(d.id)}">
-          <div class="device-info">
-            <strong>${escapeHtml(d.name)}</strong>
-            <span class="muted">${escapeHtml(d.status)} · ${escapeHtml(d.id)}</span>
-          </div>
-          <div class="device-actions">
-            ${d.status === "active" ? `<a class="button secondary" href="/device.html?id=${encodeURIComponent(d.id)}">Alerts</a>` : ""}
-            ${d.status !== "revoked" ? `<button type="button" class="secondary revoke" data-id="${escapeHtml(d.id)}">Revoke</button>` : ""}
-          </div>
-        </li>`
-      )
-      .join("") || "<li class='muted'>No chambers linked yet.</li>";
-  for (const btn of document.querySelectorAll(".revoke")) {
-    btn.addEventListener("click", async () => {
-      if (!confirm("Revoke this device? Its cloud certificate stops working immediately. Local growing still works.")) return;
-      await api(`/api/devices/${encodeURIComponent(btn.dataset.id)}/revoke`, { method: "POST", jsonBody: {} });
-      location.reload();
-    });
-  }
+  const devices = await api("/api/fleet/devices").catch(() => ({ devices: [] }));
+  $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No devices linked yet." });
   renderAlertSettings().catch((err) => showAlertsStatus(err.message));
   $("#mint").addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -773,6 +765,17 @@ if (page === "profile") renderProfile().catch((err) => ($("#summary").textConten
 if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
 if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
+if (page === "devices") renderDevices().catch((err) => {
+  if (err.status === 401) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  const box = $("#devices-error");
+  if (box) {
+    box.textContent = err.message;
+    box.classList.remove("hidden");
+  }
+});
 if (page === "publish") renderPublish();
 if (page === "moderate") renderModerate();
 if (page === "device") renderDevice().catch((err) => {
@@ -1303,6 +1306,56 @@ async function renderAlertSettings() {
 
 const STATE_LABEL = { temperature: "Temperature", humidity: "Humidity", water: "Water", offline: "Online", fruiting: "Fruiting day" };
 
+async function loadDeviceCatalog() {
+  const caps = await capabilities().catch(() => ({}));
+  const [culinary, mine] = await Promise.all([
+    api("/api/profiles?pack=culinary").catch(() => []),
+    api("/api/me/profiles").catch(() => ({ profiles: [] })),
+  ]);
+  const off = caps.show_psilocybin === false ? [] : await api("/api/profiles?pack=psilocybin").catch(() => []);
+  const own = (mine.profiles || []).map((item) => item.profile || item);
+  const seen = new Set();
+  const out = [];
+  for (const row of [...(culinary || []), ...(off || []), ...own]) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return { caps, profiles: out };
+}
+
+function canWriteDevice(device) {
+  return Boolean(device?.controllable && device?.online);
+}
+
+async function renderDevices() {
+  if (!getToken()) {
+    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    return;
+  }
+  const caps = await capabilities().catch(() => ({}));
+  if (caps.fleet) $("#devices-bulk")?.classList.remove("hidden");
+  const list = await api("/api/fleet/devices");
+  let rows = list.devices || [];
+  function paint() {
+    const q = ($("#devices-filter")?.value || "").toLowerCase();
+    const sort = $("#devices-sort")?.value || "name";
+    let shown = rows.filter((d) => {
+      const hay = `${d.name} ${d.profile?.name || ""} ${d.profile?.species || ""} ${d.profile?.id || ""}`.toLowerCase();
+      return !q || hay.includes(q);
+    });
+    shown.sort((a, b) => {
+      if (sort === "status") return Number(b.online) - Number(a.online) || a.name.localeCompare(b.name);
+      if (sort === "seen") return String(b.last_seen_at || "").localeCompare(String(a.last_seen_at || ""));
+      return a.name.localeCompare(b.name);
+    });
+    $("#devices-list").innerHTML = renderDeviceCards(shown, { empty: "No devices match that filter." });
+  }
+  $("#devices-filter")?.addEventListener("input", paint);
+  $("#devices-sort")?.addEventListener("change", paint);
+  paint();
+}
+
 async function renderDevice() {
   if (!getToken()) {
     location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
@@ -1311,22 +1364,57 @@ async function renderDevice() {
   const id = params().get("id") || "";
   if (!id) {
     const box = $("#device-error");
-    box.innerHTML = `Pick a chamber from your <a href="/account.html">account</a>.`;
+    box.innerHTML = `Pick a chamber from your <a href="/devices.html">devices</a>.`;
     box.classList.remove("hidden");
     return;
   }
   const path = `/api/devices/${encodeURIComponent(id)}/alerts`;
-  const data = await api(path);
+  const [detail, data, catalog, me] = await Promise.all([
+    api(`/api/fleet/devices/${encodeURIComponent(id)}`),
+    api(path),
+    loadDeviceCatalog(),
+    api("/api/me").catch(() => ({})),
+  ]);
+  const device = detail.device;
   const form = $("#rules-form");
-  $("#device-name").textContent = `${data.device.name} alerts`;
-  document.title = `${data.device.name} alerts · Shroom Labs`;
-  $("#device-meta").textContent = data.device.last_seen_at
-    ? `Last report ${fmtWhen(data.device.last_seen_at)}`
-    : "No reports from this chamber yet.";
+  const species = speciesLine(device);
+  // Coach stays hidden unless this user has Coach beta or entitlement.
+  const showCoach = Boolean(me.grow_coach?.beta || me.grow_coach?.entitled) && !device.off_menu;
+  $("#device-name").textContent = device.name;
+  document.title = `${device.name} · Shroom Labs`;
+  $("#device-meta").textContent = [
+    device.device_type_label || "Shrooly chamber",
+    device.online ? "Online" : "Offline",
+    lastSeenLine(device),
+    species || "No species selected",
+    growLine(device),
+    showCoach ? coachLine(device) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const notice = deliveryNotice(data);
   if (notice) {
     $("#device-status").innerHTML = `${escapeHtml(notice)} <a href="/account.html#alerts">Alert settings</a>`;
     $("#device-status").classList.remove("hidden");
+  }
+  const canWrite = canWriteDevice(device);
+  const dash = $("#device-dash");
+  if (dash) {
+    dash.innerHTML = `
+      ${renderIdentity(device)}
+      ${renderGauges(device)}
+      <figure class="fleet-chart card">
+        <figcaption>Readings, last 24 hours</figcaption>
+        <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>
+      </figure>
+      ${renderControls(device, { profiles: catalog.profiles, canWrite, showCoach })}
+      ${renderReadonlyNotes(device)}
+      <p class="row">
+        <button type="button" class="secondary" id="unlink-device">Unlink</button>
+      </p>`;
+    dash.classList.remove("hidden");
+    drawHistoryChart($("#reading-chart"), detail.history || []);
+    bindDeviceControls(id, device, { canWrite });
   }
   const showStates = (states) => {
     $("#device-states").innerHTML = Object.entries(STATE_LABEL)
@@ -1382,16 +1470,79 @@ async function renderDevice() {
       flash(msg, err.status === 429 ? "Too many changes this hour. Try again later." : err.message);
     }
   });
-  bindLightForm($("#light-form"), {
-    summary: $("#light-summary"),
-    error: $("#light-error"),
-    status: $("#light-msg"),
-    send: async (light) => {
-      await api(`/api/devices/${encodeURIComponent(id)}/commands`, {
+}
+
+function numberOrUndefined(value) {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function bindDeviceControls(id, device, { canWrite }) {
+  const form = $("#device-controls");
+  const msg = $("#device-controls-msg");
+  form?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (!canWrite) return;
+    const action = ev.submitter?.dataset?.action;
+    try {
+      if (action === "name") {
+        await api(`/api/fleet/devices/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          jsonBody: { name: form.device_name.value },
+        });
+        flash(msg, "Name saved.");
+        location.reload();
+        return;
+      }
+      const payload = {};
+      if (action === "climate" || action === "setpoints") {
+        payload.temperature_c = numberOrUndefined(form.temperature_c.value);
+        payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
+        payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
+      }
+      if (action === "profile") {
+        payload.profile_id = form.profile_id.value;
+        payload.stage = form.stage.value;
+      }
+      if (action === "light") {
+        payload.light = {
+          sunrise_hour: numberOrUndefined(form.sunrise_hour.value),
+          duration_hours: numberOrUndefined(form.duration_hours.value),
+          white_led_lux: numberOrUndefined(form.white_led_lux.value),
+          red_percent: numberOrUndefined(form.red_percent.value),
+          green_percent: numberOrUndefined(form.green_percent.value),
+          blue_percent: numberOrUndefined(form.blue_percent.value),
+        };
+        const issues = collectStageLightIssues(payload.light);
+        if (issues.length) throw new Error(issues[0].message);
+      }
+      if (action === "coach_mode") {
+        payload.mode = form.coach_mode.value;
+        payload.profile_id = form.profile_id.value || device.profile?.id;
+      }
+      const applied = await api(`/api/fleet/devices/${encodeURIComponent(id)}/apply`, {
         method: "POST",
-        jsonBody: { kind: "schedule", payload: { light } },
+        jsonBody: { action: action === "climate" ? "setpoints" : action, payload },
       });
-    },
+      const result = applied.results?.[0];
+      if (!result || result.status === "failed") throw new Error(result?.error || "The chamber did not accept that change.");
+      flash(msg, result.status === "queued" ? "Saved. The chamber will pick it up when it is back." : "Saved.");
+    } catch (err) {
+      flash(msg, err.message);
+    }
+  });
+  $("#unlink-device")?.addEventListener("click", async () => {
+    if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+    try {
+      await api(`/api/fleet/devices/${encodeURIComponent(id)}/unlink`, {
+        method: "POST",
+        jsonBody: { confirm: true },
+      });
+      location.href = "/devices.html";
+    } catch (err) {
+      flash(msg, err.message);
+    }
   });
 }
 
@@ -1401,35 +1552,6 @@ function coachLabel(device) {
   if (device.coach.status === "paused") return `Paused: ${device.coach.pause_reason || "paused"}`;
   if (device.coach.mode === "autopilot") return "Autopilot";
   return "Advisor";
-}
-
-function drawReadingChart(points) {
-  const svg = $("#reading-chart");
-  if (!svg) return;
-  const temps = points.map((p) => p.temperature).filter((v) => v != null);
-  const hums = points.map((p) => p.humidity).filter((v) => v != null);
-  if (!points.length || (!temps.length && !hums.length)) {
-    svg.innerHTML = `<text x="12" y="72" fill="currentColor">Need a few readings to draw this.</text>`;
-    return;
-  }
-  const minT = Math.min(...temps, 10);
-  const maxT = Math.max(...temps, 32);
-  const minH = Math.min(...hums, 60);
-  const maxH = Math.max(...hums, 100);
-  function series(values, lo, hi, color) {
-    const pts = points
-      .map((p, i) => {
-        const v = values === "temperature" ? p.temperature : p.humidity;
-        if (v == null) return null;
-        const x = 10 + (i / Math.max(1, points.length - 1)) * 340;
-        const y = 120 - ((v - lo) / Math.max(0.1, hi - lo)) * 100;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .filter(Boolean);
-    return `<polyline fill="none" stroke="${color}" stroke-width="2" points="${pts.join(" ")}" />`;
-  }
-  svg.innerHTML =
-    series("temperature", minT, maxT, "#7dffb3") + series("humidity", minH, maxH, "#5ee4ff");
 }
 
 async function renderFleet() {
@@ -1454,11 +1576,12 @@ async function renderFleet() {
     const d = data.device;
     $("#detail-name").textContent = d.name;
     $("#rename-name").value = d.name;
-    $("#detail-meta").textContent = `${d.online ? "Online" : "Offline"} · last seen ${d.last_seen_at || "never"} · firmware ${d.firmware || "unknown"} · cert ${d.cert_expires_at || "none"}`;
+    $("#detail-meta").textContent = `${d.device_type_label || "Shrooly chamber"} · ${d.online ? "Online" : "Offline"} · ${speciesLine(d) || "No species selected"} · ${growLine(d)} · last seen ${d.last_seen_at || "never"}`;
     $("#detail-alerts").innerHTML =
       (d.alerts || []).map((a) => `<li class="${escapeHtml(a.kind)}">${escapeHtml(a.message)}</li>`).join("") ||
       `<li class="info">No alerts right now.</li>`;
     $("#detail-stats").innerHTML = [
+      ["Species", speciesLine(d) || "Not set", ""],
       ["Temperature", d.reading?.temperature, "°C"],
       ["Humidity", d.reading?.humidity, "%"],
       ["Temp target", d.setpoints?.temperature_c, "°C"],
@@ -1468,7 +1591,9 @@ async function renderFleet() {
     ]
       .map(([label, value, unit]) => `<div class="stat"><strong>${value == null || value === "" ? "n/a" : `${safeDisplay(value)}${escapeHtml(unit)}`}</strong><span>${escapeHtml(label)}</span></div>`)
       .join("");
-    drawReadingChart(data.history || []);
+    drawHistoryChart($("#reading-chart"), data.history || []);
+    const back = document.querySelector("#fleet-detail .back-link a");
+    if (back) back.insertAdjacentHTML("afterend", ` · <a href="/device.html?id=${encodeURIComponent(detailId)}">Open device page</a>`);
     fillLightInputs(d.light, {
       sunrise: $("#detail-sunrise"),
       duration: $("#detail-duration"),
@@ -1554,7 +1679,7 @@ async function renderFleet() {
             <td><a href="/fleet.html?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
             <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(d.last_seen_at || "never")}</span></td>
             <td>${d.reading ? `${safeDisplay(d.reading.temperature, "?")} °C · ${safeDisplay(d.reading.humidity, "?")}%` : "No reading"}</td>
-            <td>${escapeHtml(d.profile?.name || "None")}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
+            <td>${escapeHtml(d.profile?.name || "None")}${d.profile?.species ? `<br><span class="muted">${escapeHtml(d.profile.species)}</span>` : ""}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
             <td>${safeDisplay(d.setpoints?.temperature_c, "?")} °C · ${safeDisplay(d.setpoints?.humidity_percent, "?")}%</td>
             <td>${escapeHtml(coachLabel(d))}</td>
             <td>${(d.alerts || []).map((a) => escapeHtml(a.message)).join(" ") || "None"}</td>

@@ -18,6 +18,11 @@ export {
   collectStageLightIssues,
   lightOnSummary,
   lightChannelsOn,
+  validateStoredProfile,
+  normalizeStoredProfileLight,
+  normalizeStoredStageLight,
+  whitePercentToLux,
+  whiteLuxToPercent,
 } from "./profile-schema.js";
 
 import { isPsilocybin, ValidationError } from "./profile-schema.js";

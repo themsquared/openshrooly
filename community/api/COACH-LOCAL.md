@@ -143,6 +143,17 @@ COACH_BRIDGE_LIVE=1 npm run coach:local:bridge -- --chamber http://192.168.1.42 
 `--loop` catches per-cycle errors, logs them, waits 60s, and retries. Local D1
 calls retry briefly with jitter on `SQLITE_BUSY`.
 
+### Local cron
+
+`wrangler dev` does not fire the `*/15` cron by itself. Run this next to the
+API so Autopilot evaluates every 15 minutes (it calls
+`http://127.0.0.1:8787/cdn-cgi/handler/scheduled`; no `--test-scheduled`
+flag is needed on wrangler 4.86):
+
+```bash
+npm run coach:local:cron   # Ctrl+C to stop
+```
+
 
 ## Notes
 
@@ -154,7 +165,7 @@ calls retry briefly with jitter on `SQLITE_BUSY`.
   `CF_ACCOUNT_ID` and `WORKERS_AI_TOKEN` are set **and** `env.AI` is absent.
 - `compatibility_date` is `2026-05-03` (wrangler 4.86 runtime max).
 - Autopilot is on for this local Worker (`COACH_AUTOPILOT_ENABLED=1`) and
-  runs on the 15 minute cron. Prod stays off: do not add that flag or a
+  runs on the 15 minute cron (locally via `npm run coach:local:cron`). Prod stays off: do not add that flag or a
   Coach cron to `wrangler.deploy.toml`. Use **Run Autopilot now** on the
   Coach page to test without waiting. Autopilot does not use the `[ai]`
   binding. Chat still does.

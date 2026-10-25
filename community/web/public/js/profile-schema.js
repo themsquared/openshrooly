@@ -64,6 +64,101 @@ export function lightPhaseOn(phase = {}) {
   );
 }
 
+/**
+ * Firmware white channel curve, from lux_to_brightness in
+ * esphome/scripts/lighting_control_manager.yaml. The chamber stores white as lux.
+ * At or below 20% brightness the curve is linear and 20% is 92 lux. Above 20% it is
+ * lux = 0.02307 * percent^2.768. The white entity tops out at 4000 lux (about 78%).
+ * shared/openshrooly_lib/mapping.py uses the same numbers.
+ */
+export const WHITE_LINEAR_PERCENT = 20;
+export const WHITE_LINEAR_LUX = 92;
+export const WHITE_MAX_LUX = 4000;
+
+export function whitePercentToLux(percent) {
+  const pct = Math.min(100, Number(percent));
+  if (!(pct > 0)) return 0;
+  const lux = pct <= WHITE_LINEAR_PERCENT ? (pct / WHITE_LINEAR_PERCENT) * WHITE_LINEAR_LUX : 0.02307 * pct ** 2.768;
+  return Math.min(WHITE_MAX_LUX, Math.round(lux));
+}
+
+export function whiteLuxToPercent(lux) {
+  const value = Math.min(WHITE_MAX_LUX, Number(lux));
+  if (!(value > 0)) return 0;
+  const pct = value <= WHITE_LINEAR_LUX ? (value / WHITE_LINEAR_LUX) * WHITE_LINEAR_PERCENT : (value / 0.02307) ** (1 / 2.768);
+  return Math.min(100, pct);
+}
+
+/** Firmware 1.0.3-sl.6 uses 12 h when lux or RGB is on and duration is 0 or unset. */
+export const FIRMWARE_FALLBACK_LIGHT_HOURS = 12;
+export const DEFAULT_SUNRISE_HOUR = 8;
+
+const STAGE_LIGHT_CHANNELS = ["white_led_lux", "red_percent", "green_percent", "blue_percent"];
+const PHASE_CHANNELS = ["white_brightness_percent", "red_percent", "green_percent", "blue_percent"];
+
+function finiteOr(value, fallback) {
+  if (value == null || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Read path only. Profiles saved before every stage needed a full light mix can have a
+ * stage with no light, or light on with 0 or missing hours. Treat no light as dark and
+ * light on without hours as 12 h, the same thing the firmware does.
+ */
+export function normalizeStoredStageLight(light) {
+  if (!light || typeof light !== "object" || !Object.keys(light).length) {
+    return { sunrise_hour: DEFAULT_SUNRISE_HOUR, duration_hours: 0, white_led_lux: 0, red_percent: 0, green_percent: 0, blue_percent: 0 };
+  }
+  const next = { ...light, sunrise_hour: finiteOr(light.sunrise_hour, DEFAULT_SUNRISE_HOUR) };
+  for (const channel of STAGE_LIGHT_CHANNELS) next[channel] = finiteOr(light[channel], 0);
+  const hours = finiteOr(light.duration_hours, null);
+  if (lightChannelsOn(next) && !(hours > 0)) next.duration_hours = FIRMWARE_FALLBACK_LIGHT_HOURS;
+  else next.duration_hours = hours == null ? 0 : hours;
+  return next;
+}
+
+function normalizeStoredPhase(phase) {
+  const next = { ...phase };
+  for (const channel of PHASE_CHANNELS) next[channel] = finiteOr(phase[channel], 0);
+  const hours = finiteOr(phase.photoperiod_hours, null);
+  if (lightPhaseOn(next) && !(hours > 0)) next.photoperiod_hours = FIRMWARE_FALLBACK_LIGHT_HOURS;
+  else next.photoperiod_hours = hours == null ? 0 : hours;
+  return next;
+}
+
+function phaseFromStageLight(light) {
+  return {
+    photoperiod_hours: light.duration_hours,
+    white_brightness_percent: Math.round(whiteLuxToPercent(light.white_led_lux)),
+    red_percent: light.red_percent,
+    green_percent: light.green_percent,
+    blue_percent: light.blue_percent,
+  };
+}
+
+/** Read path only: a stored profile with every stage light and recipe phase filled in. */
+export function normalizeStoredProfileLight(profile) {
+  if (!profile || typeof profile !== "object") return profile;
+  const next = structuredClone(profile);
+  if (!Array.isArray(next.stages)) return next;
+  for (const stage of next.stages) {
+    if (!stage || typeof stage !== "object") continue;
+    stage.light = normalizeStoredStageLight(stage.light);
+  }
+  const recipe = next.light_recipe;
+  if (recipe && typeof recipe === "object" && recipe.phases && typeof recipe.phases === "object") {
+    for (const [name, phase] of Object.entries(recipe.phases)) {
+      if (phase && typeof phase === "object") recipe.phases[name] = normalizeStoredPhase(phase);
+    }
+    for (const stage of next.stages) {
+      if (stage?.id && !recipe.phases[stage.id]) recipe.phases[stage.id] = phaseFromStageLight(stage.light);
+    }
+  }
+  return next;
+}
+
 export function clockHourText(hour) {
   const total = Math.round(((((Number(hour) || 0) % 24) + 24) % 24) * 60) % (24 * 60);
   const h = Math.floor(total / 60);
@@ -828,8 +923,9 @@ export function applyPackRules(profile, extra = {}) {
 }
 
 /** Serve-time pack/notice. Force-match taxa are rewritten; every Off-menu copy carries the legal notice. */
-export function serveProfileDocument(profile, extra = {}) {
-  if (!profile || typeof profile !== "object") return profile;
+export function serveProfileDocument(stored, extra = {}) {
+  if (!stored || typeof stored !== "object") return stored;
+  const profile = normalizeStoredProfileLight(stored);
   const classified = classifyTaxon(profile, extra);
   if (classified.force) return applyPackRules(profile, extra);
   if (isPsilocybin(profile, extra)) {
@@ -1072,6 +1168,11 @@ export function validateProfile(profile, extra = {}) {
   return normalized;
 }
 
+/** Read path: stored profiles get legacy light filled in, then the same checks as a save. */
+export function validateStoredProfile(profile, extra = {}) {
+  return validateProfile(normalizeStoredProfileLight(profile), extra);
+}
+
 export function validateLightRecipe(recipe) {
   const issues = collectLightRecipeIssues(recipe);
   if (issues.length) throw new ValidationError(issues[0].message);
@@ -1147,7 +1248,7 @@ export function syncStageLightFromRecipe(profile) {
     const phase = recipe.phases[stage.id];
     stage.light = stage.light || {};
     stage.light.duration_hours = phase.photoperiod_hours;
-    stage.light.white_led_lux = Math.round((Number(phase.white_brightness_percent) / 100) * 400);
+    stage.light.white_led_lux = whitePercentToLux(phase.white_brightness_percent);
     stage.light.red_percent = phase.red_percent;
     stage.light.green_percent = phase.green_percent;
     stage.light.blue_percent = phase.blue_percent;
