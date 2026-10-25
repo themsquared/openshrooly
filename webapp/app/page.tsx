@@ -37,6 +37,7 @@ export default function Dashboard() {
   const [timezoneUpdating, setTimezoneUpdating] = useState(false)
   const [timezoneError, setTimezoneError] = useState('')
   const [flipScreen, setFlipScreen] = useState(false)
+  const [screenMushroom, setScreenMushroom] = useState(true)
   const [calibrationSuccess, setCalibrationSuccess] = useState(false)
   const [calibrationBusy, setCalibrationBusy] = useState(false)
   const [calibrationError, setCalibrationError] = useState('')
@@ -136,6 +137,15 @@ export default function Dashboard() {
         // Ignore errors during initial fetch - EventSource will populate data
       }
 
+      try {
+        const mushroom = await api.getSwitch('screen_mushroom')
+        if (mushroom) {
+          setScreenMushroom(mushroom.state === 'ON' || mushroom.value === true)
+        }
+      } catch (e) {
+        // Ignore errors during initial fetch - EventSource will populate data
+      }
+
       setReachable(ok)
       if (!ok) setLastError((prev) => prev || 'Cannot reach the chamber')
       else setLastError('')
@@ -167,6 +177,9 @@ export default function Dashboard() {
         }
         if (event.id === 'switch-flip_screen') {
           setFlipScreen(event.state === 'ON' || event.value === true)
+        }
+        if (event.id === 'switch-screen_mushroom') {
+          setScreenMushroom(event.state === 'ON' || event.value === true)
         }
         if (event.id === 'text_sensor-wifi_mode' && event.state) setWifiMode(event.state)
         if (event.id === 'text_sensor-wifi_ssid' && event.state) setWifiSsid(event.state)
@@ -329,6 +342,11 @@ export default function Dashboard() {
   const handleFlipScreenChange = async (flipped: boolean) => {
     setFlipScreen(flipped)
     await api.setSwitch('flip_screen', flipped)
+  }
+
+  const handleScreenMushroomChange = async (on: boolean) => {
+    setScreenMushroom(on)
+    await api.setSwitch('screen_mushroom', on)
   }
 
   const updateState = entities['text_sensor-update_state']?.state || 'idle'
@@ -1722,6 +1740,16 @@ export default function Dashboard() {
                       onChange={(e) => handleFlipScreenChange(e.target.checked)}
                     />
                     <span style={{ marginLeft: '8px' }}>Flip screen</span>
+                  </label>
+                </div>
+                <div className="control-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={screenMushroom}
+                      onChange={(e) => handleScreenMushroomChange(e.target.checked)}
+                    />
+                    <span style={{ marginLeft: '8px' }}>Show the little mushroom on the growing screen</span>
                   </label>
                 </div>
                 <div className="control-group">

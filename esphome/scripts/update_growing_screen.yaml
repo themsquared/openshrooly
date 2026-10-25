@@ -257,3 +257,6 @@
             return std::string("Wi-Fi setup is on");
           }
           return std::string("No Wi-Fi. Menu, System, Wi-Fi setup");
+
+    # Last, so it sees this refresh's alert and setup overlay state.
+    - script.execute: update_mascot

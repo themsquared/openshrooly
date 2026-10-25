@@ -141,6 +141,16 @@
         y: 84
         text_font: font1
 
+    # Tiny mushroom, bottom right above Select. Before the alert bar and the
+    # setup overlay so both draw over it. update_mascot picks the frame.
+    - image:
+        id: grow_mascot
+        src: mascot_idle
+        align: TOP_LEFT
+        x: 264
+        y: 77
+        hidden: true
+
     - obj:
         id: grow_alert_bar
         x: 0

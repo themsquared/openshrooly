@@ -12,11 +12,22 @@ python3 scripts/render_epaper_previews.py
 | --- | --- |
 | `growing-in-range.png` | Fruiting, day 6 of 10, progress bar, 48px temp/RH, `target 24  OK` lines |
 | `growing-alert.png` | Same grow, LOW shown inverted, water-low banner |
-| `idle.png` | No grow; climate numbers still shown |
+| `growing-night.png` | Same grow with the lights off; the mushroom is asleep |
+| `idle.png` | No grow; climate numbers still shown; humidity is low so the mushroom looks worried |
 | `boot-splash.png` | 64px filled mushroom mark, OpenShrooly wordmark, by Shroom Labs |
 | `wifi-setup.png` | Wi-Fi setup on: network name, password, 192.168.4.1, web login (example values) |
 
 Each has a `@4x.png` sibling.
+
+## Screen mushroom
+
+A 24 x 26 1-bit mushroom sits bottom right, above Select (`grow_mascot`, x 264, y 77). It only changes on the same 10 second refresh, so it adds no extra e-paper updates. Frames live in `esphome/images/mascot_*.png` and are drawn by `scripts/shroom_mascot.py` (`--preview DIR` writes 8x PNGs and GIFs).
+
+- Bobs 2 px down on every other refresh and blinks about once a minute.
+- Flat mouth and a sweat drop while humidity is off target.
+- Asleep while a grow is running and the lights are off.
+- Hidden under the alert banner and the Wi-Fi setup box.
+- Turn it off with the `Screen Mushroom` switch (on by default), or Settings, Display & Time on the chamber web page.
 
 ## What the screen reads
 
