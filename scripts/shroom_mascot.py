@@ -47,7 +47,7 @@ STEM = (  # rows 14..25
     "....################....",
 )
 
-FRAMES = ("idle", "meh", "blink", "surprise", "sleep")
+FRAMES = ("idle", "meh", "blink", "surprise", "sleep", "lean_left", "lean_right")
 
 
 def _blank() -> list[list[str]]:
@@ -105,9 +105,17 @@ def frame(name: str) -> Image.Image:
         grid[13][6] = grid[13][17] = "#"
         for x, y in ((1, 1), (0, 3), (2, 3), (1, 5), (3, 6)):
             grid[y][x] = "#"
+    elif name in ("lean_left", "lean_right"):
+        # Dance step: the cap swings 2 px at the top and 1 px at the brim,
+        # the stem bends from the hips and the feet stay put.
+        lean = -1 if name == "lean_left" else 1
+        _put(grid, CAP, CAP_TOP, row_dx=lambda i: lean * (2 if i < 4 else 1))
+        _put(grid, _stem("idle")[:7], CAP_TOP + len(CAP), dx=lean)
+        _put(grid, _stem("idle")[7:], CAP_TOP + len(CAP) + 7)
     else:
         _put(grid, CAP, CAP_TOP)
-    _put(grid, _stem(name), CAP_TOP + len(CAP))
+    if name not in ("lean_left", "lean_right"):
+        _put(grid, _stem(name), CAP_TOP + len(CAP))
     if name == "meh":  # a small sweat drop: humidity is off target
         grid[16][20] = "#"
         grid[17][20] = grid[17][21] = "#"
@@ -130,11 +138,22 @@ def save_firmware_frames() -> None:
         frame(name).save(IMAGES / f"mascot_{name}.png")
 
 
-# What the chamber shows, one step per 10 s refresh (bob = 2 px down).
-SEQUENCE = (
-    ("idle", 0), ("idle", 2), ("idle", 0), ("idle", 2), ("idle", 0), ("blink", 2),
-    ("idle", 0), ("idle", 2), ("surprise", 0), ("idle", 2), ("idle", 0), ("blink", 2),
-)
+# What the chamber shows, one step per 10 s refresh. Mirrors the lambda in
+# esphome/scripts/update_mascot.yaml (minus the random surprise).
+DANCE = ("idle", "lean_left", "idle", "lean_right")
+
+
+def step_frame(tick: int, rh_ok: bool = True) -> tuple[str, int]:
+    step = tick % 4
+    name, dy = DANCE[step], 2 if step == 2 else 0
+    if step % 2 == 0 and not rh_ok:
+        name = "meh"
+    elif step % 2 == 0 and tick % 6 == 0:
+        name = "blink"
+    return name, dy
+
+
+SEQUENCE = tuple(step_frame(t) for t in range(1, 13))
 
 
 def _shifted(img: Image.Image, dy: int, pad: int = 2) -> Image.Image:
@@ -143,9 +162,9 @@ def _shifted(img: Image.Image, dy: int, pad: int = 2) -> Image.Image:
     return out
 
 
-def save_previews(out: Path, scale: int = 8) -> None:
+def save_previews(out: Path, scale: int = 8, per_frame: bool = True) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    for name in FRAMES:
+    for name in FRAMES if per_frame else ():
         frame(name).resize((W * scale, H * scale), Image.Resampling.NEAREST).save(out / f"mascot_{name}@{scale}x.png")
     sheet = Image.new("1", ((W + 4) * len(FRAMES) * scale, (H + 4) * scale), 1)
     for i, name in enumerate(FRAMES):
@@ -160,8 +179,8 @@ def save_previews(out: Path, scale: int = 8) -> None:
         ]
         imgs[0].save(path, save_all=True, append_images=imgs[1:], duration=600, loop=0)
 
-    gif(SEQUENCE, out / "mascot.gif")
-    gif((("meh", 0), ("meh", 2)), out / "mascot_meh.gif")
+    gif(SEQUENCE[:10] + (("surprise", 0),) + SEQUENCE[11:], out / "mascot.gif")
+    gif(tuple(step_frame(t, rh_ok=False) for t in range(1, 9)), out / "mascot_meh.gif")
     gif((("sleep", 0), ("sleep", 1)), out / "mascot_sleep.gif")
 
 

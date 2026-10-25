@@ -12,6 +12,8 @@
         src: splash_logo
         align: TOP_MID
         y: 4
+        image_recolor: paper_black
+        image_recolor_opa: COVER
 
     - label:
         text: "OpenShrooly"
