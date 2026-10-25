@@ -8,6 +8,8 @@ import {
   buildDeviceModel,
   compareReadingToStage,
   detectAlerts,
+  formatHumidity,
+  formatTempC,
   estimateNeurons,
   estimateUsd,
   latestReading,
@@ -521,8 +523,39 @@ test("pearl fruiting 22.76 C vs 24 C setpoint suggests 16 C and says the chamber
   assert.ok(suggestion.temperature_c >= 15 && suggestion.temperature_c <= 17);
   assert.match(suggestion.reasons.join(" "), /running warm/i);
   assert.match(suggestion.reasons.join(" "), /Lower the setpoint/i);
+  assert.match(suggestion.reasons.join(" "), /22\.8 °C/);
+  assert.doesNotMatch(suggestion.reasons.join(" "), /22\.76/);
   assert.doesNotMatch(suggestion.reasons.join(" "), /runs cool/i);
   assert.doesNotMatch(suggestion.reasons.join(" "), /running cool/i);
+});
+
+test("Coach user-facing readings round temperature to 1 decimal and humidity to whole or 1 decimal", () => {
+  assert.equal(formatTempC(22.75559), "22.8");
+  assert.equal(formatTempC(16), "16.0");
+  assert.equal(formatTempC(12.44), "12.4");
+  assert.equal(formatHumidity(87.96), "88");
+  assert.equal(formatHumidity(88), "88");
+  assert.equal(formatHumidity(88.44), "88.4");
+
+  const pearl = profileStageTargets(pearlOyster.stages.find((s) => s.id === "fruiting"));
+  const samples = [
+    {
+      document: { humidity: 87.96, humidity_setpoint: 90.04, temperature: 22.75559, temperature_setpoint: 24.02 },
+      created_at: "2026-10-25T03:10:00Z",
+    },
+  ];
+  const suggestion = suggestSetpoints(buildDeviceModel(samples), pearl, { reading: latestReading(samples) });
+  const reasons = suggestion.reasons.join(" ");
+  assert.match(reasons, /22\.8 °C/);
+  assert.doesNotMatch(reasons, /22\.75559/);
+
+  const flags = compareReadingToStage(latestReading(samples), pearl);
+  const tempFlag = flags.find((f) => f.kind === "temperature_above_warning");
+  assert.match(tempFlag.message, /22\.8 °C/);
+  assert.doesNotMatch(tempFlag.message, /22\.75559/);
+  const rhFlag = flags.find((f) => f.kind === "humidity_setpoint_above_target");
+  assert.match(rhFlag.message, /90 %/);
+  assert.doesNotMatch(rhFlag.message, /90\.04/);
 });
 
 test("pearl fruiting that is too cold suggests 16 C and says the chamber is running cool", () => {
