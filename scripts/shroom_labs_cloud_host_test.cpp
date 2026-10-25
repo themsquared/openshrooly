@@ -1394,6 +1394,13 @@ int main() {
   // 15 min inbox (nonce+GET) + 15 min telemetry (nonce+POST) = 16 HTTPS/hour.
   expect((3600000u / PROBE_INTERVAL_MS) * 2 + (3600000u / TELEMETRY_INTERVAL_MS) * 2 <= 18, "under 20 connects/hour");
   expect(CONNECT_HOUR_CAP <= 18 && CONNECT_HOUR_CAP < 20, "hour cap under device limit");
+  expect(hour_capped_path("/api/devices/x/inbox") && hour_capped_path("/api/devices/x/telemetry") &&
+             hour_capped_path("/api/devices/x/rotate"),
+         "linked paths are capped");
+  expect(!hour_capped_path("/api/devices/enroll") && !hour_capped_path("/api/devices/x/claim-status") &&
+             !hour_capped_path("/api/devices/x/csr") && !hour_capped_path("/api/devices/x/self-revoke") &&
+             !hour_capped_path("/api/devices/x/nonce"),
+         "pairing and revoke paths are uncapped");
 
   const char *inbox_json =
       "{\"commands\":[{\"id\":12,\"kind\":\"setpoints\",\"issued_at\":\"2026-10-25T15:00:00Z\",\"apply\":true,"
@@ -1744,6 +1751,17 @@ int main() {
   expect(engCadence.probe_now(), "cadence probe applies");
   expect(engCadence.next_probe_ms() >= clk.now + PROBE_INTERVAL_MS, "telemetry 500 does not pull probe");
   expect(engCadence.next_telemetry_ms() >= clk.now + TELEMETRY_INTERVAL_MS, "telemetry 500 waits a full slot");
+  expect(engCadence.ack_waiting(), "failed ack telemetry keeps pending ack");
+  std::string retry_tel;
+  trCadence.telemetry_status = 200;
+  trCadence.hook = [&](const HttpRequest &req) {
+    if (req.url.find("/telemetry") != std::string::npos)
+      retry_tel = req.body;
+  };
+  expect(engCadence.run_job(CloudJob::TELEMETRY), "resend pending ack");
+  expect(retry_tel.find("\"ack_status\":\"applied\"") != std::string::npos, "retried ack is applied");
+  expect(retry_tel.find("\"ack_command_id\":9") != std::string::npos, "retried ack keeps command id");
+  expect(!engCadence.ack_waiting(), "ack cleared after successful resend");
 
   HostStore store503;
   ScriptTransport tr503;
@@ -1756,6 +1774,37 @@ int main() {
   eng503.csr_now();
   expect(!eng503.probe_now(), "inbox 503 probe fails");
   expect(eng503.next_probe_ms() >= clk.now + PROBE_INTERVAL_MS, "inbox 503 never retries before 15 min");
+
+  auto claim_after = [&](const char *name, uint32_t claim_ms) {
+    HostStore st;
+    ScriptTransport tr;
+    tr.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                {"/csr", ok_body(200, cert_ok)},
+                {"/self-revoke", ok_body(200, "{\"ok\":true}")}};
+    tr.status_claimed = claim_ms == 0;
+    CloudEngine eng(&tr, &clk, &st, &crypto);
+    clk.now = 2000000;
+    const uint32_t t0 = clk.now;
+    eng.connect();
+    expect(eng.state() == CloudState::PendingClaim, "claim start pending");
+    bool linked = eng.state() == CloudState::Linked;
+    for (uint32_t t = 0; t <= claim_ms + 20000 && !linked; t += 1000) {
+      clk.now = t0 + t;
+      if (t >= claim_ms)
+        tr.status_claimed = true;
+      eng.loop();
+      linked = eng.state() == CloudState::Linked;
+    }
+    expect(linked, name);
+    if (linked && claim_ms >= 600000) {
+      eng.disconnect();
+      expect(eng.state() == CloudState::Off, "long claim then revoke still wipes");
+    }
+  };
+  claim_after("claim at 0s links", 0);
+  claim_after("claim at 60s links", 60000);
+  claim_after("claim at 180s links", 180000);
+  claim_after("claim at 600s links", 600000);
 
   expect(format_iso8601_ms(parse_iso8601_ms("2026-10-25T15:00:00Z")) == "2026-10-25T15:00:00Z", "iso roundtrip");
   expect(setpoint_object_id("temperature_target") && setpoint_object_id("temperature__target") &&

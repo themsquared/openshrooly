@@ -206,7 +206,10 @@ void CloudEngine::schedule_telemetry_error_(int retry_after_s) {
   next_telemetry_ms_ = now_() + wait;
 }
 
-void CloudEngine::note_connect_() {
+void CloudEngine::note_connect_(bool count_hour) {
+  request_count_++;
+  if (!count_hour)
+    return;
   const uint32_t now = now_();
   uint8_t kept = 0;
   for (uint8_t i = 0; i < connect_n_ && i < CONNECT_HOUR_RING; i++) {
@@ -216,7 +219,6 @@ void CloudEngine::note_connect_() {
   connect_n_ = kept;
   if (connect_n_ < CONNECT_HOUR_RING)
     connect_times_[connect_n_++] = now;
-  request_count_++;
 }
 
 bool CloudEngine::allow_connect_() {
@@ -616,7 +618,8 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   fail.ok = false;
   if (transport_ == nullptr)
     return fail;
-  if (!allow_connect_())
+  const bool count = hour_capped_path(path);
+  if (count && !allow_connect_())
     return fail;
   std::string url = https_url(api_host_.c_str(), path);
   if (query != nullptr && query[0]) {
@@ -638,7 +641,7 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   if (pop) {
     std::string nonce;
     std::string nonce_body;
-    const int nonce_status = fetch_nonce_(&nonce, &nonce_body);
+    const int nonce_status = fetch_nonce_(&nonce, &nonce_body, count);
     if (nonce_status != 200) {
       fail.status = nonce_status;
       fail.body = nonce_body;
@@ -660,9 +663,9 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   }
   if (with_serial && !snap.serial.empty())
     req.headers.emplace_back("x-device-cert-serial", snap.serial);
-  if (!allow_connect_())
+  if (count && !allow_connect_())
     return fail;
-  note_connect_();
+  note_connect_(count);
   HttpResponse r = transport_->execute(req);
   if (!response_usable(r)) {
     r.ok = false;
@@ -671,7 +674,7 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   return r;
 }
 
-int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body) {
+int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body, bool count_hour) {
   std::string id;
   {
     std::lock_guard<std::mutex> g(lock_);
@@ -679,10 +682,10 @@ int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body) {
   }
   if (id.empty())
     return 0;
-  if (!allow_connect_())
+  if (count_hour && !allow_connect_())
     return 0;
   std::string path = "/api/devices/" + id + "/nonce";
-  note_connect_();
+  note_connect_(count_hour);
   HttpResponse r = transport_->execute({"POST", https_url(api_host_.c_str(), path.c_str()), "", {}});
   if (body != nullptr)
     *body = r.body;
@@ -1065,8 +1068,13 @@ bool CloudEngine::process_inbox_(const std::string &body) {
     if (post_telemetry_(reading, ack_id, ack_status.empty() ? nullptr : ack_status.c_str(),
                         ack_reason.empty() ? nullptr : ack_reason.c_str())) {
       std::lock_guard<std::mutex> g(lock_);
+      pending_ack_ = false;
       next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     } else {
+      if (!ack_status.empty()) {
+        std::lock_guard<std::mutex> g(lock_);
+        keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
+      }
       schedule_telemetry_error_(0);
     }
   }
@@ -1154,16 +1162,21 @@ bool CloudEngine::apply_now(const PendingApply &pending, ChamberReading *after, 
   return apply_plan_now_(pending.plan, pending.command_id, after, reason);
 }
 
+void CloudEngine::keep_pending_ack_(int64_t command_id, const char *status, const char *reason,
+                                   const ChamberReading &reading) {
+  pending_ack_ = true;
+  pending_ack_id_ = command_id;
+  pending_ack_status_ = status ? status : "failed";
+  pending_ack_reason_ = reason ? reason : "";
+  pending_ack_reading_ = reading;
+}
+
 void CloudEngine::complete_apply(int64_t command_id, bool ok, const char *status, const char *reason,
                                 const ChamberReading &reading) {
   std::lock_guard<std::mutex> g(lock_);
   if (ok && command_id != 0)
     last_applied_command_id_ = command_id;
-  pending_ack_ = true;
-  pending_ack_id_ = command_id;
-  pending_ack_status_ = status ? status : (ok ? "applied" : "failed");
-  pending_ack_reason_ = reason ? reason : "";
-  pending_ack_reading_ = reading;
+  keep_pending_ack_(command_id, status ? status : (ok ? "applied" : "failed"), reason, reading);
 }
 
 bool CloudEngine::apply_waiting() const {
@@ -1188,6 +1201,7 @@ bool CloudEngine::handle_telemetry_() {
   int64_t ack_id = 0;
   std::string status;
   std::string reason;
+  bool had_ack = false;
   {
     std::lock_guard<std::mutex> g(lock_);
     if (pending_ack_) {
@@ -1195,7 +1209,7 @@ bool CloudEngine::handle_telemetry_() {
       ack_id = pending_ack_id_;
       status = pending_ack_status_;
       reason = pending_ack_reason_;
-      pending_ack_ = false;
+      had_ack = true;
     } else if (chamber_) {
       reading = chamber_->read();
     }
@@ -1203,6 +1217,8 @@ bool CloudEngine::handle_telemetry_() {
   if (post_telemetry_(reading, ack_id, status.empty() ? nullptr : status.c_str(),
                       reason.empty() ? nullptr : reason.c_str())) {
     std::lock_guard<std::mutex> g(lock_);
+    if (had_ack)
+      pending_ack_ = false;
     next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     return true;
   }
