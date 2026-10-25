@@ -222,7 +222,7 @@ export function parseTelemetry(rows = []) {
         humidity: num(doc.humidity ?? doc.humidity_percent),
         temperature: num(doc.temperature ?? doc.temperature_c),
         humidity_setpoint: num(doc.humidity_setpoint ?? doc.target_humidity),
-        temperature_setpoint: num(doc.temperature_setpoint ?? doc.target_temperature),
+        temperature_setpoint: num(doc.temperature_setpoint ?? doc.target_temperature ?? doc.temperature_target),
         fan_speed: num(doc.fan_speed ?? doc.fan_speed_percent),
         water_level: num(doc.water_level ?? doc.water ?? doc.water_level_percent),
         temperature_calibration: num(

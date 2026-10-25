@@ -2,7 +2,10 @@
 
 Paid culinary coaching on Shroom Labs. **$3.99 / month.** Not sold or marketed with off-menu varieties.
 
-Cloud control is still opt-in. Coach can only *queue* setpoints; the chamber applies them if cloud is enabled and local settings do not win. See [`DEVICES.md`](DEVICES.md).
+Cloud control is still opt-in. Autopilot queues setpoints on the existing
+device inbox; the chamber applies them if cloud is enabled and local
+settings do not win. See [`DEVICES.md`](DEVICES.md). The local LAN bridge
+is a Mac/dev tool only (`community/api/COACH-LOCAL.md`).
 
 ## What it does
 
@@ -33,7 +36,12 @@ Defaults: text `@cf/qwen/qwen3-30b-a3b-fp8`, vision `@cf/meta/llama-3.2-11b-visi
 
 Public `capabilities.coach` is on only when Workers AI is bound **and** `COACH_PUBLIC=1`. `COACH_BETA_USER_IDS` is a comma list of user ids that get full Coach access (no payment) when AI is configured, even if `COACH_PUBLIC=0`. `/api/coach/subscribe` stays 503 preview unless `COACH_PUBLIC=1` and payments are configured.
 
-Production `wrangler.deploy.toml` does not bind `[ai]` yet. Try Coach on a Mac with a local D1 and a LAN chamber: [`community/api/COACH-LOCAL.md`](../community/api/COACH-LOCAL.md).
+Production `wrangler.deploy.toml` does not bind `[ai]` yet. Autopilot does
+not need that binding. Try Coach on a Mac with a local D1 and a LAN
+chamber: [`community/api/COACH-LOCAL.md`](../community/api/COACH-LOCAL.md).
+Prod Autopilot stays behind `COACH_AUTOPILOT_ENABLED` plus
+`COACH_BETA_USER_IDS` (user 82). Do not turn those on from deploy toml.
+Rollout steps (migration 0009, env vars, cron) are in that local doc.
 
 Daily caps: 40 chats, 8 photos, 80k neurons. Chat cache 10 minutes. Usage in `coach_usage`.
 

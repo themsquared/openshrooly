@@ -287,6 +287,15 @@ test("fleet and single-device light payloads are validated", async () => {
   });
   assert.equal(single.status, 400);
   assert.match(single.data.error, /sunrise/i);
+  const zeroHours = await call(ctx, "POST", "/api/devices/dev-light/commands", {
+    token,
+    body: {
+      kind: "schedule",
+      payload: { light: { sunrise_hour: 7, duration_hours: 0, white_led_lux: 150, red_percent: 0, green_percent: 0, blue_percent: 80 } },
+    },
+  });
+  assert.equal(zeroHours.status, 400);
+  assert.match(zeroHours.data.error, /duration/i);
 });
 
 test("group deletion is audited and the audit list is newest first", async () => {
@@ -388,6 +397,35 @@ test("device identity includes type, species, and grow day without the fleet fla
   assert.equal(d.reading.water_level, 42);
   assert.ok(Array.isArray(d.cloud_controls));
   assert.ok(d.local_only.some((item) => item.id === "water_calibration"));
+});
+
+test("device payload hides Coach from users without Coach beta or entitlement", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "nocoach@example.com");
+  await addDevice(ctx, user.id, "dev-nocoach");
+  const detail = await call(ctx, "GET", "/api/fleet/devices/dev-nocoach", { token });
+  assert.equal(detail.status, 200, JSON.stringify(detail.data));
+  assert.equal(detail.data.device.coach, null);
+  const list = await call(ctx, "GET", "/api/fleet/devices", { token });
+  assert.equal(list.data.devices[0].coach, null);
+
+  await grantCoach(ctx, token);
+  const entitled = await call(ctx, "GET", "/api/fleet/devices/dev-nocoach", { token });
+  assert.equal(entitled.data.device.coach?.mode, "advisor");
+
+  const betaCtx = env();
+  const beta = await register(betaCtx, "beta@example.com");
+  betaCtx.COACH_BETA_USER_IDS = String(beta.user.id);
+  await addDevice(betaCtx, beta.user.id, "dev-beta");
+  const betaList = await call(betaCtx, "GET", "/api/fleet/devices", { token: beta.token });
+  assert.equal(betaList.data.devices[0].coach?.mode, "advisor");
+
+  const flagOff = env({ COACH_AUTOPILOT_ENABLED: "0" });
+  const off = await register(flagOff, "flagoff@example.com");
+  flagOff.COACH_BETA_USER_IDS = String(off.user.id);
+  await addDevice(flagOff, off.user.id, "dev-flagoff");
+  const offDetail = await call(flagOff, "GET", "/api/fleet/devices/dev-flagoff", { token: off.token });
+  assert.equal(offDetail.data.device.coach, null);
 });
 
 test("single-device apply checks ownership, clamps, and queues when offline", async () => {

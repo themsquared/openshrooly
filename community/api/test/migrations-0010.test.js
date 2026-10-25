@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Miniflare } from "miniflare";
 
-const MIGRATION = readFileSync(new URL("../migrations/0009_device_type.sql", import.meta.url), "utf8");
+const MIGRATION = readFileSync(new URL("../migrations/0010_device_type.sql", import.meta.url), "utf8");
 
 function statements(sql) {
   return sql
@@ -13,7 +13,7 @@ function statements(sql) {
     .filter(Boolean);
 }
 
-test("0009 adds device_type without rewriting existing rows", async () => {
+test("0010 adds device_type without rewriting existing rows", async () => {
   assert.equal(statements(MIGRATION).length, 1);
   assert.match(MIGRATION, /ALTER TABLE cloud_devices ADD COLUMN device_type/);
   assert.match(MIGRATION, /shrooly_chamber/);

@@ -2,7 +2,7 @@
 
 import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin } from "./profile.js";
-import { coachAiConfigured, isCoachBetaUser } from "./providers.js";
+import { isCoachBetaUser } from "./providers.js";
 import {
   COACH_ITEM,
   buildDeviceModel,
@@ -40,11 +40,85 @@ export function coachAutopilotFlagOn(env = {}) {
 export async function coachAutopilotAvailable(env, db, user) {
   if (!coachAutopilotFlagOn(env)) return false;
   if (!user) return false;
-  if (isCoachBetaUser(env, user) && coachAiConfigured(env)) return true;
+  if (isCoachBetaUser(env, user)) return true;
   const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
   if (sub && sub.status === "active" && sub.period_end >= nowIso()) return true;
   const row = await db.one("SELECT * FROM entitlements WHERE user_id=? AND item_id=?", [user.id, COACH_ITEM]);
   return Boolean(row);
+}
+
+export const AUTOPILOT_SOURCES = new Set(["grow-coach-autopilot", "grow-coach-autopilot-undo"]);
+
+export function inferDelivery(device = {}) {
+  return String(device.id || "").startsWith("sldev_") ? "cloud" : "local";
+}
+
+export function cloudDeliveryActive({ device, state, command } = {}) {
+  const payload = parseJson(command?.payload, {});
+  if (payload.delivery === "cloud") return true;
+  if (state?.delivery === "cloud") return true;
+  if (String(device?.id || "").startsWith("sldev_")) return true;
+  return false;
+}
+
+export function isAutopilotCommand(command) {
+  const payload = parseJson(command?.payload, {});
+  return AUTOPILOT_SOURCES.has(String(payload.source || ""));
+}
+
+export function insertedId(result) {
+  return Number(result?.lastRowId ?? result?.meta?.last_row_id ?? 0) || null;
+}
+
+export function autopilotCommandExpired(command, now = Date.now()) {
+  const payload = parseJson(command?.payload, {});
+  if (payload.expires_at) {
+    const t = Date.parse(payload.expires_at);
+    if (Number.isFinite(t)) return t <= now;
+  }
+  const issued = Date.parse(command?.issued_at || "");
+  if (!Number.isFinite(issued)) return false;
+  return now - issued > AUTOPILOT_LIMITS.commandTtlMs;
+}
+
+export function sameSetpoints(a = {}, b = {}) {
+  const ta = num(a.temperature_c);
+  const tb = num(b.temperature_c);
+  const ha = num(a.humidity_percent);
+  const hb = num(b.humidity_percent);
+  if (ta != null && tb != null && Math.abs(ta - tb) > 0.15) return false;
+  if (ha != null && hb != null && Math.abs(ha - hb) > 0.6) return false;
+  if ((ta == null) !== (tb == null)) return false;
+  if ((ha == null) !== (hb == null)) return false;
+  return ta != null || ha != null;
+}
+
+export function setpointsMatch(reading = {}, target = {}) {
+  if (!target || (target.temperature_c == null && target.humidity_percent == null)) return false;
+  const reportedTemp = num(reading.temperature_setpoint ?? reading.temperature_target ?? reading.target_temperature);
+  const reportedRh = num(reading.humidity_setpoint ?? reading.target_humidity);
+  const lastTemp = num(target.temperature_c);
+  const lastRh = num(target.humidity_percent);
+  if (lastTemp != null && (reportedTemp == null || Math.abs(reportedTemp - lastTemp) > 0.15)) return false;
+  if (lastRh != null && (reportedRh == null || Math.abs(reportedRh - lastRh) > 0.6)) return false;
+  return true;
+}
+
+function commandTargets(payload = {}) {
+  return {
+    temperature_c: payload.temperature_c ?? payload.temperature_target,
+    humidity_percent: payload.humidity_percent ?? payload.target_humidity,
+    fan_speed_percent: payload.fan_speed_percent,
+  };
+}
+
+function commandFrom(payload = {}) {
+  const from = payload.from || payload.planned_from || {};
+  return {
+    temperature_c: from.temperature_c ?? from.temperature_target,
+    humidity_percent: from.humidity_percent ?? from.target_humidity,
+    fan_speed_percent: from.fan_speed_percent,
+  };
 }
 
 function num(value) {
@@ -247,6 +321,8 @@ function emptyMode(deviceId, userId) {
     changes_count: 0,
     last_setpoints: null,
     last_manual_at: null,
+    pending_command_id: null,
+    delivery: null,
     updated_at: nowIso(),
   };
 }
@@ -268,7 +344,7 @@ async function writeDeviceMode(db, row) {
   const updated = { ...row, updated_at: nowIso() };
   if (existing) {
     await db.run(
-      "UPDATE coach_device_mode SET mode=?, paused=?, pause_reason=?, pause_until=?, profile_id=?, last_change_at=?, changes_day=?, changes_count=?, last_setpoints=?, last_manual_at=?, updated_at=? WHERE device_id=?",
+      "UPDATE coach_device_mode SET mode=?, paused=?, pause_reason=?, pause_until=?, profile_id=?, last_change_at=?, changes_day=?, changes_count=?, last_setpoints=?, last_manual_at=?, pending_command_id=?, delivery=?, updated_at=? WHERE device_id=?",
       [
         updated.mode,
         updated.paused ? 1 : 0,
@@ -280,13 +356,15 @@ async function writeDeviceMode(db, row) {
         updated.changes_count,
         typeof updated.last_setpoints === "string" ? updated.last_setpoints : JSON.stringify(updated.last_setpoints),
         updated.last_manual_at,
+        updated.pending_command_id ?? null,
+        updated.delivery || null,
         updated.updated_at,
         updated.device_id,
       ]
     );
   } else {
     await db.run(
-      "INSERT INTO coach_device_mode (device_id, user_id, mode, paused, pause_reason, pause_until, profile_id, last_change_at, changes_day, changes_count, last_setpoints, last_manual_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO coach_device_mode (device_id, user_id, mode, paused, pause_reason, pause_until, profile_id, last_change_at, changes_day, changes_count, last_setpoints, last_manual_at, pending_command_id, delivery, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         updated.device_id,
         updated.user_id,
@@ -300,6 +378,8 @@ async function writeDeviceMode(db, row) {
         updated.changes_count,
         typeof updated.last_setpoints === "string" ? updated.last_setpoints : JSON.stringify(updated.last_setpoints),
         updated.last_manual_at,
+        updated.pending_command_id ?? null,
+        updated.delivery || null,
         updated.updated_at,
       ]
     );
@@ -308,8 +388,8 @@ async function writeDeviceMode(db, row) {
 }
 
 async function addLog(db, row) {
-  await db.run(
-    "INSERT INTO coach_autopilot_log (device_id, user_id, action, old_value, new_value, reason, readings, undone_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  const result = await db.run(
+    "INSERT INTO coach_autopilot_log (device_id, user_id, action, old_value, new_value, reason, readings, undone_at, command_id, apply_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
       row.device_id,
       row.user_id,
@@ -319,9 +399,22 @@ async function addLog(db, row) {
       row.reason,
       row.readings == null ? null : JSON.stringify(row.readings),
       null,
+      row.command_id ?? null,
+      row.apply_status || null,
       nowIso(),
     ]
   );
+  return insertedId(result);
+}
+
+async function updateLogStatus(db, { id, commandId, applyStatus }) {
+  if (id) {
+    await db.run("UPDATE coach_autopilot_log SET apply_status=? WHERE id=?", [applyStatus, id]);
+    return;
+  }
+  if (commandId) {
+    await db.run("UPDATE coach_autopilot_log SET apply_status=? WHERE command_id=?", [applyStatus, commandId]);
+  }
 }
 
 export async function listAutopilotActions(db, deviceId, limit = 12) {
@@ -337,6 +430,8 @@ export async function listAutopilotActions(db, deviceId, limit = 12) {
       reason: row.reason,
       readings: parseJson(row.readings),
       undone_at: row.undone_at || null,
+      command_id: row.command_id == null ? null : Number(row.command_id),
+      apply_status: row.apply_status || null,
       created_at: row.created_at,
     }));
 }
@@ -387,6 +482,8 @@ export async function getAutopilotStatus(db, env, user, deviceId) {
     available,
     ...publicStatus(state),
     profile_id: state.profile_id,
+    delivery: state.delivery || inferDelivery(device),
+    pending_command_id: state.pending_command_id || null,
     actions: available ? await listAutopilotActions(db, deviceId) : [],
   };
 }
@@ -442,10 +539,11 @@ export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, pr
     state.paused = 0;
     state.pause_reason = null;
     state.pause_until = null;
+    state.delivery = state.delivery || inferDelivery(device);
   }
   state.mode = nextMode;
   await writeDeviceMode(db, state);
-  return { ok: true, ...publicStatus(state), profile_id: state.profile_id };
+  return { ok: true, ...publicStatus(state), profile_id: state.profile_id, delivery: state.delivery || inferDelivery(device) };
 }
 
 export async function pauseForManualOverride(db, deviceId, userId, now = Date.now()) {
@@ -472,7 +570,7 @@ export async function pauseForManualOverride(db, deviceId, userId, now = Date.no
 export async function noteManualSetpointCommand(db, device, payload) {
   if (!device?.id || !device.owner_id) return;
   const source = payload?.source || "";
-  if (source === "grow-coach-autopilot" || source === "grow-coach-autopilot-undo") return;
+  if (AUTOPILOT_SOURCES.has(source)) return;
   const state = await getDeviceMode(db, device.id, device.owner_id);
   if (state.mode !== "autopilot") return;
   await pauseForManualOverride(db, device.id, device.owner_id);
@@ -498,13 +596,221 @@ export function stageFromProfile(profile) {
   return expandStage(stages.find((s) => s.id === "fruiting") || stages[0] || {});
 }
 
-async function applySetpointsCommand(db, deviceId, payload) {
-  const body = { expires_at: laterIso(AUTOPILOT_LIMITS.commandTtlMs), ...payload };
-  if (!body.expires_at) body.expires_at = laterIso(AUTOPILOT_LIMITS.commandTtlMs);
-  await db.run(
+function setpointCommandBody(payload, device) {
+  const next = {
+    temperature_c: payload.temperature_c,
+    humidity_percent: payload.humidity_percent,
+    fan_speed_percent: payload.fan_speed_percent,
+  };
+  const delivery = payload.delivery || inferDelivery(device);
+  return {
+    expires_at: payload.expires_at || laterIso(AUTOPILOT_LIMITS.commandTtlMs),
+    ...payload,
+    ...next,
+    temperature_target: next.temperature_c,
+    target_humidity: next.humidity_percent,
+    delivery,
+  };
+}
+
+function expiresAtIso(now = Date.now()) {
+  return new Date(now + AUTOPILOT_LIMITS.commandTtlMs).toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+function isoAt(now = Date.now()) {
+  return new Date(now).toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+async function applySetpointsCommand(db, deviceId, payload, device = { id: deviceId }, now = Date.now()) {
+  const body = setpointCommandBody({ expires_at: payload.expires_at || expiresAtIso(now), ...payload }, device);
+  const result = await db.run(
     "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
-    [deviceId, "setpoints", JSON.stringify(body), nowIso(), null]
+    [deviceId, "setpoints", JSON.stringify(body), isoAt(now), null]
   );
+  return { id: insertedId(result), payload: body };
+}
+
+function isCoachSchemaError(err) {
+  const msg = String(err?.message || err || "");
+  return /no such column|has no column|pending_command_id|apply_status/i.test(msg);
+}
+
+export function autopilotCommandFinalized(command) {
+  const payload = parseJson(command?.payload, {});
+  return Boolean(payload._ack && payload._ack.status);
+}
+
+function bridgeOutcome(payload = {}) {
+  const bridge = payload._bridge || {};
+  if (bridge.status === "sent" || bridge.sent === true) return "applied";
+  if (bridge.status === "failed" || bridge.status === "dry_run") return "failed";
+  return null;
+}
+
+async function markCommandConsumed(db, command, extra = {}, now = Date.now()) {
+  const payload = { ...parseJson(command.payload, {}), ...extra };
+  command.payload = JSON.stringify(payload);
+  if (!command.consumed_at) command.consumed_at = isoAt(now);
+  await db.run("UPDATE device_commands SET consumed_at=?, payload=? WHERE id=? AND device_id=?", [
+    command.consumed_at,
+    command.payload,
+    command.id,
+    command.device_id,
+  ]);
+}
+
+async function finalizeAutopilotCommand(db, { command, state, user, status, reason, now = Date.now(), readings = null } = {}) {
+  if (autopilotCommandFinalized(command)) {
+    return { status: parseJson(command.payload, {})._ack.status, skipped: "already_finalized", last_setpoints: state.last_setpoints };
+  }
+  const payload = parseJson(command.payload, {});
+  const from = commandFrom(payload);
+  const next = commandTargets(payload);
+  await markCommandConsumed(db, command, { _ack: { status, reason, at: isoAt(now) } }, now);
+  if (Number(state.pending_command_id) === Number(command.id)) state.pending_command_id = null;
+  if (status === "applied") {
+    state.last_setpoints = next;
+  } else if (sameSetpoints(parseJson(state.last_setpoints, {}), next)) {
+    state.last_setpoints = from.temperature_c != null || from.humidity_percent != null ? from : state.last_setpoints;
+  }
+  await writeDeviceMode(db, state);
+  await updateLogStatus(db, { commandId: command.id, applyStatus: status });
+  if (status !== "applied") {
+    await addLog(db, {
+      device_id: state.device_id,
+      user_id: user?.id || state.user_id,
+      action: status,
+      old_value: next,
+      new_value: from,
+      reason: reason || `Command ${status}.`,
+      readings,
+      command_id: command.id,
+      apply_status: status,
+    });
+  }
+  return { status, last_setpoints: state.last_setpoints };
+}
+
+async function loadReconcileCommands(db, device, state) {
+  const open = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL ORDER BY id ASC LIMIT ?", [
+    device.id,
+    20,
+  ]);
+  const commands = [...(open || [])];
+  const pendingId = Number(state.pending_command_id);
+  if (pendingId) {
+    const seen = commands.some((row) => Number(row.id) === pendingId);
+    if (!seen) {
+      const row = await db.one("SELECT * FROM device_commands WHERE id=?", [pendingId]);
+      if (row && row.device_id === device.id) commands.push(row);
+    }
+  }
+  return commands;
+}
+
+export async function reconcileAutopilotCommands(db, { device, user, now = Date.now(), reading = null } = {}) {
+  if (!device?.id) return { reconciled: [] };
+  try {
+    const state = await getDeviceMode(db, device.id, user?.id || device.owner_id);
+    const commands = await loadReconcileCommands(db, device, state);
+    const results = [];
+    for (const command of commands) {
+      if (!isAutopilotCommand(command)) continue;
+      if (autopilotCommandFinalized(command)) continue;
+      const payload = parseJson(command.payload, {});
+      const bridgeStatus = bridgeOutcome(payload);
+      if (bridgeStatus === "applied") {
+        results.push(
+          await finalizeAutopilotCommand(db, {
+            command,
+            state,
+            user: user || { id: state.user_id },
+            status: "applied",
+            reason: payload._bridge?.reason || "Local bridge applied the command.",
+            now,
+            readings: reading,
+          })
+        );
+        continue;
+      }
+      if (bridgeStatus === "failed") {
+        results.push(
+          await finalizeAutopilotCommand(db, {
+            command,
+            state,
+            user: user || { id: state.user_id },
+            status: "failed",
+            reason: payload._bridge?.reason || "Command failed.",
+            now,
+            readings: reading,
+          })
+        );
+        continue;
+      }
+      if (reading && setpointsMatch(reading, commandTargets(payload))) {
+        results.push(
+          await finalizeAutopilotCommand(db, {
+            command,
+            state,
+            user: user || { id: state.user_id },
+            status: "applied",
+            reason: "Chamber reported the new setpoints.",
+            now,
+            readings: reading,
+          })
+        );
+        continue;
+      }
+      if (autopilotCommandExpired(command, now)) {
+        results.push(
+          await finalizeAutopilotCommand(db, {
+            command,
+            state,
+            user: user || { id: state.user_id },
+            status: "expired",
+            reason: "Command expired.",
+            now,
+            readings: reading,
+          })
+        );
+      }
+    }
+    return { reconciled: results, state: await getDeviceMode(db, device.id, user?.id || device.owner_id) };
+  } catch (err) {
+    if (isCoachSchemaError(err)) return { reconciled: [], skipped: "schema" };
+    throw err;
+  }
+}
+
+const ACK_STATUSES = new Set(["applied", "failed", "refused", "expired"]);
+
+export async function noteAutopilotCommandAck(db, device, commandId, ackStatus = "applied", extra = {}, now = Date.now()) {
+  if (!device?.id || !commandId) return null;
+  try {
+    const command = await db.one("SELECT * FROM device_commands WHERE id=?", [commandId]);
+    if (!command || command.device_id !== device.id) return null;
+    if (!isAutopilotCommand(command)) return null;
+    const state = await getDeviceMode(db, device.id, device.owner_id);
+    const raw = String(ackStatus || "");
+    const status = ACK_STATUSES.has(raw) ? raw : "failed";
+    return finalizeAutopilotCommand(db, {
+      command,
+      state,
+      user: { id: device.owner_id },
+      status,
+      reason: extra.ack_reason || extra.reason || (status === "applied" ? "Device acknowledged the command." : `Device reported ${status}.`),
+      now,
+      readings: extra,
+    });
+  } catch (err) {
+    if (isCoachSchemaError(err)) return { skipped: "schema" };
+    throw err;
+  }
+}
+
+export async function inferAutopilotApplyFromReading(db, device, reading, now = Date.now()) {
+  if (!device?.id || !reading) return null;
+  return reconcileAutopilotCommands(db, { device, user: { id: device.owner_id }, now, reading });
 }
 
 async function pauseAutopilot(db, state, user, reason, readings = null, { until = null, lastManualAt = null } = {}) {
@@ -528,6 +834,9 @@ async function pauseAutopilot(db, state, user, reason, readings = null, { until 
 export async function runAutopilotForDevice(db, env, { device, user, now = Date.now() } = {}) {
   if (!coachAutopilotFlagOn(env)) return { skipped: "kill_switch" };
   if (!(await coachAutopilotAvailable(env, db, user))) return { skipped: "not_entitled" };
+  const samplesEarly = await loadRecentTelemetry(db, device.id, { now });
+  const currentEarly = latestReading(samplesEarly, now);
+  await reconcileAutopilotCommands(db, { device, user, now, reading: currentEarly });
   const state = await getDeviceMode(db, device.id, user.id);
   if (state.mode !== "autopilot") return { skipped: "advisor" };
 
@@ -552,11 +861,30 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     return { paused: true, reason: pause.reason, flipped_to: "advisor" };
   }
 
+  const pending = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL ORDER BY id ASC LIMIT ?", [
+    device.id,
+    20,
+  ]);
+  const pendingAutopilot = (pending || []).filter(isAutopilotCommand);
   const last = parseJson(state.last_setpoints, {});
   if (setpointsMismatch(current, last, { now, lastChangeAt: state.last_change_at })) {
+    for (const command of pendingAutopilot) {
+      await finalizeAutopilotCommand(db, {
+        command,
+        state,
+        user,
+        status: "refused",
+        reason: "Chamber setpoint changed; manual override wins.",
+        now,
+        readings: current,
+      });
+    }
     await pauseForManualOverride(db, device.id, user.id, now);
     const paused = await getDeviceMode(db, device.id, user.id);
     return { paused: true, reason: paused.pause_reason, flipped_to: "advisor" };
+  }
+  if (pendingAutopilot.length) {
+    return { skipped: "pending", reason: "Waiting for the chamber to apply the last Autopilot command." };
   }
 
   const resolved = await resolveAllowedProfile(db, state.profile_id);
@@ -591,17 +919,26 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     };
   }
 
-  await applySetpointsCommand(db, device.id, {
-    ...plan.next,
-    from: currentSetpoints,
-    source: "grow-coach-autopilot",
-    approved: true,
-  });
+  const queued = await applySetpointsCommand(
+    db,
+    device.id,
+    {
+      ...plan.next,
+      from: currentSetpoints,
+      source: "grow-coach-autopilot",
+      approved: true,
+      delivery: state.delivery || inferDelivery(device),
+    },
+    device,
+    now
+  );
   const day = new Date(now).toISOString().slice(0, 10);
   state.last_change_at = new Date(now).toISOString();
   state.changes_count = dailyChangeCount(state, now) + 1;
   state.changes_day = day;
-  state.last_setpoints = plan.next;
+  state.last_setpoints = currentSetpoints;
+  state.pending_command_id = queued.id;
+  state.delivery = state.delivery || inferDelivery(device);
   state.paused = 0;
   state.pause_reason = null;
   await writeDeviceMode(db, state);
@@ -613,8 +950,10 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     new_value: plan.next,
     reason: plan.reason,
     readings: current,
+    command_id: queued.id,
+    apply_status: "queued",
   });
-  return { applied: true, next: plan.next, reason: plan.reason };
+  return { applied: true, queued: true, next: plan.next, reason: plan.reason, command_id: queued.id, delivery: queued.payload.delivery };
 }
 
 export async function runAutopilotPass(env, { now = Date.now(), deviceId = null } = {}) {
@@ -646,17 +985,26 @@ export async function undoAutopilotAction(db, env, user, actionId) {
   if (!device || Number(device.owner_id) !== Number(user.id)) return { error: "not found", status: 404 };
   if (row.undone_at) return { error: "Already undone.", status: 400 };
   if (row.action !== "apply") return { error: "Only applied changes can be undone.", status: 400 };
+  if (!["queued", "applied"].includes(String(row.apply_status || ""))) {
+    return { error: "Only queued or applied changes can be undone.", status: 400 };
+  }
   const oldValue = parseJson(row.old_value);
   if (!oldValue) return { error: "Nothing to restore.", status: 400 };
   const state = await getDeviceMode(db, row.device_id, user.id);
   const resolved = await resolveAllowedProfile(db, state.profile_id);
   const restored = clampAutopilotSetpoints(oldValue, stageFromProfile(resolved.profile));
-  await applySetpointsCommand(db, row.device_id, {
-    ...restored,
-    from: parseJson(row.new_value),
-    source: "grow-coach-autopilot-undo",
-    approved: true,
-  });
+  const queued = await applySetpointsCommand(
+    db,
+    row.device_id,
+    {
+      ...restored,
+      from: parseJson(row.new_value),
+      source: "grow-coach-autopilot-undo",
+      approved: true,
+      delivery: state.delivery || inferDelivery(device),
+    },
+    device
+  );
   await db.run("UPDATE coach_autopilot_log SET undone_at=? WHERE id=?", [nowIso(), row.id]);
   await addLog(db, {
     device_id: row.device_id,
@@ -666,8 +1014,10 @@ export async function undoAutopilotAction(db, env, user, actionId) {
     new_value: restored,
     reason: "Undo restored the previous setpoints.",
     readings: parseJson(row.readings),
+    command_id: queued.id,
+    apply_status: "queued",
   });
-  state.last_setpoints = restored;
+  state.pending_command_id = queued.id;
   await writeDeviceMode(db, state);
-  return { ok: true, restored };
+  return { ok: true, restored, command_id: queued.id };
 }

@@ -26,6 +26,33 @@ def test_all_seed_profiles_validate():
         assert profile.light_recipe.sources
         assert "colonization" in profile.light_recipe.phases
         assert "fruiting" in profile.light_recipe.phases
+        for stage in profile.stages:
+            light = stage.light
+            assert light.sunrise_hour is not None, f"{profile.id} {stage.id} sunrise"
+            assert 0 <= light.duration_hours <= 24, f"{profile.id} {stage.id} duration"
+            assert 0 <= light.white_led_lux <= 4000, f"{profile.id} {stage.id} lux"
+            assert stage.id in profile.light_recipe.phases, f"{profile.id} missing {stage.id} recipe"
+            on = (
+                light.white_led_lux > 0
+                or light.red_percent > 0
+                or light.green_percent > 0
+                or light.blue_percent > 0
+            )
+            if on:
+                assert light.duration_hours > 0, f"{profile.id} {stage.id} lit without duration"
+
+
+def test_every_built_in_stage_has_complete_light():
+    for profile in load_seed_profiles(ROOT / "data", include_psilocybin=True):
+        validate_profile(profile)
+        for stage in profile.stages:
+            light = stage.light
+            assert 0 <= light.sunrise_hour <= 23
+            assert light.duration_hours is not None
+            phase = profile.light_recipe.phases[stage.id]
+            assert 0 <= phase.photoperiod_hours <= 24
+            assert 0 <= phase.white_brightness_percent <= 100
+            assert stage.light.duration_hours == phase.photoperiod_hours
 
 
 def test_light_recipe_ranges_and_sources():
@@ -67,6 +94,17 @@ def test_round_trip_json():
     again = MushroomProfile.from_dict(profile.to_dict())
     assert again.id == profile.id
     assert again.total_days() == profile.total_days()
+
+
+def test_lit_stage_cannot_have_zero_duration():
+    raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+    raw["stages"][1]["light"]["duration_hours"] = 0
+    with pytest.raises(ValidationError, match="duration"):
+        validate_profile(raw)
+    raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+    del raw["light_recipe"]["phases"]["pinning"]
+    with pytest.raises(ValidationError, match="pinning"):
+        validate_profile(raw)
 
 
 def test_stage_at_day_walks_sequence():

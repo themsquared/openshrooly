@@ -16,6 +16,22 @@ function scheduleText(start, end) {
   return `${hourText(start)} to ${hourText(end)}`
 }
 
+/** "07:00" */
+function hour24(hour) {
+  const total = Math.round((((hour % 24) + 24) % 24) * 60) % (24 * 60)
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/** "Light on 07:00 to 19:00" or "Light off (dark)" */
+function lightOnSummary(sunrise, duration) {
+  const hours = Number(duration)
+  if (!(hours > 0)) return 'Light off (dark)'
+  const start = Number(sunrise) || 0
+  return `Light on ${hour24(start)} to ${hour24(start + hours)}`
+}
+
 /** "Today 21.3° to 23.1°", or null when there is nothing yet. */
 function rangeText(lo, hi, unit) {
   if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null
@@ -46,4 +62,4 @@ function trendText(samples, step) {
   return 'Steady'
 }
 
-module.exports = { hourText, scheduleText, rangeText, addSample, trendText }
+module.exports = { hourText, scheduleText, hour24, lightOnSummary, rangeText, addSample, trendText }

@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { call, testEnv } from "./helpers.js";
+import { call, SAMPLE_CULINARY_PROFILE, testEnv } from "./helpers.js";
 import {
   appleClientSecret,
   appleRelayEmail,
@@ -197,21 +197,9 @@ test("Apple real name is never stored as display_name and never appears on publi
   assert.equal(Object.hasOwn(me.data.user, "display_name"), false);
 
   const profile = {
+    ...SAMPLE_CULINARY_PROFILE,
     id: "relay-oyster",
     name: "Relay Oyster",
-    species: "Pleurotus ostreatus",
-    pack: "culinary",
-    schema_version: 1,
-    stages: [
-      {
-        id: "fruiting",
-        name: "Fruiting",
-        duration_days: 7,
-        humidity_percent: 90,
-        temperature_c: 18,
-        fan: { speed_percent: 30, period_min: 15, run_duration_s: 30 },
-      },
-    ],
   };
   const created = await call(ctx, "POST", "/api/profiles", { token, body: profile });
   assert.equal(created.status, 201, JSON.stringify(created.data));

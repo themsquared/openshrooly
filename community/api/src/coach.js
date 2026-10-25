@@ -2,6 +2,7 @@
 
 import { laterIso, nowIso, randomToken, sha256Hex } from "./crypto.js";
 import {
+  coachAutopilotAvailable,
   coachAutopilotFlagOn,
   getAutopilotStatus,
   runAutopilotForDevice,
@@ -85,6 +86,15 @@ async function requireCoach(request, db, env) {
   requireVerified(user);
   if (!(await hasGrowCoach(db, user, env))) {
     throw new ValidationError("Grow Coach is a $3.99/month culinary subscription.", 402);
+  }
+  return user;
+}
+
+async function requireAutopilotUser(request, db, env) {
+  const { user } = await userFromRequest(request, db);
+  requireVerified(user);
+  if (!(await coachAutopilotAvailable(env, db, user))) {
+    throw new ValidationError("not found", 404);
   }
   return user;
 }
@@ -258,6 +268,7 @@ export async function handleCoach(method, path, url, request, env) {
     const entitled = user ? await hasGrowCoach(db, user, env) : false;
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
     const publicOn = capabilities(env, request).coach;
+    const autopilot = await coachAutopilotAvailable(env, db, user);
     return json({
       product: coachCatalog(),
       entitled,
@@ -266,7 +277,7 @@ export async function handleCoach(method, path, url, request, env) {
       period_end: sub?.period_end || null,
       waitlist: !entitled && !publicOn,
       preview: !entitled && !publicOn,
-      autopilot: coachAutopilotFlagOn(env) && (entitled || beta),
+      autopilot,
       marketing: publicOn || entitled
         ? "Culinary chambers only. Not sold or marketed with off-menu varieties."
         : "Coming soon. Chat and checkout open at launch. Not sold with off-menu varieties.",
@@ -367,14 +378,14 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "GET" && path === "/api/coach/autopilot") {
-    const user = await requireCoach(request, db, env);
+    const user = await requireAutopilotUser(request, db, env);
     const result = await getAutopilotStatus(db, env, user, url.searchParams.get("device_id"));
     if (result.error) return json({ error: result.error }, result.status || 404);
     return json(result);
   }
 
   if (method === "POST" && path === "/api/coach/autopilot/mode") {
-    const user = await requireCoach(request, db, env);
+    const user = await requireAutopilotUser(request, db, env);
     const body = await request.json().catch(() => ({}));
     if (!body.device_id) throw new ValidationError("Pick a chamber first.", 400);
     const result = await setDeviceAutopilotMode(db, env, user, {
@@ -387,7 +398,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/coach/autopilot/run") {
-    const user = await requireCoach(request, db, env);
+    const user = await requireAutopilotUser(request, db, env);
     const body = await request.json().catch(() => ({}));
     if (!coachAutopilotFlagOn(env)) return json({ error: "not found" }, 404);
     if (!body.device_id) throw new ValidationError("Pick a chamber first.", 400);
@@ -399,7 +410,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/coach/autopilot/undo") {
-    const user = await requireCoach(request, db, env);
+    const user = await requireAutopilotUser(request, db, env);
     const body = await request.json().catch(() => ({}));
     if (!body.action_id) throw new ValidationError("Pick an action to undo.", 400);
     const result = await undoAutopilotAction(db, env, user, body.action_id);

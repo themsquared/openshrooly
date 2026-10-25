@@ -247,6 +247,8 @@ CREATE TABLE IF NOT EXISTS coach_device_mode (
     changes_count INTEGER NOT NULL DEFAULT 0,
     last_setpoints TEXT,
     last_manual_at TEXT,
+    pending_command_id INTEGER,
+    delivery TEXT,
     updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS coach_autopilot_log (
@@ -259,9 +261,12 @@ CREATE TABLE IF NOT EXISTS coach_autopilot_log (
     reason TEXT NOT NULL,
     readings TEXT,
     undone_at TEXT,
+    command_id INTEGER,
+    apply_status TEXT,
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_coach_autopilot_log_device ON coach_autopilot_log(device_id, id);
+CREATE INDEX IF NOT EXISTS idx_coach_autopilot_log_command ON coach_autopilot_log(command_id);
 CREATE TABLE IF NOT EXISTS device_groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     owner_id INTEGER NOT NULL,

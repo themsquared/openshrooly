@@ -105,7 +105,11 @@ def apply_recipe_to_profile(profile: MushroomProfile) -> MushroomProfile:
     if profile.light_recipe is None:
         return profile
     for stage in profile.stages:
-        stage.light = phase_to_schedule(profile.light_recipe.phase_for(stage.id), stage.light.sunrise_hour)
+        if stage.id not in profile.light_recipe.phases:
+            profile.light_recipe.phases[stage.id] = profile.light_recipe.phase_for(stage.id)
+        stage.light = phase_to_schedule(
+            profile.light_recipe.phases[stage.id], stage.light.sunrise_hour
+        )
     return profile
 
 

@@ -35,14 +35,14 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "name", "duration_days", "humidity_percent", "temperature_c"],
+        "required": ["id", "name", "duration_days", "humidity_percent", "temperature_c", "light"],
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
           "duration_days": { "type": "number", "exclusiveMinimum": 0 },
           "humidity_percent": { "type": "number", "minimum": 30, "maximum": 100 },
           "temperature_c": { "type": "number", "minimum": 10, "maximum": 35 },
-          "light": { "type": "object" },
+          "light": { "$ref": "#/$defs/stageLight" },
           "fan": { "type": "object" },
           "notes": { "type": "string" }
         }
@@ -74,6 +74,25 @@
         "title": { "type": "string", "minLength": 1 },
         "detail": { "type": "string", "minLength": 1 },
         "url": { "type": "string", "pattern": "^https://" }
+      }
+    },
+    "stageLight": {
+      "type": "object",
+      "required": [
+        "sunrise_hour",
+        "duration_hours",
+        "white_led_lux",
+        "red_percent",
+        "green_percent",
+        "blue_percent"
+      ],
+      "properties": {
+        "sunrise_hour": { "type": "integer", "minimum": 0, "maximum": 23 },
+        "duration_hours": { "type": "number", "minimum": 0, "maximum": 24 },
+        "white_led_lux": { "type": "number", "minimum": 0, "maximum": 4000 },
+        "red_percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "green_percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "blue_percent": { "type": "integer", "minimum": 0, "maximum": 100 }
       }
     },
     "lightPhase": {
@@ -111,7 +130,11 @@
           "properties": {
             "colonization": { "$ref": "#/$defs/lightPhase" },
             "fruiting": { "$ref": "#/$defs/lightPhase" },
-            "pinning": { "$ref": "#/$defs/lightPhase" }
+            "pinning": { "$ref": "#/$defs/lightPhase" },
+            "rest": { "$ref": "#/$defs/lightPhase" },
+            "flush": { "$ref": "#/$defs/lightPhase" },
+            "cold_shock": { "$ref": "#/$defs/lightPhase" },
+            "browning": { "$ref": "#/$defs/lightPhase" }
           }
         }
       }
