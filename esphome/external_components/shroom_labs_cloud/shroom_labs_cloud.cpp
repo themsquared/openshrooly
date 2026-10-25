@@ -465,10 +465,24 @@ bool ShroomLabsCloud::fill_qr(QrCode *out) const {
   return qr_encode(url.c_str(), out);
 }
 
+#ifndef OBJECT_ID_MAX_LEN
+#define OBJECT_ID_MAX_LEN 64
+#endif
+
+static const char *entity_object_id(EntityBase *entity, char *buf) {
+  if (entity == nullptr) {
+    buf[0] = '\0';
+    return buf;
+  }
+  StringRef id = entity->get_object_id_to(buf);
+  return id.c_str() != nullptr ? id.c_str() : buf;
+}
+
 void ShroomLabsCloud::attach_local_watchers_() {
   this->watchers_on_ = true;
+  char id_buf[OBJECT_ID_MAX_LEN];
   for (auto *n : App.get_numbers()) {
-    if (n == nullptr || !setpoint_object_id(n->get_object_id().c_str()))
+    if (n == nullptr || !setpoint_object_id(entity_object_id(n, id_buf)))
       continue;
     n->add_on_state_callback([this](float) {
       if (!this->applying_remote_)
@@ -479,10 +493,11 @@ void ShroomLabsCloud::attach_local_watchers_() {
 
 ChamberReading ShroomLabsCloud::read_chamber() {
   ChamberReading out;
+  char id_buf[OBJECT_ID_MAX_LEN];
   for (auto *s : App.get_sensors()) {
     if (s == nullptr || !s->has_state() || std::isnan(s->state))
       continue;
-    const char *id = s->get_object_id().c_str();
+    const char *id = entity_object_id(s, id_buf);
     if (sensor_is_temperature(id)) {
       out.has_temperature = true;
       out.temperature = s->state;
@@ -494,7 +509,7 @@ ChamberReading ShroomLabsCloud::read_chamber() {
   for (auto *n : App.get_numbers()) {
     if (n == nullptr || std::isnan(n->state))
       continue;
-    const char *id = n->get_object_id().c_str();
+    const char *id = entity_object_id(n, id_buf);
     if (std::strcmp(id, "temperature_target") == 0 || std::strcmp(id, "temperature__target") == 0) {
       out.has_temperature_target = true;
       out.temperature_target = n->state;
@@ -507,12 +522,13 @@ ChamberReading ShroomLabsCloud::read_chamber() {
 }
 
 static bool write_number(const char *const *ids, float value, ShroomLabsCloud *self) {
+  char id_buf[OBJECT_ID_MAX_LEN];
   for (auto *n : App.get_numbers()) {
     if (n == nullptr)
       continue;
-    const std::string id = n->get_object_id();
+    const char *id = entity_object_id(n, id_buf);
     for (const char *const *p = ids; *p != nullptr; p++) {
-      if (id == *p) {
+      if (std::strcmp(id, *p) == 0) {
         self->set_applying_remote(true);
         auto call = n->make_call();
         call.set_value(value);
