@@ -464,6 +464,51 @@ test("telemetry ack only consumes the device's own commands", async () => {
   assert.equal(still.length, 1);
 });
 
+test("firmware-shaped telemetry ack_status is stored and returns 200", async () => {
+  const ctx = env();
+  ctx.COACH_AUTOPILOT_ENABLED = "1";
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token);
+  await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: {
+      kind: "setpoints",
+      payload: {
+        source: "grow-coach-autopilot",
+        temperature_c: 23,
+        humidity_percent: 90,
+        temperature_target: 23,
+        target_humidity: 90,
+        from: { temperature_c: 24, humidity_percent: 90 },
+      },
+    },
+  });
+  const [cmd] = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [d.deviceId]);
+  const ack = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/telemetry`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: {
+      temperature: 22.5,
+      humidity: 88,
+      temperature_c: 22.5,
+      humidity_percent: 88,
+      temperature_target: 23,
+      target_humidity: 90,
+      temperature_setpoint: 23,
+      humidity_setpoint: 90,
+      ack_command_id: cmd.id,
+      ack_status: "applied",
+    },
+  });
+  assert.equal(ack.status, 200);
+  const tel = await ctx.db.all("SELECT * FROM device_telemetry WHERE device_id=?", [d.deviceId]);
+  assert.match(tel[0].document, /ack_command_id/);
+  assert.match(tel[0].document, /ack_status/);
+  const consumed = await ctx.db.one("SELECT * FROM device_commands WHERE id=?", [cmd.id]);
+  assert.ok(consumed.consumed_at);
+});
+
 test("reclaim after revoke requires proof by the key on file", async () => {
   const ctx = env();
   const { token } = await register(ctx);

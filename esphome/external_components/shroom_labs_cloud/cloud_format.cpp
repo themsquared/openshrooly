@@ -1,6 +1,7 @@
 #include "cloud_format.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -386,6 +387,79 @@ static const char *find_key(const char *json, const char *key) {
   return nullptr;
 }
 
+/** Match "key": only at object depth 1 so nested from.temperature_c is ignored. */
+static const char *find_key_top(const char *json, const char *key) {
+  if (json == nullptr || key == nullptr)
+    return nullptr;
+  const size_t klen = std::strlen(key);
+  int depth = 0;
+  bool in_str = false;
+  bool esc = false;
+  for (const char *p = json; *p; p++) {
+    if (in_str) {
+      if (esc)
+        esc = false;
+      else if (*p == '\\')
+        esc = true;
+      else if (*p == '"')
+        in_str = false;
+      continue;
+    }
+    if (*p == '"') {
+      const char *q = p + 1;
+      if (depth == 1 && std::strncmp(q, key, klen) == 0 && q[klen] == '"') {
+        const char *c = q + klen + 1;
+        while (*c == ' ' || *c == '\n' || *c == '\t')
+          c++;
+        if (*c == ':')
+          return c + 1;
+      }
+      in_str = true;
+      continue;
+    }
+    if (*p == '{' || *p == '[')
+      depth++;
+    else if (*p == '}' || *p == ']')
+      depth--;
+  }
+  return nullptr;
+}
+
+static bool json_get_double_top(const char *json, const char *key, double *out) {
+  const char *p = find_key_top(json, key);
+  if (p == nullptr || out == nullptr)
+    return false;
+  while (*p == ' ' || *p == '\n' || *p == '\t')
+    p++;
+  char *end = nullptr;
+  double v = std::strtod(p, &end);
+  if (end == p)
+    return false;
+  *out = v;
+  return true;
+}
+
+static bool json_get_string_top(const char *json, const char *key, std::string *out) {
+  const char *p = find_key_top(json, key);
+  if (p == nullptr || out == nullptr)
+    return false;
+  while (*p == ' ' || *p == '\n' || *p == '\t')
+    p++;
+  if (*p != '"')
+    return false;
+  p++;
+  out->clear();
+  while (*p && *p != '"') {
+    if (*p == '\\' && p[1]) {
+      p++;
+      out->push_back(*p++);
+    } else {
+      out->push_back(*p++);
+    }
+  }
+  return *p == '"';
+}
+
 bool json_get_string(const char *json, const char *key, std::string *out) {
   const char *p = find_key(json, key);
   if (p == nullptr || out == nullptr)
@@ -436,6 +510,297 @@ bool json_get_int64(const char *json, const char *key, int64_t *out) {
     return false;
   *out = static_cast<int64_t>(v);
   return true;
+}
+
+bool json_get_double(const char *json, const char *key, double *out) {
+  const char *p = find_key(json, key);
+  if (p == nullptr || out == nullptr)
+    return false;
+  while (*p == ' ' || *p == '\n' || *p == '\t')
+    p++;
+  char *end = nullptr;
+  double v = std::strtod(p, &end);
+  if (end == p)
+    return false;
+  *out = v;
+  return true;
+}
+
+static const char *skip_ws(const char *p) {
+  while (p != nullptr && (*p == ' ' || *p == '\n' || *p == '\t' || *p == '\r'))
+    p++;
+  return p;
+}
+
+static bool extract_balanced(const char *start, char open, char close, std::string *out) {
+  if (start == nullptr || *start != open || out == nullptr)
+    return false;
+  int depth = 0;
+  bool in_str = false;
+  bool esc = false;
+  for (const char *p = start; *p; p++) {
+    if (in_str) {
+      if (esc)
+        esc = false;
+      else if (*p == '\\')
+        esc = true;
+      else if (*p == '"')
+        in_str = false;
+      continue;
+    }
+    if (*p == '"') {
+      in_str = true;
+      continue;
+    }
+    if (*p == open)
+      depth++;
+    else if (*p == close) {
+      depth--;
+      if (depth == 0) {
+        out->assign(start, static_cast<size_t>(p - start + 1));
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max) {
+  if (json == nullptr || out == nullptr || max == 0)
+    return 0;
+  const char *arr = find_key(json, "commands");
+  if (arr == nullptr)
+    return 0;
+  arr = skip_ws(arr);
+  if (*arr != '[')
+    return 0;
+  arr++;
+  size_t n = 0;
+  while (*arr && n < max) {
+    arr = skip_ws(arr);
+    if (*arr == ']' || *arr == '\0')
+      break;
+    if (*arr == ',') {
+      arr++;
+      continue;
+    }
+    std::string obj;
+    if (!extract_balanced(arr, '{', '}', &obj))
+      break;
+    InboxCommand cmd{};
+    json_get_int64(obj.c_str(), "id", &cmd.id);
+    json_get_string(obj.c_str(), "kind", &cmd.kind);
+    json_get_string(obj.c_str(), "issued_at", &cmd.issued_at);
+    cmd.has_apply = json_get_bool(obj.c_str(), "apply", &cmd.apply);
+    std::string payload;
+    const char *pay = find_key_top(obj.c_str(), "payload");
+    if (pay != nullptr) {
+      pay = skip_ws(pay);
+      extract_balanced(pay, '{', '}', &payload);
+    }
+    const char *src = payload.empty() ? obj.c_str() : payload.c_str();
+    json_get_string_top(src, "expires_at", &cmd.expires_at);
+    if (cmd.expires_at.empty())
+      json_get_string_top(obj.c_str(), "expires_at", &cmd.expires_at);
+    double t = 0;
+    double h = 0;
+    if (json_get_double_top(src, "temperature_target", &t) || json_get_double_top(src, "temperature_c", &t)) {
+      cmd.has_temp = true;
+      cmd.temperature_c = t;
+    }
+    if (json_get_double_top(src, "target_humidity", &h) || json_get_double_top(src, "humidity_percent", &h)) {
+      cmd.has_rh = true;
+      cmd.humidity_percent = h;
+    }
+    out[n++] = cmd;
+    arr += obj.size();
+  }
+  return n;
+}
+
+float clamp_setpoint_temp(float c) {
+  if (c < SETPOINT_TEMP_MIN)
+    return SETPOINT_TEMP_MIN;
+  if (c > SETPOINT_TEMP_MAX)
+    return SETPOINT_TEMP_MAX;
+  return c;
+}
+
+float clamp_setpoint_rh(float rh) {
+  if (rh < SETPOINT_RH_MIN)
+    return SETPOINT_RH_MIN;
+  if (rh > SETPOINT_RH_MAX)
+    return SETPOINT_RH_MAX;
+  return rh;
+}
+
+bool value_in_entity_range(float v, const EntityRange &range) {
+  if (!range.has)
+    return true;
+  const float slop = range.step > 0 ? range.step / 2.0f + 0.001f : 0.15f;
+  return v + slop >= range.min && v - slop <= range.max;
+}
+
+float snap_entity_value(float v, const EntityRange &range) {
+  if (!range.has)
+    return v;
+  float out = v;
+  if (out < range.min)
+    out = range.min;
+  if (out > range.max)
+    out = range.max;
+  if (range.step > 0) {
+    const float n = std::round((out - range.min) / range.step);
+    out = range.min + n * range.step;
+    if (out > range.max)
+      out = range.max;
+    if (out < range.min)
+      out = range.min;
+  }
+  return out;
+}
+
+SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uint32_t last_local_ms, uint32_t now_ms,
+                                   bool remote_apply) {
+  SetpointPlan plan{};
+  if (cmd.kind != "setpoints")
+    return plan;
+  if (!remote_apply)
+    return plan;
+  const int64_t exp = parse_iso8601_ms(cmd.expires_at.c_str());
+  if (exp > 0 && wall_ms >= exp)
+    return plan;
+  if (cmd.has_apply && !cmd.apply) {
+    plan.decision = SetpointDecision::Refuse;
+    plan.ack_status = "refused";
+    plan.reason = "Local change wins.";
+    return plan;
+  }
+  if (!cmd.has_apply)
+    return plan;
+  const int64_t issued = parse_iso8601_ms(cmd.issued_at.c_str());
+  if (last_local_ms != 0 && wall_ms > 0 && issued > 0) {
+    const int32_t age = static_cast<int32_t>(now_ms - last_local_ms);
+    if (age >= 0) {
+      const int64_t local_wall = wall_ms - static_cast<int64_t>(age);
+      if (local_wall > issued) {
+        plan.decision = SetpointDecision::Refuse;
+        plan.ack_status = "refused";
+        plan.reason = "Local change after command.";
+        return plan;
+      }
+    }
+  }
+  if (!cmd.has_temp && !cmd.has_rh) {
+    plan.decision = SetpointDecision::Fail;
+    plan.ack_status = "failed";
+    plan.reason = "No setpoints.";
+    return plan;
+  }
+  plan.decision = SetpointDecision::Apply;
+  plan.ack_status = "applied";
+  if (cmd.has_temp) {
+    plan.write_temp = true;
+    plan.temperature_c = static_cast<float>(cmd.temperature_c);
+  }
+  if (cmd.has_rh) {
+    plan.write_rh = true;
+    plan.humidity_percent = static_cast<float>(cmd.humidity_percent);
+  }
+  return plan;
+}
+
+static void append_num(std::string *out, float v) {
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%.2f", static_cast<double>(v));
+  *out += buf;
+}
+
+std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
+                                const char *ack_reason, const EntityRange *temp_range, const EntityRange *rh_range) {
+  std::string out = "{";
+  bool first = true;
+  auto comma = [&]() {
+    if (!first)
+      out += ",";
+    first = false;
+  };
+  if (reading.has_temperature) {
+    comma();
+    out += "\"temperature\":";
+    append_num(&out, reading.temperature);
+    out += ",\"temperature_c\":";
+    append_num(&out, reading.temperature);
+  }
+  if (reading.has_humidity) {
+    comma();
+    out += "\"humidity\":";
+    append_num(&out, reading.humidity);
+    out += ",\"humidity_percent\":";
+    append_num(&out, reading.humidity);
+  }
+  if (reading.has_temperature_target) {
+    comma();
+    out += "\"temperature_target\":";
+    append_num(&out, reading.temperature_target);
+    out += ",\"temperature_setpoint\":";
+    append_num(&out, reading.temperature_target);
+  }
+  if (reading.has_target_humidity) {
+    comma();
+    out += "\"target_humidity\":";
+    append_num(&out, reading.target_humidity);
+    out += ",\"humidity_setpoint\":";
+    append_num(&out, reading.target_humidity);
+  }
+  if (ack_id > 0 && ack_status != nullptr && ack_status[0]) {
+    comma();
+    out += "\"ack_command_id\":";
+    out += std::to_string(ack_id);
+    out += ",\"ack_status\":\"";
+    out += ack_status;
+    out += "\"";
+    if (ack_reason != nullptr && ack_reason[0]) {
+      out += ",\"ack_reason\":\"";
+      out += ack_reason;
+      out += "\"";
+    }
+  }
+  if (temp_range != nullptr && temp_range->has) {
+    comma();
+    out += "\"temperature_target_min\":";
+    append_num(&out, temp_range->min);
+    out += ",\"temperature_target_max\":";
+    append_num(&out, temp_range->max);
+  }
+  if (rh_range != nullptr && rh_range->has) {
+    comma();
+    out += "\"target_humidity_min\":";
+    append_num(&out, rh_range->min);
+    out += ",\"target_humidity_max\":";
+    append_num(&out, rh_range->max);
+  }
+  out += "}";
+  return out;
+}
+
+bool setpoint_object_id(const char *object_id) {
+  if (object_id == nullptr)
+    return false;
+  return std::strcmp(object_id, "temperature_target") == 0 || std::strcmp(object_id, "temperature__target") == 0 ||
+         std::strcmp(object_id, "target_humidity") == 0;
+}
+
+bool sensor_is_temperature(const char *object_id) {
+  if (object_id == nullptr)
+    return false;
+  return std::strcmp(object_id, "temperature") == 0 || std::strcmp(object_id, "current_temperature") == 0;
+}
+
+bool sensor_is_humidity(const char *object_id) {
+  if (object_id == nullptr)
+    return false;
+  return std::strcmp(object_id, "humidity") == 0 || std::strcmp(object_id, "current_humidity") == 0;
 }
 
 static void der_len(std::vector<uint8_t> *out, size_t n) {
@@ -595,6 +960,39 @@ int64_t parse_iso8601_ms(const char *iso) {
   }
   days += d - 1;
   return (((days * 24 + h) * 60 + mi) * 60 + s) * 1000;
+}
+
+std::string format_iso8601_ms(int64_t ms) {
+  if (ms <= 0)
+    return "";
+  int64_t sec = ms / 1000;
+  int s = static_cast<int>(sec % 60);
+  sec /= 60;
+  int mi = static_cast<int>(sec % 60);
+  sec /= 60;
+  int h = static_cast<int>(sec % 24);
+  int64_t days = sec / 24;
+  int y = 1970;
+  while (true) {
+    const int dy = (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? 366 : 365;
+    if (days < dy)
+      break;
+    days -= dy;
+    y++;
+  }
+  static const int mdays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  int m = 1;
+  for (; m <= 12; m++) {
+    int md = mdays[m - 1];
+    if (m == 2 && (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
+      md++;
+    if (days < md)
+      break;
+    days -= md;
+  }
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02dZ", y, m, static_cast<int>(days) + 1, h, mi, s);
+  return buf;
 }
 
 std::string https_url(const char *host, const char *path) {

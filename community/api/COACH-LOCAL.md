@@ -196,13 +196,13 @@ Prod stays off. Do not add `COACH_AUTOPILOT_ENABLED` or change
    `device_commands` and show on `GET /api/devices/:id/inbox` as
    `kind=setpoints` with `temperature_target` / `target_humidity`,
    `expires_at` (30 minutes), and `delivery: "cloud"`.
-5. **Firmware 1.0.3-sl.5** enrolls and probes inbox once per hour for
-   revoke/cert status only. It does **not** apply setpoint commands or
-   POST telemetry. A later image must parse inbox `setpoints`, write the
-   number entities, and ack on telemetry (`ack_command_id`,
-   `ack_status=applied|failed|refused`). Stay under about 20 HTTPS
-   connects/hour (each authenticated call is nonce + request). Inbox every
-   12-15 minutes, plus telemetry only when acking, fits that budget and
-   the 30 minute command TTL. Until that firmware ships, the server still
+5. **Firmware 1.0.4-sl.1** applies inbox `setpoints` when `apply` is
+   true, writes clamped `temperature_target` / `target_humidity`, and
+   POSTs telemetry acks (`ack_command_id`,
+   `ack_status=applied|failed|refused`). Inbox is about every 15 minutes;
+   telemetry on ack or that same cadence (about 16 HTTPS connects/hour,
+   each authenticated call is nonce + request). 1.0.3-sl.5 only probed
+   inbox once per hour and did not apply commands. The server still
    queues, expires, restores `last_setpoints` to `from`, and records
-   status. Do not run the local bridge against a prod `sldev_*` chamber.
+   status if a command is not acked. Do not run the local bridge against
+   a prod `sldev_*` chamber.
