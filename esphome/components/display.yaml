@@ -59,11 +59,6 @@ image:
     type: BINARY
     invert_alpha: true
   - platform: file
-    file: "images/mascot_sleep.png"
-    id: mascot_sleep
-    type: BINARY
-    invert_alpha: true
-  - platform: file
     file: "images/mascot_lean_left.png"
     id: mascot_lean_left
     type: BINARY

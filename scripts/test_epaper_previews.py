@@ -70,7 +70,11 @@ def main() -> None:
 
     # Screen mushroom: small 1-bit frames, drawn under the alert bar and setup
     # overlay, before the Select button so flipping keeps working.
-    assert {"idle", "meh", "blink", "surprise", "sleep", "lean_left", "lean_right"} <= set(MASCOT_FRAMES)
+    assert {"idle", "meh", "blink", "surprise", "lean_left", "lean_right"} <= set(MASCOT_FRAMES)
+    # Shroomy always parties: no sleep frame, and lights off never stops the dance.
+    assert "sleep" not in MASCOT_FRAMES
+    assert not (ROOT / "esphome" / "images" / "mascot_sleep.png").exists()
+    assert "mascot_sleep" not in display
     for name in MASCOT_FRAMES:
         frame = Image.open(ROOT / "esphome" / "images" / f"mascot_{name}.png")
         assert frame.mode == "1" and frame.size == (24, 26), (name, frame.mode, frame.size)
@@ -82,6 +86,11 @@ def main() -> None:
     mascot_script = (ROOT / "esphome" / "scripts" / "update_mascot.yaml").read_text(encoding="utf-8")
     for name in MASCOT_FRAMES:
         assert f"id(mascot_{name})" in mascot_script, f"update_mascot never shows mascot_{name}"
+    mascot_code = mascot_script.split("lambda:", 1)[1]
+    for gone in ("mascot_sleep", "lights_on_flag", "lights_status"):
+        assert gone not in mascot_code, f"update_mascot must not use {gone}: the dance never stops"
+    assert "component.update" not in mascot_script and "interval" not in mascot_code, \
+        "update_mascot must not add e-paper refreshes; it rides the 10 s growing-screen refresh"
 
     # 1-bit images: LVGL paints them as an alpha mask in image_recolor, which
     # defaults to white paper on this panel. Every LVGL image widget showing a

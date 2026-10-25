@@ -536,7 +536,7 @@ def main() -> None:
                 "meta": ("24", "OK", "90", "OK"),
                 "next_event": "Lights on 07:00",
                 "status": "Wi-Fi 192.168.1.20",
-                "mascot": "sleep",
+                "mascot": "lean_right",
             },
             fonts,
         ),
