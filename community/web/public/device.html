@@ -4,22 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!--SEO_HEAD-->
-  <title>Chamber alerts · Shroom Labs</title>
-  <meta name="description" content="Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts.">
+  <title>Device · Shroom Labs</title>
+  <meta name="description" content="Live stats, grow identity, and chamber controls for one of your Shroom Labs devices.">
   <meta name="robots" content="noindex,follow">
   <link rel="canonical" href="https://shroomlabs.io/device.html">
   <meta property="og:site_name" content="Shroom Labs">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Chamber alerts · Shroom Labs">
-  <meta property="og:description" content="Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts.">
+  <meta property="og:title" content="Device · Shroom Labs">
+  <meta property="og:description" content="Live stats, grow identity, and chamber controls for one of your Shroom Labs devices.">
   <meta property="og:url" content="https://shroomlabs.io/device.html">
   <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Chamber alerts · Shroom Labs">
+  <meta property="og:image:alt" content="Device · Shroom Labs">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Chamber alerts · Shroom Labs">
-  <meta name="twitter:description" content="Alert rules and grow tracking for one of your Shroom Labs chambers, with recent alerts.">
+  <meta name="twitter:title" content="Device · Shroom Labs">
+  <meta name="twitter:description" content="Live stats, grow identity, and chamber controls for one of your Shroom Labs devices.">
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
@@ -39,12 +39,14 @@
   </header>
   <!--/CHROME_HEADER-->
   <main id="main">
-    <p class="back-link"><a href="/account.html#alerts">Back to account</a></p>
-    <h1 id="device-name">Chamber alerts</h1>
+    <p class="back-link"><a href="/devices.html">Back to devices</a></p>
+    <h1 id="device-name">Device</h1>
     <p id="device-meta" class="muted"></p>
     <p id="device-error" class="notice hidden" role="alert"></p>
     <p id="device-status" class="notice hidden"></p>
+    <div id="device-dash" class="hidden"></div>
     <div id="device-body" class="hidden">
+      <h2 id="alerts-title">Alerts</h2>
       <ul id="device-states" class="state-chips" aria-label="Current alert state"></ul>
       <form id="rules-form" class="card alert-form">
         <fieldset>

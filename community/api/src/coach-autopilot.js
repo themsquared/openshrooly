@@ -256,6 +256,13 @@ export async function getDeviceMode(db, deviceId, userId) {
   return row || emptyMode(deviceId, userId);
 }
 
+export async function rememberDeviceProfile(db, deviceId, userId, profileId) {
+  const state = await getDeviceMode(db, deviceId, userId);
+  state.user_id = userId;
+  state.profile_id = profileId || null;
+  return writeDeviceMode(db, state);
+}
+
 async function writeDeviceMode(db, row) {
   const existing = await db.one("SELECT * FROM coach_device_mode WHERE device_id=?", [row.device_id]);
   const updated = { ...row, updated_at: nowIso() };
