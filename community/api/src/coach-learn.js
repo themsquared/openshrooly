@@ -140,6 +140,9 @@ export function parseTelemetry(rows = []) {
         temperature_setpoint: num(doc.temperature_setpoint ?? doc.target_temperature),
         fan_speed: num(doc.fan_speed ?? doc.fan_speed_percent),
         water_level: num(doc.water_level ?? doc.water),
+        temperature_calibration: num(
+          doc.temperature_calibration ?? doc.temp_calibration_c ?? doc.calibration_c
+        ),
         stage: doc.stage || doc.stage_id || "",
         created_at: row.created_at || doc.created_at || "",
       };
@@ -191,12 +194,14 @@ export function buildDeviceModel(samples, reports = []) {
 
   const humidityDroop = humidErr.length ? -Math.min(0, mean(humidErr)) : 0;
   const tempOffset = mean(tempErr) || 0;
+  const calibrations = parsed.map((s) => s.temperature_calibration).filter((v) => v != null);
 
   return {
     sample_count: parsed.length,
     humidity_error: mean(humidErr),
     humidity_droop: humidityDroop,
     temperature_offset: tempOffset,
+    temperature_calibration: calibrations.length ? mean(calibrations) : null,
     humidity_rise_per_min: riseRate,
     water_use_per_sample: waterUse,
     fan_average: mean(parsed.map((s) => s.fan_speed)),
@@ -205,8 +210,19 @@ export function buildDeviceModel(samples, reports = []) {
   };
 }
 
-export function suggestSetpoints(model, stage = {}, { auto = false } = {}) {
+/** Profile stage target band. Center ± hysteresis when min/max are present. */
+export function stageTemperatureTargetRange(stage = {}) {
+  const center = num(stage.temperature_c);
+  const lo = num(stage.temperature_target_min);
+  const hi = num(stage.temperature_target_max);
+  if (lo != null && hi != null && lo <= hi) return [lo, hi];
+  if (center != null) return [center, center];
+  return null;
+}
+
+export function suggestSetpoints(model, stage = {}, { auto = false, reading = null } = {}) {
   const bounds = safeBoundsForStage(stage);
+  const targetRange = stageTemperatureTargetRange(stage);
   const baseRh = num(stage.humidity_percent) ?? 90;
   const baseTemp = num(stage.temperature_c) ?? 20;
   const baseFan = num(stage.fan?.speed_percent ?? stage.fan_speed_percent) ?? 30;
@@ -224,14 +240,41 @@ export function suggestSetpoints(model, stage = {}, { auto = false } = {}) {
     humidity -= Math.min(bounds.humidity_delta, Math.round(model.humidity_error));
     reasons.push("Humidity runs high versus the target.");
   }
-  if (Math.abs(model.temperature_offset || 0) >= 0.6) {
-    const delta = clip(-model.temperature_offset, [-bounds.temperature_delta, bounds.temperature_delta]);
-    temperature += delta;
-    reasons.push(`Temperature runs ${model.temperature_offset > 0 ? "warm" : "cool"} by ${Math.abs(model.temperature_offset).toFixed(1)}°C.`);
+
+  // Reading-vs-setpoint is tracking error, not a sensor calibration. Only a real
+  // calibration value may shift the suggested setpoint, and never outside the
+  // profile target band.
+  const calibration = num(model.temperature_calibration);
+  if (calibration != null && Math.abs(calibration) >= 0.1) {
+    temperature -= calibration;
+    reasons.push(`Applying a ${calibration.toFixed(1)}°C sensor calibration.`);
+  }
+
+  const currentTemp = num(reading?.temperature);
+  const targetLo = targetRange ? targetRange[0] : baseTemp;
+  const targetHi = targetRange ? targetRange[1] : baseTemp;
+  if (currentTemp != null && targetHi != null && currentTemp > targetHi) {
+    reasons.push(
+      `The chamber is running warm at ${currentTemp} °C (above the ${targetHi} °C target). Lower the setpoint toward ${baseTemp} °C.`
+    );
+  } else if (currentTemp != null && targetLo != null && currentTemp < targetLo) {
+    reasons.push(
+      `The chamber is running cool at ${currentTemp} °C (below the ${targetLo} °C target). Raise the setpoint toward ${baseTemp} °C.`
+    );
   }
 
   humidity = Math.round(clip(humidity, bounds.humidity_percent) * 10) / 10;
-  temperature = Math.round(clip(temperature, bounds.temperature_c) * 10) / 10;
+  let tempLo = bounds.temperature_c[0];
+  let tempHi = bounds.temperature_c[1];
+  if (targetRange) {
+    tempLo = Math.max(tempLo, targetRange[0]);
+    tempHi = Math.min(tempHi, targetRange[1]);
+    if (tempLo > tempHi) {
+      tempLo = targetRange[0];
+      tempHi = targetRange[1];
+    }
+  }
+  temperature = Math.round(clip(temperature, [tempLo, tempHi]) * 10) / 10;
   const fan = clip(baseFan, bounds.fan_speed_percent);
 
   const within =
