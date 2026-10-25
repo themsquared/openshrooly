@@ -69,6 +69,19 @@
         <p id="usage" class="muted"></p>
       </div>
 
+      <section id="mode-panel" class="card coach-panel hidden" aria-labelledby="mode-title">
+        <h2 id="mode-title">Coach mode</h2>
+        <div class="mode-toggle" role="group" aria-label="Coach mode">
+          <button type="button" id="mode-advisor" aria-pressed="true">Advisor</button>
+          <button type="button" id="mode-autopilot" aria-pressed="false">Autopilot</button>
+        </div>
+        <p id="mode-status" class="muted">Advisor. Coach suggests changes. You tap Apply.</p>
+        <p class="row">
+          <button type="button" class="secondary hidden" id="run-autopilot">Run Autopilot now</button>
+        </p>
+        <ul id="autopilot-actions" class="action-list"></ul>
+      </section>
+
       <div class="coach-grid">
         <section class="card coach-panel" aria-labelledby="model-title">
           <h2 id="model-title">This chamber</h2>

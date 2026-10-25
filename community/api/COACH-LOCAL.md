@@ -81,3 +81,7 @@ The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
 - The REST adapter runs only when `ENVIRONMENT=local` **and** both
   `CF_ACCOUNT_ID` and `WORKERS_AI_TOKEN` are set **and** `env.AI` is absent.
 - `compatibility_date` is `2026-05-03` (wrangler 4.86 runtime max).
+- Autopilot is on for this local Worker (`COACH_AUTOPILOT_ENABLED=1`) and
+  runs on the 15 minute cron. Prod stays off: do not add that flag or a
+  Coach cron to `wrangler.deploy.toml`. Use **Run Autopilot now** on the
+  Coach page to test without waiting.

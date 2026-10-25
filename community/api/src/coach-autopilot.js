@@ -1,0 +1,583 @@
+/** Grow Coach Autopilot: server-side guardrails. The model never chooses setpoints. */
+
+import { nowIso } from "./crypto.js";
+import { isPsilocybin } from "./profile.js";
+import { coachAiConfigured, isCoachBetaUser } from "./providers.js";
+import {
+  COACH_ITEM,
+  buildDeviceModel,
+  latestReading,
+  parseTelemetry,
+  refuseRestrictedPack,
+  stageHumidityTargetRange,
+  stageTemperatureTargetRange,
+  suggestSetpoints,
+} from "./coach-learn.js";
+
+export const AUTOPILOT_LIMITS = {
+  tempClamp: [10, 32],
+  humidityClamp: [60, 98],
+  maxStepTemp: 1,
+  maxStepRh: 3,
+  maxStepFan: 10,
+  minIntervalMs: 60 * 60 * 1000,
+  dailyCap: 8,
+  staleMs: 15 * 60 * 1000,
+  manualPauseMs: 12 * 60 * 60 * 1000,
+  physicalTemp: [0, 45],
+  physicalRh: [10, 100],
+  jumpTemp: 8,
+  jumpRh: 25,
+  fanClamp: [10, 80],
+};
+
+export function coachAutopilotFlagOn(env = {}) {
+  return String(env.COACH_AUTOPILOT_ENABLED || "") === "1";
+}
+
+export async function coachAutopilotAvailable(env, db, user) {
+  if (!coachAutopilotFlagOn(env)) return false;
+  if (!user) return false;
+  if (isCoachBetaUser(env, user) && coachAiConfigured(env)) return true;
+  const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
+  if (sub && sub.status === "active" && sub.period_end >= nowIso()) return true;
+  const row = await db.one("SELECT * FROM entitlements WHERE user_id=? AND item_id=?", [user.id, COACH_ITEM]);
+  return Boolean(row);
+}
+
+function num(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function clip(value, [lo, hi]) {
+  return Math.min(hi, Math.max(lo, value));
+}
+
+function intersectRange(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  const lo = Math.max(a[0], b[0]);
+  const hi = Math.min(a[1], b[1]);
+  return lo <= hi ? [lo, hi] : a;
+}
+
+export function autopilotTempRange(stage = {}) {
+  return intersectRange(AUTOPILOT_LIMITS.tempClamp, stageTemperatureTargetRange(stage)) || AUTOPILOT_LIMITS.tempClamp;
+}
+
+export function autopilotHumidityRange(stage = {}) {
+  return intersectRange(AUTOPILOT_LIMITS.humidityClamp, stageHumidityTargetRange(stage)) || AUTOPILOT_LIMITS.humidityClamp;
+}
+
+export function clampAutopilotSetpoints(proposed = {}, stage = {}) {
+  const tempRange = autopilotTempRange(stage);
+  const rhRange = autopilotHumidityRange(stage);
+  const out = {};
+  if (proposed.temperature_c != null) {
+    out.temperature_c = Math.round(clip(Number(proposed.temperature_c), tempRange) * 10) / 10;
+  }
+  if (proposed.humidity_percent != null) {
+    out.humidity_percent = Math.round(clip(Number(proposed.humidity_percent), rhRange) * 10) / 10;
+  }
+  if (proposed.fan_speed_percent != null) {
+    out.fan_speed_percent = clip(Number(proposed.fan_speed_percent), AUTOPILOT_LIMITS.fanClamp);
+  }
+  return out;
+}
+
+export function stepToward(current, target, maxStep) {
+  if (current == null || !Number.isFinite(Number(current))) return target;
+  if (target == null || !Number.isFinite(Number(target))) return Number(current);
+  const from = Number(current);
+  const to = Number(target);
+  const delta = to - from;
+  if (Math.abs(delta) <= maxStep) return to;
+  return from + Math.sign(delta) * maxStep;
+}
+
+export function limitAutopilotStep(from = {}, to = {}) {
+  const next = { ...to };
+  if (to.temperature_c != null) {
+    next.temperature_c = Math.round(stepToward(from.temperature_c, to.temperature_c, AUTOPILOT_LIMITS.maxStepTemp) * 10) / 10;
+  }
+  if (to.humidity_percent != null) {
+    next.humidity_percent = Math.round(stepToward(from.humidity_percent, to.humidity_percent, AUTOPILOT_LIMITS.maxStepRh) * 10) / 10;
+  }
+  if (to.fan_speed_percent != null) {
+    next.fan_speed_percent = Math.round(stepToward(from.fan_speed_percent, to.fan_speed_percent, AUTOPILOT_LIMITS.maxStepFan));
+  }
+  return next;
+}
+
+export function nextEligibleAt(state = {}, now = Date.now()) {
+  const last = state.last_change_at ? Date.parse(state.last_change_at) : NaN;
+  if (!Number.isFinite(last)) return now;
+  return last + AUTOPILOT_LIMITS.minIntervalMs;
+}
+
+export function dailyChangeCount(state = {}, now = Date.now()) {
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (state.changes_day !== day) return 0;
+  return Number(state.changes_count || 0);
+}
+
+export function evaluateAutopilotPause({ reading, previous, device, now = Date.now() } = {}) {
+  const status = String(device?.status || "");
+  const seen = device?.last_seen_at ? Date.parse(device.last_seen_at) : NaN;
+  if (status && status !== "claimed" && status !== "active") {
+    return { pause: true, reason: "The chamber looks offline." };
+  }
+  if (Number.isFinite(seen) && now - seen > AUTOPILOT_LIMITS.staleMs) {
+    return { pause: true, reason: "The chamber looks offline." };
+  }
+  if (!reading || (reading.temperature == null && reading.humidity == null)) {
+    return { pause: true, reason: "Readings are missing." };
+  }
+  if (reading.age_seconds != null && reading.age_seconds * 1000 > AUTOPILOT_LIMITS.staleMs) {
+    return { pause: true, reason: "Readings are stale (older than 15 minutes)." };
+  }
+  const temp = num(reading.temperature);
+  const rh = num(reading.humidity);
+  if (temp != null && (temp < AUTOPILOT_LIMITS.physicalTemp[0] || temp > AUTOPILOT_LIMITS.physicalTemp[1])) {
+    return { pause: true, reason: "Readings are outside a physical range." };
+  }
+  if (rh != null && (rh < AUTOPILOT_LIMITS.physicalRh[0] || rh > AUTOPILOT_LIMITS.physicalRh[1])) {
+    return { pause: true, reason: "Readings are outside a physical range." };
+  }
+  if (previous) {
+    const prevTemp = num(previous.temperature);
+    const prevRh = num(previous.humidity);
+    if (temp != null && prevTemp != null && Math.abs(temp - prevTemp) > AUTOPILOT_LIMITS.jumpTemp) {
+      return { pause: true, reason: "Readings jumped too far too fast." };
+    }
+    if (rh != null && prevRh != null && Math.abs(rh - prevRh) > AUTOPILOT_LIMITS.jumpRh) {
+      return { pause: true, reason: "Readings jumped too far too fast." };
+    }
+  }
+  return { pause: false };
+}
+
+export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage = {}, state = {}, now = Date.now() } = {}) {
+  const intervalAt = nextEligibleAt(state, now);
+  if (now < intervalAt) {
+    return { ok: false, waitUntil: intervalAt, reason: "Waiting for the minimum interval between changes." };
+  }
+  if (dailyChangeCount(state, now) >= AUTOPILOT_LIMITS.dailyCap) {
+    return { ok: false, waitUntil: intervalAt, reason: "Daily Autopilot change cap reached." };
+  }
+  const allowed = {
+    temperature_c: suggestion?.temperature_c,
+    humidity_percent: suggestion?.humidity_percent,
+    fan_speed_percent: suggestion?.fan_speed_percent,
+  };
+  const clamped = clampAutopilotSetpoints(allowed, stage);
+  const stepped = limitAutopilotStep(currentSetpoints, clamped);
+  const changed =
+    (stepped.temperature_c != null && stepped.temperature_c !== currentSetpoints.temperature_c) ||
+    (stepped.humidity_percent != null && stepped.humidity_percent !== currentSetpoints.humidity_percent) ||
+    (stepped.fan_speed_percent != null && stepped.fan_speed_percent !== currentSetpoints.fan_speed_percent);
+  if (!changed) return { ok: false, reason: "Already at the profile target." };
+  return {
+    ok: true,
+    next: stepped,
+    reason: (suggestion?.reasons || []).join(" ") || "Move setpoints toward the profile stage target.",
+  };
+}
+
+function parseJson(value, fallback = null) {
+  if (value == null || value === "" || value === "null") return fallback;
+  if (typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed == null ? fallback : parsed;
+  } catch {
+    return fallback;
+  }
+}
+
+function emptyMode(deviceId, userId) {
+  return {
+    device_id: deviceId,
+    user_id: userId,
+    mode: "advisor",
+    paused: 0,
+    pause_reason: null,
+    pause_until: null,
+    profile_id: null,
+    last_change_at: null,
+    changes_day: null,
+    changes_count: 0,
+    last_setpoints: null,
+    last_manual_at: null,
+    updated_at: nowIso(),
+  };
+}
+
+export async function getDeviceMode(db, deviceId, userId) {
+  const row = await db.one("SELECT * FROM coach_device_mode WHERE device_id=?", [deviceId]);
+  return row || emptyMode(deviceId, userId);
+}
+
+async function writeDeviceMode(db, row) {
+  const existing = await db.one("SELECT * FROM coach_device_mode WHERE device_id=?", [row.device_id]);
+  const updated = { ...row, updated_at: nowIso() };
+  if (existing) {
+    await db.run(
+      "UPDATE coach_device_mode SET mode=?, paused=?, pause_reason=?, pause_until=?, profile_id=?, last_change_at=?, changes_day=?, changes_count=?, last_setpoints=?, last_manual_at=?, updated_at=? WHERE device_id=?",
+      [
+        updated.mode,
+        updated.paused ? 1 : 0,
+        updated.pause_reason,
+        updated.pause_until,
+        updated.profile_id,
+        updated.last_change_at,
+        updated.changes_day,
+        updated.changes_count,
+        typeof updated.last_setpoints === "string" ? updated.last_setpoints : JSON.stringify(updated.last_setpoints),
+        updated.last_manual_at,
+        updated.updated_at,
+        updated.device_id,
+      ]
+    );
+  } else {
+    await db.run(
+      "INSERT INTO coach_device_mode (device_id, user_id, mode, paused, pause_reason, pause_until, profile_id, last_change_at, changes_day, changes_count, last_setpoints, last_manual_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        updated.device_id,
+        updated.user_id,
+        updated.mode,
+        updated.paused ? 1 : 0,
+        updated.pause_reason,
+        updated.pause_until,
+        updated.profile_id,
+        updated.last_change_at,
+        updated.changes_day,
+        updated.changes_count,
+        typeof updated.last_setpoints === "string" ? updated.last_setpoints : JSON.stringify(updated.last_setpoints),
+        updated.last_manual_at,
+        updated.updated_at,
+      ]
+    );
+  }
+  return updated;
+}
+
+async function addLog(db, row) {
+  await db.run(
+    "INSERT INTO coach_autopilot_log (device_id, user_id, action, old_value, new_value, reason, readings, undone_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      row.device_id,
+      row.user_id,
+      row.action,
+      row.old_value == null ? null : JSON.stringify(row.old_value),
+      row.new_value == null ? null : JSON.stringify(row.new_value),
+      row.reason,
+      row.readings == null ? null : JSON.stringify(row.readings),
+      null,
+      nowIso(),
+    ]
+  );
+}
+
+export async function listAutopilotActions(db, deviceId, limit = 12) {
+  const rows = await db.all("SELECT * FROM coach_autopilot_log WHERE device_id=?", [deviceId]);
+  return (rows || [])
+    .slice()
+    .sort((a, b) => Number(b.id) - Number(a.id))
+    .slice(0, limit)
+    .map((row) => ({
+      id: row.id,
+      action: row.action,
+      old_value: parseJson(row.old_value),
+      new_value: parseJson(row.new_value),
+      reason: row.reason,
+      readings: parseJson(row.readings),
+      undone_at: row.undone_at || null,
+      created_at: row.created_at,
+    }));
+}
+
+function publicStatus(state, now = Date.now()) {
+  const pauseUntil = state.pause_until ? Date.parse(state.pause_until) : NaN;
+  const stillPaused = Boolean(Number(state.paused)) && (!Number.isFinite(pauseUntil) || pauseUntil > now);
+  if (state.mode !== "autopilot") {
+    return {
+      mode: "advisor",
+      status: stillPaused ? "paused" : "advisor",
+      pause_reason: stillPaused ? state.pause_reason || "Autopilot is paused." : null,
+      pause_until: stillPaused ? state.pause_until : null,
+      next_eligible_at: stillPaused && Number.isFinite(pauseUntil) ? new Date(pauseUntil).toISOString() : null,
+    };
+  }
+  if (stillPaused) {
+    return {
+      mode: "autopilot",
+      status: "paused",
+      pause_reason: state.pause_reason || "Autopilot is paused.",
+      pause_until: state.pause_until,
+      next_eligible_at: Number.isFinite(pauseUntil) ? new Date(pauseUntil).toISOString() : null,
+    };
+  }
+  const eligible = nextEligibleAt(state, now);
+  return {
+    mode: "autopilot",
+    status: "active",
+    pause_reason: null,
+    pause_until: null,
+    next_eligible_at: new Date(Math.max(now, eligible)).toISOString(),
+  };
+}
+
+export async function getAutopilotStatus(db, env, user, deviceId) {
+  const available = await coachAutopilotAvailable(env, db, user);
+  if (!deviceId) {
+    return { available, mode: "advisor", status: "advisor", actions: [] };
+  }
+  const state = await getDeviceMode(db, deviceId, user.id);
+  return {
+    available,
+    ...publicStatus(state),
+    profile_id: state.profile_id,
+    actions: available ? await listAutopilotActions(db, deviceId) : [],
+  };
+}
+
+export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, profileId } = {}) {
+  if (!(await coachAutopilotAvailable(env, db, user))) {
+    return { error: "not found", status: 404 };
+  }
+  const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [deviceId]);
+  if (!device || Number(device.owner_id) !== Number(user.id)) {
+    return { error: "not your device", status: 403 };
+  }
+  const nextMode = mode === "autopilot" ? "autopilot" : "advisor";
+  if (nextMode === "autopilot" && refuseRestrictedPack({ pack: profileId, tags: [] })) {
+    return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
+  }
+  if (nextMode === "autopilot" && profileId) {
+    const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
+    const doc = row ? (typeof row.document === "string" ? JSON.parse(row.document) : row.document) : null;
+    if (doc && (isPsilocybin(doc) || refuseRestrictedPack(doc))) {
+      return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
+    }
+  }
+  const state = await getDeviceMode(db, deviceId, user.id);
+  if (nextMode === "autopilot") {
+    const until = state.pause_until ? Date.parse(state.pause_until) : NaN;
+    if (Number(state.paused) && Number.isFinite(until) && until > Date.now()) {
+      return { error: state.pause_reason || "Autopilot is paused.", status: 409 };
+    }
+    state.paused = 0;
+    state.pause_reason = null;
+    state.pause_until = null;
+  }
+  state.mode = nextMode;
+  state.profile_id = profileId || state.profile_id;
+  await writeDeviceMode(db, state);
+  return { ok: true, ...publicStatus(state) };
+}
+
+export async function pauseForManualOverride(db, deviceId, userId, now = Date.now()) {
+  const state = await getDeviceMode(db, deviceId, userId);
+  if (state.mode !== "autopilot") return state;
+  state.mode = "advisor";
+  state.paused = 1;
+  state.pause_reason = "You changed a setpoint. Autopilot is paused for 12 hours.";
+  state.pause_until = new Date(now + AUTOPILOT_LIMITS.manualPauseMs).toISOString().replace(/\.\d+Z$/, "Z");
+  state.last_manual_at = new Date(now).toISOString().replace(/\.\d+Z$/, "Z");
+  await writeDeviceMode(db, state);
+  await addLog(db, {
+    device_id: deviceId,
+    user_id: userId,
+    action: "pause",
+    old_value: null,
+    new_value: null,
+    reason: state.pause_reason,
+    readings: null,
+  });
+  return state;
+}
+
+export async function noteManualSetpointCommand(db, device, payload) {
+  if (!device?.id || !device.owner_id) return;
+  const source = payload?.source || "";
+  if (source === "grow-coach-autopilot" || source === "grow-coach-autopilot-undo") return;
+  const state = await getDeviceMode(db, device.id, device.owner_id);
+  if (state.mode !== "autopilot") return;
+  await pauseForManualOverride(db, device.id, device.owner_id);
+}
+
+async function slimPublished(db) {
+  const rows = await db.all("SELECT document FROM profiles WHERE published=1");
+  return (rows || [])
+    .map((row) => (typeof row.document === "string" ? JSON.parse(row.document) : row.document))
+    .filter((p) => p && !isPsilocybin(p) && !refuseRestrictedPack(p));
+}
+
+function expandStage(stage = {}) {
+  const rh = num(stage.humidity_percent);
+  const rhHyst = num(stage.humidity_hysteresis);
+  const temp = num(stage.temperature_c);
+  const tempHyst = num(stage.temperature_hysteresis);
+  return {
+    ...stage,
+    humidity_target_min: num(stage.humidity_target_min) ?? (rh != null && rhHyst != null ? rh - rhHyst : rh),
+    humidity_target_max: num(stage.humidity_target_max) ?? (rh != null && rhHyst != null ? rh + rhHyst : rh),
+    temperature_target_min: num(stage.temperature_target_min) ?? (temp != null && tempHyst != null ? temp - tempHyst : temp),
+    temperature_target_max: num(stage.temperature_target_max) ?? (temp != null && tempHyst != null ? temp + tempHyst : temp),
+  };
+}
+
+function stageFromProfile(profile) {
+  if (!profile) return {};
+  const stages = profile.stages || [];
+  return expandStage(stages.find((s) => s.id === "fruiting") || stages[0] || {});
+}
+
+async function applySetpointsCommand(db, deviceId, payload) {
+  await db.run(
+    "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
+    [deviceId, "setpoints", JSON.stringify(payload), nowIso(), null]
+  );
+}
+
+export async function runAutopilotForDevice(db, env, { device, user, now = Date.now(), force = false } = {}) {
+  if (!coachAutopilotFlagOn(env)) return { skipped: "kill_switch" };
+  if (!(await coachAutopilotAvailable(env, db, user))) return { skipped: "not_entitled" };
+  const state = await getDeviceMode(db, device.id, user.id);
+  if (state.mode !== "autopilot") return { skipped: "advisor" };
+
+  const pauseUntil = state.pause_until ? Date.parse(state.pause_until) : NaN;
+  if (Number(state.paused) && Number.isFinite(pauseUntil) && pauseUntil > now) {
+    return { skipped: "paused", reason: state.pause_reason };
+  }
+  if (Number(state.paused) && (!Number.isFinite(pauseUntil) || pauseUntil <= now)) {
+    state.paused = 0;
+    state.pause_reason = null;
+    state.pause_until = null;
+    await writeDeviceMode(db, state);
+  }
+
+  const samples = await db.all("SELECT * FROM device_telemetry WHERE device_id=?", [device.id]);
+  const parsed = parseTelemetry(samples).slice().sort((a, b) => Date.parse(a.created_at || 0) - Date.parse(b.created_at || 0));
+  const current = latestReading(samples, now);
+  const previous = parsed.length > 1 ? parsed[parsed.length - 2] : null;
+  const pause = evaluateAutopilotPause({ reading: current, previous, device, now });
+  if (pause.pause) {
+    state.mode = "advisor";
+    state.paused = 1;
+    state.pause_reason = pause.reason;
+    state.pause_until = null;
+    await writeDeviceMode(db, state);
+    await addLog(db, {
+      device_id: device.id,
+      user_id: user.id,
+      action: "pause",
+      old_value: null,
+      new_value: null,
+      reason: pause.reason,
+      readings: current,
+    });
+    return { paused: true, reason: pause.reason, flipped_to: "advisor" };
+  }
+
+  const library = await slimPublished(db);
+  const profile = library.find((p) => p.id === state.profile_id) || library[0] || null;
+  if (profile && refuseRestrictedPack(profile)) {
+    state.mode = "advisor";
+    state.paused = 1;
+    state.pause_reason = "Autopilot is not available for off-menu varieties.";
+    await writeDeviceMode(db, state);
+    return { skipped: "off_menu" };
+  }
+  const stage = stageFromProfile(profile);
+  const reports = await db.all("SELECT * FROM grow_reports WHERE author_id=?", [user.id]);
+  const model = buildDeviceModel(samples, reports.filter((r) => !String(r.profile_id || "").includes("psilocybin")));
+  const suggestion = suggestSetpoints(model, stage, { reading: current });
+  const last = parseJson(state.last_setpoints, {});
+  const currentSetpoints = {
+    temperature_c: current.temperature_setpoint ?? last.temperature_c,
+    humidity_percent: current.humidity_setpoint ?? last.humidity_percent,
+    fan_speed_percent: last.fan_speed_percent ?? suggestion.fan_speed_percent,
+  };
+  const plan = planAutopilotChange({
+    suggestion,
+    currentSetpoints,
+    stage,
+    state: force ? { ...state, last_change_at: null, changes_count: 0, changes_day: null } : state,
+    now,
+  });
+  if (!plan.ok) return { skipped: "no_change", reason: plan.reason, waitUntil: plan.waitUntil || null };
+
+  await applySetpointsCommand(db, device.id, {
+    ...plan.next,
+    source: "grow-coach-autopilot",
+    approved: true,
+  });
+  const day = new Date(now).toISOString().slice(0, 10);
+  state.last_change_at = new Date(now).toISOString();
+  state.changes_count = dailyChangeCount(state, now) + 1;
+  state.changes_day = day;
+  state.last_setpoints = plan.next;
+  state.paused = 0;
+  state.pause_reason = null;
+  await writeDeviceMode(db, state);
+  await addLog(db, {
+    device_id: device.id,
+    user_id: user.id,
+    action: "apply",
+    old_value: currentSetpoints,
+    new_value: plan.next,
+    reason: plan.reason,
+    readings: current,
+  });
+  return { applied: true, next: plan.next, reason: plan.reason };
+}
+
+export async function runAutopilotPass(env, { now = Date.now(), deviceId = null } = {}) {
+  if (!coachAutopilotFlagOn(env)) return { skipped: "kill_switch", ran: 0 };
+  const { db } = env;
+  const rows = deviceId
+    ? [await db.one("SELECT * FROM coach_device_mode WHERE device_id=?", [deviceId])].filter(Boolean)
+    : await db.all("SELECT * FROM coach_device_mode WHERE mode=?", ["autopilot"]);
+  let ran = 0;
+  const results = [];
+  for (const row of rows || []) {
+    const device = await db.one("SELECT * FROM cloud_devices WHERE id=?", [row.device_id]);
+    const user = await db.one("SELECT * FROM users WHERE id=?", [row.user_id]);
+    if (!device || !user) continue;
+    const result = await runAutopilotForDevice(db, env, { device, user, now });
+    results.push({ device_id: row.device_id, ...result });
+    if (result.applied) ran += 1;
+  }
+  return { ran, results };
+}
+
+export async function undoAutopilotAction(db, env, user, actionId) {
+  if (!(await coachAutopilotAvailable(env, db, user))) {
+    return { error: "not found", status: 404 };
+  }
+  const row = await db.one("SELECT * FROM coach_autopilot_log WHERE id=?", [actionId]);
+  if (!row || Number(row.user_id) !== Number(user.id)) return { error: "not found", status: 404 };
+  if (row.undone_at) return { error: "Already undone.", status: 400 };
+  if (row.action !== "apply") return { error: "Only applied changes can be undone.", status: 400 };
+  const oldValue = parseJson(row.old_value);
+  if (!oldValue) return { error: "Nothing to restore.", status: 400 };
+  await applySetpointsCommand(db, row.device_id, { ...oldValue, source: "grow-coach-autopilot-undo", approved: true });
+  await db.run("UPDATE coach_autopilot_log SET undone_at=? WHERE id=?", [nowIso(), row.id]);
+  await addLog(db, {
+    device_id: row.device_id,
+    user_id: user.id,
+    action: "undo",
+    old_value: parseJson(row.new_value),
+    new_value: oldValue,
+    reason: "Undo restored the previous setpoints.",
+    readings: parseJson(row.readings),
+  });
+  const state = await getDeviceMode(db, row.device_id, user.id);
+  state.last_setpoints = oldValue;
+  await writeDeviceMode(db, state);
+  return { ok: true, restored: oldValue };
+}

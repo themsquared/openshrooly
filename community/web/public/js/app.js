@@ -798,6 +798,8 @@ async function renderCoach() {
   const photosOn = Boolean((await capabilities()).photos);
   $("#photo-panel")?.classList.toggle("hidden", !photosOn);
   $("#auto-tune").checked = Boolean(catalog.auto_tune);
+  const autopilotOn = Boolean(catalog.autopilot);
+  $("#mode-panel")?.classList.toggle("hidden", !autopilotOn);
 
   async function refreshUsage() {
     const usage = await api("/api/coach/usage").catch(() => null);
@@ -843,12 +845,104 @@ async function renderCoach() {
     $("#suggestion").dataset.ready = s.within_bounds ? "1" : "0";
   }
 
-  $("#device").addEventListener("change", () => refreshModel().catch(showCoachError));
+  function setModeButtons(mode) {
+    const auto = mode === "autopilot";
+    $("#mode-advisor")?.setAttribute("aria-pressed", auto ? "false" : "true");
+    $("#mode-autopilot")?.setAttribute("aria-pressed", auto ? "true" : "false");
+  }
+
+  function formatEligible(iso) {
+    if (!iso) return "";
+    const at = Date.parse(iso);
+    if (!Number.isFinite(at)) return "";
+    return new Date(at).toLocaleString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  async function refreshAutopilot() {
+    if (!autopilotOn) return;
+    if (!deviceId()) {
+      setModeButtons("advisor");
+      $("#mode-status").textContent = "Pick a chamber to use Autopilot.";
+      $("#run-autopilot")?.classList.add("hidden");
+      $("#autopilot-actions").innerHTML = "";
+      return;
+    }
+    const data = await api(`/api/coach/autopilot?device_id=${encodeURIComponent(deviceId())}`);
+    setModeButtons(data.mode);
+    if (data.status === "paused") {
+      const until = formatEligible(data.pause_until || data.next_eligible_at);
+      $("#mode-status").textContent = until
+        ? `Autopilot paused: ${data.pause_reason} Next eligible after ${until}.`
+        : `Autopilot paused: ${data.pause_reason}`;
+    } else if (data.mode === "autopilot") {
+      const next = formatEligible(data.next_eligible_at);
+      $("#mode-status").textContent = next
+        ? `Autopilot is on. Next change after ${next}.`
+        : "Autopilot is on.";
+    } else {
+      $("#mode-status").textContent = "Advisor. Coach suggests changes. You tap Apply.";
+    }
+    $("#run-autopilot")?.classList.toggle("hidden", data.mode !== "autopilot");
+    $("#autopilot-actions").innerHTML =
+      (data.actions || [])
+        .map((row) => {
+          const next = row.new_value || {};
+          const summary = row.action === "apply"
+            ? `Set ${next.temperature_c ?? "?"} °C and ${next.humidity_percent ?? "?"}% RH`
+            : row.action === "undo"
+              ? "Restored the previous setpoints"
+              : "Paused Autopilot";
+          const undo = row.action === "apply" && !row.undone_at
+            ? `<button type="button" class="secondary" data-undo="${row.id}">Undo</button>`
+            : row.undone_at
+              ? `<span class="muted">Undone</span>`
+              : "";
+          return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(row.reason || "")}</p></div>${undo}</li>`;
+        })
+        .join("") || `<li class="muted">No Autopilot actions yet.</li>`;
+  }
+
+  $("#device").addEventListener("change", () => {
+    refreshModel().catch(showCoachError);
+    refreshAutopilot().catch(showCoachError);
+  });
   $("#profile")?.addEventListener("change", () => refreshModel().catch(showCoachError));
   $("#refresh-model").addEventListener("click", () => refreshModel().catch(showCoachError));
   $("#auto-tune").addEventListener("change", async () => {
     try {
       await api("/api/coach/auto-tune", { method: "POST", jsonBody: { enabled: $("#auto-tune").checked } });
+    } catch (err) {
+      showCoachError(err);
+    }
+  });
+  async function setCoachMode(mode) {
+    if (!deviceId()) {
+      showCoachError(new Error("Pick a chamber first."));
+      return;
+    }
+    await api("/api/coach/autopilot/mode", {
+      method: "POST",
+      jsonBody: { device_id: deviceId(), mode, profile_id: profileId() || undefined },
+    });
+    await refreshAutopilot();
+  }
+  $("#mode-advisor")?.addEventListener("click", () => setCoachMode("advisor").catch(showCoachError));
+  $("#mode-autopilot")?.addEventListener("click", () => setCoachMode("autopilot").catch(showCoachError));
+  $("#run-autopilot")?.addEventListener("click", async () => {
+    try {
+      await api("/api/coach/autopilot/run", { method: "POST", jsonBody: { device_id: deviceId() } });
+      await refreshModel();
+      await refreshAutopilot();
+    } catch (err) {
+      showCoachError(err);
+    }
+  });
+  $("#autopilot-actions")?.addEventListener("click", async (ev) => {
+    const id = ev.target?.dataset?.undo;
+    if (!id) return;
+    try {
+      await api("/api/coach/autopilot/undo", { method: "POST", jsonBody: { action_id: Number(id) } });
+      await refreshAutopilot();
     } catch (err) {
       showCoachError(err);
     }
@@ -909,6 +1003,7 @@ async function renderCoach() {
   });
 
   await refreshModel().catch(showCoachError);
+  await refreshAutopilot().catch(showCoachError);
   await refreshUsage();
 }
 

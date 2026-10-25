@@ -3,6 +3,7 @@ import { handleRequest, withCors } from "./handlers.js";
 import { SCHEMA_SQL } from "./schema.js";
 import { createOptionalStorage } from "./storage.js";
 import { runAlerts } from "./alerts/cron.js";
+import { runAutopilotPass } from "./coach-autopilot.js";
 import { reclassifyUnconfirmedLegacyBatch } from "./review.js";
 
 async function envContext(env) {
@@ -62,6 +63,7 @@ async function envContext(env) {
       GROW_COACH_VISION_MODEL: env.GROW_COACH_VISION_MODEL,
       COACH_PUBLIC: env.COACH_PUBLIC,
       COACH_BETA_USER_IDS: env.COACH_BETA_USER_IDS,
+      COACH_AUTOPILOT_ENABLED: env.COACH_AUTOPILOT_ENABLED,
     };
   }
   return env._ctx;
@@ -89,6 +91,14 @@ export default {
         console.log(JSON.stringify({ level: "info", event: "alerts_cron", ...summary, reclass }));
       } catch (err) {
         console.log(JSON.stringify({ level: "error", event: "legacy_reclass_failed", message: String(err?.message || err).slice(0, 200) }));
+      }
+      try {
+        const auto = await runAutopilotPass(ctx, { now: Number(event?.scheduledTime) || Date.now() });
+        if (auto.skipped !== "kill_switch") {
+          console.log(JSON.stringify({ level: "info", event: "coach_autopilot", ran: auto.ran }));
+        }
+      } catch (err) {
+        console.log(JSON.stringify({ level: "error", event: "coach_autopilot_failed", message: String(err?.message || err).slice(0, 200) }));
       }
     })();
     executionCtx.waitUntil(work);

@@ -5,6 +5,7 @@ import { rateLimit, rateLimitClient } from "./security.js";
 import { devStubsEnabled } from "./providers.js";
 import { ValidationError } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
+import { noteManualSetpointCommand } from "./coach-autopilot.js";
 import {
   buildCsr,
   bytesToB64url,
@@ -765,10 +766,12 @@ export async function handleDevices(method, path, url, request, env) {
       throw new ValidationError("unknown command");
     }
     const issuedAt = nowIso();
+    const payload = body.payload || {};
     await db.run(
       "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
-      [device.id, kind, JSON.stringify(body.payload || {}), issuedAt, null]
+      [device.id, kind, JSON.stringify(payload), issuedAt, null]
     );
+    if (kind === "setpoints") await noteManualSetpointCommand(db, device, payload);
     return json({ ok: true, issued_at: issuedAt, local_wins_if_newer: true });
   }
 
