@@ -93,6 +93,16 @@ test("every built-in profile stage has a complete light mix", () => {
   }
 });
 
+test("a community profile cannot be saved without a complete stage light mix", () => {
+  const pearl = load("data/profiles/culinary/pearl-oyster.json");
+  const missing = structuredClone(pearl);
+  delete missing.stages.find((s) => s.id === "fruiting").light;
+  assert.throws(() => validateProfile(missing), /sunrise|light hours|white light|red|green|blue/i);
+  const noHours = structuredClone(pearl);
+  noHours.stages.find((s) => s.id === "fruiting").light.duration_hours = 0;
+  assert.throws(() => validateProfile(noHours), /duration must be greater than 0/i);
+});
+
 test("stage light payloads use the same ranges as the profile light schema", () => {
   const ok = validateStageLight({
     sunrise_hour: 8,
