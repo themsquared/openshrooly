@@ -12,6 +12,7 @@ import {
   collectProfileIssues,
   publishReadyIssues,
   syncStageLightFromRecipe,
+  whiteLuxToPercent,
   parseProfileDocument,
   exportProfileDocument,
   firstIssue,
@@ -605,7 +606,7 @@ export class ProfileBuilder extends HTMLElement {
         recipe.phases[stage.id] = recipe.phases[stage.id] || defaultLightPhase(stage.id);
         const phase = recipe.phases[stage.id];
         if (key === "duration_hours") phase.photoperiod_hours = Number(raw);
-        if (key === "white_led_lux") phase.white_brightness_percent = Math.min(100, Math.round((Number(raw) / 400) * 100));
+        if (key === "white_led_lux") phase.white_brightness_percent = Math.round(whiteLuxToPercent(raw));
         if (key === "red_percent" || key === "green_percent" || key === "blue_percent") phase[key] = Number(raw);
       }
     }

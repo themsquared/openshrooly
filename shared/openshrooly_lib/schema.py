@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import copy
+import math
 from typing import Any
 from urllib.parse import urlparse
 
+from .mapping import lux_to_brightness_percent
 from .models import MushroomProfile
 
 PROFILE_SCHEMA_VERSION = 1
@@ -46,6 +49,103 @@ def is_https_source_url(url: str | None) -> bool:
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValidationError(message)
+
+
+# Firmware 1.0.3-sl.6 uses 12 h when lux or RGB is on and duration is 0 or unset.
+FIRMWARE_FALLBACK_LIGHT_HOURS = 12
+DEFAULT_SUNRISE_HOUR = 8
+_STAGE_CHANNELS = ("white_led_lux", "red_percent", "green_percent", "blue_percent")
+_PHASE_CHANNELS = ("white_brightness_percent", "red_percent", "green_percent", "blue_percent")
+
+
+def _finite_or(value: Any, fallback: Any) -> Any:
+    if value is None or value == "":
+        return fallback
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    if not math.isfinite(number):
+        return fallback
+    return int(number) if number.is_integer() else number
+
+
+def _normalize_stage_light(light: Any) -> dict[str, Any]:
+    if not isinstance(light, dict) or not light:
+        return {
+            "sunrise_hour": DEFAULT_SUNRISE_HOUR,
+            "duration_hours": 0,
+            "white_led_lux": 0,
+            "red_percent": 0,
+            "green_percent": 0,
+            "blue_percent": 0,
+        }
+    out = dict(light)
+    out["sunrise_hour"] = _finite_or(light.get("sunrise_hour"), DEFAULT_SUNRISE_HOUR)
+    for channel in _STAGE_CHANNELS:
+        out[channel] = _finite_or(light.get(channel), 0)
+    hours = _finite_or(light.get("duration_hours"), None)
+    on = any(float(out[channel]) > 0 for channel in _STAGE_CHANNELS)
+    if on and not (hours is not None and hours > 0):
+        out["duration_hours"] = FIRMWARE_FALLBACK_LIGHT_HOURS
+    else:
+        out["duration_hours"] = 0 if hours is None else hours
+    return out
+
+
+def _normalize_phase(phase: dict[str, Any]) -> dict[str, Any]:
+    out = dict(phase)
+    for channel in _PHASE_CHANNELS:
+        out[channel] = _finite_or(phase.get(channel), 0)
+    hours = _finite_or(phase.get("photoperiod_hours"), None)
+    on = any(float(out[channel]) > 0 for channel in _PHASE_CHANNELS)
+    if on and not (hours is not None and hours > 0):
+        out["photoperiod_hours"] = FIRMWARE_FALLBACK_LIGHT_HOURS
+    else:
+        out["photoperiod_hours"] = 0 if hours is None else hours
+    return out
+
+
+def normalize_stored_light(data: dict[str, Any]) -> dict[str, Any]:
+    """Read path only, same rules as normalizeStoredProfileLight in profile-schema.js.
+
+    Profiles saved before every stage needed a full light mix can have a stage with
+    no light, or light on with 0 or missing hours. No light reads as dark. Light on
+    without hours reads as 12 h, which is what the firmware does.
+    """
+    if not isinstance(data, dict):
+        return data
+    out = copy.deepcopy(data)
+    stages = out.get("stages")
+    if not isinstance(stages, list):
+        return out
+    for stage in stages:
+        if isinstance(stage, dict):
+            stage["light"] = _normalize_stage_light(stage.get("light"))
+    recipe = out.get("light_recipe")
+    phases = recipe.get("phases") if isinstance(recipe, dict) else None
+    if isinstance(phases, dict):
+        for name, phase in list(phases.items()):
+            if isinstance(phase, dict):
+                phases[name] = _normalize_phase(phase)
+        for stage in stages:
+            if isinstance(stage, dict) and stage.get("id") and stage["id"] not in phases:
+                light = stage["light"]
+                phases[stage["id"]] = {
+                    "photoperiod_hours": light["duration_hours"],
+                    "white_brightness_percent": int(
+                        math.floor(lux_to_brightness_percent(light["white_led_lux"]) + 0.5)
+                    ),
+                    "red_percent": light["red_percent"],
+                    "green_percent": light["green_percent"],
+                    "blue_percent": light["blue_percent"],
+                }
+    return out
+
+
+def validate_stored_profile(data: dict[str, Any]) -> MushroomProfile:
+    """Validate a profile read back from storage after filling in legacy light."""
+    return validate_profile(normalize_stored_light(data))
 
 
 def validate_profile(data: dict[str, Any] | MushroomProfile) -> MushroomProfile:

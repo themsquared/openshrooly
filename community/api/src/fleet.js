@@ -2,7 +2,7 @@
 
 import { laterIso, nowIso } from "./crypto.js";
 import { requireVerified, userFromRequest } from "./auth.js";
-import { isPsilocybin, ValidationError, validateStageLight } from "./profile.js";
+import { isPsilocybin, normalizeStoredProfileLight, ValidationError, validateStageLight } from "./profile.js";
 import {
   compareReadingToStage,
   latestReading,
@@ -106,7 +106,7 @@ async function loadProfile(db, user, profileId) {
   const owned = user && row.author_id != null && Number(row.author_id) === Number(user.id);
   if (!published && !owned) return null;
   const doc = typeof row.document === "string" ? JSON.parse(row.document) : row.document;
-  return doc ? { ...doc, id: doc.id || row.id } : null;
+  return doc ? normalizeStoredProfileLight({ ...doc, id: doc.id || row.id }) : null;
 }
 
 async function requireFleetUser(request, db, env) {

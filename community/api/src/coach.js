@@ -10,7 +10,7 @@ import {
   undoAutopilotAction,
 } from "./coach-autopilot.js";
 import { requireVerified, userFromRequest } from "./auth.js";
-import { ValidationError, isPsilocybin } from "./profile.js";
+import { ValidationError, isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
 import {
   comingSoonBody,
@@ -213,7 +213,7 @@ async function loadGrounding(db, user, deviceId, profileId) {
   const culinaryReports = reports.filter((r) => !String(r.profile_id || "").includes("psilocybin"));
   model = buildDeviceModel(samples, culinaryReports);
   const profiles = (await db.all("SELECT document FROM profiles WHERE published=1")).map((row) =>
-    typeof row.document === "string" ? JSON.parse(row.document) : row.document
+    normalizeStoredProfileLight(typeof row.document === "string" ? JSON.parse(row.document) : row.document)
   );
   const culinary = profiles.filter((p) => !isPsilocybin(p)).map(slimCulinaryProfile);
   const profile = pickCoachProfile(culinary, profileId, culinaryReports);
