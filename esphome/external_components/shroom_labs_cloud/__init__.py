@@ -15,6 +15,7 @@ ShroomLabsCloud = shroom_labs_ns.class_("ShroomLabsCloud", cg.Component)
 
 CONF_API_HOST = "api_host"
 CONF_SITE_ORIGIN = "site_origin"
+CONF_REMOTE_APPLY = "remote_apply"
 
 
 CONFIG_SCHEMA = cv.Schema(
@@ -23,6 +24,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(CONF_WEB_SERVER_BASE_ID): cv.use_id(web_server_base.WebServerBase),
         cv.Optional(CONF_API_HOST, default="api.shroomlabs.io"): cv.domain,
         cv.Optional(CONF_SITE_ORIGIN, default="https://shroomlabs.io"): cv.url,
+        cv.Optional(CONF_REMOTE_APPLY, default=True): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -33,7 +35,9 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_api_host(config[CONF_API_HOST]))
     cg.add(var.set_site_origin(config[CONF_SITE_ORIGIN]))
+    cg.add(var.set_remote_apply(config[CONF_REMOTE_APPLY]))
     cg.add_define("USE_SHROOM_LABS_CLOUD")
+    cg.add_define("SHL_CLOUD_REMOTE_APPLY", 1 if config[CONF_REMOTE_APPLY] else 0)
 
     # HTTPS with the server certificate always checked. No insecure TLS.
     esp32.include_builtin_idf_component("esp_http_client")

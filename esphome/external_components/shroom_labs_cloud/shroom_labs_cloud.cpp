@@ -3,6 +3,8 @@
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
+#include "esphome/components/number/number.h"
+#include "esphome/components/sensor/sensor.h"
 #include "../web_server_idf/web_server_idf.h"
 
 #include <esp_crt_bundle.h>
@@ -24,10 +26,15 @@
 #define SHL_HAS_FLASH_ENC 1
 #endif
 
+#include <cmath>
 #include <cstring>
 #include <ctime>
 #include <memory>
 #include <strings.h>
+
+#ifndef SHL_CLOUD_REMOTE_APPLY
+#define SHL_CLOUD_REMOTE_APPLY 1
+#endif
 
 namespace esphome {
 namespace shroom_labs {
@@ -75,6 +82,10 @@ class CloudPage : public AsyncWebHandler {
       this->cloud_->refresh();
     else if (action == "disconnect")
       this->cloud_->disconnect();
+    else if (action == "remote_apply_on")
+      this->cloud_->set_remote_apply(true);
+    else if (action == "remote_apply_off")
+      this->cloud_->set_remote_apply(false);
     else {
       request->send(400, "text/plain", "unknown action");
       return;
@@ -328,9 +339,10 @@ HttpResponse IdfTransport::execute(const HttpRequest &req) {
 }
 
 ShroomLabsCloud::ShroomLabsCloud(web_server_base::WebServerBase *base)
-    : base_(base), engine_(&transport_, &clock_, &store_, &crypto_) {
+    : base_(base), engine_(&transport_, &clock_, &store_, &crypto_), chamber_impl_(this) {
   engine_.set_sync_jobs(false);
   engine_.set_start_job(&ShroomLabsCloud::start_job, this);
+  engine_.set_chamber(&chamber_impl_);
 }
 
 bool ShroomLabsCloud::start_job(void *ctx, CloudJob job) {
@@ -359,6 +371,23 @@ void ShroomLabsCloud::task_entry_(void *arg) {
   vTaskDelete(nullptr);
 }
 
+void ShroomLabsCloud::set_remote_apply(bool on) {
+#if SHL_CLOUD_REMOTE_APPLY == 0
+  on = false;
+#endif
+  this->engine_.set_remote_apply(on);
+  this->persist_remote_apply_(on);
+}
+
+void ShroomLabsCloud::persist_remote_apply_(bool on) {
+  nvs_handle_t h;
+  if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK)
+    return;
+  nvs_set_u8(h, "raply", on ? 1 : 0);
+  nvs_commit(h);
+  nvs_close(h);
+}
+
 void ShroomLabsCloud::setup() {
   global_shroom_labs_cloud = this;
 #ifdef SHL_HAS_FLASH_ENC
@@ -370,13 +399,26 @@ void ShroomLabsCloud::setup() {
   this->nvs_encrypted_ = this->flash_encrypted_;
 #endif
   this->engine_.load();
+#if SHL_CLOUD_REMOTE_APPLY != 0
+  nvs_handle_t h;
+  if (nvs_open(NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+    uint8_t v = 1;
+    if (nvs_get_u8(h, "raply", &v) == ESP_OK)
+      this->engine_.set_remote_apply(v != 0);
+    nvs_close(h);
+  }
+#else
+  this->engine_.set_remote_apply(false);
+#endif
   this->base_->add_handler(new CloudPage(this));  // NOLINT(cppcoreguidelines-owning-memory)
-  ESP_LOGI(TAG, "Cloud link %s. Flash encryption %s. NVS encryption %s.",
-           this->engine_.cloud_enabled() ? "on" : "off (opt-in)", this->flash_encrypted_ ? "on" : "off",
-           this->nvs_encrypted_ ? "on" : "off");
+  ESP_LOGI(TAG, "Cloud link %s. Remote apply %s. Flash encryption %s. NVS encryption %s.",
+           this->engine_.cloud_enabled() ? "on" : "off (opt-in)", this->engine_.remote_apply() ? "on" : "off",
+           this->flash_encrypted_ ? "on" : "off", this->nvs_encrypted_ ? "on" : "off");
 }
 
 void ShroomLabsCloud::loop() {
+  if (!this->watchers_on_)
+    this->attach_local_watchers_();
   if (this->busy_)
     return;
   this->engine_.loop();
@@ -388,6 +430,7 @@ void ShroomLabsCloud::dump_config() {
   ESP_LOGCONFIG(TAG, "  State: %s", state_name(this->engine_.state()));
   ESP_LOGCONFIG(TAG, "  Device id present: %s", YESNO(!this->engine_.device_id().empty()));
   ESP_LOGCONFIG(TAG, "  Linked: %s", YESNO(this->engine_.linked()));
+  ESP_LOGCONFIG(TAG, "  Remote apply: %s", YESNO(this->engine_.remote_apply()));
   ESP_LOGCONFIG(TAG, "  Flash encryption: %s", YESNO(this->flash_encrypted_));
 }
 
@@ -421,6 +464,81 @@ bool ShroomLabsCloud::fill_qr(QrCode *out) const {
     return false;
   return qr_encode(url.c_str(), out);
 }
+
+void ShroomLabsCloud::attach_local_watchers_() {
+  this->watchers_on_ = true;
+  for (auto *n : App.get_numbers()) {
+    if (n == nullptr || !setpoint_object_id(n->get_object_id().c_str()))
+      continue;
+    n->add_on_state_callback([this](float) {
+      if (!this->applying_remote_)
+        this->note_local_change();
+    });
+  }
+}
+
+ChamberReading ShroomLabsCloud::read_chamber() {
+  ChamberReading out;
+  for (auto *s : App.get_sensors()) {
+    if (s == nullptr || !s->has_state() || std::isnan(s->state))
+      continue;
+    const char *id = s->get_object_id().c_str();
+    if (sensor_is_temperature(id)) {
+      out.has_temperature = true;
+      out.temperature = s->state;
+    } else if (sensor_is_humidity(id)) {
+      out.has_humidity = true;
+      out.humidity = s->state;
+    }
+  }
+  for (auto *n : App.get_numbers()) {
+    if (n == nullptr || std::isnan(n->state))
+      continue;
+    const char *id = n->get_object_id().c_str();
+    if (std::strcmp(id, "temperature_target") == 0 || std::strcmp(id, "temperature__target") == 0) {
+      out.has_temperature_target = true;
+      out.temperature_target = n->state;
+    } else if (std::strcmp(id, "target_humidity") == 0) {
+      out.has_target_humidity = true;
+      out.target_humidity = n->state;
+    }
+  }
+  return out;
+}
+
+static bool write_number(const char *const *ids, float value, ShroomLabsCloud *self) {
+  for (auto *n : App.get_numbers()) {
+    if (n == nullptr)
+      continue;
+    const std::string id = n->get_object_id();
+    for (const char *const *p = ids; *p != nullptr; p++) {
+      if (id == *p) {
+        self->set_applying_remote(true);
+        auto call = n->make_call();
+        call.set_value(value);
+        call.perform();
+        self->set_applying_remote(false);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool ShroomLabsCloud::write_temperature_target(float c) {
+  static const char *const ids[] = {"temperature_target", "temperature__target", nullptr};
+  return write_number(ids, clamp_setpoint_temp(c), this);
+}
+
+bool ShroomLabsCloud::write_humidity_target(float rh) {
+  static const char *const ids[] = {"target_humidity", nullptr};
+  return write_number(ids, clamp_setpoint_rh(rh), this);
+}
+
+ChamberReading EspChamber::read() { return cloud_->read_chamber(); }
+bool EspChamber::write_temperature(float c) { return cloud_->write_temperature_target(c); }
+bool EspChamber::write_humidity(float rh) { return cloud_->write_humidity_target(rh); }
+uint32_t EspChamber::last_local_change_ms() { return cloud_->last_local_change_ms(); }
 
 }  // namespace shroom_labs
 }  // namespace esphome

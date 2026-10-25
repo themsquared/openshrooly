@@ -10,7 +10,7 @@ Outbound Shroom Labs pairing. Compiled into this firmware, **off until someone t
 4. After the owner claims the code, `POST /api/devices/:id/csr` with the enroll token and proof of possession. Stores the 7-day client cert and schedules a silent rotate at 3.5 days.
 5. Local Disconnect calls `POST /api/devices/:id/self-revoke` with the device key proof, then wipes the `shlcloud` NVS namespace and zeroes the key. Account revoke is noticed on the next inbox probe as `403 {"code":"revoked"}`. The chamber wipes the cert and key and shows Unlinked. An expired cert (`cert_expired`) keeps the key and renews by proof for 30 days. A bad proof (`proof_invalid`) backs off and retries. Refresh then enrolls again once the row is revoked.
 
-Telemetry and applying remote commands are not in this ship. `cloud_ready()`, `note_local_change()`, and the inbox probe are the hooks.
+From 1.0.4-sl.1 the chamber applies Autopilot `setpoints` from the inbox when `apply` is true, writes `temperature_target` / `temperature__target` and `target_humidity` (clamped 10-32 C, 60-98% RH), and POSTs telemetry with `ack_command_id` / `ack_status`. Inbox is polled about every 15 minutes. Telemetry is sent when acking, or on that same 15 minute cadence. Each authenticated call is nonce plus request (2 HTTPS). Typical budget is 16 connects/hour, well under 20. Errors back off. A local setpoint change after `issued_at` is acked `refused`. Turn remote apply off with `remote_apply: false`, the `SHL_CLOUD_REMOTE_APPLY=0` build flag, or POST `/cloud` `action=remote_apply_off`. Cert rotation, revoke, and relink are unchanged. `cloud_ready()` and `note_local_change()` stay the hooks.
 
 ## TLS
 
@@ -25,3 +25,15 @@ The key lives in the `shlcloud` NVS namespace. This build uses encrypted NVS whe
 The component is in `esphome/components/cloud.yaml`. Cloud stays off until **Connect to Shroom Labs** is turned on.
 
 See `docs/DEVICES.md`. If that file and the Worker disagree, the Worker wins.
+
+## OTA to 1.0.4-sl.1
+
+Signed update from 1.0.3-sl.2 or later. See `docs/INSTALL.md`.
+
+1. `device_version` is `1.0.4-sl.1` in `esphome/openshrooly.yaml`.
+2. Build the OTA and factory bins.
+3. Sign with the release key (`scripts/sign_release.py` / INSTALL.md).
+4. Publish to the stable channel.
+5. On the chamber use Update, or install the signed file.
+
+Identity NVS is unchanged (same SHL4 layout). A chamber that is already linked keeps its cert and starts applying inbox setpoints on the next 15 minute probe. Remote apply stays on unless you turn it off.

@@ -40,12 +40,27 @@ class EspCrypto : public CloudCrypto {
   std::string hardware_id() override;
 };
 
+class ShroomLabsCloud;
+
+class EspChamber : public CloudChamber {
+ public:
+  explicit EspChamber(ShroomLabsCloud *cloud) : cloud_(cloud) {}
+  ChamberReading read() override;
+  bool write_temperature(float c) override;
+  bool write_humidity(float rh) override;
+  uint32_t last_local_change_ms() override;
+
+ protected:
+  ShroomLabsCloud *cloud_;
+};
+
 /** Opt-in outbound Shroom Labs link. The P-256 key is born on the device and never leaves NVS. */
 class ShroomLabsCloud : public Component {
  public:
   explicit ShroomLabsCloud(web_server_base::WebServerBase *base);
   void set_api_host(const std::string &host) { engine_.set_api_host(host); }
   void set_site_origin(const std::string &site) { engine_.set_site_origin(site); }
+  void set_remote_apply(bool on);
 
   void setup() override;
   void loop() override;
@@ -71,9 +86,19 @@ class ShroomLabsCloud : public Component {
   bool nvs_encrypted() const { return nvs_encrypted_; }
   bool flash_encrypted() const { return flash_encrypted_; }
 
-  void note_local_change() { last_local_change_ms_ = millis(); }
+  void note_local_change() {
+    last_local_change_ms_ = millis();
+    engine_.note_local_change(last_local_change_ms_);
+  }
   bool cloud_ready() const { return linked() && cloud_enabled(); }
   uint32_t last_local_change_ms() const { return last_local_change_ms_; }
+  bool remote_apply() const { return engine_.remote_apply(); }
+  bool applying_remote() const { return applying_remote_; }
+  void set_applying_remote(bool on) { applying_remote_ = on; }
+
+  ChamberReading read_chamber();
+  bool write_temperature_target(float c);
+  bool write_humidity_target(float rh);
 
   static bool start_job(void *ctx, CloudJob job);
 
@@ -86,11 +111,17 @@ class ShroomLabsCloud : public Component {
   EspStore store_;
   EspCrypto crypto_;
   CloudEngine engine_;
+  EspChamber chamber_impl_{this};
   bool nvs_encrypted_{false};
   bool flash_encrypted_{false};
   uint32_t last_local_change_ms_{0};
+  bool applying_remote_{false};
+  bool watchers_on_{false};
   CloudJob pending_job_{CloudJob::NONE};
   std::atomic<bool> busy_{false};
+
+  void attach_local_watchers_();
+  void persist_remote_apply_(bool on);
 };
 
 extern ShroomLabsCloud *global_shroom_labs_cloud;  // NOLINT
