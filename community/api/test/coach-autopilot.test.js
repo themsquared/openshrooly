@@ -156,7 +156,7 @@ test("stale, missing, implausible, and offline readings pause Autopilot", () => 
   assert.match(evaluateAutopilotPause({ reading: null, now }).reason, /missing/i);
   assert.match(
     evaluateAutopilotPause({
-      reading: { temperature: 22, humidity: 88, age_seconds: 16 * 60 },
+      reading: { temperature: 22, humidity: 88, age_seconds: 21 * 60 },
       now,
     }).reason,
     /stale/i
@@ -179,7 +179,7 @@ test("stale, missing, implausible, and offline readings pause Autopilot", () => 
   assert.match(
     evaluateAutopilotPause({
       reading: { temperature: 20, humidity: 88, age_seconds: 10 },
-      device: { status: "claimed", last_seen_at: "2026-10-25T11:40:00Z" },
+      device: { status: "claimed", last_seen_at: "2026-10-25T11:39:00Z" },
       now,
     }).reason,
     /offline/i
@@ -292,6 +292,54 @@ test("Autopilot applies a stepped setpoint, logs it, and Undo restores the old v
   assert.equal(JSON.parse(after[1].payload).temperature_c, fruiting.temperature_target_max);
 });
 
+test("stale threshold is the heartbeat plus 5 minutes of drift", () => {
+  assert.equal(AUTOPILOT_LIMITS.staleMs, 20 * 60 * 1000);
+  const now = Date.parse("2026-10-25T12:00:00Z");
+  const seen = (ageS) => ({ status: "active", last_seen_at: new Date(now - ageS * 1000).toISOString() });
+  assert.equal(
+    evaluateAutopilotPause({ reading: { temperature: 22, humidity: 88, age_seconds: 15 * 60 + 30 }, device: seen(15 * 60 + 30), now }).pause,
+    false
+  );
+  const late = evaluateAutopilotPause({ reading: { temperature: 22, humidity: 88, age_seconds: 21 * 60 }, device: seen(10), now });
+  assert.equal(late.pause, true);
+  assert.match(late.reason, /older than 20 minutes/);
+  assert.match(evaluateAutopilotPause({ reading: { temperature: 22, humidity: 88, age_seconds: 10 }, device: seen(21 * 60), now }).reason, /offline/i);
+});
+
+async function runWithReadingAge(email, deviceId, ageMs) {
+  const ctx = env();
+  const { token, user } = await register(ctx, email);
+  await subscribe(ctx, token);
+  await addDevice(ctx, user.id, deviceId);
+  await addPublishedProfile(ctx, user.id);
+  const now = Date.now();
+  const at = new Date(now - ageMs).toISOString();
+  await addReading(ctx, deviceId, { humidity: 88, humidity_setpoint: 90, temperature: 20, temperature_setpoint: 20 }, at);
+  const enabled = await setDeviceAutopilotMode(ctx.db, ctx, user, { deviceId, mode: "autopilot", profileId: pearlOyster.id });
+  assert.equal(enabled.ok, true, JSON.stringify(enabled));
+  const device = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [deviceId]);
+  device.last_seen_at = at;
+  const result = await runAutopilotForDevice(ctx.db, ctx, { device, user, now });
+  const status = await call(ctx, "GET", `/api/coach/autopilot?device_id=${deviceId}`, { token });
+  return { result, status };
+}
+
+test("readings 15 min 30 s old keep Autopilot active", async () => {
+  const { result, status } = await runWithReadingAge("late-ok@example.com", "dev-late-ok", (15 * 60 + 30) * 1000);
+  assert.notEqual(result.paused, true, JSON.stringify(result));
+  assert.equal(status.data.mode, "autopilot");
+  assert.notEqual(status.data.status, "paused");
+});
+
+test("readings 21 min old pause Autopilot to Advisor", async () => {
+  const { result, status } = await runWithReadingAge("late-stale@example.com", "dev-late-stale", 21 * 60 * 1000);
+  assert.equal(result.paused, true);
+  assert.equal(result.flipped_to, "advisor");
+  assert.match(result.reason, /stale|offline/i);
+  assert.equal(status.data.mode, "advisor");
+  assert.equal(status.data.status, "paused");
+});
+
 test("stale readings flip Autopilot back to Advisor with a visible reason", async () => {
   const ctx = env();
   const { token, user } = await register(ctx, "stale@example.com");
@@ -302,7 +350,7 @@ test("stale readings flip Autopilot back to Advisor with a visible reason", asyn
     ctx,
     "dev-stale",
     { humidity: 88, humidity_setpoint: 90, temperature: 20, temperature_setpoint: 20 },
-    new Date(Date.now() - 20 * 60 * 1000).toISOString()
+    new Date(Date.now() - 25 * 60 * 1000).toISOString()
   );
   const enabled = await setDeviceAutopilotMode(ctx.db, ctx, user, {
     deviceId: "dev-stale",

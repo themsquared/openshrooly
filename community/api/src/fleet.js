@@ -8,6 +8,8 @@ import {
   latestReading,
   downsampleHistory,
   loadRecentTelemetry,
+  READINGS_STALE_MINUTES,
+  READINGS_STALE_MS,
   refuseRestrictedPack,
   TELEMETRY_HISTORY_LIMIT,
 } from "./coach-learn.js";
@@ -24,7 +26,7 @@ import { fleetUiEnabled } from "./providers.js";
 import { SQL as ALERT_SQL } from "./alerts/store.js";
 import { growStage, readRules } from "./alerts/rules.js";
 
-export const FLEET_ONLINE_MS = 15 * 60 * 1000;
+export const FLEET_ONLINE_MS = READINGS_STALE_MS;
 export const FLEET_COMMAND_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_DEVICE_TYPE = "shrooly_chamber";
 
@@ -192,7 +194,7 @@ function fleetAlerts({ device, reading, stage, now }) {
   if (!reading || (reading.temperature == null && reading.humidity == null)) {
     alerts.push({ kind: "missing", message: "Readings are missing." });
   } else if (reading.age_seconds != null && reading.age_seconds * 1000 > FLEET_ONLINE_MS) {
-    alerts.push({ kind: "stale", message: "Readings are stale (older than 15 minutes)." });
+    alerts.push({ kind: "stale", message: `Readings are stale (older than ${READINGS_STALE_MINUTES} minutes).` });
   }
   for (const flag of compareReadingToStage(reading, stage)) {
     alerts.push({ kind: "out_of_range", message: flag.message });

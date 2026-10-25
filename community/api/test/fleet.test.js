@@ -312,11 +312,12 @@ test("group deletion is audited and the audit list is newest first", async () =>
   assert.ok(audit.data.entries.every((e, i, all) => i === 0 || Number(all[i - 1].id) >= Number(e.id)));
 });
 
-test("deviceIsOnline uses a 15 minute window", () => {
+test("deviceIsOnline tolerates the 15 minute heartbeat plus drift", () => {
   const now = Date.parse("2026-10-25T12:00:00Z");
   assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:50:00Z" }, now), true);
-  assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:40:00Z" }, now), false);
-  assert.equal(FLEET_ONLINE_MS, 15 * 60 * 1000);
+  assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:44:30Z" }, now), true);
+  assert.equal(deviceIsOnline({ last_seen_at: "2026-10-25T11:39:00Z" }, now), false);
+  assert.equal(FLEET_ONLINE_MS, 20 * 60 * 1000);
 });
 
 test("fleet 168h history downsamples and still covers the week", async () => {
