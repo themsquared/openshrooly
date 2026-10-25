@@ -216,8 +216,10 @@ async function memberDeviceIds(db, groupId) {
 }
 
 async function groupIdsForDevice(db, ownerId, deviceId) {
-  const members = await db.all("SELECT * FROM device_group_members WHERE device_id=?", [deviceId]);
-  const groups = await db.all("SELECT * FROM device_groups WHERE owner_id=?", [ownerId]);
+  const [members, groups] = await Promise.all([
+    db.all("SELECT * FROM device_group_members WHERE device_id=?", [deviceId]),
+    db.all("SELECT * FROM device_groups WHERE owner_id=?", [ownerId]),
+  ]);
   const owned = new Set((groups || []).map((g) => Number(g.id)));
   return (members || []).filter((m) => owned.has(Number(m.group_id))).map((m) => Number(m.group_id));
 }
@@ -276,20 +278,28 @@ async function loadGrowTracking(db, user, device, modeRow, current, now) {
  * Pass `coachAvailable` when enriching many devices to check access once.
  */
 export async function enrichDevice(db, env, user, device, { now = Date.now(), coachAvailable } = {}) {
-  const samples = await loadRecentTelemetry(db, device.id, { now });
+  // Independent reads go out together: this used to be ~10 serial D1 round trips.
+  const [samples, modeRow, certs, coachOk, groupIds] = await Promise.all([
+    loadRecentTelemetry(db, device.id, { now }),
+    getDeviceMode(db, device.id, user.id),
+    db.all("SELECT * FROM device_certs WHERE device_id=?", [device.id]),
+    coachAvailable ?? coachAutopilotAvailable(env, db, user),
+    groupIdsForDevice(db, user.id, device.id),
+  ]);
   const current = latestReading(samples, now);
   const latestDoc = latestDocFrom(samples);
   const caps = deviceCapabilities(latestDoc);
-  const modeRow = await getDeviceMode(db, device.id, user.id);
-  const tracked = await loadGrowTracking(db, user, device, modeRow, current, now);
+  const [tracked, commands] = await Promise.all([
+    loadGrowTracking(db, user, device, modeRow, current, now),
+    commandStates(db, device, caps, { now }),
+  ]);
   const profile = tracked.profile;
   const stage = tracked.stage;
   const offMenu = Boolean(profile && (isPsilocybin(profile) || refuseRestrictedPack(profile)));
-  const certs = await db.all("SELECT * FROM device_certs WHERE device_id=?", [device.id]);
   const activeCert = (certs || [])
     .filter((c) => c.status === "active")
     .sort((a, b) => String(b.not_after || "").localeCompare(String(a.not_after || "")))[0];
-  const showCoach = !offMenu && (coachAvailable ?? (await coachAutopilotAvailable(env, db, user)));
+  const showCoach = !offMenu && coachOk;
   const coach =
     !showCoach
       ? null
@@ -345,14 +355,28 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     firmware: caps.firmware,
     capabilities: { source: caps.source, list: caps.list, ranges: caps.ranges },
     controls: controlSupport(caps),
-    commands: await commandStates(db, device, caps, { now }),
+    commands,
     cert_expires_at: activeCert?.not_after || null,
     alerts: fleetAlerts({ device, reading: current, stage, now }),
-    group_ids: await groupIdsForDevice(db, user.id, device.id),
+    group_ids: groupIds,
     off_menu: offMenu,
     cloud_controls: cloudControls(caps),
     local_only: LOCAL_ONLY_CONTROLS,
   };
+}
+
+/** The device page payload: the enriched device plus its downsampled reading history. */
+export async function deviceDetail(db, env, user, device, { hours = 24, now = Date.now(), coachAvailable } = {}) {
+  const since = new Date(now - hours * 3600 * 1000).toISOString();
+  const [samples, enriched] = await Promise.all([
+    loadRecentTelemetry(db, device.id, { now, windowMs: hours * 3600 * 1000, limit: TELEMETRY_HISTORY_LIMIT }),
+    enrichDevice(db, env, user, device, { now, coachAvailable }),
+  ]);
+  const history = downsampleHistory(
+    samples.filter((s) => !s.created_at || s.created_at >= since),
+    { hours }
+  );
+  return { device: enriched, history };
 }
 
 /** Cloud controls with whether this chamber's firmware can take each one. */
@@ -634,6 +658,8 @@ function publicGroup(row, deviceIds = []) {
   return { id: Number(row.id), owner_id: Number(row.owner_id), name: row.name, device_ids: deviceIds, updated_at: row.updated_at };
 }
 
+export { ownedDevice };
+
 export async function handleFleet(method, path, url, request, env) {
   if (!path.startsWith("/api/fleet")) return null;
   const { db } = env;
@@ -660,17 +686,7 @@ export async function handleFleet(method, path, url, request, env) {
     const device = await ownedDevice(db, user, decodeURIComponent(detail[1]));
     if (!device) return json({ error: "not your device" }, 403);
     const hours = Math.min(168, Math.max(1, Number(url.searchParams.get("hours")) || 24));
-    const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
-    const samples = await loadRecentTelemetry(db, device.id, {
-      now: Date.now(),
-      windowMs: hours * 3600 * 1000,
-      limit: TELEMETRY_HISTORY_LIMIT,
-    });
-    const history = downsampleHistory(
-      samples.filter((s) => !s.created_at || s.created_at >= since),
-      { hours }
-    );
-    return json({ device: await enrichDevice(db, env, user, device), history });
+    return json(await deviceDetail(db, env, user, device, { hours }));
   }
 
   const commandsMatch = path.match(/^\/api\/fleet\/devices\/([^/]+)\/commands$/);

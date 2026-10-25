@@ -20,16 +20,34 @@ export function speciesLine(device) {
 
 export function growLine(device) {
   const profile = device?.profile?.name || "";
+  const parts = [profile, phaseLine(device)].filter(Boolean);
+  return parts.join(" · ") || "No grow selected";
+}
+
+/** Phase and grow day only, for places that already show the profile name. */
+export function phaseLine(device) {
   const phase = device?.grow?.phase || device?.stage?.name || "";
   const day = device?.grow?.day;
   const total = device?.grow?.total_days;
   const parts = [];
-  if (profile) parts.push(profile);
   if (phase) parts.push(phase);
-  if (day != null && Number.isFinite(Number(day))) {
+  if (day != null && day !== "" && Number.isFinite(Number(day))) {
     parts.push(total ? `day ${Number(day)} of ${total}` : `day ${Number(day)}`);
   }
-  return parts.join(" · ") || "No grow selected";
+  return parts.join(" · ");
+}
+
+/**
+ * What is growing, each fact once: the common name as the title, the latin
+ * name under it only when it adds something, then phase and day.
+ */
+export function growingLabels(device) {
+  const latin = speciesLine(device);
+  const name = device?.profile?.name || "";
+  const title = name || latin || "No species selected";
+  const sub = latin && latin !== title ? latin : "";
+  const phase = phaseLine(device) || (device?.profile ? "" : "No grow selected");
+  return { title, latin: sub, phase };
 }
 
 export function coachLine(device) {
@@ -51,9 +69,26 @@ export function readingLine(device) {
   const t = device?.reading?.temperature;
   const h = device?.reading?.humidity;
   if (t == null && h == null) return "No reading yet";
-  const temp = t == null ? "n/a" : `${safeDisplay(t)} °C`;
-  const rh = h == null ? "n/a" : `${safeDisplay(h)}%`;
-  return `${temp} · ${rh} humidity`;
+  const temp = t == null ? "temperature not reported" : `${safeDisplay(t)} °C`;
+  const rh = h == null ? "humidity not reported" : `${safeDisplay(h)}% humidity`;
+  return `${temp} · ${rh}`;
+}
+
+/** When the numbers on screen were measured. */
+export function readingWhenLine(device, now = Date.now()) {
+  const at = device?.reading?.reading_at;
+  if (!at) return device?.reading ? "" : "No reading in the last while. Readings arrive about every 15 minutes.";
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return "";
+  const mins = Math.max(0, Math.round((now - date.getTime()) / 60000));
+  const clock = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `Measured at ${clock}${mins >= 1 ? ` (${mins} min ago)` : " (just now)"}. The chamber reports about every 15 minutes.`;
+}
+
+/** True when the chamber sends this reading at all. */
+export function reports(device, field) {
+  const v = device?.reading?.[field];
+  return v != null && v !== "" && Number.isFinite(Number(v));
 }
 
 function identityArt(device) {
@@ -63,19 +98,19 @@ function identityArt(device) {
 }
 
 export function renderDeviceCard(device) {
-  const species = speciesLine(device) || "Species not set";
+  const grow = growingLabels(device);
   const online = device.online ? "Online" : "Offline";
   const coach = coachLine(device);
   const href = `/device.html?id=${encodeURIComponent(device.id)}`;
   const art = identityArt(device);
-  return `<article class="card device-card">
+  return `<article class="card device-card" data-device-id="${escapeHtml(device.id)}">
     <a class="device-card-link" href="${href}">
       <div class="device-card-art">${art || `<div class="device-card-fallback" aria-hidden="true"></div>`}</div>
       <div class="device-card-body">
         <p class="device-card-kicker">${escapeHtml(deviceTypeLabel(device.device_type))} · <span class="${device.online ? "is-on" : "is-off"}">${online}</span></p>
         <h3>${escapeHtml(device.name || "Unnamed device")}</h3>
-        <p class="device-card-species">${escapeHtml(species)}</p>
-        <p class="muted">${escapeHtml(growLine(device))}</p>
+        <p class="device-card-species">${escapeHtml(grow.title)}${grow.latin ? ` <em class="muted">${escapeHtml(grow.latin)}</em>` : ""}</p>
+        ${grow.phase ? `<p class="muted">${escapeHtml(grow.phase)}</p>` : ""}
         <p class="device-card-read">${escapeHtml(readingLine(device))}</p>
         <p class="muted">${escapeHtml(lastSeenLine(device))}${coach ? ` · ${escapeHtml(coach)}` : ""}</p>
       </div>
@@ -93,35 +128,49 @@ function numOrBlank(value) {
 }
 
 function gauge(label, value, unit, target) {
-  const shown = value == null || value === "" ? "n/a" : safeDisplay(value);
+  const missing = value == null || value === "";
+  const shown = missing ? `<span class="gauge-missing">Not reported</span>` : `${safeDisplay(value)}${escapeHtml(unit)}`;
   const extra = target == null || target === "" ? "" : `<span class="gauge-target">target ${safeDisplay(target)}${escapeHtml(unit)}</span>`;
   return `<div class="device-gauge">
     <span class="gauge-label">${escapeHtml(label)}</span>
-    <strong>${shown}${value == null ? "" : escapeHtml(unit)}</strong>
+    <strong>${shown}</strong>
     ${extra}
   </div>`;
 }
 
 export function renderIdentity(device) {
-  const species = speciesLine(device);
+  const grow = growingLabels(device);
   const art = identityArt(device);
   return `<section class="device-identity card" aria-labelledby="growing-title">
     <div class="device-identity-art">${art || ""}</div>
     <div>
       <p class="device-card-kicker">What is growing</p>
-      <h2 id="growing-title">${escapeHtml(species || "No species selected")}</h2>
-      <p class="device-identity-profile">${escapeHtml(device.profile?.name || "No profile selected")}</p>
-      <p class="muted">${escapeHtml(growLine(device))}</p>
+      <h2 id="growing-title">${escapeHtml(grow.title)}</h2>
+      ${grow.latin ? `<p class="device-identity-profile"><em>${escapeHtml(grow.latin)}</em></p>` : ""}
+      ${grow.phase ? `<p class="muted">${escapeHtml(grow.phase)}</p>` : ""}
     </div>
   </section>`;
 }
 
-export function renderGauges(device) {
+/** Humidity and temperature always; water and fan only when this chamber reports them. */
+export function renderGauges(device, { now = Date.now() } = {}) {
+  const extras = [];
+  if (reports(device, "water_level")) extras.push(gauge("Water", device.reading.water_level, "%"));
+  const when = readingWhenLine(device, now);
+  const waterNote = reports(device, "water_level") || !device?.reading ? "" : " This chamber does not report its water level.";
   return `<div class="device-gauges" aria-label="Live readings">
     ${gauge("Humidity", device.reading?.humidity, "%", device.setpoints?.humidity_percent)}
     ${gauge("Temperature", device.reading?.temperature, " °C", device.setpoints?.temperature_c)}
-    ${gauge("Water", device.reading?.water_level, "%")}
-  </div>`;
+    ${extras.join("")}
+  </div>
+  <p class="muted device-reading-when" id="reading-when">${escapeHtml(`${when}${waterNote}`.trim())}</p>`;
+}
+
+/** Plain header line: hardware, status, last seen and Coach. What is growing lives in the identity card. */
+export function deviceMetaLine(device, { showCoach = false } = {}) {
+  return [device.device_type_label || deviceTypeLabel(device.device_type), device.online ? "Online" : "Offline", lastSeenLine(device), showCoach ? coachLine(device) : ""]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export function renderReadonlyNotes(device) {

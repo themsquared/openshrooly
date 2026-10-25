@@ -9,9 +9,12 @@ import { queueItemHtml } from "./moderate-queue.js";
 import { escapeHtml, renderSafeMarkdown, safeDisplay } from "./safe-markdown.js";
 import {
   coachLine,
+  deviceMetaLine,
   drawHistoryChart,
   growLine,
+  growingLabels,
   lastSeenLine,
+  readingWhenLine,
   renderControls,
   renderCommandList,
   resultMessage,
@@ -25,6 +28,7 @@ import {
   speciesLine,
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
+import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -1365,109 +1369,218 @@ function canWriteDevice(device) {
   return Boolean(device?.controllable && device?.online);
 }
 
+function loginRedirect() {
+  location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+}
+
+/** Small "Live" / "Updating…" badge next to a page title. */
+function setLiveBadge(el, state, at) {
+  if (!el) return;
+  const text = {
+    cached: `Updating… showing what this phone saw ${ageText(at) || "earlier"}`,
+    loading: "Updating…",
+    live: "Live",
+    polling: "Reconnecting. Checking every 30 seconds.",
+    gone: "This chamber is no longer on your account.",
+  }[state] || "";
+  el.textContent = text;
+  el.dataset.state = state;
+  el.classList.toggle("hidden", !text);
+}
+
+function sortDeviceRows(rows, q, sort) {
+  const shown = rows.filter((d) => {
+    const hay = `${d.name} ${d.profile?.name || ""} ${d.profile?.species || ""} ${d.profile?.id || ""}`.toLowerCase();
+    return !q || hay.includes(q);
+  });
+  shown.sort((a, b) => {
+    if (sort === "status") return Number(b.online) - Number(a.online) || String(a.name).localeCompare(String(b.name));
+    if (sort === "seen") return String(b.last_seen_at || "").localeCompare(String(a.last_seen_at || ""));
+    return String(a.name).localeCompare(String(b.name));
+  });
+  return shown;
+}
+
+/**
+ * Keep a device list current: paint the cached list, load the current one, then
+ * apply per-device pushes from the account socket.
+ */
+function liveDeviceList({ cacheKey, onRows, onState }) {
+  let rows = null;
+  const cached = liveCache.get(cacheKey);
+  if (cached?.data?.devices) {
+    rows = cached.data.devices;
+    onRows(rows, { cached: true });
+    onState("cached", cached.at);
+  } else onState("loading");
+  const save = () => liveCache.set(cacheKey, { devices: rows });
+  const live = keepLive({
+    load: loadDeviceList,
+    socketPath: "/api/live/socket",
+    onData: (data) => {
+      rows = data.devices || [];
+      save();
+      onRows(rows, { cached: false });
+      onState(live?.live ? "live" : "polling");
+    },
+    onMessage: (msg) => {
+      if (!rows) return;
+      if (msg.type === "device" && msg.device?.id) {
+        const i = rows.findIndex((d) => d.id === msg.device.id);
+        if (i >= 0) rows[i] = msg.device;
+        else rows.push(msg.device);
+      } else if (msg.type === "device_removed" && msg.device_id) {
+        rows = rows.filter((d) => d.id !== msg.device_id);
+      } else return;
+      save();
+      onRows(rows, { cached: false, changed: msg.device?.id || msg.device_id });
+    },
+    onState: (s) => onState(s),
+  });
+  return live;
+}
+
 async function renderDevices() {
-  if (!getToken()) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
-    return;
-  }
-  const caps = await capabilities().catch(() => ({}));
-  if (caps.fleet) $("#devices-bulk")?.classList.remove("hidden");
-  const list = await api("/api/fleet/devices");
-  let rows = list.devices || [];
-  function paint() {
+  // The cached paint runs synchronously; wait until the rest of this module (STATE_LABEL etc.) is initialized.
+  await Promise.resolve();
+  if (!getToken()) return loginRedirect();
+  capabilities()
+    .then((caps) => caps.fleet && $("#devices-bulk")?.classList.remove("hidden"))
+    .catch(() => {});
+  let rows = [];
+  const paint = () => {
     const q = ($("#devices-filter")?.value || "").toLowerCase();
     const sort = $("#devices-sort")?.value || "name";
-    let shown = rows.filter((d) => {
-      const hay = `${d.name} ${d.profile?.name || ""} ${d.profile?.species || ""} ${d.profile?.id || ""}`.toLowerCase();
-      return !q || hay.includes(q);
-    });
-    shown.sort((a, b) => {
-      if (sort === "status") return Number(b.online) - Number(a.online) || a.name.localeCompare(b.name);
-      if (sort === "seen") return String(b.last_seen_at || "").localeCompare(String(a.last_seen_at || ""));
-      return a.name.localeCompare(b.name);
-    });
-    $("#devices-list").innerHTML = renderDeviceCards(shown, { empty: "No devices match that filter." });
-  }
+    $("#devices-list").innerHTML = renderDeviceCards(sortDeviceRows(rows, q, sort), { empty: "No devices match that filter." });
+  };
   $("#devices-filter")?.addEventListener("input", paint);
   $("#devices-sort")?.addEventListener("change", paint);
-  paint();
+  const live = liveDeviceList({
+    cacheKey: "devices",
+    onRows: (next) => {
+      rows = next;
+      paint();
+    },
+    onState: (s, at) => setLiveBadge($("#devices-live"), s, at),
+  });
+  try {
+    live.push(await loadDeviceList());
+  } catch (err) {
+    live.stop();
+    throw err;
+  }
 }
 
 async function renderDevice() {
-  if (!getToken()) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
-    return;
-  }
+  // The cached paint runs synchronously; wait until the rest of this module (STATE_LABEL etc.) is initialized.
+  await Promise.resolve();
+  if (!getToken()) return loginRedirect();
   const id = params().get("id") || "";
   if (!id) {
+    $("#device-skeleton")?.classList.add("hidden");
     const box = $("#device-error");
     box.innerHTML = `Pick a chamber from your <a href="/devices.html">devices</a>.`;
     box.classList.remove("hidden");
     return;
   }
-  const path = `/api/devices/${encodeURIComponent(id)}/alerts`;
-  const [detail, data, catalog, me] = await Promise.all([
-    api(`/api/fleet/devices/${encodeURIComponent(id)}`),
-    api(path),
-    loadDeviceCatalog(),
-    api("/api/me").catch(() => ({})),
-  ]);
-  const device = detail.device;
+  const enc = encodeURIComponent(id);
+  const alertsPath = `/api/devices/${enc}/alerts`;
+  const cacheKey = `device:${id}`;
   const form = $("#rules-form");
-  const species = speciesLine(device);
-  // Coach stays hidden unless the server says this user can use Coach.
-  const showCoach = Boolean(me.grow_coach?.available) && !device.off_menu;
-  $("#device-name").textContent = device.name;
-  document.title = `${device.name} · Shroom Labs`;
-  $("#device-meta").textContent = [
-    device.device_type_label || "Shrooly chamber",
-    device.online ? "Online" : "Offline",
-    lastSeenLine(device),
-    species || "No species selected",
-    growLine(device),
-    showCoach ? coachLine(device) : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const notice = deliveryNotice(data);
-  if (notice) {
-    $("#device-status").innerHTML = `${escapeHtml(notice)} <a href="/account.html#alerts">Alert settings</a>`;
-    $("#device-status").classList.remove("hidden");
-  }
-  const canWrite = canWriteDevice(device);
-  const dash = $("#device-dash");
-  if (dash) {
+  const view = { snapshot: null, catalog: null, controlsKey: "", built: false, rulesFilled: false, coachLegacy: null };
+
+  const showCoachFor = (snap) => {
+    const device = snap.device || {};
+    if (device.off_menu) return false;
+    if (typeof snap.coach_available === "boolean") return snap.coach_available;
+    return Boolean(view.coachLegacy);
+  };
+
+  const controlsBusy = () => {
+    const controls = $("#device-controls");
+    if (!controls) return false;
+    return controls.dataset.dirty === "1" || controls.dataset.busy === "1" || controls.contains(document.activeElement);
+  };
+
+  const paintControls = (force = false) => {
+    const snap = view.snapshot;
+    if (!snap?.device) return;
+    const device = snap.device;
+    const canWrite = canWriteDevice(device);
+    const showCoach = showCoachFor(snap);
+    const profiles = view.catalog?.profiles || (device.profile?.id ? [device.profile] : []);
+    const key = JSON.stringify([canWrite, showCoach, device.name, device.profile?.id, device.stage, device.setpoints, device.light, device.controls, device.coach, device.capabilities, profiles.length]);
+    if (!force && key === view.controlsKey) return;
+    if (!force && controlsBusy()) return;
+    view.controlsKey = key;
+    $("#dev-controls").innerHTML = renderControls(device, { profiles, canWrite, showCoach });
+    const controls = $("#device-controls");
+    controls?.addEventListener("input", () => (controls.dataset.dirty = "1"));
+    bindDeviceControls(id, () => view.snapshot?.device, {
+      canWrite,
+      onSent: () => {
+        if (controls) delete controls.dataset.dirty;
+        live.refresh();
+      },
+    });
+  };
+
+  const swap = (sel, html) => {
+    const el = $(sel);
+    if (el && el._html !== html) {
+      el.innerHTML = html;
+      el._html = html;
+    }
+  };
+
+  const buildDash = () => {
+    if (view.built) return;
+    view.built = true;
+    const dash = $("#device-dash");
     dash.innerHTML = `
-      ${renderIdentity(device)}
-      ${renderGauges(device)}
+      <div id="dev-identity"></div>
+      <div id="dev-gauges"></div>
       <figure class="fleet-chart card">
         <figcaption>Readings, last 24 hours</figcaption>
         <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>
       </figure>
-      ${renderControls(device, { profiles: catalog.profiles, canWrite, showCoach })}
-      ${renderCommandList(device.commands || [])}
-      ${renderReadonlyNotes(device)}
+      <div id="dev-controls"></div>
+      <div id="dev-commands"></div>
+      <div id="dev-notes"></div>
       <p class="row">
         <button type="button" class="secondary" id="unlink-device">Unlink</button>
       </p>`;
     dash.classList.remove("hidden");
-    drawHistoryChart($("#reading-chart"), detail.history || []);
-    bindDeviceControls(id, device, { canWrite });
-  }
-  const showStates = (states) => {
-    $("#device-states").innerHTML = Object.entries(STATE_LABEL)
-      .filter(([rule]) => rule !== "fruiting")
-      .map(([rule, label]) => {
-        const open = states[rule] === "open";
-        const text = rule === "offline" ? (open ? "Offline" : "Online") : `${label} ${open ? "needs a look" : "ok"}`;
-        return `<li class="${open ? "is-open" : "is-ok"}">${escapeHtml(text)}</li>`;
-      })
-      .join("");
+    $("#unlink-device")?.addEventListener("click", async () => {
+      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      try {
+        await api(`/api/fleet/devices/${enc}/unlink`, { method: "POST", jsonBody: { confirm: true } });
+        liveCache.clear();
+        location.href = "/devices.html";
+      } catch (err) {
+        flash($("#device-controls-msg"), err.message);
+      }
+    });
   };
-  const fill = (rules) => {
+
+  const showStates = (states) => {
+    swap(
+      "#device-states",
+      Object.entries(STATE_LABEL)
+        .filter(([rule]) => rule !== "fruiting")
+        .map(([rule, label]) => {
+          const open = states?.[rule] === "open";
+          const text = rule === "offline" ? (open ? "Offline" : "Online") : `${label} ${open ? "needs a look" : "ok"}`;
+          return `<li class="${open ? "is-open" : "is-ok"}">${escapeHtml(text)}</li>`;
+        })
+        .join("")
+    );
+  };
+
+  const fillRules = (rules, profiles) => {
     $("#grow-profile").innerHTML =
       `<option value="">Not tracking a grow</option>` +
-      data.profiles.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join("");
+      (profiles || []).map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join("");
     $("#grow-profile").value = rules.grow?.profile_id || "";
     $("#grow-start").value = rules.grow?.started_on || "";
     for (const rule of ["temperature", "humidity", "water", "offline", "fruiting"]) form[`${rule}_enabled`].checked = Boolean(rules[rule]?.enabled);
@@ -1477,10 +1590,84 @@ async function renderDevice() {
     form.water_below.value = rules.water.below;
     form.offline_minutes.value = rules.offline.minutes;
   };
-  showStates(data.states);
-  fill(data.rules);
-  $("#device-alerts").innerHTML = alertItems(data.alerts || []);
-  $("#device-body").classList.remove("hidden");
+
+  const paint = (snap, { cached = false } = {}) => {
+    if (!snap?.device) return;
+    view.snapshot = snap;
+    const device = snap.device;
+    const showCoach = showCoachFor(snap);
+    $("#device-skeleton")?.classList.add("hidden");
+    $("#device-error")?.classList.add("hidden");
+    $("#device-name").textContent = device.name;
+    document.title = `${device.name} · Shroom Labs`;
+    $("#device-meta").textContent = deviceMetaLine(device, { showCoach });
+    buildDash();
+    swap("#dev-identity", renderIdentity(device));
+    swap("#dev-gauges", renderGauges(device));
+    if ($("#reading-chart")._history !== JSON.stringify(snap.history || [])) {
+      $("#reading-chart")._history = JSON.stringify(snap.history || []);
+      drawHistoryChart($("#reading-chart"), snap.history || []);
+    }
+    paintControls();
+    swap("#dev-commands", renderCommandList(device.commands || []));
+    swap("#dev-notes", renderReadonlyNotes(device));
+    const alerts = snap.alerts;
+    const status = $("#device-status");
+    if (alerts) {
+      const notice = deliveryNotice(alerts);
+      status.innerHTML = notice ? `${escapeHtml(notice)} <a href="/account.html#alerts">Alert settings</a>` : "";
+      status.classList.toggle("hidden", !notice);
+      showStates(alerts.states);
+      if (!view.rulesFilled && !form.contains(document.activeElement)) {
+        fillRules(alerts.rules, alerts.profiles);
+        view.rulesFilled = true;
+      }
+      swap("#device-alerts", alertItems(alerts.alerts || []));
+      $("#device-body").classList.remove("hidden");
+    } else if (!cached) {
+      status.innerHTML = `Verify your email to use alerts for this chamber. <a href="/account.html">Account</a>`;
+      status.classList.remove("hidden");
+      $("#device-body").classList.add("hidden");
+    }
+    if (!cached) liveCache.set(cacheKey, snap);
+  };
+
+  // 1. Whatever this phone saw last time, right away.
+  const cached = liveCache.get(cacheKey);
+  if (cached?.data?.device) {
+    paint(cached.data, { cached: true });
+    setLiveBadge($("#device-live"), "cached", cached.at);
+  } else setLiveBadge($("#device-live"), "loading");
+
+  // 2. Current data in one request, plus a socket for every change after that.
+  const live = keepLive({
+    load: () => loadDeviceSnapshot(id),
+    socketPath: `/api/live/devices/${enc}/socket`,
+    onData: (snap) => {
+      paint(snap);
+      setLiveBadge($("#device-live"), live?.live ? "live" : "polling");
+    },
+    onState: (s) => {
+      setLiveBadge($("#device-live"), s);
+      if (s === "gone") liveCache.clear();
+    },
+  });
+
+  const snap = await loadDeviceSnapshot(id);
+  live.push(snap);
+  if (snap.coach_available == null) {
+    view.coachLegacy = await coachAvailable();
+    paintControls(true);
+  }
+
+  // 3. The profile catalog only feeds the profile picker; load it after the page is up.
+  loadDeviceCatalog()
+    .then((catalog) => {
+      view.catalog = catalog;
+      paintControls();
+    })
+    .catch(() => {});
+
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const msg = $("#rules-msg");
@@ -1491,7 +1678,7 @@ async function renderDevice() {
       return;
     }
     try {
-      const saved = await api(path, {
+      const saved = await api(alertsPath, {
         method: "PUT",
         jsonBody: {
           temperature: { enabled: form.temperature_enabled.checked, minutes: Number(form.temperature_minutes.value) },
@@ -1502,7 +1689,7 @@ async function renderDevice() {
           grow: profile ? { profile_id: profile, started_on: started } : null,
         },
       });
-      fill(saved.rules);
+      fillRules(saved.rules, saved.profiles || view.snapshot?.alerts?.profiles);
       flash(msg, "Saved.");
     } catch (err) {
       flash(msg, err.status === 429 ? "Too many changes this hour. Try again later." : err.message);
@@ -1514,25 +1701,6 @@ function numberOrUndefined(value) {
   if (value == null || value === "") return undefined;
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
-}
-
-/** Keep the Recent changes list honest: re-read it while anything is still queued or delivered. */
-function watchDeviceCommands(id, { everyMs = 15000, forMs = 10 * 60 * 1000 } = {}) {
-  const started = Date.now();
-  let timer = null;
-  const tick = async () => {
-    try {
-      const data = await api(`/api/fleet/devices/${encodeURIComponent(id)}/commands`);
-      const list = document.querySelector("#device-commands");
-      if (list) list.outerHTML = renderCommandList(data.commands || []).match(/<ul id="device-commands"[\s\S]*?<\/ul>/)[0];
-      if ((data.commands || []).some(commandPending) && Date.now() - started < forMs) timer = setTimeout(tick, everyMs);
-    } catch {
-      timer = null;
-    }
-  };
-  clearTimeout(watchDeviceCommands.timer);
-  timer = setTimeout(tick, 1500);
-  watchDeviceCommands.timer = timer;
 }
 
 /** Run one write with its buttons disabled, so a fast second click cannot send it again. */
@@ -1550,14 +1718,18 @@ async function inFlight(form, run) {
   }
 }
 
-function bindDeviceControls(id, device, { canWrite }) {
+/**
+ * Wire the controls form. Command status, renames and profile changes come back
+ * through the live snapshot, so nothing here reloads the page.
+ */
+function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) {
   const form = $("#device-controls");
   const msg = $("#device-controls-msg");
-  if ((device.commands || []).some(commandPending)) watchDeviceCommands(id);
   form?.addEventListener("submit", (ev) => {
     ev.preventDefault();
     if (!canWrite) return;
     const action = ev.submitter?.dataset?.action;
+    const device = currentDevice() || {};
     inFlight(form, async () => {
       try {
         if (action === "name") {
@@ -1566,7 +1738,7 @@ function bindDeviceControls(id, device, { canWrite }) {
             jsonBody: { name: form.device_name.value },
           });
           flash(msg, "Name saved.");
-          location.reload();
+          onSent();
           return;
         }
         const payload = { request_id: newRequestId() };
@@ -1604,29 +1776,11 @@ function bindDeviceControls(id, device, { canWrite }) {
         const result = applied.results?.[0];
         if (!result || result.status === "failed") throw new Error(resultMessage(result));
         flash(msg, resultMessage(result));
-        if (action === "profile") {
-          // Profile and species on the page come from the server; show what it now tracks.
-          const fresh = await api(`/api/fleet/devices/${encodeURIComponent(id)}`).catch(() => null);
-          const identity = document.querySelector(".device-identity");
-          if (fresh?.device && identity) identity.outerHTML = renderIdentity(fresh.device);
-        }
-        if (result.command_id) watchDeviceCommands(id);
+        onSent();
       } catch (err) {
         flash(msg, err.message);
       }
     });
-  });
-  $("#unlink-device")?.addEventListener("click", async () => {
-    if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
-    try {
-      await api(`/api/fleet/devices/${encodeURIComponent(id)}/unlink`, {
-        method: "POST",
-        jsonBody: { confirm: true },
-      });
-      location.href = "/devices.html";
-    } catch (err) {
-      flash(msg, err.message);
-    }
   });
 }
 
@@ -1640,6 +1794,8 @@ function coachLabel(device) {
 }
 
 async function renderFleet() {
+  // The cached paint runs synchronously; wait until the rest of this module (STATE_LABEL etc.) is initialized.
+  await Promise.resolve();
   if (!getToken()) {
     location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;
@@ -1657,26 +1813,51 @@ async function renderFleet() {
   const detailId = params().get("id");
   if (detailId) {
     $("#fleet-detail").classList.remove("hidden");
-    const data = await api(`/api/fleet/devices/${encodeURIComponent(detailId)}`);
-    const d = data.device;
-    $("#detail-name").textContent = d.name;
-    $("#rename-name").value = d.name;
-    $("#detail-meta").textContent = `${d.device_type_label || "Shrooly chamber"} · ${d.online ? "Online" : "Offline"} · ${speciesLine(d) || "No species selected"} · ${growLine(d)} · last seen ${d.last_seen_at || "never"}`;
-    $("#detail-alerts").innerHTML =
-      (d.alerts || []).map((a) => `<li class="${escapeHtml(a.kind)}">${escapeHtml(a.message)}</li>`).join("") ||
-      `<li class="info">No alerts right now.</li>`;
-    $("#detail-stats").innerHTML = [
-      ["Species", speciesLine(d) || "Not set", ""],
-      ["Temperature", d.reading?.temperature, "°C"],
-      ["Humidity", d.reading?.humidity, "%"],
-      ["Temp target", d.setpoints?.temperature_c, "°C"],
-      ["Humidity target", d.setpoints?.humidity_percent, "%"],
-      ["Profile", d.profile?.name || "None", ""],
-      ...(d.coach ? [["Coach", coachLabel(d), ""]] : []),
-    ]
-      .map(([label, value, unit]) => `<div class="stat"><strong>${value == null || value === "" ? "n/a" : `${safeDisplay(value)}${escapeHtml(unit)}`}</strong><span>${escapeHtml(label)}</span></div>`)
-      .join("");
-    drawHistoryChart($("#reading-chart"), data.history || []);
+    const cacheKey = `device:${detailId}`;
+    let d = null;
+    const paintDetail = (data, { cached = false } = {}) => {
+      if (!data?.device) return;
+      d = data.device;
+      $("#fleet-skeleton")?.classList.add("hidden");
+      $("#detail-name").textContent = d.name;
+      if (document.activeElement !== $("#rename-name")) $("#rename-name").value = d.name;
+      $("#detail-meta").textContent = deviceMetaLine(d);
+      $("#detail-alerts").innerHTML =
+        (d.alerts || []).map((a) => `<li class="${escapeHtml(a.kind)}">${escapeHtml(a.message)}</li>`).join("") ||
+        `<li class="info">No alerts right now.</li>`;
+      const grow = growingLabels(d);
+      $("#detail-stats").innerHTML = [
+        ["Growing", d.profile || speciesLine(d) ? grow.title : "Nothing selected", ""],
+        ...(grow.latin ? [["Species", grow.latin, ""]] : []),
+        ...(grow.phase ? [["Phase", grow.phase, ""]] : []),
+        ["Temperature", d.reading?.temperature, "°C"],
+        ["Humidity", d.reading?.humidity, "%"],
+        ...(d.reading?.water_level != null ? [["Water", d.reading.water_level, "%"]] : []),
+        ["Temp target", d.setpoints?.temperature_c, "°C"],
+        ["Humidity target", d.setpoints?.humidity_percent, "%"],
+        ...(d.coach ? [["Coach", coachLabel(d), ""]] : []),
+      ]
+        .map(([label, value, unit]) => `<div class="stat"><strong>${value == null || value === "" ? "Not reported" : `${safeDisplay(value)}${escapeHtml(unit)}`}</strong><span>${escapeHtml(label)}</span></div>`)
+        .join("");
+      $("#detail-when").textContent = readingWhenLine(d);
+      drawHistoryChart($("#reading-chart"), data.history || []);
+      if (!cached) liveCache.set(cacheKey, data);
+    };
+    const cachedDetail = liveCache.get(cacheKey);
+    if (cachedDetail?.data?.device) {
+      paintDetail(cachedDetail.data, { cached: true });
+      setLiveBadge($("#fleet-live"), "cached", cachedDetail.at);
+    } else setLiveBadge($("#fleet-live"), "loading");
+    const detailLive = keepLive({
+      load: () => loadDeviceSnapshot(detailId),
+      socketPath: `/api/live/devices/${encodeURIComponent(detailId)}/socket`,
+      onData: (data) => {
+        paintDetail(data);
+        setLiveBadge($("#fleet-live"), detailLive?.live ? "live" : "polling");
+      },
+      onState: (st) => setLiveBadge($("#fleet-live"), st),
+    });
+    detailLive.push(await loadDeviceSnapshot(detailId));
     const back = document.querySelector("#fleet-detail .back-link a");
     if (back) back.insertAdjacentHTML("afterend", ` · <a href="/device.html?id=${encodeURIComponent(detailId)}">Open device page</a>`);
     fillLightInputs(d.light, {
@@ -1713,7 +1894,8 @@ async function renderFleet() {
           method: "PATCH",
           jsonBody: { name: $("#rename-name").value },
         });
-        location.reload();
+        $("#rename-name").blur();
+        detailLive.refresh();
       } catch (err) {
         showError(err);
       }
@@ -1734,12 +1916,21 @@ async function renderFleet() {
   }
 
   $("#fleet-list").classList.remove("hidden");
+  let rows = [];
+  let paintRows = () => {};
+  const listLive = liveDeviceList({
+    cacheKey: "devices",
+    onRows: (next) => {
+      rows = next;
+      paintRows();
+    },
+    onState: (st, at) => setLiveBadge($("#fleet-live"), st, at),
+  });
   const [list, groups, audit] = await Promise.all([
-    api("/api/fleet/devices"),
+    loadDeviceList(),
     api("/api/fleet/groups"),
     api("/api/fleet/audit"),
   ]);
-  let rows = list.devices || [];
   const groupRows = groups.groups || [];
   // Coach column and bulk Coach mode appear only for users the server allows.
   const showCoachColumn = await coachAvailable();
@@ -1774,8 +1965,8 @@ async function renderFleet() {
           (d) => `<tr>
             <td><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></td>
             <td><a href="/fleet.html?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
-            <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(d.last_seen_at || "never")}</span></td>
-            <td>${d.reading ? `${safeDisplay(d.reading.temperature, "?")} °C · ${safeDisplay(d.reading.humidity, "?")}%` : "No reading"}</td>
+            <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(lastSeenLine(d))}</span></td>
+            <td>${d.reading ? `${safeDisplay(d.reading.temperature, "not reported")} °C · ${safeDisplay(d.reading.humidity, "not reported")}%` : "No reading"}</td>
             <td>${escapeHtml(d.profile?.name || "None")}${d.profile?.species ? `<br><span class="muted">${escapeHtml(d.profile.species)}</span>` : ""}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
             <td>${safeDisplay(d.setpoints?.temperature_c, "?")} °C · ${safeDisplay(d.setpoints?.humidity_percent, "?")}%</td>
             ${showCoachColumn ? `<td>${escapeHtml(coachLabel(d))}</td>` : ""}
@@ -1791,7 +1982,13 @@ async function renderFleet() {
   $("#fleet-all").addEventListener("change", () => {
     for (const box of document.querySelectorAll("#fleet-rows input[type=checkbox]")) box.checked = $("#fleet-all").checked;
   });
-  paint();
+  // Live pushes repaint the table but keep whatever boxes are ticked.
+  paintRows = () => {
+    const ticked = new Set(selectedIds());
+    paint();
+    for (const box of document.querySelectorAll("#fleet-rows input[type=checkbox]")) box.checked = ticked.has(box.value);
+  };
+  listLive.push(list);
 
   function bulkBody() {
     const action = $("#bulk-action").value;

@@ -18,6 +18,22 @@ database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
 binding = "PHOTOS"
 bucket_name = "shroomlabs-photos"
 
+# Live device cache (src/live.js). One SQLite-backed object per device keeps
+# the device page snapshot and pushes changes over hibernatable WebSockets;
+# one per user fans changes out to the Devices and Fleet pages. D1 stays the
+# source of truth: objects rebuild from D1, never the other way round.
+[[durable_objects.bindings]]
+name = "DEVICE_LIVE"
+class_name = "DeviceLive"
+
+[[durable_objects.bindings]]
+name = "USER_LIVE"
+class_name = "UserLive"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DeviceLive", "UserLive"]
+
 [vars]
 SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"

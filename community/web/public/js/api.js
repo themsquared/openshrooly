@@ -12,6 +12,12 @@ export function getToken() {
 export function setToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
+  // Cached live device snapshots belong to the old sign-in.
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith("sl.live.")) localStorage.removeItem(k);
+  } catch {
+    // ignore
+  }
 }
 
 export async function api(path, { method = "GET", body, jsonBody } = {}) {

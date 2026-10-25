@@ -28,6 +28,7 @@ import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RE
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 import { handleAlerts } from "./alerts/http.js";
+import { handleLive } from "./live.js";
 import { handleReview } from "./review-http.js";
 import { readJsonLimited } from "./http-body.js";
 import { canSeeMedia, getMedia, mediaApiUrl, mediaApproved } from "./media-acl.js";
@@ -36,6 +37,7 @@ import {
   getReview,
   isModerator,
   isPublicProfile,
+  isPublicRow,
   canSeePhoto,
   canServeReportPhoto,
   offmenuVisible,
@@ -70,7 +72,7 @@ export function corsHeaders(env, request, extra = {}) {
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": origin === "*" ? "false" : "true",
     "access-control-allow-headers": "authorization, content-type, x-csrf-token",
-    "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "access-control-max-age": "86400",
     vary: "Origin",
     ...extra,
@@ -165,12 +167,18 @@ async function canRead(db, user, profile) {
 }
 
 async function listProfiles(db, env, pack, q) {
-  const rows = await db.all("SELECT * FROM profiles");
+  // Two queries for the whole library. One review lookup per profile made this
+  // endpoint 50+ serial D1 round trips (1.2-2.2 s on prod).
+  const [rows, reviewRows] = await Promise.all([
+    db.all("SELECT * FROM profiles"),
+    db.all("SELECT * FROM profile_review"),
+  ]);
+  const reviews = new Map((reviewRows || []).map((r) => [r.profile_id, r]));
   const query = (q || "").toLowerCase();
   const out = [];
   for (const row of rows) {
-    if (!(await isPublicProfile(db, row))) continue;
-    const review = await getReview(db, row.id);
+    const review = reviews.get(row.id) || null;
+    if (!isPublicRow(row, review)) continue;
     const working = parseProfile(row);
     if (!working) continue;
     const extra = serveExtra(review, working);
@@ -283,6 +291,8 @@ async function route(method, path, url, request, env) {
   }
   const authResponse = await handleAuth(method, path, url, request, env);
   if (authResponse) return authResponse;
+  const liveResponse = await handleLive(method, path, url, request, env);
+  if (liveResponse) return liveResponse;
   const deviceResponse = await handleDevices(method, path, url, request, env);
   if (deviceResponse) return deviceResponse;
   const fleetResponse = await handleFleet(method, path, url, request, env);

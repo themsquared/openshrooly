@@ -1038,3 +1038,24 @@ button.nav-toggle {
   .account-actions .button,
   .account-actions button { width: 100%; }
 }
+
+/* Live device pages: skeleton while the first data arrives, and a quiet status badge. */
+.device-skeleton { display: grid; gap: 0.8rem; margin: 1rem 0; }
+.device-skeleton.hidden { display: none; }
+.sk-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.8rem; }
+.sk {
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(127, 127, 127, 0.12) 25%, rgba(127, 127, 127, 0.24) 50%, rgba(127, 127, 127, 0.12) 75%);
+  background-size: 200% 100%;
+  animation: sk-shimmer 1.2s ease-in-out infinite;
+}
+.sk-identity { height: 150px; }
+.sk-card { height: 120px; }
+.sk-tile { height: 84px; }
+.sk-chart { height: 160px; }
+@keyframes sk-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+.live-badge { margin: 0.2rem 0; font-size: 0.85rem; }
+.live-badge[data-state="live"]::before { content: ""; display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.35rem; border-radius: 50%; background: #2f9e44; vertical-align: middle; }
+.gauge-missing { font-size: 1rem; font-weight: 600; opacity: 0.7; }
+.device-reading-when { margin-top: 0.4rem; font-size: 0.85rem; }
