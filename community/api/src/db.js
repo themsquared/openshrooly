@@ -816,6 +816,7 @@ function dispatch(mode, tables, ids, sql, params) {
       cloud_enabled: params[9],
       last_seen_at: params[10],
       created_at: params[11],
+      device_type: params[12] || "shrooly_chamber",
     });
     return {};
   }
