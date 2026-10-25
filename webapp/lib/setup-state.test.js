@@ -43,7 +43,19 @@ test("fruiting preset writes grow caption and existing setpoint numbers", () => 
   const writes = applyPresetWrites(oyster);
   assert.deepEqual(
     writes.map((w) => w.id),
-    ["grow_phase", "grow_day", "grow_days_total", "target_humidity", "temperature__target", "lights__sunrise_hour", "lights__duration__hours_"]
+    [
+      "grow_phase",
+      "grow_day",
+      "grow_days_total",
+      "target_humidity",
+      "temperature__target",
+      "lights__sunrise_hour",
+      "lights__duration__hours_",
+      "white_led_intensity",
+      "red_led_intensity",
+      "green_led_intensity",
+      "blue_led_intensity",
+    ]
   );
   assert.equal(writes[0].value, "Fruiting");
   assert.equal(writes.find((w) => w.id === "target_humidity").value, 90);
@@ -97,4 +109,14 @@ test("writes become the same entity ids the dashboard already listens to", () =>
   assert.equal(patch["select-grow_phase"].state, "Colonizing");
   assert.equal(patch["number-grow_days_total"].value, 14);
   assert.equal(patch["number-target_humidity"].value, 90);
+  assert.equal(patch["number-lights__duration__hours_"].value, 0);
+  assert.equal(patch["number-white_led_intensity"].value, 0);
+  assert.equal(patch["number-blue_led_intensity"].value, 0);
+});
+
+test("fruiting presets write duration and a complete mix", () => {
+  const oyster = applyPresetWrites(GROW_PRESETS.find((p) => p.id === "oyster-fruit"));
+  assert.equal(oyster.find((w) => w.id === "lights__duration__hours_").value, 12);
+  assert.equal(oyster.find((w) => w.id === "white_led_intensity").value, 92);
+  assert.equal(oyster.find((w) => w.id === "blue_led_intensity").value, 80);
 });

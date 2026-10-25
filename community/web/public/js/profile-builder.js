@@ -23,6 +23,7 @@ import {
   isPsilocybin,
   isStageId,
   isHttpsSourceUrl,
+  lightOnSummary,
 } from "./profile-schema.js";
 
 function fieldId(path) {
@@ -277,7 +278,27 @@ export class ProfileBuilder extends HTMLElement {
         this.slider("fan_period", "Fan period", stage.fan?.period_min ?? 15, { ...RANGES.fan_period_min, step: 1 }, `stages.${stage.id}.fan.period_min`, issues),
         this.slider("fan_run", "Fan run time", stage.fan?.run_duration_s ?? 30, { ...RANGES.fan_run_duration_s, step: 1 }, `stages.${stage.id}.fan.run_duration_s`, issues)
       ),
+      this.renderStageLight(stage, issues),
       this.areaField("stage-notes", "Phase notes", stage.notes || "", issues, `stages.${stage.id}.notes`)
+    );
+  }
+
+  renderStageLight(stage, issues) {
+    const light = stage.light || {};
+    const sunrise = light.sunrise_hour ?? 8;
+    const duration = light.duration_hours ?? 0;
+    return h("fieldset", { class: "pb-stage-light" },
+      h("legend", {}, "Light for this phase"),
+      h("p", { class: "muted", id: `light-summary-${stage.id}` }, lightOnSummary(sunrise, duration)),
+      h("p", { class: "muted" }, "Duration is required when the light is on. 0 hours is only for a dark phase with lux 0 and RGB 0."),
+      this.slider("sunrise", "Sunrise hour", sunrise, { ...RANGES.sunrise_hour, step: 1 }, `stages.${stage.id}.light.sunrise_hour`, issues),
+      this.slider("light_hours", "Hours on", duration, { ...RANGES.photoperiod_hours, step: 0.25 }, `stages.${stage.id}.light.duration_hours`, issues),
+      this.slider("lux", "White lux", light.white_led_lux ?? 0, { ...RANGES.white_led_lux, step: 1 }, `stages.${stage.id}.light.white_led_lux`, issues),
+      h("div", { class: "pb-row pb-row-3" },
+        this.slider("stage-red", "Red", light.red_percent ?? 0, { ...RANGES.rgb_percent, step: 1 }, `stages.${stage.id}.light.red_percent`, issues),
+        this.slider("stage-green", "Green", light.green_percent ?? 0, { ...RANGES.rgb_percent, step: 1 }, `stages.${stage.id}.light.green_percent`, issues),
+        this.slider("stage-blue", "Blue", light.blue_percent ?? 0, { ...RANGES.rgb_percent, step: 1 }, `stages.${stage.id}.light.blue_percent`, issues)
+      )
     );
   }
 
@@ -575,6 +596,19 @@ export class ProfileBuilder extends HTMLElement {
     else if (path.endsWith("fan.speed_percent")) stage.fan.speed_percent = Number(raw);
     else if (path.endsWith("fan.period_min")) stage.fan.period_min = Number(raw);
     else if (path.endsWith("fan.run_duration_s")) stage.fan.run_duration_s = Number(raw);
+    else if (path.includes(".light.")) {
+      stage.light = stage.light || {};
+      const key = path.split(".").pop();
+      stage.light[key] = Number(raw);
+      const recipe = this.profile.light_recipe;
+      if (recipe?.phases) {
+        recipe.phases[stage.id] = recipe.phases[stage.id] || defaultLightPhase(stage.id);
+        const phase = recipe.phases[stage.id];
+        if (key === "duration_hours") phase.photoperiod_hours = Number(raw);
+        if (key === "white_led_lux") phase.white_brightness_percent = Math.min(100, Math.round((Number(raw) / 400) * 100));
+        if (key === "red_percent" || key === "green_percent" || key === "blue_percent") phase[key] = Number(raw);
+      }
+    }
     else if (path.includes("light_recipe.phases.")) {
       const key = path.split(".").pop();
       const id = path.split(".")[2];
@@ -601,6 +635,11 @@ export class ProfileBuilder extends HTMLElement {
       }
       const clock = this.querySelector(".pb-clock span");
       if (clock && phase) clock.style.width = `${(Number(phase.photoperiod_hours) / 24) * 100}%`;
+    }
+    if (path.includes(".light.")) {
+      const stage = this.profile.stages.find((s) => s.id === this.activeStage);
+      const box = this.querySelector(`#light-summary-${this.activeStage}`);
+      if (box && stage?.light) box.textContent = lightOnSummary(stage.light.sunrise_hour, stage.light.duration_hours);
     }
   }
 

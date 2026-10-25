@@ -63,6 +63,33 @@ test("every seed profile has a sourced light recipe inside the ranges", () => {
       assert.ok(phase.photoperiod_hours >= 0 && phase.photoperiod_hours <= 24, `${file} ${name}`);
       assert.ok(phase.white_brightness_percent >= 0 && phase.white_brightness_percent <= 100, `${file} ${name}`);
     }
+    for (const stage of profile.stages) {
+      const light = stage.light || {};
+      assert.ok(stage.id in recipe.phases, `${file} ${stage.id} recipe`);
+      assert.ok(light.sunrise_hour != null, `${file} ${stage.id} sunrise`);
+      assert.ok(light.duration_hours != null, `${file} ${stage.id} duration`);
+      assert.ok(light.white_led_lux != null, `${file} ${stage.id} lux`);
+      const on = Number(light.white_led_lux) > 0 || Number(light.red_percent) > 0 || Number(light.green_percent) > 0 || Number(light.blue_percent) > 0;
+      if (on) assert.ok(Number(light.duration_hours) > 0, `${file} ${stage.id} lit without duration`);
+    }
+  }
+});
+
+test("every built-in profile stage has a complete light mix", () => {
+  const files = ["culinary", "psilocybin"].flatMap((pack) =>
+    readdirSync(join(root, "data/profiles", pack))
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => `data/profiles/${pack}/${name}`)
+  );
+  for (const file of files) {
+    const profile = validateProfile(load(file));
+    for (const stage of profile.stages) {
+      const light = stage.light;
+      const phase = profile.light_recipe.phases[stage.id];
+      assert.ok(phase, `${file} ${stage.id}`);
+      assert.equal(light.duration_hours, phase.photoperiod_hours, `${file} ${stage.id} hours`);
+      assert.ok(light.sunrise_hour >= 0 && light.sunrise_hour <= 23);
+    }
   }
 });
 
@@ -80,6 +107,23 @@ test("stage light payloads use the same ranges as the profile light schema", () 
   assert.throws(() => validateStageLight({ duration_hours: 25 }), /hours/i);
   assert.throws(() => validateStageLight({ white_led_lux: 5000 }), /lux/i);
   assert.throws(() => validateStageLight({ red_percent: 120 }), /red/i);
+  assert.throws(
+    () => validateStageLight({ sunrise_hour: 8, duration_hours: 0, white_led_lux: 150, red_percent: 0, green_percent: 0, blue_percent: 0 }),
+    /duration/i
+  );
+  assert.throws(
+    () => validateStageLight({ sunrise_hour: 8, white_led_lux: 90, red_percent: 0, green_percent: 0, blue_percent: 80 }),
+    /duration/i
+  );
+  const dark = validateStageLight({
+    sunrise_hour: 8,
+    duration_hours: 0,
+    white_led_lux: 0,
+    red_percent: 0,
+    green_percent: 0,
+    blue_percent: 0,
+  });
+  assert.equal(dark.duration_hours, 0);
 });
 
 test("light recipe validation rejects bad ranges and missing sources", () => {

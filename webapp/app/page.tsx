@@ -9,7 +9,7 @@ import {
 } from '../lib/setup-state'
 import { DEVICE_VERSION, connectionLabel } from '../lib/setup-state'
 import type { GrowPreset } from '../lib/setup-state'
-import { addSample, rangeText, scheduleText, trendText } from '../lib/card-text'
+import { addSample, lightOnSummary, rangeText, scheduleText, trendText } from '../lib/card-text'
 import type { Sample } from '../lib/card-text'
 import Icon from './components/Icon'
 import LiveGauge from './components/LiveGauge'
@@ -437,6 +437,9 @@ export default function Dashboard() {
     handleNumberChange('number-red_led_intensity', rgb.r)
     handleNumberChange('number-green_led_intensity', rgb.g)
     handleNumberChange('number-blue_led_intensity', rgb.b)
+    if ((rgb.r > 0 || rgb.g > 0 || rgb.b > 0) && !(lightDuration > 0)) {
+      handleDurationChange(12)
+    }
   }
 
   // Helper to get values
@@ -453,8 +456,16 @@ export default function Dashboard() {
   // Sync lighting state from entities
   useEffect(() => {
     const sunrise = parseFloat((getNumber('lights__sunrise_hour') || 8) as string)
-    const duration = parseFloat((getNumber('lights__duration__hours_') || 12) as string)
+    let duration = parseFloat((getNumber('lights__duration__hours_') || 12) as string)
     const lux = parseFloat((getNumber('white_led_intensity') || 150) as string)
+    const rgbOn =
+      parseFloat((getNumber('red_led_intensity') || 0) as string) > 0 ||
+      parseFloat((getNumber('green_led_intensity') || 0) as string) > 0 ||
+      parseFloat((getNumber('blue_led_intensity') || 0) as string) > 0
+    if ((lux > 0 || rgbOn) && !(duration > 0)) {
+      duration = 12
+      handleNumberChange('number-lights__duration__hours_', 12)
+    }
 
     setLightSunrise(sunrise)
     setLightDuration(duration)
@@ -501,8 +512,14 @@ export default function Dashboard() {
   }
 
   const handleDurationChange = (newDuration: number) => {
-    // Clamp duration between 0 and 24
-    const clampedDuration = Math.max(0, Math.min(24, newDuration))
+    const rgbOn =
+      parseFloat((getNumber('red_led_intensity') || 0) as string) > 0 ||
+      parseFloat((getNumber('green_led_intensity') || 0) as string) > 0 ||
+      parseFloat((getNumber('blue_led_intensity') || 0) as string) > 0
+    const lightOn = luxValue > 0 || rgbOn
+    // Clamp duration between 0 and 24. When the light is on, 0 is not a valid photoperiod.
+    const floor = lightOn ? 0.25 : 0
+    const clampedDuration = Math.max(floor, Math.min(24, newDuration))
     setLightDuration(clampedDuration)
 
     // Calculate sunset, handling wrap around midnight
@@ -521,6 +538,9 @@ export default function Dashboard() {
     const lux = sliderToLux(sliderValue)
     setLuxValue(lux)
     handleNumberChange('number-white_led_intensity', lux)
+    if (lux > 0 && !(lightDuration > 0)) {
+      handleDurationChange(12)
+    }
   }
 
   // Common function to get position from mouse or touch event
@@ -781,6 +801,8 @@ export default function Dashboard() {
   const greenValue = parseFloat((getNumber('green_led_intensity') || 0) as string) || 0
   const blueValue = parseFloat((getNumber('blue_led_intensity') || 0) as string) || 0
   const currentColor = rgbToHex(redValue, greenValue, blueValue)
+  const lightEnabled = luxValue > 0 || redValue > 0 || greenValue > 0 || blueValue > 0
+  const durationRequired = lightEnabled && !(lightDuration > 0)
 
   return (
     <div className="dashboard">
@@ -932,7 +954,7 @@ export default function Dashboard() {
             {lightsOn && <span className="card-unit">lux</span>}
           </div>
           <div className="card-schedule">
-            {scheduleText(lightSunrise, lightSunset)}
+            {lightOnSummary(lightSunrise, lightDuration)}
           </div>
         </div>
 
@@ -1512,7 +1534,24 @@ export default function Dashboard() {
             <h2>💡 Lighting Schedule</h2>
             <div className="modal-content">
               <div className="control-group">
-                <label>Light Schedule: {scheduleText(lightSunrise, lightSunset)} ({lightDuration.toFixed(1)}h)</label>
+                <label>{lightOnSummary(lightSunrise, lightDuration)} ({lightDuration.toFixed(1)}h)</label>
+                <p className="lux-guide">Duration is required when the light is on. 0 hours is only for a dark stage with lux 0 and RGB 0.</p>
+                <label htmlFor="light-duration-hours">Duration (hours)</label>
+                <input
+                  id="light-duration-hours"
+                  type="number"
+                  min={lightEnabled ? 0.25 : 0}
+                  max={24}
+                  step={0.25}
+                  required={lightEnabled}
+                  value={Number.isFinite(lightDuration) ? lightDuration : ''}
+                  onChange={(e) => handleDurationChange(parseFloat(e.target.value))}
+                />
+                {durationRequired ? (
+                  <div className="warning-message" role="alert" style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', color: '#856404' }}>
+                    Duration is required when the light is on. Using 12 hours.
+                  </div>
+                ) : null}
                 <div className="dual-slider-container">
                   {/* Sunrise handle with sun icon - above track */}
                   <div

@@ -92,7 +92,7 @@ export function planBridgeCommand({ command, stage = {}, reading, now = Date.now
     return {
       ok: false,
       status: "failed",
-      reason: "Bridge accepts only setpoints until lights have step and override checks.",
+      reason: "Bridge accepts only setpoints until lights have step and override checks. A light schedule also needs duration greater than 0 when brightness is greater than 0.",
       mark: true,
     };
   }

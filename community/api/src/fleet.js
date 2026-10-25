@@ -242,8 +242,10 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
     };
   }
   if (action === "light") {
-    const light = payload.light || lightFromStage(stage);
-    if (!light) return { ok: false, error: "No light recipe on this profile stage." };
+    const fromStage = lightFromStage(stage) || {};
+    const incoming = payload.light && typeof payload.light === "object" ? payload.light : {};
+    const light = { ...fromStage, ...incoming };
+    if (!Object.keys(light).length) return { ok: false, error: "No light recipe on this profile stage." };
     try {
       const checked = validateStageLight(light);
       return { ok: true, kind: "schedule", payload: { light: checked }, preview: { light: checked } };

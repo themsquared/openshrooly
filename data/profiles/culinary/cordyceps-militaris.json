@@ -168,6 +168,13 @@
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
+      },
+      "pinning": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 51,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
       }
     }
   }

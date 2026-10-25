@@ -16,6 +16,8 @@ export {
   collectProfileIssues,
   collectLightRecipeIssues,
   collectStageLightIssues,
+  lightOnSummary,
+  lightChannelsOn,
 } from "./profile-schema.js";
 
 import { isPsilocybin, ValidationError } from "./profile-schema.js";

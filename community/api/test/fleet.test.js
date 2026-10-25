@@ -274,6 +274,15 @@ test("fleet and single-device light payloads are validated", async () => {
   });
   assert.equal(single.status, 400);
   assert.match(single.data.error, /sunrise/i);
+  const zeroHours = await call(ctx, "POST", "/api/devices/dev-light/commands", {
+    token,
+    body: {
+      kind: "schedule",
+      payload: { light: { sunrise_hour: 7, duration_hours: 0, white_led_lux: 150, red_percent: 0, green_percent: 0, blue_percent: 80 } },
+    },
+  });
+  assert.equal(zeroHours.status, 400);
+  assert.match(zeroHours.data.error, /duration/i);
 });
 
 test("group deletion is audited and the audit list is newest first", async () => {

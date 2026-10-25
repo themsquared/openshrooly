@@ -44,7 +44,41 @@ export function httpsSourceHref(url) {
 }
 
 export const AFFILIATE_ID_RE = /^[a-z0-9-]{1,40}$/;
-export const LIGHT_PHASE_IDS = new Set(["colonization", "pinning", "fruiting"]);
+export const LIGHT_PHASE_IDS = new Set(STAGE_CATALOG.map((s) => s.id));
+
+export function lightChannelsOn(light = {}) {
+  return (
+    Number(light.white_led_lux) > 0 ||
+    Number(light.red_percent) > 0 ||
+    Number(light.green_percent) > 0 ||
+    Number(light.blue_percent) > 0
+  );
+}
+
+export function lightPhaseOn(phase = {}) {
+  return (
+    Number(phase.white_brightness_percent) > 0 ||
+    Number(phase.red_percent) > 0 ||
+    Number(phase.green_percent) > 0 ||
+    Number(phase.blue_percent) > 0
+  );
+}
+
+export function clockHourText(hour) {
+  const total = Math.round(((((Number(hour) || 0) % 24) + 24) % 24) * 60) % (24 * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Plain 24h window, or an explicit dark label when duration is 0. */
+export function lightOnSummary(sunriseHour, durationHours) {
+  const duration = Number(durationHours);
+  if (!(duration > 0)) return "Light off (dark)";
+  const start = Number(sunriseHour) || 0;
+  const end = (start + duration) % 24;
+  return `Light on ${clockHourText(start)} to ${clockHourText(end)}`;
+}
 
 export function isAffiliateId(id) {
   return typeof id === "string" && AFFILIATE_ID_RE.test(id);
@@ -725,7 +759,7 @@ export function blankProfile({ id = "", name = "", pack = "culinary" } = {}) {
     affiliate_links: [],
     firmware_compat: { min_version: "1.0.0", uses_existing_entities_only: true },
     light_recipe: {
-      why: "Hours and mix for this chamber.",
+      why: "Hours and mix for this chamber. Each grow phase needs its own hours and mix.",
       wavelength_note: WAVELENGTH_NOTE,
       sources: [{ title: "Grower", detail: "Recorded from this grow." }],
       phases: {
@@ -916,19 +950,33 @@ export function collectProfileIssues(profile, extra = {}) {
       addIssue(issues, `stages.${stage.id}.fan.run_duration_s`, `${label} fan cycle needs at least 60 seconds off.`);
     }
     const light = stage.light || {};
-    if (light.sunrise_hour != null && !inRange(light.sunrise_hour, 0, 23)) {
+    if (light.sunrise_hour == null || !inRange(light.sunrise_hour, 0, 23)) {
       addIssue(issues, `stages.${stage.id}.light.sunrise_hour`, `${label} sunrise must be hour 0 to 23.`);
     }
-    if (light.duration_hours != null && !inRange(light.duration_hours, 0, 24)) {
+    if (light.duration_hours == null || !inRange(light.duration_hours, 0, 24)) {
       addIssue(issues, `stages.${stage.id}.light.duration_hours`, `${label} light hours must be 0 to 24.`);
     }
-    if (light.white_led_lux != null && !inRange(light.white_led_lux, 0, 4000)) {
+    if (light.white_led_lux == null || !inRange(light.white_led_lux, 0, 4000)) {
       addIssue(issues, `stages.${stage.id}.light.white_led_lux`, `${label} white light must be 0 to 4000 lux.`);
     }
     for (const channel of ["red_percent", "green_percent", "blue_percent"]) {
-      if (light[channel] != null && !inRange(light[channel], 0, 100)) {
+      if (light[channel] == null || !inRange(light[channel], 0, 100)) {
         addIssue(issues, `stages.${stage.id}.light.${channel}`, `${label} ${channel.replace("_percent", "")} must be 0 to 100%.`);
       }
+    }
+    if (lightChannelsOn(light) && !(Number(light.duration_hours) > 0)) {
+      addIssue(
+        issues,
+        `stages.${stage.id}.light.duration_hours`,
+        `${label} duration must be greater than 0 when the light is on. Use 0 only for a dark stage with lux 0 and RGB 0.`
+      );
+    }
+    if (profile.light_recipe && !(profile.light_recipe.phases || {})[stage.id]) {
+      addIssue(
+        issues,
+        `light_recipe.phases.${stage.id}`,
+        `Add a ${label} light mix. Every phase needs hours, white, and RGB.`
+      );
     }
   }
 
@@ -992,7 +1040,7 @@ export function collectLightRecipeIssues(recipe) {
   if (!phases.fruiting) addIssue(issues, "light_recipe.phases.fruiting", "Add a fruiting light mix.");
   for (const [name, phase] of Object.entries(phases)) {
     if (!LIGHT_PHASE_IDS.has(name)) {
-      addIssue(issues, `light_recipe.phases.${name}`, "Light recipe phases must be colonization, pinning, or fruiting.");
+      addIssue(issues, `light_recipe.phases.${name}`, "Light recipe phases must use a known grow phase id.");
       continue;
     }
     if (!inRange(phase.photoperiod_hours, 0, 24)) {
@@ -1005,6 +1053,13 @@ export function collectLightRecipeIssues(recipe) {
       if (!inRange(phase[channel], 0, 100)) {
         addIssue(issues, `light_recipe.phases.${name}.${channel}`, `${name} ${channel.replace("_percent", "")} must be 0 to 100%.`);
       }
+    }
+    if (lightPhaseOn(phase) && !(Number(phase.photoperiod_hours) > 0)) {
+      addIssue(
+        issues,
+        `light_recipe.phases.${name}.photoperiod_hours`,
+        `${name} hours on must be greater than 0 when the mix is on. Use 0 only for a dark mix.`
+      );
     }
   }
   return issues;
@@ -1044,6 +1099,15 @@ export function collectStageLightIssues(light = {}, prefix = "light") {
       addIssue(issues, `${prefix}.${channel}`, `${channel.replace("_percent", "")} must be 0 to 100%.`);
     }
   }
+  const duration = light.duration_hours;
+  const durationMissing = duration == null || duration === "" || !Number.isFinite(Number(duration));
+  if (lightChannelsOn(light) && (durationMissing || Number(duration) <= 0)) {
+    addIssue(
+      issues,
+      `${prefix}.duration_hours`,
+      "Duration must be greater than 0 when brightness is greater than 0. Use 0 only for a dark stage with lux 0 and RGB 0."
+    );
+  }
   return issues;
 }
 
@@ -1075,8 +1139,12 @@ export function syncStageLightFromRecipe(profile) {
   const recipe = next.light_recipe;
   if (!recipe?.phases) return next;
   for (const stage of next.stages || []) {
-    const phase = recipe.phases[stage.id] || (["pinning", "fruiting", "flush"].includes(stage.id) ? recipe.phases.fruiting : recipe.phases.colonization);
-    if (!phase) continue;
+    const inherited =
+      recipe.phases[stage.id] ||
+      (["pinning", "fruiting", "flush"].includes(stage.id) ? recipe.phases.fruiting : recipe.phases.colonization);
+    if (!inherited) continue;
+    if (!recipe.phases[stage.id]) recipe.phases[stage.id] = structuredClone(inherited);
+    const phase = recipe.phases[stage.id];
     stage.light = stage.light || {};
     stage.light.duration_hours = phase.photoperiod_hours;
     stage.light.white_led_lux = Math.round((Number(phase.white_brightness_percent) / 100) * 400);
