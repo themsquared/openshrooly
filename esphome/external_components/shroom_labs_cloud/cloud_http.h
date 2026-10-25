@@ -22,6 +22,9 @@ static constexpr uint32_t PROBE_INTERVAL_MS = 15 * 60 * 1000;
 static constexpr uint32_t PROBE_JITTER_MS = 20 * 1000;
 /** Telemetry on ack, else this cadence. Same 15 min slot as inbox = 8 more connects/hour. */
 static constexpr uint32_t TELEMETRY_INTERVAL_MS = 15 * 60 * 1000;
+/** After a reboot while linked: first inbox poll and heartbeat 30 to 60 s after boot, once Wi-Fi is up. */
+static constexpr uint32_t BOOT_CONTACT_MIN_MS = 30 * 1000;
+static constexpr uint32_t BOOT_CONTACT_JITTER_MS = 30 * 1000;
 /** Hard cap on linked inbox/telemetry/rotate HTTPS connects (plus their nonces) in any rolling hour. Device limit is 20.
  * Pairing (enroll, claim-status, CSR) and self-revoke are uncapped; they have their own poll window. */
 static constexpr uint8_t CONNECT_HOUR_CAP = 18;
