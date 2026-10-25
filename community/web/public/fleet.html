@@ -105,6 +105,15 @@
           <label>Stage
             <input id="bulk-stage" type="text" placeholder="fruiting">
           </label>
+          <label>Sunrise hour
+            <input id="bulk-sunrise" type="number" min="0" max="23" step="1" placeholder="8">
+          </label>
+          <label>Duration hours
+            <input id="bulk-duration" type="number" min="0" max="24" step="0.25" placeholder="12">
+          </label>
+          <label>White lux
+            <input id="bulk-lux" type="number" min="0" max="4000" step="1" placeholder="92">
+          </label>
           <label>Coach mode
             <select id="bulk-coach">
               <option value="advisor">Advisor</option>
@@ -149,6 +158,27 @@
       </form>
       <ul id="detail-alerts" class="alert-list"></ul>
       <div id="detail-stats" class="stat-grid"></div>
+      <form id="detail-light-form" class="card alert-form">
+        <fieldset>
+          <legend>Light schedule</legend>
+          <p class="muted">Duration is required when the light is on. Leave duration empty to use this profile stage.</p>
+          <p id="detail-light-summary" class="muted"></p>
+          <div class="row">
+            <label>Sunrise hour <input type="number" id="detail-sunrise" min="0" max="23" step="1"></label>
+            <label>Duration hours <input type="number" id="detail-duration" min="0" max="24" step="0.25"></label>
+            <label>White lux <input type="number" id="detail-lux" min="0" max="4000" step="1"></label>
+          </div>
+          <div class="row">
+            <label>Red % <input type="number" id="detail-red" min="0" max="100" step="1"></label>
+            <label>Green % <input type="number" id="detail-green" min="0" max="100" step="1"></label>
+            <label>Blue % <input type="number" id="detail-blue" min="0" max="100" step="1"></label>
+          </div>
+          <p class="row">
+            <button type="submit">Send light schedule</button>
+            <span id="detail-light-msg" class="muted" role="status"></span>
+          </p>
+        </fieldset>
+      </form>
       <figure class="fleet-chart card">
         <figcaption>Readings, last 24 hours</figcaption>
         <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>

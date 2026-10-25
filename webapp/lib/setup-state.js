@@ -7,7 +7,7 @@ const GROW_PRESETS = [
     phase: "Colonizing",
     day: 1,
     total: 14,
-    setpoints: { humidity: 90, temperature: 24, sunrise: 8, lightHours: 0 },
+    setpoints: { humidity: 90, temperature: 24, sunrise: 8, lightHours: 0, lux: 0, red: 0, green: 0, blue: 0 },
   },
   {
     id: "oyster-fruit",
@@ -15,7 +15,7 @@ const GROW_PRESETS = [
     phase: "Fruiting",
     day: 1,
     total: 10,
-    setpoints: { humidity: 90, temperature: 22, sunrise: 8, lightHours: 12 },
+    setpoints: { humidity: 90, temperature: 22, sunrise: 8, lightHours: 12, lux: 92, red: 0, green: 0, blue: 80 },
   },
   {
     id: "lions-mane-fruit",
@@ -23,7 +23,7 @@ const GROW_PRESETS = [
     phase: "Fruiting",
     day: 1,
     total: 14,
-    setpoints: { humidity: 90, temperature: 18, sunrise: 8, lightHours: 12 },
+    setpoints: { humidity: 90, temperature: 18, sunrise: 8, lightHours: 12, lux: 200, red: 0, green: 0, blue: 80 },
   },
 ];
 
@@ -110,6 +110,18 @@ function applyPresetWrites(preset) {
     writes.push({ kind: "number", id: "temperature__target", value: preset.setpoints.temperature });
     writes.push({ kind: "number", id: "lights__sunrise_hour", value: preset.setpoints.sunrise });
     writes.push({ kind: "number", id: "lights__duration__hours_", value: preset.setpoints.lightHours });
+    if (preset.setpoints.lux != null) {
+      writes.push({ kind: "number", id: "white_led_intensity", value: preset.setpoints.lux });
+    }
+    if (preset.setpoints.red != null) {
+      writes.push({ kind: "number", id: "red_led_intensity", value: preset.setpoints.red });
+    }
+    if (preset.setpoints.green != null) {
+      writes.push({ kind: "number", id: "green_led_intensity", value: preset.setpoints.green });
+    }
+    if (preset.setpoints.blue != null) {
+      writes.push({ kind: "number", id: "blue_led_intensity", value: preset.setpoints.blue });
+    }
   }
   return writes;
 }

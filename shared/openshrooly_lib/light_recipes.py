@@ -34,8 +34,21 @@ def _src(title: str, detail: str, url: str | None = None) -> SourceNote:
     return SourceNote(title=title, detail=detail, url=url)
 
 
-def _recipe(why: str, sources: list[SourceNote], fruiting: LightPhase, **extra: LightPhase) -> LightRecipe:
-    phases = {"colonization": DARK, "fruiting": fruiting, **extra}
+def _recipe(
+    why: str,
+    sources: list[SourceNote],
+    fruiting: LightPhase,
+    pinning: LightPhase | None = None,
+    **extra: LightPhase,
+) -> LightRecipe:
+    # Pinning uses the fruiting mix unless a paper says otherwise. Light is the
+    # usual pinning cue; colonization-like rests stay dark via extra=DARK.
+    phases = {
+        "colonization": DARK,
+        "pinning": fruiting if pinning is None else pinning,
+        "fruiting": fruiting,
+        **extra,
+    }
     return LightRecipe(why=why, sources=sources, phases=phases, wavelength_note=WAVELENGTH_NOTE)
 
 
@@ -288,6 +301,8 @@ RECIPES: dict[str, LightRecipe] = {
         "shiitake-specific fruiting lux for this chamber was found.",
         [LEATHAM_1987, KIM_2024_SHIITAKE, STAMETS_BOOK, SAKAMOTO_2018, GENERAL_DEFAULT],
         GENERAL_FRUITING,
+        browning=DARK,
+        cold_shock=DARK,
     ),
     "reishi": _recipe(
         "Colonization is dark. Fruiting uses 12 h and 37% white, mapped from 500 lux in "

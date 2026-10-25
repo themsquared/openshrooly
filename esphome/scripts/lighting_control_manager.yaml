@@ -75,8 +75,30 @@
 
       // ---- window calc using LOCAL time ----
       const int sunrise_h = (int) id(sunrise_hour).state;
+      const float raw_hours = id(light_hours).state;
+      const float white_now = id(white_intensity).state;
+      const float rgb_now = id(color_r).state + id(color_g).state + id(color_b).state;
+      const bool light_wanted = (white_now > 0.5f) || (rgb_now > 0.5f);
+      const bool hours_missing = isnan(raw_hours) || isinf(raw_hours) || raw_hours < 0.0f;
+      const bool hours_zero_while_on = light_wanted && raw_hours <= 0.0f;
+      float used_hours = raw_hours;
+      bool used_default_hours = false;
+      if (hours_missing || hours_zero_while_on) {
+        used_hours = 12.0f;
+        used_default_hours = true;
+        static bool warned_missing_duration = false;
+        if (!warned_missing_duration) {
+          ESP_LOGW("shrooly", "Light duration is 0 or unset while lux/RGB is on; using 12 h");
+          warned_missing_duration = true;
+        }
+        if (fabsf(raw_hours - 12.0f) > 0.01f) {
+          auto fix = id(light_hours).make_call();
+          fix.set_value(12.0f);
+          fix.perform();
+        }
+      }
       const int start_min = sunrise_h * 60;
-      const int duration_min = (int)(id(light_hours).state * 60);
+      const int duration_min = (int)(used_hours * 60);
       const int end_min = start_min + duration_min;
 
       // Debug logging - commented out now that timezone is working
@@ -130,7 +152,12 @@
         // Calculate turn OFF time
         int off_hour = (end_min / 60) % 24;
         int off_minute = end_min % 60;
-        id(lights_status).publish_state(str_sprintf("ON, turns OFF at %02d:%02d", off_hour, off_minute).c_str());
+        if (used_default_hours) {
+          id(lights_status).publish_state(str_sprintf(
+              "Duration was 0; using 12h. ON, turns OFF at %02d:%02d", off_hour, off_minute).c_str());
+        } else {
+          id(lights_status).publish_state(str_sprintf("ON, turns OFF at %02d:%02d", off_hour, off_minute).c_str());
+        }
       } else {
         // Determine if lights turn on today or tomorrow
         if (end_min > 1440) {
@@ -179,9 +206,9 @@
 
       if (schedule_changed) {
         ESP_LOGI("shrooly", "Schedule changed: sunrise=%dh, duration=%.1fh, in_window=%s",
-                 sunrise_h, id(light_hours).state, in_win ? "YES" : "NO");
+                 sunrise_h, used_hours, in_win ? "YES" : "NO");
         prev_sunrise_h = sunrise_h;
-        prev_light_hours = id(light_hours).state;
+        prev_light_hours = used_hours;
 
         // When schedule changes, force evaluation regardless of prev_on state
         if (in_win) {

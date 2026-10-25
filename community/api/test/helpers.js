@@ -87,6 +87,15 @@ export function assertNoPublicPii(value, email, extra = [], label = "public outp
   }
 }
 
+export const SAMPLE_STAGE_LIGHT = {
+  sunrise_hour: 8,
+  duration_hours: 12,
+  white_led_lux: 92,
+  red_percent: 0,
+  green_percent: 0,
+  blue_percent: 80,
+};
+
 export const SAMPLE_CULINARY_PROFILE = {
   id: "privacy-oyster",
   name: "Privacy Oyster",
@@ -100,6 +109,7 @@ export const SAMPLE_CULINARY_PROFILE = {
       duration_days: 7,
       humidity_percent: 90,
       temperature_c: 18,
+      light: { ...SAMPLE_STAGE_LIGHT },
       fan: { speed_percent: 30, period_min: 15, run_duration_s: 30 },
     },
   ],

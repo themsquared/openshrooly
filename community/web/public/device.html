@@ -87,6 +87,28 @@
           <span id="rules-msg" class="muted" role="status"></span>
         </div>
       </form>
+      <form id="light-form" class="card alert-form">
+        <fieldset>
+          <legend>Light schedule</legend>
+          <p class="muted">Duration is required when the light is on. 0 hours is only for a dark stage with lux 0 and RGB 0.</p>
+          <p id="light-summary" class="muted">Light on 08:00 to 20:00</p>
+          <div class="row">
+            <label>Sunrise hour <input type="number" name="sunrise_hour" id="light-sunrise" min="0" max="23" step="1" value="8"></label>
+            <label>Duration hours <input type="number" name="duration_hours" id="light-duration" min="0" max="24" step="0.25" value="12" required></label>
+            <label>White lux <input type="number" name="white_led_lux" id="light-lux" min="0" max="4000" step="1" value="92"></label>
+          </div>
+          <div class="row">
+            <label>Red % <input type="number" name="red_percent" id="light-red" min="0" max="100" step="1" value="0"></label>
+            <label>Green % <input type="number" name="green_percent" id="light-green" min="0" max="100" step="1" value="0"></label>
+            <label>Blue % <input type="number" name="blue_percent" id="light-blue" min="0" max="100" step="1" value="80"></label>
+          </div>
+          <p id="light-error" class="notice hidden" role="alert"></p>
+          <div class="form-actions">
+            <button type="submit">Send light schedule</button>
+            <span id="light-msg" class="muted" role="status"></span>
+          </div>
+        </fieldset>
+      </form>
       <h2>Recent alerts for this chamber</h2>
       <ul id="device-alerts" class="alert-feed"></ul>
     </div>
