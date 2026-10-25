@@ -1733,6 +1733,94 @@ int main() {
   std::printf("hour connects healthy=%zu telemetry_fail=%zu inbox_503=%zu tls=%zu\n", healthy_n, tel_fail_n,
               inbox_503_n, tls_n);
 
+  // Reboot while linked: a fresh engine loads the saved identity. It must post
+  // telemetry within the first few minutes and every 15 minutes after, and stay
+  // under the connect cap in every rolling hour, whether the network is up or not.
+  auto reboot_sim = [&](const char *name, int inbox_st, int tel_st, bool tls, uint32_t rng) -> size_t {
+    HostStore st;
+    ScriptTransport tr;
+    FakeChamber ch;
+    ch.t_range = {true, 15.f, 35.f, 0.5f};
+    ch.h_range = {true, 30.f, 100.f, 0.5f};
+    ch.cur.has_temperature_target = true;
+    ch.cur.temperature_target = 21;
+    ch.cur.has_target_humidity = true;
+    ch.cur.target_humidity = 88;
+    tr.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+    clk.now = 200000;
+    clk.wall = parse_iso8601_ms("2026-10-25T16:00:00Z");
+    {
+      CloudEngine first(&tr, &clk, &st, &crypto);
+      first.connect();
+      first.csr_now();
+      expect(first.state() == CloudState::Linked, "reboot sim links before reboot");
+    }
+    tr.inbox_status = inbox_st;
+    tr.inbox_body = "{\"commands\":[]}";
+    tr.telemetry_status = tel_st;
+    tr.telemetry_body = tel_st == 200 ? "{\"ok\":true}" : "{\"error\":\"no\"}";
+    tr.tls_fail = tls;
+    tr.nonce_limit = 1000;
+    clk.rng = rng;
+    clk.now = 1500;  // millis() restarts near zero after a reboot
+    const int64_t w0 = clk.wall + 600000;
+    clk.wall = w0;
+    std::vector<uint32_t> at;
+    std::vector<uint32_t> tel_at;
+    tr.hook = [&](const HttpRequest &req) {
+      at.push_back(clk.now);
+      if (req.url.find("/telemetry") != std::string::npos)
+        tel_at.push_back(clk.now);
+    };
+    CloudEngine eng(&tr, &clk, &st, &crypto);
+    eng.set_chamber(&ch);
+    eng.load();
+    expect(eng.state() == CloudState::Linked, "reboot sim restores linked");
+    expect(eng.next_telemetry_ms() != 0, "reboot schedules telemetry");
+    const uint32_t t0 = clk.now;
+    const uint32_t span = 3u * 3600u * 1000u;
+    for (uint32_t t = 0; t <= span; t += 5000) {
+      clk.now = t0 + t;
+      clk.wall = w0 + static_cast<int64_t>(t);
+      eng.loop();
+    }
+    tr.hook = nullptr;
+    size_t worst = 0;
+    for (size_t i = 0; i < at.size(); i++) {
+      size_t n = 0;
+      for (size_t j = i; j < at.size() && at[j] - at[i] < CONNECT_HOUR_MS; j++)
+        n++;
+      if (n > worst)
+        worst = n;
+    }
+    expect(worst <= CONNECT_HOUR_CAP, name);
+    if (!tls && tel_st == 200) {
+      expect(!tel_at.empty() && tel_at[0] - t0 <= 3u * 60u * 1000u, "reboot first telemetry within 3 min");
+      expect(tel_at.empty() || tel_at[0] - t0 >= BOOT_CONTACT_MIN_MS, "reboot waits for Wi-Fi before first post");
+      bool cadence = tel_at.size() >= 11;
+      for (size_t i = 1; i < tel_at.size(); i++) {
+        if (tel_at[i] - tel_at[i - 1] > TELEMETRY_INTERVAL_MS + 30000u)
+          cadence = false;
+      }
+      expect(cadence, "reboot telemetry every 15 min after the first");
+    }
+    if (!tls && inbox_st == 200 && tel_st == 200) {
+      size_t inbox = 0;
+      for (const auto &u : tr.urls)
+        if (u.find("/inbox") != std::string::npos)
+          inbox++;
+      expect(inbox >= 12, "reboot keeps polling the inbox");
+    }
+    std::printf("%s: first telemetry %us, posts=%zu, worst rolling hour=%zu\n", name,
+                tel_at.empty() ? 0u : (tel_at[0] - t0) / 1000u, tel_at.size(), worst);
+    return worst;
+  };
+  reboot_sim("reboot healthy under cap", 200, 200, false, 1);
+  reboot_sim("reboot healthy jitter under cap", 200, 200, false, 0x7fffffffu);
+  reboot_sim("reboot inbox 503 under cap", 503, 200, false, 12345);
+  reboot_sim("reboot telemetry 500 under cap", 200, 500, false, 777);
+  reboot_sim("reboot tls fail under cap", 0, 0, true, 99);
+
   HostStore storeCadence;
   ScriptTransport trCadence;
   FakeChamber chamberCadence;

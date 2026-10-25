@@ -103,6 +103,7 @@ class CloudEngine {
   void bump_backoff_(int retry_after_s);
   void schedule_probe_error_(int retry_after_s);
   void schedule_telemetry_error_(int retry_after_s);
+  void schedule_boot_contact_();
   bool allow_connect_();
   void note_connect_(bool count_hour);
   void keep_pending_ack_(int64_t command_id, const char *status, const char *reason, const ChamberReading &reading);

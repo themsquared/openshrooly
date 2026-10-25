@@ -59,7 +59,19 @@ void CloudEngine::load() {
       apply_(CloudEvent::Expired);
     }
   }
+  if (state_ == CloudState::Linked)
+    schedule_boot_contact_();
   secure_clear(&s, sizeof(s));
+}
+
+// A reboot while linked restores no timers. Poll the inbox and post a heartbeat
+// together shortly after boot, then fall into the normal 15 minute cadence.
+void CloudEngine::schedule_boot_contact_() {
+  uint32_t at = now_() + BOOT_CONTACT_MIN_MS + (clock_->random() % (BOOT_CONTACT_JITTER_MS + 1));
+  if (at == 0)
+    at = 1;
+  next_probe_ms_ = at;
+  next_telemetry_ms_ = at;
 }
 
 void CloudEngine::save_identity_() {
@@ -1349,6 +1361,12 @@ void CloudEngine::loop() {
       }
     } else if (st == CloudState::Linked || st == CloudState::Rotating) {
       maybe_fill_issued_();
+      // 0 means never scheduled. Linked must always have a heartbeat due.
+      if (next_telemetry_ms_ == 0) {
+        next_telemetry_ms_ = now + BOOT_CONTACT_MIN_MS + (clock_->random() % (BOOT_CONTACT_JITTER_MS + 1));
+        if (next_telemetry_ms_ == 0)
+          next_telemetry_ms_ = 1;
+      }
       const int64_t wall = wall_();
       rotate_due = wall > 0 && issued_ms_ > 0 && wall >= issued_ms_ + rotate_after_ms_ &&
                    time_reached(now, next_rotate_ms_) && rotate_slot_open_();
