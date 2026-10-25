@@ -4,7 +4,15 @@ import { laterIso, nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { requireVerified, userFromRequest } from "./auth.js";
 import { ValidationError, isPsilocybin } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
-import { comingSoonBody, capabilities, devStubsEnabled, paymentsConfigured } from "./providers.js";
+import {
+  comingSoonBody,
+  capabilities,
+  coachAiConfigured,
+  coachPublicEnabled,
+  devStubsEnabled,
+  isCoachBetaUser,
+  paymentsConfigured,
+} from "./providers.js";
 import { bytesToBase64, decodePhotoBase64, sanitizeGrowPhoto } from "./photos.js";
 import { readJsonLimited } from "./http-body.js";
 import { insertMedia, pendingPhotoKey } from "./media-acl.js";
@@ -45,7 +53,11 @@ export function coachCatalog() {
   };
 }
 
-export async function hasGrowCoach(db, user) {
+export function coachBetaAccess(env, user) {
+  return Boolean(user && isCoachBetaUser(env, user) && coachAiConfigured(env));
+}
+
+export async function hasPaidCoach(db, user) {
   if (!user) return false;
   const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
   if (sub && sub.status === "active" && sub.period_end >= nowIso()) return true;
@@ -53,10 +65,15 @@ export async function hasGrowCoach(db, user) {
   return Boolean(row);
 }
 
-async function requireCoach(request, db) {
+export async function hasGrowCoach(db, user, env = {}) {
+  if (coachBetaAccess(env, user)) return true;
+  return hasPaidCoach(db, user);
+}
+
+async function requireCoach(request, db, env) {
   const { user } = await userFromRequest(request, db);
   requireVerified(user);
-  if (!(await hasGrowCoach(db, user))) {
+  if (!(await hasGrowCoach(db, user, env))) {
     throw new ValidationError("Grow Coach is a $3.99/month culinary subscription.", 402);
   }
   return user;
@@ -172,18 +189,20 @@ export async function handleCoach(method, path, url, request, env) {
 
   if (method === "GET" && path === "/api/coach") {
     const { user } = await userFromRequest(request, db);
-    const entitled = user ? await hasGrowCoach(db, user) : false;
+    const beta = coachBetaAccess(env, user);
+    const entitled = user ? await hasGrowCoach(db, user, env) : false;
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
-    const caps = capabilities(env, request);
+    const publicOn = capabilities(env, request).coach;
     return json({
       product: coachCatalog(),
       entitled,
+      beta,
       auto_tune: Boolean(Number(sub?.auto_tune)),
       period_end: sub?.period_end || null,
-      waitlist: !caps.coach,
-      preview: !caps.coach,
-      marketing: caps.coach
-        ? "Culinary chambers only. Not sold with off-menu varieties."
+      waitlist: !entitled && !publicOn,
+      preview: !entitled && !publicOn,
+      marketing: publicOn || entitled
+        ? "Culinary chambers only. Not sold or marketed with off-menu varieties."
         : "Coming soon. Chat and checkout open at launch. Not sold with off-menu varieties.",
     });
   }
@@ -195,10 +214,8 @@ export async function handleCoach(method, path, url, request, env) {
     if (body.pack === "psilocybin") {
       throw new ValidationError("Grow Coach is not sold or marketed with off-menu varieties.", 400);
     }
-    const caps = capabilities(env, request);
-    if (!caps.coach) return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
-    if (!paymentsConfigured(env) && !devStubsEnabled(env, request)) {
-      return json(comingSoonBody("Payments"), 503);
+    if (!coachPublicEnabled(env) || (!paymentsConfigured(env) && !devStubsEnabled(env, request))) {
+      return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }
     const sessionId = `cs_test_${randomToken().slice(0, 16)}`;
     await db.run(
@@ -228,7 +245,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "GET" && path === "/api/coach/model") {
-    const user = await requireCoach(request, db);
+    const user = await requireCoach(request, db, env);
     const grounding = await loadGrounding(db, user, url.searchParams.get("device_id"));
     return json({
       device: grounding.device,
@@ -239,7 +256,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/coach/suggest") {
-    const user = await requireCoach(request, db);
+    const user = await requireCoach(request, db, env);
     const body = await request.json().catch(() => ({}));
     if (refuseRestrictedPack(body.profile)) {
       throw new ValidationError("Grow Coach will not auto-tune off-menu varieties.", 400);
@@ -269,14 +286,14 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/coach/auto-tune") {
-    const user = await requireCoach(request, db);
+    const user = await requireCoach(request, db, env);
     const body = await request.json().catch(() => ({}));
     await db.run("UPDATE coach_subs SET auto_tune=? WHERE user_id=?", [body.enabled ? 1 : 0, user.id]);
     return json({ auto_tune: Boolean(body.enabled) });
   }
 
   if (method === "POST" && path === "/api/coach/chat") {
-    const user = await requireCoach(request, db);
+    const user = await requireCoach(request, db, env);
     const body = await request.json().catch(() => ({}));
     if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
       throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
@@ -303,7 +320,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "GET" && path === "/api/coach/usage") {
-    const user = await requireCoach(request, db);
+    const user = await requireCoach(request, db, env);
     const row = await usageRow(db, user.id);
     return json({
       day: row.day,
@@ -315,7 +332,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "POST" && path === "/api/coach/photo") {
-    const user = await requireCoach(request, db);
+    const user = await requireCoach(request, db, env);
     const body = await readJsonLimited(request);
     if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
       throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
@@ -349,7 +366,7 @@ export async function handleCoach(method, path, url, request, env) {
   }
 
   if (method === "GET" && path === "/api/coach/alerts") {
-    const user = await requireCoach(request, db);
+    const user = await requireCoach(request, db, env);
     const grounding = await loadGrounding(db, user, url.searchParams.get("device_id"));
     return json({ alerts: grounding.alerts, model: grounding.device_model });
   }

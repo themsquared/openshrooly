@@ -1,6 +1,6 @@
 # Production deploy config. `npm run deploy` uses this file
 # (`wrangler deploy -c wrangler.deploy.toml`).
-# Photos are on. There is no [ai] binding: Grow Coach stays off until payments exist.
+# Photos are on. AI is bound for Grow Coach private beta (COACH_PUBLIC=0).
 # Secrets: npx wrangler secret put NAME -c wrangler.deploy.toml
 name = "shroomlabs-api"
 main = "src/index.js"
@@ -18,10 +18,15 @@ database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
 binding = "PHOTOS"
 bucket_name = "shroomlabs-photos"
 
+[ai]
+binding = "AI"
+
 [vars]
 SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
 PHOTOS_ENABLED = "1"
+COACH_PUBLIC = "0"
+COACH_BETA_USER_IDS = "82"
 # Browser origins allowed to call api.shroomlabs.io with Authorization headers.
 CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
 # Not used for grow-report, profile, or coach photos. Those are served only
@@ -34,9 +39,9 @@ GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleuse
 # Sign in with Apple: set APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_SERVICES_ID, and APPLE_PRIVATE_KEY
 # as Wrangler secrets once the Developer portal items exist. See docs/AUTH.md.
 # The Worker mints the client secret at runtime. Do not commit the .p8 key.
-# Grow Coach stays off until payments exist. Do not add an [ai] binding here.
+# Grow Coach is private beta: AI is bound, public checkout stays closed.
 GROW_COACH_PROVIDER = "workers-ai"
-GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
+GROW_COACH_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.

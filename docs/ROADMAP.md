@@ -204,7 +204,7 @@ Learning (droop, sensor offset, rise rate, alerts) is **plain JavaScript** — n
 
 | Piece | Model | Why |
 | --- | --- | --- |
-| Chat | `@cf/meta/llama-3.2-3b-instruct` | Cheap text, culinary system prompt |
+| Chat | `@cf/qwen/qwen3-30b-a3b-fp8` | Text + think-tag strip, culinary system prompt |
 | Photo check | `@cf/meta/llama-3.2-11b-vision-instruct` | Stage + contamination flags |
 | Learning / alerts | Deterministic JS | Testable, $0 inference |
 

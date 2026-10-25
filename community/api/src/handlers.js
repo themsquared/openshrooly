@@ -15,7 +15,7 @@ import { decodePhotoBase64, mediaFilename, processPhoto, sniffImage, PHOTO_TYPES
 import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
-import { handleCoach, hasGrowCoach } from "./coach.js";
+import { coachBetaAccess, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities } from "./providers.js";
@@ -316,7 +316,8 @@ async function route(method, path, url, request, env) {
       entitlements,
       sessions,
       grow_coach: {
-        entitled: await hasGrowCoach(db, user),
+        entitled: await hasGrowCoach(db, user, env),
+        beta: coachBetaAccess(env, user),
         period_end: coachSub?.period_end || null,
         auto_tune: Boolean(Number(coachSub?.auto_tune)),
         product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, pack: "culinary" },

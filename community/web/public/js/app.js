@@ -403,7 +403,9 @@ async function renderAccount() {
       .join("") || "<li class='muted'>No profiles yet.</li>";
   if ($("#coach-account") && me.grow_coach) {
     $("#coach-account").textContent = me.grow_coach.entitled
-      ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
+      ? me.grow_coach.beta
+        ? "Private beta access. Culinary chambers only."
+        : `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
       : "Not subscribed. Grow Coach is $3.99/month for culinary chambers only.";
   }
   if (me.sessions) {
@@ -747,11 +749,14 @@ async function renderCoach() {
     return null;
   });
   if (!catalog) return;
-  $("#coach-status").textContent = catalog.entitled
-    ? `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
+  const canUse = Boolean(catalog.entitled || catalog.beta);
+  $("#coach-status").textContent = canUse
+    ? catalog.beta
+      ? "Private beta. Culinary chambers only."
+      : `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
     : catalog.marketing;
-  if (!catalog.waitlist && $("#coach-eyebrow")) $("#coach-eyebrow").textContent = "Culinary subscription · $3.99 / month";
-  if (catalog.waitlist) {
+  if ((canUse || !catalog.waitlist) && $("#coach-eyebrow")) $("#coach-eyebrow").textContent = "Culinary subscription · $3.99 / month";
+  if (!canUse && catalog.waitlist) {
     $("#subscribe-panel")?.classList.add("hidden");
     $("#gated")?.classList.add("hidden");
     return;
@@ -764,7 +769,7 @@ async function renderCoach() {
     });
     return;
   }
-  if (!catalog.entitled) {
+  if (!canUse) {
     $("#subscribe-panel").classList.remove("hidden");
     $("#subscribe").addEventListener("click", async () => {
       try {

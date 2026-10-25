@@ -9,6 +9,8 @@ import {
   refuseRestrictedPack,
   suggestSetpoints,
 } from "../src/coach-learn.js";
+import { capabilities } from "../src/providers.js";
+import { DEFAULT_TEXT_MODEL, stripThinkTags, workersAiText } from "../src/coach-models.js";
 import { call, callRaw, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 import { buildJpeg, toBase64 } from "./image-fixtures.js";
 
@@ -209,4 +211,97 @@ test("photo check returns stage flags and next steps", async () => {
   ]);
   const capped = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "another?" } });
   assert.equal(capped.status, 429);
+});
+
+function mockWorkersAi(result) {
+  return {
+    async run() {
+      return result;
+    },
+  };
+}
+
+function privateBetaEnv(extra = {}) {
+  return testEnv({
+    COACH_PUBLIC: "0",
+    GROW_COACH_PROVIDER: "workers-ai",
+    GROW_COACH_STUB: "",
+    ...extra,
+  });
+}
+
+test("Qwen3 response shapes strip <think> tags before use", () => {
+  assert.equal(DEFAULT_TEXT_MODEL, "@cf/qwen/qwen3-30b-a3b-fp8");
+  assert.equal(stripThinkTags("<think>hidden</think>Keep the door sealed."), "Keep the door sealed.");
+  assert.equal(
+    workersAiText({
+      choices: [{ message: { content: "<think>reason\nacross lines</think>\nFill the reservoir." } }],
+    }),
+    "Fill the reservoir."
+  );
+  assert.equal(workersAiText({ response: "<think>hmm</think>Humidity is low." }), "Humidity is low.");
+});
+
+test("beta user can chat on mocked AI; think tags are stripped", async () => {
+  const ctx = privateBetaEnv({
+    AI: mockWorkersAi({
+      choices: [{ message: { content: "<think>internal</think>Seal the door and fill the reservoir." } }],
+      usage: { prompt_tokens: 80, completion_tokens: 20 },
+    }),
+  });
+  const { token, user } = await register(ctx, "beta@example.com");
+  ctx.COACH_BETA_USER_IDS = String(user.id);
+
+  const catalog = await call(ctx, "GET", "/api/coach", { token });
+  assert.equal(catalog.status, 200);
+  assert.equal(catalog.data.beta, true);
+  assert.equal(catalog.data.entitled, true);
+  assert.equal(catalog.data.waitlist, false);
+  assert.equal(catalog.data.preview, false);
+
+  const chat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
+  assert.equal(chat.status, 200, JSON.stringify(chat.data));
+  assert.equal(chat.data.provider, "workers-ai");
+  assert.equal(chat.data.reply, "Seal the door and fill the reservoir.");
+  assert.doesNotMatch(chat.data.reply, /<think>/i);
+  assert.doesNotMatch(chat.data.reply, /internal/);
+});
+
+test("non-beta user stays on preview; subscribe stays 503; public coach stays off", async () => {
+  const ctx = privateBetaEnv({
+    COACH_BETA_USER_IDS: "82",
+    AI: mockWorkersAi({ response: "hello" }),
+  });
+  const { token, user } = await register(ctx, "wait@example.com");
+  assert.notEqual(String(user.id), "82");
+
+  const caps = await call(ctx, "GET", "/api/capabilities");
+  assert.equal(caps.data.coach, false);
+  assert.equal(capabilities(ctx).coach, false);
+
+  const catalog = await call(ctx, "GET", "/api/coach", { token });
+  assert.equal(catalog.data.beta, false);
+  assert.equal(catalog.data.entitled, false);
+  assert.equal(catalog.data.preview, true);
+  assert.equal(catalog.data.waitlist, true);
+  assert.match(catalog.data.marketing, /coming soon/i);
+
+  const denied = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
+  assert.equal(denied.status, 402);
+
+  const sub = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
+  assert.equal(sub.status, 503);
+  assert.equal(sub.data.coming_soon, true);
+  assert.equal(sub.data.waitlist, true);
+});
+
+test("subscribe stays 503 for a beta user while COACH_PUBLIC is off", async () => {
+  const ctx = privateBetaEnv({
+    AI: mockWorkersAi({ response: "ok" }),
+  });
+  const { token, user } = await register(ctx, "beta-sub@example.com");
+  ctx.COACH_BETA_USER_IDS = String(user.id);
+  const sub = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
+  assert.equal(sub.status, 503);
+  assert.equal(sub.data.coming_soon, true);
 });

@@ -36,10 +36,13 @@ function hasAiTable(src) {
   return /(?:^|\n)\[ai\]\s*\n/.test(src);
 }
 
-test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
+test("wrangler.deploy.toml matches prod: photos on, AI bound, Coach private beta", () => {
   assert.deepEqual(r2Photos(deploy), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
   assert.equal(quoted(deploy, "PHOTOS_ENABLED"), "1");
-  assert.equal(hasAiTable(deploy), false);
+  assert.equal(hasAiTable(deploy), true);
+  assert.equal(quoted(tableBlock(deploy, "[ai]"), "binding"), "AI");
+  assert.equal(quoted(deploy, "COACH_PUBLIC"), "0");
+  assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), "82");
   assert.equal(quoted(deploy, "name"), "shroomlabs-api");
   assert.equal(quoted(tableBlock(deploy, "[[d1_databases]]"), "database_id"), quoted(tableBlock(local, "[[d1_databases]]"), "database_id"));
 });
