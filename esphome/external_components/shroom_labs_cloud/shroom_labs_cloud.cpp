@@ -470,12 +470,10 @@ bool ShroomLabsCloud::fill_qr(QrCode *out) const {
 #endif
 
 static const char *entity_object_id(EntityBase *entity, char *buf) {
-  if (entity == nullptr) {
-    buf[0] = '\0';
-    return buf;
-  }
-  StringRef id = entity->get_object_id_to(buf);
-  return id.c_str() != nullptr ? id.c_str() : buf;
+  buf[0] = '\0';
+  if (entity != nullptr)
+    entity->get_object_id_to(buf);
+  return buf;
 }
 
 void ShroomLabsCloud::attach_local_watchers_() {
