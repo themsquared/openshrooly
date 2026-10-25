@@ -5,7 +5,7 @@ import { rateLimit, rateLimitClient } from "./security.js";
 import { devStubsEnabled } from "./providers.js";
 import { ValidationError, validateStageLight } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
-import { noteManualSetpointCommand } from "./coach-autopilot.js";
+import { inferAutopilotApplyFromReading, noteAutopilotCommandAck, noteManualSetpointCommand } from "./coach-autopilot.js";
 import { commandExpired } from "./fleet.js";
 import {
   buildCsr,
@@ -821,11 +821,22 @@ export async function handleDevices(method, path, url, request, env) {
     ]);
     await db.run("UPDATE cloud_devices SET last_seen_at=? WHERE id=?", [nowIso(), bound.device.id]);
     if (body.ack_command_id) {
-      await db.run("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?", [
-        nowIso(),
+      const acked = await noteAutopilotCommandAck(
+        db,
+        bound.device,
         body.ack_command_id,
-        bound.device.id,
-      ]);
+        body.ack_status || "applied",
+        body
+      );
+      if (!acked) {
+        await db.run("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?", [
+          nowIso(),
+          body.ack_command_id,
+          bound.device.id,
+        ]);
+      }
+    } else {
+      await inferAutopilotApplyFromReading(db, bound.device, body);
     }
     return json({ ok: true });
   }

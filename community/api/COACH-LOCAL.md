@@ -95,15 +95,26 @@ LIMIT`), not the full table.
 The chamber’s own page at its LAN IP is the same ESPHome REST the hub uses
 (`GET /sensor/current_humidity`, `GET /sensor/current_temperature`, …).
 
-## 4. Local Autopilot delivery
+## 4. Local Autopilot delivery (dev only)
 
-The Worker only queues `device_commands`. This Node bridge applies one pending
-**setpoints** command to the chamber’s local HTTP API (the same
-`POST /number/…/set` paths the hub uses). It re-validates global clamps,
-profile stage range, and step limits. Schedule/light commands are refused
-until they have the same step and override checks. Missing chamber setpoints
-refuse the write (the command is marked failed). Expired or manually
-overridden commands are refused.
+Production Autopilot is a website feature. shroomlabs.io plans the change and
+queues a `setpoints` command on the existing cloud device inbox
+(`GET /api/devices/:id/inbox`). An enrolled chamber (`sldev_*`, cert + proof)
+applies `temperature_target` / `target_humidity` itself and acks on
+`POST /api/devices/:id/telemetry`. The local LAN bridge is **not** the prod
+path. Keep it off unless you are debugging a fake `local-chamber` row.
+
+This Node bridge applies one pending **setpoints** command to the chamber's
+local HTTP API (the same `POST /number/…/set` paths the hub uses). It
+re-validates global clamps, profile stage range, and step limits.
+Schedule/light commands are refused until they have the same step and
+override checks. Missing chamber setpoints refuse the write (the command is
+marked failed). Expired or manually overridden commands are refused.
+
+The bridge refuses any device with cloud delivery active: `sldev_*` ids,
+`coach_device_mode.delivery=cloud`, or a command payload with
+`delivery: "cloud"`. It does not consume those rows. Cloud and the bridge
+cannot both drive one chamber.
 
 Dry-run is the default (`DRY_RUN=1`): it GETs a reading, logs the writes, and
 marks the row `dry_run` (not sent) so going live cannot replay a backlog.
@@ -145,7 +156,40 @@ calls retry briefly with jitter on `SQLITE_BUSY`.
 - Autopilot is on for this local Worker (`COACH_AUTOPILOT_ENABLED=1`) and
   runs on the 15 minute cron. Prod stays off: do not add that flag or a
   Coach cron to `wrangler.deploy.toml`. Use **Run Autopilot now** on the
-  Coach page to test without waiting.
+  Coach page to test without waiting. Autopilot does not use the `[ai]`
+  binding. Chat still does.
 - Chamber list (`FLEET_UI_ENABLED=1`) is on here so you can manage one or
   many chambers. Prod stays off. Do not add that flag to
   `wrangler.deploy.toml`.
+
+## Production Autopilot rollout (do not enable from this file)
+
+Prod stays off. Do not add `COACH_AUTOPILOT_ENABLED` or change
+`wrangler.deploy.toml` bindings. When Mike wants a first cloud chamber:
+
+1. **Migration.** Apply `migrations/0009_coach_autopilot_ack.sql` once on
+   the prod D1 (`pending_command_id`, `delivery`, `command_id`,
+   `apply_status`). Fresh `schema.sql` already has those columns.
+2. **Env vars (dashboard, not this repo).**
+   `COACH_AUTOPILOT_ENABLED=1` and `COACH_BETA_USER_IDS=82`. Do not add an
+   `[ai]` binding for Autopilot. Chat/photo still need AI later.
+3. **Cron.** The Worker `scheduled` handler already calls
+   `runAutopilotPass` after grow alerts. Prod cron is `*/5 * * * *`
+   (alerts). That interval is enough for Autopilot (>=1 hour between
+   changes). Do not add a second trigger.
+4. **Device.** Owner 82 opts in per chamber (Advisor is the default). The
+   chamber must be claimed (`sldev_*`), cloud enabled, and talking to
+   `api.shroomlabs.io` with its cert + proof. Commands go to
+   `device_commands` and show on `GET /api/devices/:id/inbox` as
+   `kind=setpoints` with `temperature_target` / `target_humidity`,
+   `expires_at` (30 minutes), and `delivery: "cloud"`.
+5. **Firmware 1.0.3-sl.5** enrolls and probes inbox once per hour for
+   revoke/cert status only. It does **not** apply setpoint commands or
+   POST telemetry. A later image must parse inbox `setpoints`, write the
+   number entities, and ack on telemetry (`ack_command_id`,
+   `ack_status=applied|failed|refused`). Stay under about 20 HTTPS
+   connects/hour (each authenticated call is nonce + request). Inbox every
+   12-15 minutes, plus telemetry only when acking, fits that budget and
+   the 30 minute command TTL. Until that firmware ships, the server still
+   queues, expires, restores `last_setpoints` to `from`, and records
+   status. Do not run the local bridge against a prod `sldev_*` chamber.

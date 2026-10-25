@@ -603,3 +603,59 @@ test("live cycle logs the chamber write error instead of a generic failure", asy
   const marked = await db.all("SELECT * FROM device_commands WHERE device_id=?", ["local-chamber"]);
   assert.equal(JSON.parse(marked[0].payload)._bridge.reason, "chamber web password missing or wrong (401)");
 });
+
+test("bridge refuses a device whose Autopilot delivery is cloud", async () => {
+  const cloudCmd = command({
+    payload: {
+      temperature_c: 16.5,
+      humidity_percent: 88,
+      from: { temperature_c: 16, humidity_percent: 88 },
+      source: "grow-coach-autopilot",
+      delivery: "cloud",
+    },
+  });
+  const byPayload = planBridgeCommand({ command: cloudCmd, stage: fruiting, reading });
+  assert.equal(byPayload.ok, false);
+  assert.equal(byPayload.mark, false);
+  assert.match(byPayload.reason, /cloud delivery/i);
+
+  const byId = planBridgeCommand({
+    command: command(),
+    stage: fruiting,
+    reading,
+    device: { id: "sldev_abc" },
+  });
+  assert.equal(byId.ok, false);
+  assert.equal(byId.mark, false);
+
+  const db = createMemoryDb();
+  await db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["sldev_live", "hw-live", "{}", "Kitchen", "active", 1, null, null, null, 1, nowIso(), nowIso()]
+  );
+  await db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+    "sldev_live",
+    "setpoints",
+    cloudCmd.payload,
+    nowIso(),
+    null,
+  ]);
+  const posts = [];
+  const result = await runBridgeCycle({
+    ...memoryPending(db, "sldev_live"),
+    env: { COACH_BRIDGE_LIVE: "1" },
+    device: { id: "sldev_live" },
+    deviceMode: { delivery: "cloud" },
+    stage: fruiting,
+    readChamber: async () => reading,
+    applyWrites: async (writes) => {
+      posts.push(...writes);
+      return { ok: true };
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "skipped");
+  assert.equal(posts.length, 0);
+  const left = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["sldev_live"]);
+  assert.equal(left.length, 1);
+});
