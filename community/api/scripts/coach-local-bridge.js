@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Apply one pending local device_command to the LAN chamber (Option A).
+ * Dev-only LAN Autopilot delivery. Production uses the cloud inbox.
  * DRY_RUN by default. Live writes require COACH_BRIDGE_LIVE=1 and no DRY_RUN=1.
+ * Refuses sldev_* / delivery=cloud devices so it cannot fight the cloud path.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -109,10 +110,18 @@ function parseRowPayload(row) {
   return row.document || null;
 }
 
+function loadDeviceRow(deviceId) {
+  return (
+    wranglerLocalD1Rows(`SELECT * FROM cloud_devices WHERE id=${sqlQuote(deviceId)} LIMIT 1;`)[0] || { id: deviceId }
+  );
+}
+
+function loadDeviceMode(deviceId) {
+  return wranglerLocalD1Rows(`SELECT * FROM coach_device_mode WHERE device_id=${sqlQuote(deviceId)} LIMIT 1;`)[0] || {};
+}
+
 function loadStage(deviceId) {
-  const mode = wranglerLocalD1Rows(
-    `SELECT profile_id FROM coach_device_mode WHERE device_id=${sqlQuote(deviceId)} LIMIT 1;`
-  )[0];
+  const mode = loadDeviceMode(deviceId);
   const profileId = mode?.profile_id;
   if (!profileId) return {};
   const row = wranglerLocalD1Rows(`SELECT document FROM profiles WHERE id=${sqlQuote(profileId)} LIMIT 1;`)[0];
@@ -163,6 +172,8 @@ async function runOnce({ chamber, deviceId, env = process.env } = {}) {
     killSwitch: existsSync(killPath),
     state: readState(statePath),
     saveState: (next) => writeState(statePath, { ...readState(statePath), ...next }),
+    device: loadDeviceRow(deviceId),
+    deviceMode: loadDeviceMode(deviceId),
     log,
     listPending: async () =>
       wranglerLocalD1Rows(

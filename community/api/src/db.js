@@ -964,6 +964,9 @@ function dispatch(mode, tables, ids, sql, params) {
     tables.device_commands.push(row);
     return { lastRowId: row.id };
   }
+  if (q.startsWith("SELECT * FROM device_commands WHERE id=")) {
+    return tables.device_commands.filter((c) => Number(c.id) === Number(params[0]));
+  }
   if (q.startsWith("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL")) {
     let rows = tables.device_commands.filter((c) => c.device_id === params[0] && !c.consumed_at);
     if (q.includes("ORDER BY id ASC")) rows = rows.slice().sort((a, b) => Number(a.id) - Number(b.id));
@@ -1141,12 +1144,14 @@ function dispatch(mode, tables, ids, sql, params) {
       changes_count: params[9],
       last_setpoints: params[10],
       last_manual_at: params[11],
-      updated_at: params[12],
+      pending_command_id: params[12],
+      delivery: params[13],
+      updated_at: params[14],
     });
     return {};
   }
   if (q.startsWith("UPDATE coach_device_mode SET")) {
-    const row = tables.coach_device_mode.find((r) => r.device_id === params[11]);
+    const row = tables.coach_device_mode.find((r) => r.device_id === params[params.length - 1]);
     if (row) {
       row.mode = params[0];
       row.paused = params[1];
@@ -1158,7 +1163,9 @@ function dispatch(mode, tables, ids, sql, params) {
       row.changes_count = params[7];
       row.last_setpoints = params[8];
       row.last_manual_at = params[9];
-      row.updated_at = params[10];
+      row.pending_command_id = params[10];
+      row.delivery = params[11];
+      row.updated_at = params[12];
     }
     return {};
   }
@@ -1173,7 +1180,9 @@ function dispatch(mode, tables, ids, sql, params) {
       reason: params[5],
       readings: params[6],
       undone_at: params[7],
-      created_at: params[8],
+      command_id: params[8],
+      apply_status: params[9],
+      created_at: params[10],
     };
     tables.coach_autopilot_log.push(row);
     return { lastRowId: row.id };
@@ -1187,12 +1196,26 @@ function dispatch(mode, tables, ids, sql, params) {
     }
     return rows;
   }
+  if (q.startsWith("SELECT * FROM coach_autopilot_log WHERE command_id=")) {
+    return tables.coach_autopilot_log.filter((r) => Number(r.command_id) === Number(params[0]));
+  }
   if (q.startsWith("SELECT * FROM coach_autopilot_log WHERE id=")) {
     return tables.coach_autopilot_log.filter((r) => Number(r.id) === Number(params[0]));
   }
   if (q.startsWith("UPDATE coach_autopilot_log SET undone_at=")) {
     const row = tables.coach_autopilot_log.find((r) => Number(r.id) === Number(params[1]));
     if (row) row.undone_at = params[0];
+    return {};
+  }
+  if (q.startsWith("UPDATE coach_autopilot_log SET apply_status=? WHERE command_id=")) {
+    for (const row of tables.coach_autopilot_log.filter((r) => Number(r.command_id) === Number(params[1]))) {
+      row.apply_status = params[0];
+    }
+    return {};
+  }
+  if (q.startsWith("UPDATE coach_autopilot_log SET apply_status=? WHERE id=")) {
+    const row = tables.coach_autopilot_log.find((r) => Number(r.id) === Number(params[1]));
+    if (row) row.apply_status = params[0];
     return {};
   }
   if (q.startsWith("SELECT * FROM device_groups WHERE id=")) {

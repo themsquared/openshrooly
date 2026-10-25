@@ -1,7 +1,14 @@
 /** Local Autopilot delivery. Re-validates queued setpoints before a LAN write. */
 
 import { commandExpired } from "./fleet.js";
-import { AUTOPILOT_LIMITS, clampAutopilotSetpoints, limitAutopilotStep, setpointsMismatch, stageFromProfile } from "./coach-autopilot.js";
+import {
+  AUTOPILOT_LIMITS,
+  clampAutopilotSetpoints,
+  cloudDeliveryActive,
+  limitAutopilotStep,
+  setpointsMismatch,
+  stageFromProfile,
+} from "./coach-autopilot.js";
 import { REACHABILITY_MS } from "../scripts/coach-readings.js";
 
 export const BRIDGE_RATE_MS = 10 * 60 * 1000;
@@ -82,8 +89,16 @@ function writeFor(field, value) {
   return { field, value: Number(value), entityIds: NUMBER_ENTITIES[field] || [field] };
 }
 
-export function planBridgeCommand({ command, stage = {}, reading, now = Date.now() } = {}) {
+export function planBridgeCommand({ command, stage = {}, reading, now = Date.now(), device, state } = {}) {
   if (!command) return { ok: false, status: "empty", reason: "No pending command.", mark: false };
+  if (cloudDeliveryActive({ device, state, command })) {
+    return {
+      ok: false,
+      status: "skipped",
+      reason: "Cloud delivery is active for this device. The local bridge will not write.",
+      mark: false,
+    };
+  }
   if (bridgeCommandExpired(command, now)) {
     return { ok: false, status: "failed", reason: "Command expired.", mark: true };
   }
@@ -212,6 +227,8 @@ export async function runBridgeCycle({
   saveState,
   log = () => {},
   stage,
+  device,
+  deviceMode,
 } = {}) {
   const mode = bridgeMode(env);
   if (killSwitch) {
@@ -228,7 +245,14 @@ export async function runBridgeCycle({
 
   const before = await readChamber();
   const resolvedStage = stage || (loadStage ? await loadStage() : {}) || {};
-  const plan = planBridgeCommand({ command, stage: resolvedStage, reading: before, now });
+  const plan = planBridgeCommand({
+    command,
+    stage: resolvedStage,
+    reading: before,
+    now,
+    device,
+    state: deviceMode,
+  });
   if (!plan.ok) {
     log({ action: plan.status, reason: plan.reason, command_id: command.id, before });
     if (plan.mark) {

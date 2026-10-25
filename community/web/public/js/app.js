@@ -913,17 +913,31 @@ async function renderCoach() {
       (data.actions || [])
         .map((row) => {
           const next = row.new_value || {};
+          const statusLabel = {
+            queued: "Queued for the chamber",
+            applied: "Applied",
+            failed: "Failed",
+            expired: "Expired",
+            refused: "Refused",
+          }[row.apply_status] || "";
           const summary = row.action === "apply"
             ? `Set ${next.temperature_c ?? "?"} °C and ${next.humidity_percent ?? "?"}% RH`
             : row.action === "undo"
               ? "Restored the previous setpoints"
-              : "Paused Autopilot";
-          const undo = row.action === "apply" && !row.undone_at
+              : row.action === "expired"
+                ? "Command expired"
+                : row.action === "failed" || row.action === "refused"
+                  ? `Command ${row.action}`
+                  : "Paused Autopilot";
+          const detail = [statusLabel, row.reason].filter(Boolean).join(". ");
+          const undo = row.action === "apply" && !row.undone_at && row.apply_status !== "failed" && row.apply_status !== "expired" && row.apply_status !== "refused"
             ? `<button type="button" class="secondary" data-undo="${row.id}">Undo</button>`
             : row.undone_at
               ? `<span class="muted">Undone</span>`
-              : "";
-          return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(row.reason || "")}</p></div>${undo}</li>`;
+              : statusLabel && row.action === "apply"
+                ? `<span class="muted">${escapeHtml(statusLabel)}</span>`
+                : "";
+          return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(detail)}</p></div>${undo}</li>`;
         })
         .join("") || `<li class="muted">No Autopilot actions yet.</li>`;
   }
