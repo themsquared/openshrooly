@@ -4,13 +4,130 @@ export const COACH_ITEM = "grow-coach";
 export const COACH_PRICE_CENTS = 399;
 export const COACH_PERIOD_DAYS = 30;
 
+/** Global envelope. Per-stage warning bands tighten this when present. */
+export const TEMPERATURE_CLAMP = [10, 32];
+
 export const SAFE_BOUNDS = {
   humidity_percent: [70, 96],
-  temperature_c: [16, 28],
+  temperature_c: [...TEMPERATURE_CLAMP],
   humidity_delta: 6,
   temperature_delta: 2,
   fan_speed_percent: [10, 80],
 };
+
+/** Clip the global envelope to a stage's warning band when the profile has one. */
+export function safeBoundsForStage(stage = {}) {
+  const floor = TEMPERATURE_CLAMP[0];
+  const ceil = TEMPERATURE_CLAMP[1];
+  const warnMin = num(stage.temperature_warning_min_c);
+  const warnMax = num(stage.temperature_warning_max_c);
+  const lo = warnMin != null ? Math.max(floor, warnMin) : floor;
+  const hi = warnMax != null ? Math.min(ceil, warnMax) : ceil;
+  return {
+    ...SAFE_BOUNDS,
+    temperature_c: lo <= hi ? [lo, hi] : [floor, ceil],
+  };
+}
+
+export function latestReading(samples = [], now = Date.now()) {
+  const parsed = parseTelemetry(samples);
+  if (!parsed.length) return null;
+  const latest = parsed.reduce((best, row) => {
+    const t = Date.parse(row.created_at);
+    const bt = Date.parse(best.created_at);
+    if (Number.isFinite(t) && (!Number.isFinite(bt) || t >= bt)) return row;
+    return best;
+  }, parsed[parsed.length - 1]);
+  const at = latest.created_at ? Date.parse(latest.created_at) : NaN;
+  return {
+    humidity: latest.humidity,
+    temperature: latest.temperature,
+    humidity_setpoint: latest.humidity_setpoint,
+    temperature_setpoint: latest.temperature_setpoint,
+    reading_at: latest.created_at || null,
+    age_seconds: Number.isFinite(at) ? Math.max(0, Math.round((now - at) / 1000)) : null,
+  };
+}
+
+export function compareReadingToStage(reading, stage = {}) {
+  const flags = [];
+  if (!reading) return flags;
+  const warnMin = num(stage.temperature_warning_min_c);
+  const warnMax = num(stage.temperature_warning_max_c);
+  const targetMax = num(stage.temperature_target_max);
+  const rhMin = num(stage.humidity_target_min);
+  const rhMax = num(stage.humidity_target_max);
+
+  function flagRange(value, { lo, hi, kind, label, unit, band }) {
+    if (value == null) return;
+    if (hi != null && value > hi) {
+      flags.push({
+        kind: `${kind}_above_${band}`,
+        field: kind,
+        value,
+        limit: hi,
+        message: `${label} ${value} ${unit} is above the ${hi} ${unit} ${band}.`,
+      });
+    } else if (lo != null && value < lo) {
+      flags.push({
+        kind: `${kind}_below_${band}`,
+        field: kind,
+        value,
+        limit: lo,
+        message: `${label} ${value} ${unit} is below the ${lo} ${unit} ${band}.`,
+      });
+    }
+  }
+
+  flagRange(reading.temperature, {
+    lo: warnMin,
+    hi: warnMax,
+    kind: "temperature",
+    label: "Temperature",
+    unit: "°C",
+    band: "warning",
+  });
+  flagRange(reading.temperature_setpoint, {
+    lo: warnMin,
+    hi: warnMax,
+    kind: "temperature_setpoint",
+    label: "Temperature setpoint",
+    unit: "°C",
+    band: "warning",
+  });
+  flagRange(reading.humidity, {
+    lo: rhMin,
+    hi: rhMax,
+    kind: "humidity",
+    label: "Humidity",
+    unit: "%",
+    band: "target",
+  });
+  flagRange(reading.humidity_setpoint, {
+    lo: rhMin,
+    hi: rhMax,
+    kind: "humidity_setpoint",
+    label: "Humidity setpoint",
+    unit: "%",
+    band: "target",
+  });
+
+  if (
+    reading.temperature != null &&
+    warnMax == null &&
+    targetMax != null &&
+    reading.temperature > targetMax
+  ) {
+    flags.push({
+      kind: "temperature_above_target",
+      field: "temperature",
+      value: reading.temperature,
+      limit: targetMax,
+      message: `Temperature ${reading.temperature} °C is above the ${targetMax} °C target.`,
+    });
+  }
+  return flags;
+}
 
 export function parseTelemetry(rows = []) {
   return rows
@@ -89,6 +206,7 @@ export function buildDeviceModel(samples, reports = []) {
 }
 
 export function suggestSetpoints(model, stage = {}, { auto = false } = {}) {
+  const bounds = safeBoundsForStage(stage);
   const baseRh = num(stage.humidity_percent) ?? 90;
   const baseTemp = num(stage.temperature_c) ?? 20;
   const baseFan = num(stage.fan?.speed_percent ?? stage.fan_speed_percent) ?? 30;
@@ -98,31 +216,31 @@ export function suggestSetpoints(model, stage = {}, { auto = false } = {}) {
   const reasons = [];
 
   if ((model.humidity_droop || 0) >= 2) {
-    const bump = Math.min(SAFE_BOUNDS.humidity_delta, Math.round(model.humidity_droop));
+    const bump = Math.min(bounds.humidity_delta, Math.round(model.humidity_droop));
     humidity += bump;
     reasons.push(`Chamber lags humidity setpoint by ~${model.humidity_droop.toFixed(1)}%.`);
   }
   if ((model.humidity_error || 0) >= 3) {
-    humidity -= Math.min(SAFE_BOUNDS.humidity_delta, Math.round(model.humidity_error));
+    humidity -= Math.min(bounds.humidity_delta, Math.round(model.humidity_error));
     reasons.push("Humidity runs high versus the target.");
   }
   if (Math.abs(model.temperature_offset || 0) >= 0.6) {
-    const delta = clip(-model.temperature_offset, [-SAFE_BOUNDS.temperature_delta, SAFE_BOUNDS.temperature_delta]);
+    const delta = clip(-model.temperature_offset, [-bounds.temperature_delta, bounds.temperature_delta]);
     temperature += delta;
     reasons.push(`Temperature runs ${model.temperature_offset > 0 ? "warm" : "cool"} by ${Math.abs(model.temperature_offset).toFixed(1)}°C.`);
   }
 
-  humidity = Math.round(clip(humidity, SAFE_BOUNDS.humidity_percent) * 10) / 10;
-  temperature = Math.round(clip(temperature, SAFE_BOUNDS.temperature_c) * 10) / 10;
-  const fan = clip(baseFan, SAFE_BOUNDS.fan_speed_percent);
+  humidity = Math.round(clip(humidity, bounds.humidity_percent) * 10) / 10;
+  temperature = Math.round(clip(temperature, bounds.temperature_c) * 10) / 10;
+  const fan = clip(baseFan, bounds.fan_speed_percent);
 
   const within =
-    humidity >= SAFE_BOUNDS.humidity_percent[0] &&
-    humidity <= SAFE_BOUNDS.humidity_percent[1] &&
-    temperature >= SAFE_BOUNDS.temperature_c[0] &&
-    temperature <= SAFE_BOUNDS.temperature_c[1] &&
-    Math.abs(humidity - baseRh) <= SAFE_BOUNDS.humidity_delta &&
-    Math.abs(temperature - baseTemp) <= SAFE_BOUNDS.temperature_delta;
+    humidity >= bounds.humidity_percent[0] &&
+    humidity <= bounds.humidity_percent[1] &&
+    temperature >= bounds.temperature_c[0] &&
+    temperature <= bounds.temperature_c[1] &&
+    Math.abs(humidity - baseRh) <= bounds.humidity_delta &&
+    Math.abs(temperature - baseTemp) <= bounds.temperature_delta;
 
   return {
     humidity_percent: humidity,

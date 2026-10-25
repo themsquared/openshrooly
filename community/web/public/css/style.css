@@ -626,6 +626,8 @@ button.nav-toggle {
   background: rgba(7, 17, 14, 0.5);
 }
 .chat-bubble.you { border-color: rgba(125, 255, 179, 0.28); }
+.chat-bubble ul { margin: 0.35em 0; padding-left: 1.2em; }
+.chat-bubble li { margin: 0.15em 0; }
 .photo-flags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.6rem 0; }
 @media (max-width: 767px) {
   .hero { min-height: 420px; border-radius: 22px; }
