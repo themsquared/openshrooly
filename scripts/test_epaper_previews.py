@@ -8,6 +8,9 @@ import subprocess
 
 from PIL import Image
 
+import lvgl_images
+from shroom_mascot import FRAMES as MASCOT_FRAMES
+
 ROOT = Path(__file__).resolve().parents[1]
 PREVIEWS = ROOT / "docs" / "device-screen"
 FONTS = ROOT / "esphome" / "fonts"
@@ -67,7 +70,8 @@ def main() -> None:
 
     # Screen mushroom: small 1-bit frames, drawn under the alert bar and setup
     # overlay, before the Select button so flipping keeps working.
-    for name in ("idle", "meh", "blink", "surprise", "sleep"):
+    assert {"idle", "meh", "blink", "surprise", "sleep", "lean_left", "lean_right"} <= set(MASCOT_FRAMES)
+    for name in MASCOT_FRAMES:
         frame = Image.open(ROOT / "esphome" / "images" / f"mascot_{name}.png")
         assert frame.mode == "1" and frame.size == (24, 26), (name, frame.mode, frame.size)
         assert f"id: mascot_{name}" in display, f"mascot_{name} must live in display.yaml"
@@ -75,6 +79,39 @@ def main() -> None:
     assert main_yaml.index("id: grow_mascot") < main_yaml.index("id: grow_alert_bar"), \
         "grow_mascot must come before the alert bar so alerts draw over it"
     assert "script.execute: update_mascot" in script
+    mascot_script = (ROOT / "esphome" / "scripts" / "update_mascot.yaml").read_text(encoding="utf-8")
+    for name in MASCOT_FRAMES:
+        assert f"id(mascot_{name})" in mascot_script, f"update_mascot never shows mascot_{name}"
+
+    # 1-bit images: LVGL paints them as an alpha mask in image_recolor, which
+    # defaults to white paper on this panel. Every LVGL image widget showing a
+    # BINARY image must set image_recolor: paper_black, and the image needs
+    # invert_alpha: true, or the chamber draws nothing (PR #68 shipped that way).
+    problems = lvgl_images.recolor_problems()
+    assert not problems, "1-bit images that would draw blank on the chamber:\n" + "\n".join(problems)
+    widgets = lvgl_images.image_widgets()
+    for wid in ("grow_mascot", "header_mark", "claim_header_mark", "splash_logo_widget"):
+        assert wid in widgets, f"{wid} must be an image widget"
+    for image_id, wid in [("mark_16", "header_mark"), ("splash_logo", "splash_logo_widget")] + [
+        (f"mascot_{n}", "grow_mascot") for n in MASCOT_FRAMES
+    ]:
+        src = Image.open(lvgl_images.image_specs()[image_id].file).convert("1")
+        paper = Image.new("1", src.size, 1)
+        lvgl_images.draw_image(paper, image_id, wid, (0, 0))
+        assert paper.tobytes() == src.tobytes(), f"{image_id} in {wid} does not draw like its PNG"
+    # The check itself must catch the PR #68 setup: no recolor, no invert.
+    real_specs, real_widgets = lvgl_images.image_specs, lvgl_images.image_widgets
+    try:
+        lvgl_images.image_specs = lambda: {k: v.__class__(v.id, v.file, v.type, False) for k, v in real_specs().items()}
+        lvgl_images.image_widgets = lambda: {k: v.__class__(v.id, v.src, v.source, None, None) for k, v in real_widgets().items()}
+        broken = lvgl_images.recolor_problems()
+        assert any("grow_mascot" in b and "image_recolor" in b for b in broken), broken
+        assert any("mascot_idle" in b and "invert_alpha" in b for b in broken), broken
+        paper = Image.new("1", (24, 26), 1)
+        lvgl_images.draw_image(paper, "mascot_idle", "grow_mascot", (0, 0))
+        assert min(paper.getdata()) == 1, "old setup must render blank in the simulator"
+    finally:
+        lvgl_images.image_specs, lvgl_images.image_widgets = real_specs, real_widgets
     controls = (ROOT / "esphome" / "components" / "controls.yaml").read_text(encoding="utf-8")
     assert "id: screen_mushroom" in controls and "RESTORE_DEFAULT_ON" in controls.split("id: screen_mushroom", 1)[1][:300]
 

@@ -22,7 +22,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+from lvgl_images import draw_image
+from shroom_mascot import SEQUENCE as MASCOT_SEQUENCE
 from shroom_mascot import save_firmware_frames as save_mascot_frames
+from shroom_mascot import save_previews as save_mascot_previews
 
 ROOT = Path(__file__).resolve().parents[1]
 ESPHOME = ROOT / "esphome"
@@ -359,13 +362,13 @@ def draw_progress(img: Image.Image, day: int, total: int) -> None:
 
 def draw_header(img: Image.Image, fonts: dict[str, BitmapFont], time: str, phase: str) -> None:
     ui, small = fonts["12x24"], fonts["6x12"]
-    img.paste(Image.open(IMAGES / "mark_16.png").convert("1"), (MARK_X, MARK_Y))
+    draw_image(img, "mark_16", "header_mark", (MARK_X, MARK_Y))
     ui.draw(img, TIME_X, TIME_Y, time)
     small.draw(img, WIDTH - 5 - small.text_width(phase), PHASE_Y, phase)
 
 
-def draw_mascot(img: Image.Image, name: str) -> None:
-    img.paste(Image.open(IMAGES / f"mascot_{name}.png").convert("1"), (MASCOT_X, MASCOT_Y))
+def draw_mascot(img: Image.Image, name: str, dy: int = 0) -> None:
+    draw_image(img, f"mascot_{name}", "grow_mascot", (MASCOT_X, MASCOT_Y + dy))
 
 
 def draw_growing(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
@@ -382,7 +385,7 @@ def draw_growing(state: dict, fonts: dict[str, BitmapFont]) -> Image.Image:
         ui.draw(img, (WIDTH - ui.text_width(alert)) // 2, ALERT_Y, alert, color=1)
     else:
         small.draw(img, 5, NEXT_Y, state["next_event"])
-        draw_mascot(img, state.get("mascot", "idle"))
+        draw_mascot(img, state.get("mascot", "idle"), state.get("mascot_dy", 0))
     small.draw(img, 5, STATUS_Y, state.get("status", NO_WIFI_STATUS))
     draw_select(img, small)
     return img
@@ -434,12 +437,23 @@ SPLASH_BY_Y = 100
 
 def draw_splash(fonts: dict[str, BitmapFont]) -> Image.Image:
     img = new_paper()
-    logo = Image.open(IMAGES / "splash_logo.png").convert("1")
-    img.paste(logo, ((WIDTH - logo.size[0]) // 2, SPLASH_LOGO_Y))
+    logo = Image.open(IMAGES / "splash_logo.png")
+    draw_image(img, "splash_logo", "splash_logo_widget", ((WIDTH - logo.size[0]) // 2, SPLASH_LOGO_Y))
     word, by = "OpenShrooly", "by Shroom Labs"
     fonts["12x24"].draw(img, (WIDTH - fonts["12x24"].text_width(word)) // 2, SPLASH_WORD_Y, word)
     fonts["6x12"].draw(img, (WIDTH - fonts["6x12"].text_width(by)) // 2, SPLASH_BY_Y, by)
     return img
+
+
+def save_mascot_on_screen(state: dict, fonts: dict[str, BitmapFont]) -> None:
+    """Bottom right corner of the growing screen over a dance cycle, 4x."""
+    box = (WIDTH - 112, 70, WIDTH, HEIGHT)
+    frames = []
+    for name, dy in MASCOT_SEQUENCE:
+        img = draw_growing({**state, "mascot": name, "mascot_dy": dy}, fonts).crop(box)
+        frames.append(img.resize((img.size[0] * 4, img.size[1] * 4), Image.Resampling.NEAREST).convert("L"))
+    out = PREVIEWS / "mascot" / "mascot_on_screen.gif"
+    frames[0].save(out, save_all=True, append_images=frames[1:], duration=600, loop=0)
 
 
 def save_pair(img: Image.Image, stem: str) -> None:
@@ -545,6 +559,21 @@ def main() -> None:
         "wifi-setup",
     )
     save_pair(draw_splash(fonts), "boot-splash")
+    save_mascot_previews(PREVIEWS / "mascot", per_frame=False)
+    save_mascot_on_screen(
+        {
+            "time": "14:32",
+            "phase_line": "Fruiting, day 6 of 10",
+            "day": 6,
+            "total": 10,
+            "temp": "24.5C",
+            "rh": "91%",
+            "meta": ("24", "OK", "90", "OK"),
+            "next_event": "Lights off 19:00",
+            "status": "Wi-Fi 192.168.1.20",
+        },
+        fonts,
+    )
     print(f"wrote fonts, logos, and previews under {PREVIEWS}")
 
 

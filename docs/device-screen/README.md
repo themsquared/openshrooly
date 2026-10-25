@@ -21,10 +21,12 @@ Each has a `@4x.png` sibling.
 
 ## Screen mushroom
 
-A 24 x 26 1-bit mushroom sits bottom right, above Select (`grow_mascot`, x 264, y 77). It only changes on the same 10 second refresh, so it adds no extra e-paper updates. Frames live in `esphome/images/mascot_*.png` and are drawn by `scripts/shroom_mascot.py` (`--preview DIR` writes 8x PNGs and GIFs).
+A 24 x 26 1-bit mushroom sits bottom right, above Select (`grow_mascot`, x 264, y 77). It only changes on the same 10 second refresh, so it adds no extra e-paper updates. Frames live in `esphome/images/mascot_*.png` and are drawn by `scripts/shroom_mascot.py` (`--preview DIR` writes 8x PNGs and GIFs). `mascot/mascot_on_screen.gif` is the corner of the growing screen over one dance cycle.
 
-- Bobs 2 px down on every other refresh and blinks about once a minute.
-- Flat mouth and a sweat drop while humidity is off target.
+LVGL draws a 1-bit image as an alpha mask painted in the widget's `image_recolor` color. That color defaults to black, which is white paper on this panel, so each image widget sets `image_recolor: paper_black` and each 1-bit image sets `invert_alpha: true`. Before 1.0.4-sl.3 neither was set and the mushroom, header mark, and splash logo drew nothing on the chamber. `scripts/lvgl_images.py` copies that drawing rule, the previews go through it, and `scripts/test_epaper_previews.py` fails if a 1-bit image would draw blank.
+
+- Dances one step per refresh: upright, lean left, bob 2 px down, lean right. Blinks about once a minute.
+- Flat mouth and a sweat drop on the upright steps while humidity is off target.
 - Asleep while a grow is running and the lights are off.
 - Hidden under the alert banner and the Wi-Fi setup box.
 - Turn it off with the `Screen Mushroom` switch (on by default), or Settings, Display & Time on the chamber web page.

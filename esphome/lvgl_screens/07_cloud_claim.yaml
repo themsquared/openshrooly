@@ -12,6 +12,8 @@
         align: TOP_LEFT
         x: 5
         y: 3
+        image_recolor: paper_black
+        image_recolor_opa: COVER
 
     - label:
         id: claim_title

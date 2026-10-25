@@ -16,6 +16,8 @@
         align: TOP_LEFT
         x: 5
         y: 3
+        image_recolor: paper_black
+        image_recolor_opa: COVER
 
     - label:
         id: main_time_label
@@ -150,6 +152,8 @@
         x: 264
         y: 77
         hidden: true
+        image_recolor: paper_black
+        image_recolor_opa: COVER
 
     - obj:
         id: grow_alert_bar
