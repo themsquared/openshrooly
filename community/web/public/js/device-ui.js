@@ -133,8 +133,79 @@ export function renderReadonlyNotes(device) {
   </section>`;
 }
 
+/** Plain labels for what the chamber has actually done with a change. Enqueue is never "applied". */
+export const COMMAND_STATUS_LABEL = {
+  queued: "Queued, waiting for the chamber",
+  delivered: "Delivered, not confirmed yet",
+  applied: "Applied, confirmed by the chamber",
+  failed: "Failed",
+  expired: "Expired",
+};
+
+export function commandStatusLabel(status) {
+  return COMMAND_STATUS_LABEL[status] || "Unknown";
+}
+
+export function commandPending(command) {
+  return command?.status === "queued" || command?.status === "delivered";
+}
+
+/** What to tell the grower right after Save or Apply, from the API's per-device result. */
+export function resultMessage(result) {
+  if (!result) return "The chamber did not accept that change.";
+  if (result.status === "failed") return result.error || "The chamber did not accept that change.";
+  const parts = [];
+  if (result.message) parts.push(result.message);
+  if (result.deduped) parts.push("You already sent this, so it was not sent again.");
+  if (result.status === "queued") parts.push("Queued. It shows as applied only after the chamber confirms it.");
+  else if (result.status === "delivered") parts.push("The chamber picked it up. Waiting for it to confirm.");
+  else if (result.status === "applied" && !result.message) parts.push("Saved.");
+  return parts.join(" ");
+}
+
+export function newRequestId() {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function renderCapabilities(device) {
+  const firmware = device.firmware ? `Firmware ${device.firmware}` : "Firmware version not reported";
+  const source = device.capabilities?.source;
+  const how =
+    source === "reported"
+      ? "The chamber reported what it can take from the cloud."
+      : "The chamber does not report what it can take yet, so the site assumes temperature and humidity targets only.";
+  return `<p class="muted device-capabilities">${escapeHtml(firmware)}. ${escapeHtml(how)}</p>`;
+}
+
+function commandLine(command) {
+  const when = command.at || command.issued_at || "";
+  const reason = command.reason ? ` · ${command.reason}` : "";
+  return `<li class="command-${escapeHtml(command.status)}"><strong>${escapeHtml(commandStatusLabel(command.status))}</strong> · ${escapeHtml(
+    command.summary || command.kind
+  )}${escapeHtml(reason)}<br><span class="muted">${escapeHtml(when)}</span></li>`;
+}
+
+export function renderCommandList(commands = []) {
+  const items = (commands || []).map(commandLine).join("") || `<li class="muted">Nothing sent from the cloud yet.</li>`;
+  return `<section class="card device-commands" aria-labelledby="commands-title">
+    <h2 id="commands-title">Recent changes</h2>
+    <ul id="device-commands" class="device-note-list">${items}</ul>
+  </section>`;
+}
+
+function controlNote(control) {
+  return control?.note ? `<p class="muted control-note">${escapeHtml(control.note)}</p>` : "";
+}
+
 export function renderControls(device, { profiles = [], canWrite = false, showCoach = false } = {}) {
   const disabled = canWrite ? "" : " disabled";
+  const controls = device.controls || {};
+  const off = (key) => (canWrite && controls[key]?.supported !== false ? "" : " disabled");
+  const fanOff = off("fan");
+  const lightOff = off("light");
+  const profileOff = off("profile");
   const light = device.light || {};
   const profileOptions =
     `<option value="">Choose a profile</option>` +
@@ -171,6 +242,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       : "";
   return `<form id="device-controls" class="card alert-form">
     <p class="muted">${escapeHtml(notice)}</p>
+    ${renderCapabilities(device)}
     <fieldset>
       <legend>Device name</legend>
       <label>Name <input name="device_name" maxlength="80" value="${escapeHtml(device.name || "")}"${disabled}></label>
@@ -182,7 +254,8 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
         <label>Profile <select name="profile_id"${disabled}>${profileOptions}</select></label>
         <label>Phase <select name="stage"${disabled}>${stageOptions || `<option value="${escapeHtml(device.stage?.id || "")}">${escapeHtml(device.stage?.name || "Current phase")}</option>`}</select></label>
       </div>
-      <button type="submit" data-action="profile"${disabled}>Apply profile</button>
+      <button type="submit" data-action="profile"${profileOff}>Apply profile</button>
+      ${controlNote(controls.profile)}
     </fieldset>
     <fieldset>
       <legend>Temperature</legend>
@@ -200,30 +273,32 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
     <fieldset>
       <legend>Air exchange</legend>
       <label>Fan speed (%)
-        <input name="fan_speed_percent" type="number" step="1" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${disabled}>
+        <input name="fan_speed_percent" type="number" step="1" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${fanOff}>
       </label>
+      ${controlNote(controls.fan)}
       <p class="muted">Period and run time stay on the chamber.</p>
     </fieldset>
     <fieldset>
       <legend>Lighting</legend>
+      ${controlNote(controls.light)}
       <p class="muted">Duration is required when the light is on. 0 hours is only for a dark stage with lux 0 and RGB 0.</p>
       <div class="row">
         <label>Sunrise hour
-          <input name="sunrise_hour" type="number" step="0.25" min="0" max="23.75" value="${numOrBlank(light.sunrise_hour)}"${disabled}>
+          <input name="sunrise_hour" type="number" step="0.25" min="0" max="23.75" value="${numOrBlank(light.sunrise_hour)}"${lightOff}>
         </label>
         <label>Duration (hours)
-          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${disabled}>
+          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${lightOff}>
         </label>
       </div>
       <label>White intensity (lux)
-        <input name="white_led_lux" type="number" min="0" max="4000" value="${numOrBlank(light.white_led_lux)}"${disabled}>
+        <input name="white_led_lux" type="number" min="0" max="4000" value="${numOrBlank(light.white_led_lux)}"${lightOff}>
       </label>
       <div class="row">
-        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${disabled}></label>
-        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${disabled}></label>
-        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${disabled}></label>
+        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${lightOff}></label>
+        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${lightOff}></label>
+        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${lightOff}></label>
       </div>
-      <button type="submit" data-action="light"${disabled}>Save light schedule</button>
+      <button type="submit" data-action="light"${lightOff}>Save light schedule</button>
     </fieldset>
     ${coach}
     <p id="device-controls-msg" class="muted" role="status"></p>

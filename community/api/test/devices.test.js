@@ -451,7 +451,7 @@ test("telemetry ack only consumes the device's own commands", async () => {
   const { token } = await register(ctx);
   const a = await enrollClaimIssue(ctx, token, "6666666666666666");
   const b = await enrollClaimIssue(ctx, token, "7777777777777777");
-  await call(ctx, "POST", `/api/devices/${a.deviceId}/commands`, { token, body: { kind: "setpoints", payload: { rh: 90 } } });
+  await call(ctx, "POST", `/api/devices/${a.deviceId}/commands`, { token, body: { kind: "setpoints", payload: { humidity_percent: 90 } } });
   const [cmd] = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [a.deviceId]);
   const ack = await deviceCall(ctx, "POST", `/api/devices/${b.deviceId}/telemetry`, {
     deviceId: b.deviceId,
@@ -1024,4 +1024,108 @@ test("revoked re-enroll issues a new device id and drops old telemetry", async (
   assert.equal(oldTel.length, 0);
   const oldRow = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
   assert.equal(oldRow, null);
+});
+
+async function commandStatus(ctx, token, deviceId) {
+  const res = await call(ctx, "GET", `/api/fleet/devices/${deviceId}/commands`, { token });
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  return res.data.commands[0];
+}
+
+test("raw command route queues (never applied) and the inbox poll marks it delivered", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "8888888888888888");
+  const push = await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: { kind: "setpoints", payload: { temperature_c: 18, humidity_percent: 90 } },
+  });
+  assert.equal(push.status, 200, JSON.stringify(push.data));
+  assert.equal(push.data.status, "queued");
+  assert.ok(push.data.command_id);
+  assert.equal((await commandStatus(ctx, token, d.deviceId)).status, "queued");
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, { deviceId: d.deviceId, key: d.pair.keys.privateKey, cert: d.issued.data });
+  assert.equal(inbox.status, 200);
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.ok(row.last_inbox_at);
+  assert.equal((await commandStatus(ctx, token, d.deviceId)).status, "delivered");
+});
+
+test("a firmware 'failed' ack is kept and shown with its reason", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "9999999999999999");
+  const push = await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: { kind: "setpoints", payload: { temperature_c: 18, humidity_percent: 90 } },
+  });
+  const ack = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/telemetry`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { temperature: 20, humidity: 88, ack_command_id: push.data.command_id, ack_status: "failed", ack_reason: "No setpoints." },
+  });
+  assert.equal(ack.status, 200);
+  const state = await commandStatus(ctx, token, d.deviceId);
+  assert.equal(state.status, "failed");
+  assert.equal(state.reason, "No setpoints.");
+  const ok = await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: { kind: "setpoints", payload: { temperature_c: 19, humidity_percent: 91 } },
+  });
+  await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/telemetry`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { temperature: 20, humidity: 88, ack_command_id: ok.data.command_id, ack_status: "applied" },
+  });
+  const applied = await commandStatus(ctx, token, d.deviceId);
+  assert.equal(applied.id, ok.data.command_id);
+  assert.equal(applied.status, "applied");
+});
+
+test("readings that show the new targets confirm a setpoint command without an ack", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aaaaaaaaaaaaaaaa");
+  const push = await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: { kind: "setpoints", payload: { temperature_c: 18, humidity_percent: 90 } },
+  });
+  const send = (t, h) =>
+    deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/telemetry`, {
+      deviceId: d.deviceId,
+      key: d.pair.keys.privateKey,
+      cert: d.issued.data,
+      body: { temperature: 20, humidity: 85, temperature_target: t, temperature_setpoint: t, target_humidity: h, humidity_setpoint: h },
+    });
+  await send(22, 85);
+  assert.notEqual((await commandStatus(ctx, token, d.deviceId)).status, "applied");
+  await send(18, 90);
+  const state = await commandStatus(ctx, token, d.deviceId);
+  assert.equal(state.id, push.data.command_id);
+  assert.equal(state.status, "applied");
+  assert.match(state.reason, /readings/i);
+});
+
+test("profile apply on the raw route is translated for setpoint-only firmware", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "bbbbbbbbbbbbbbbb");
+  const push = await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: { kind: "apply_profile", payload: { profile_id: "lions-mane", stage: "fruiting" } },
+  });
+  assert.equal(push.status, 200, JSON.stringify(push.data));
+  assert.equal(push.data.status, "queued");
+  const [cmd] = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [d.deviceId]);
+  assert.equal(cmd.kind, "setpoints");
+  const payload = JSON.parse(cmd.payload);
+  assert.equal(payload.temperature_c, 17);
+  assert.equal(payload.humidity_percent, 90);
+  const notice = await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: { kind: "firmware_notice", payload: { version: "1.0.5" } },
+  });
+  assert.equal(notice.status, 409);
 });

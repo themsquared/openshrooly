@@ -914,6 +914,11 @@ function dispatch(mode, tables, ids, sql, params) {
     if (row) row.name = params[0];
     return { changes: row ? 1 : 0 };
   }
+  if (q === "UPDATE cloud_devices SET last_inbox_at=? WHERE id=?") {
+    const row = tables.cloud_devices.find((d) => d.id === params[1]);
+    if (row) row.last_inbox_at = params[0];
+    return { changes: row ? 1 : 0 };
+  }
   if (q.startsWith("UPDATE cloud_devices SET last_seen_at=")) {
     const row = tables.cloud_devices.find((d) => d.id === params[1]);
     if (row) row.last_seen_at = params[0];
@@ -977,6 +982,12 @@ function dispatch(mode, tables, ids, sql, params) {
       if (Number.isFinite(limit)) rows = rows.slice(0, limit);
     }
     return rows;
+  }
+  if (q === "SELECT * FROM device_commands WHERE device_id=? ORDER BY id DESC LIMIT ?") {
+    return tables.device_commands
+      .filter((c) => c.device_id === params[0])
+      .sort((a, b) => Number(b.id) - Number(a.id))
+      .slice(0, Number(params[1]));
   }
   if (q.startsWith("SELECT * FROM device_commands WHERE device_id=")) {
     return tables.device_commands.filter((c) => c.device_id === params[0]);

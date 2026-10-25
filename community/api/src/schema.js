@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS cloud_devices (
     cloud_enabled INTEGER NOT NULL DEFAULT 0,
     last_seen_at TEXT,
     device_type TEXT NOT NULL DEFAULT 'shrooly_chamber',
+    last_inbox_at TEXT,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS device_certs (

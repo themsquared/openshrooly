@@ -133,8 +133,10 @@ test("bulk setpoints clamp to global limits and record per-device results", asyn
   });
   assert.equal(applied.status, 200, JSON.stringify(applied.data));
   const byId = Object.fromEntries(applied.data.results.map((r) => [r.device_id, r]));
-  assert.equal(byId["dev-hot"].status, "applied");
+  // Enqueue is never "applied": both wait for the chamber, online or not.
+  assert.equal(byId["dev-hot"].status, "queued");
   assert.equal(byId["dev-off"].status, "queued");
+  assert.ok(byId["dev-hot"].command_id);
   const audit = await call(ctx, "GET", "/api/fleet/audit", { token });
   assert.ok(audit.data.entries.some((e) => e.action === "setpoints" && e.results.length === 2));
 });
@@ -222,7 +224,7 @@ test("fleet setpoint apply pauses Autopilot immediately", async () => {
     body: { action: "setpoints", device_ids: ["dev-pause"], payload: { temperature_c: 18 } },
   });
   assert.equal(applied.status, 200, JSON.stringify(applied.data));
-  assert.equal(applied.data.results[0].status, "applied");
+  assert.equal(applied.data.results[0].status, "queued");
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-pause", { token });
   assert.equal(status.data.mode, "advisor");
   assert.equal(status.data.status, "paused");
@@ -383,7 +385,7 @@ test("device identity includes type, species, and grow day without the fleet fla
     body: { action: "profile", payload: { profile_id: pearlOyster.id, stage: "fruiting" } },
   });
   assert.equal(applied.status, 200, JSON.stringify(applied.data));
-  assert.equal(applied.data.results[0].status, "applied");
+  assert.equal(applied.data.results[0].status, "queued");
   const detail = await call(ctx, "GET", "/api/fleet/devices/dev-id", { token });
   assert.equal(detail.status, 200, JSON.stringify(detail.data));
   const d = detail.data.device;
@@ -458,7 +460,7 @@ test("single-device apply checks ownership, clamps, and queues when offline", as
     token: owner.token,
     body: { action: "setpoints", payload: { temperature_c: 18, humidity_percent: 88 } },
   });
-  assert.equal(hot.data.results[0].status, "applied");
+  assert.equal(hot.data.results[0].status, "queued");
 
   const quiet = await call(ctx, "POST", "/api/fleet/devices/dev-quiet/apply", {
     token: owner.token,

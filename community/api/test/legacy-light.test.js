@@ -92,6 +92,12 @@ test("a legacy profile still starts a grow, forks, rates, and exports with sensi
     "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ["dev-legacy", "hw-legacy", "{}", "Kitchen", "active", grower.user.id, null, null, null, 1, nowIso(), nowIso()]
   );
+  // A chamber that says it takes light schedules, so the light preview is about the profile's values.
+  await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
+    "dev-legacy",
+    JSON.stringify({ firmware_version: "2.0.0", capabilities: ["setpoints.temperature", "setpoints.humidity", "light.schedule"] }),
+    nowIso(),
+  ]);
 
   const shown = await call(ctx, "GET", "/api/profiles/legacy-oyster", { token: grower.token });
   assert.equal(shown.status, 200, JSON.stringify(shown.data));
