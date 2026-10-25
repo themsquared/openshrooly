@@ -111,7 +111,32 @@ function safeNext(value, fallback = "/account.html") {
   return next;
 }
 
+/** Grow Coach visibility comes from the server (`grow_coach.available` on /api/me). Hidden by default. */
+let coachAvailablePromise = null;
+let coachOffMenuPage = false;
+function coachAvailable() {
+  if (!isSignedIn()) return Promise.resolve(false);
+  coachAvailablePromise ||= api("/api/me")
+    .then((me) => Boolean(me?.grow_coach?.available))
+    .catch(() => false);
+  return coachAvailablePromise;
+}
+
+async function syncCoachLinks() {
+  const offMenu = coachOffMenuPage || document.body?.hasAttribute("data-coach-off");
+  const show = !offMenu && (await coachAvailable());
+  for (const el of document.querySelectorAll("[data-coach-link], #nav-coach, #footer-nav-coach")) {
+    el.classList.toggle("hidden", !show);
+  }
+}
+
+function setCoachOffMenu(off) {
+  coachOffMenuPage = Boolean(off);
+  syncCoachLinks().catch(() => {});
+}
+
 function renderNav() {
+  syncCoachLinks().catch(() => {});
   const nav = $("#session-nav");
   if (!nav) return;
   if (isSignedIn()) {
@@ -194,8 +219,7 @@ async function renderHome() {
   $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", off);
-  $("#coach-promo")?.classList.toggle("hidden", off);
-  for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", off);
+  setCoachOffMenu(off);
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
   $("#cards").innerHTML = profiles.length
     ? renderProfileCards(profiles)
@@ -235,7 +259,7 @@ async function renderProfile() {
     $("#affiliates")?.replaceChildren();
     renderResources($("#resources"), data.resources || { links: PSI_RESOURCES });
   }
-  for (const link of document.querySelectorAll("#nav-coach, #footer-nav-coach")) link.classList.toggle("hidden", off);
+  setCoachOffMenu(off);
   const caps = await capabilities();
   if (!caps.photos) {
     document.querySelector('input[name="photo"]')?.closest("label")?.classList.add("hidden");
@@ -487,12 +511,14 @@ async function renderAccount() {
         (item) => `<li><a href="/publish.html?id=${encodeURIComponent(item.profile.id)}">${escapeHtml(item.profile.name)}</a> · ${escapeHtml(stateLabel[item.review?.status] || "Draft")}${item.review?.reason ? ` · ${escapeHtml(item.review.reason)}` : ""}</li>`
       )
       .join("") || "<li class='muted'>No profiles yet.</li>";
-  if ($("#coach-account") && me.grow_coach) {
-    $("#coach-account").textContent = me.grow_coach.entitled
-      ? me.grow_coach.beta
-        ? "Private beta access. Culinary chambers only."
-        : `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
-      : "Not subscribed. Grow Coach is $3.99/month for culinary chambers only.";
+  // Grow Coach billing shows only when the server says this user can use Coach.
+  const coachBilling = $("#coach-billing");
+  if (coachBilling) coachBilling.classList.toggle("hidden", !me.grow_coach?.available);
+  if ($("#coach-account") && me.grow_coach?.available) {
+    $("#coach-account").textContent =
+      me.grow_coach.entitled && !me.grow_coach.beta && me.grow_coach.period_end
+        ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
+        : "Private beta access. Culinary chambers only.";
   }
   if (me.sessions) {
     $("#sessions").innerHTML = me.sessions
@@ -845,13 +871,19 @@ async function renderCoach() {
     return null;
   });
   if (!catalog) return;
+  if (!catalog.available) {
+    // Coach is hidden for this visitor. Send them home instead of showing a sales page.
+    location.replace("/");
+    return;
+  }
+  $("#coach-hero")?.classList.remove("hidden");
   const canUse = Boolean(catalog.entitled || catalog.beta);
   $("#coach-status").textContent = canUse
     ? catalog.beta
       ? "Private beta. Culinary chambers only."
       : `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
     : catalog.marketing;
-  if ((canUse || !catalog.waitlist) && $("#coach-eyebrow")) $("#coach-eyebrow").textContent = "Culinary subscription · $3.99 / month";
+  if ((canUse || !catalog.waitlist) && $("#coach-eyebrow")) $("#coach-eyebrow").textContent = canUse ? "Private beta · Culinary chambers only" : "Culinary subscription";
   if (!canUse && catalog.waitlist) {
     $("#subscribe-panel")?.classList.add("hidden");
     $("#gated")?.classList.add("hidden");
@@ -1378,8 +1410,8 @@ async function renderDevice() {
   const device = detail.device;
   const form = $("#rules-form");
   const species = speciesLine(device);
-  // Coach stays hidden unless this user has Coach beta or entitlement.
-  const showCoach = Boolean(me.grow_coach?.beta || me.grow_coach?.entitled) && !device.off_menu;
+  // Coach stays hidden unless the server says this user can use Coach.
+  const showCoach = Boolean(me.grow_coach?.available) && !device.off_menu;
   $("#device-name").textContent = device.name;
   document.title = `${device.name} · Shroom Labs`;
   $("#device-meta").textContent = [
@@ -1548,7 +1580,8 @@ function bindDeviceControls(id, device, { canWrite }) {
 
 function coachLabel(device) {
   if (device.off_menu) return "Off-menu";
-  if (!device.coach) return "Advisor";
+  // The API only sends `coach` to users who can use Coach. No coach, no label.
+  if (!device.coach) return "";
   if (device.coach.status === "paused") return `Paused: ${device.coach.pause_reason || "paused"}`;
   if (device.coach.mode === "autopilot") return "Autopilot";
   return "Advisor";
@@ -1587,7 +1620,7 @@ async function renderFleet() {
       ["Temp target", d.setpoints?.temperature_c, "°C"],
       ["Humidity target", d.setpoints?.humidity_percent, "%"],
       ["Profile", d.profile?.name || "None", ""],
-      ["Coach", coachLabel(d), ""],
+      ...(d.coach ? [["Coach", coachLabel(d), ""]] : []),
     ]
       .map(([label, value, unit]) => `<div class="stat"><strong>${value == null || value === "" ? "n/a" : `${safeDisplay(value)}${escapeHtml(unit)}`}</strong><span>${escapeHtml(label)}</span></div>`)
       .join("");
@@ -1648,6 +1681,10 @@ async function renderFleet() {
   ]);
   let rows = list.devices || [];
   const groupRows = groups.groups || [];
+  // Coach column and bulk Coach mode appear only for users the server allows.
+  const showCoachColumn = await coachAvailable();
+  for (const el of document.querySelectorAll("[data-coach-only]")) el.classList.toggle("hidden", !showCoachColumn);
+  if (!showCoachColumn) $('#bulk-action option[value="coach_mode"]')?.remove();
   $("#fleet-group-filter").innerHTML =
     `<option value="">All chambers</option>` +
     groupRows.map((g) => `<option value="${safeDisplay(g.id)}">${escapeHtml(g.name)}</option>`).join("");
@@ -1681,11 +1718,11 @@ async function renderFleet() {
             <td>${d.reading ? `${safeDisplay(d.reading.temperature, "?")} °C · ${safeDisplay(d.reading.humidity, "?")}%` : "No reading"}</td>
             <td>${escapeHtml(d.profile?.name || "None")}${d.profile?.species ? `<br><span class="muted">${escapeHtml(d.profile.species)}</span>` : ""}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
             <td>${safeDisplay(d.setpoints?.temperature_c, "?")} °C · ${safeDisplay(d.setpoints?.humidity_percent, "?")}%</td>
-            <td>${escapeHtml(coachLabel(d))}</td>
+            ${showCoachColumn ? `<td>${escapeHtml(coachLabel(d))}</td>` : ""}
             <td>${(d.alerts || []).map((a) => escapeHtml(a.message)).join(" ") || "None"}</td>
           </tr>`
         )
-        .join("") || `<tr><td colspan="8" class="muted">No chambers yet.</td></tr>`;
+        .join("") || `<tr><td colspan="${showCoachColumn ? 8 : 7}" class="muted">No chambers yet.</td></tr>`;
   }
 
   $("#fleet-filter").addEventListener("input", paint);

@@ -92,8 +92,7 @@ test("stubs are inert in a prod-like config even when leftover stub flags are se
 
   const coach = await call(ctx, "GET", "/api/coach", { host });
   assert.equal(coach.status, 200);
-  assert.equal(coach.data.waitlist, true);
-  assert.match(coach.data.marketing, /coming soon/i);
+  assert.deepEqual(coach.data, { available: false });
 
   const authed = testEnv();
   const { token } = await register(authed, "buyer@example.com");
@@ -109,8 +108,7 @@ test("stubs are inert in a prod-like config even when leftover stub flags are se
   assert.equal(paid.data.coming_soon, true);
 
   const sub = await call(authed, "POST", "/api/coach/subscribe", { host, token, body: {} });
-  assert.equal(sub.status, 503);
-  assert.equal(sub.data.coming_soon, true);
+  assert.equal(sub.status, 404, "no Coach for a user without beta or entitlement");
 });
 
 test("DEV_STUBS still completes local magic and OIDC flows", async () => {

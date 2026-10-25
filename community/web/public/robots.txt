@@ -7,6 +7,7 @@ Disallow: /moderate.html
 Disallow: /device.html
 Disallow: /devices.html
 Disallow: /fleet.html
+Disallow: /coach.html
 Disallow: /alerts-unsub.html
 Disallow: /auth/
 Sitemap: https://shroomlabs.io/sitemap.xml

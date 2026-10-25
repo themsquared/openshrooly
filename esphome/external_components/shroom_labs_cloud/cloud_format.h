@@ -86,6 +86,83 @@ std::string reclaim_body_json(const char *jwk);
 bool json_get_string(const char *json, const char *key, std::string *out);
 bool json_get_int64(const char *json, const char *key, int64_t *out);
 bool json_get_bool(const char *json, const char *key, bool *out);
+bool json_get_double(const char *json, const char *key, double *out);
+
+static constexpr uint8_t MAX_INBOX_COMMANDS = 8;
+static constexpr float SETPOINT_TEMP_MIN = 10.0f;
+static constexpr float SETPOINT_TEMP_MAX = 32.0f;
+static constexpr float SETPOINT_RH_MIN = 60.0f;
+static constexpr float SETPOINT_RH_MAX = 98.0f;
+
+struct InboxCommand {
+  int64_t id{0};
+  std::string kind;
+  std::string issued_at;
+  std::string expires_at;
+  bool apply{false};
+  bool has_apply{false};
+  bool has_temp{false};
+  bool has_rh{false};
+  double temperature_c{0};
+  double humidity_percent{0};
+};
+
+size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max);
+
+enum class SetpointDecision : uint8_t { Skip = 0, Apply, Refuse, Fail };
+
+struct SetpointPlan {
+  SetpointDecision decision{SetpointDecision::Skip};
+  const char *ack_status{nullptr};
+  const char *reason{nullptr};
+  bool write_temp{false};
+  bool write_rh{false};
+  float temperature_c{0};
+  float humidity_percent{0};
+};
+
+struct ChamberReading {
+  bool has_temperature{false};
+  bool has_humidity{false};
+  bool has_temperature_target{false};
+  bool has_target_humidity{false};
+  float temperature{0};
+  float humidity{0};
+  float temperature_target{0};
+  float target_humidity{0};
+};
+
+struct EntityRange {
+  bool has{false};
+  float min{0};
+  float max{0};
+  float step{0};
+};
+
+class CloudChamber {
+ public:
+  virtual ~CloudChamber() = default;
+  virtual ChamberReading read() { return {}; }
+  virtual EntityRange temperature_range() { return {}; }
+  virtual EntityRange humidity_range() { return {}; }
+  virtual bool write_temperature(float) { return false; }
+  virtual bool write_humidity(float) { return false; }
+  virtual uint32_t last_local_change_ms() { return 0; }
+};
+
+bool value_in_entity_range(float v, const EntityRange &range);
+float snap_entity_value(float v, const EntityRange &range);
+
+SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uint32_t last_local_ms, uint32_t now_ms,
+                                   bool remote_apply);
+std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
+                                const char *ack_reason = nullptr, const EntityRange *temp_range = nullptr,
+                                const EntityRange *rh_range = nullptr);
+float clamp_setpoint_temp(float c);
+float clamp_setpoint_rh(float rh);
+bool setpoint_object_id(const char *object_id);
+bool sensor_is_temperature(const char *object_id);
+bool sensor_is_humidity(const char *object_id);
 std::string claim_status_body_json(const char *enroll_token);
 
 // PKCS#10 for P-256 + ecdsa-with-SHA256. sign() must write raw 64-byte r||s over SHA-256(info).
@@ -96,6 +173,7 @@ bool build_p256_csr_pem(const uint8_t x[32], const uint8_t y[32], const char *cn
 void ecdsa_raw_to_der(const uint8_t raw[64], uint8_t *der, size_t *der_len);
 
 int64_t parse_iso8601_ms(const char *iso);
+std::string format_iso8601_ms(int64_t ms);
 std::string https_url(const char *host, const char *path);
 bool api_url_allowed(const char *url, const char *host);
 

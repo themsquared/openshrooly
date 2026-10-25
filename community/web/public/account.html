@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!--SEO_HEAD-->
   <title>Account · Shroom Labs</title>
-  <meta name="description" content="Your Shroom Labs sessions, home hub, claimed chambers, alerts, Grow Coach, and purchases.">
+  <meta name="description" content="Your Shroom Labs profile, devices, billing, security, and shared profiles.">
   <meta name="robots" content="noindex,follow">
   <link rel="canonical" href="https://shroomlabs.io/account.html">
   <meta property="og:site_name" content="Shroom Labs">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Account · Shroom Labs">
-  <meta property="og:description" content="Your Shroom Labs sessions, home hub, claimed chambers, alerts, Grow Coach, and purchases.">
+  <meta property="og:description" content="Your Shroom Labs profile, devices, billing, security, and shared profiles.">
   <meta property="og:url" content="https://shroomlabs.io/account.html">
   <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
   <meta property="og:image:width" content="1200">
@@ -19,7 +19,7 @@
   <meta property="og:image:alt" content="Account · Shroom Labs">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Account · Shroom Labs">
-  <meta name="twitter:description" content="Your Shroom Labs sessions, home hub, claimed chambers, alerts, Grow Coach, and purchases.">
+  <meta name="twitter:description" content="Your Shroom Labs profile, devices, billing, security, and shared profiles.">
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
@@ -35,74 +35,105 @@
   <header class="site-header" data-chrome="header">
     <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html">Grow Coach</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html" class="hidden" data-coach-link>Grow Coach</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
   </header>
   <!--/CHROME_HEADER-->
-  <main id="main">
-    <h1>Account</h1>
-    <p>Signed in as <strong id="who"></strong></p>
-    <p id="verified" class="muted"></p>
-    <h2>Sessions</h2>
-    <p class="muted">Sign out everywhere ends every open session on every device.</p>
-    <ul id="sessions"></ul>
-    <p><button type="button" class="secondary" id="signout-all">Sign out everywhere</button></p>
-    <h2>Home hub</h2>
-    <p>Give your hub a name, then copy the connection once and paste it on that hub so it can reach Shroom Labs.</p>
-    <form id="mint" class="card" style="padding:1.2rem">
-      <label>Name <input name="name" value="home-hub"></label>
-      <button type="submit">Create hub connection</button>
-    </form>
-    <p id="new-token-wrap" class="notice hidden">Copy this now. It will not be shown again.<br><code id="new-token"></code></p>
-    <ul id="tokens"></ul>
-    <h2 id="devices">Devices</h2>
-    <p class="muted">Linked chambers show species, live readings, and grow status. Open a card for the same controls the chamber page uses. Growing still works on the chamber if you unlink it.</p>
-    <p><a class="button" href="/devices.html">Open devices</a> <a class="button secondary" href="/claim.html">How linking works</a></p>
-    <p id="fleet-link" class="hidden"><a class="button secondary" href="/fleet.html">Bulk tools</a></p>
-    <div id="device-cards"></div>
-    <h2 id="alerts">Alerts</h2>
-    <p class="muted">An email when a chamber drifts out of range, runs low on water, stops reporting, or reaches fruiting day. Pick a chamber above to change its alerts.</p>
-    <p id="alerts-status" class="notice hidden"></p>
-    <form id="alert-prefs" class="card alert-form">
-      <label class="toggle"><input type="checkbox" name="email"> Email me alerts</label>
-      <div class="row">
-        <label>Time zone <select name="timezone"></select></label>
-        <label>Wait before repeating an alert <select name="cooldown_minutes">
-          <option value="30">30 minutes</option>
-          <option value="60">1 hour</option>
-          <option value="120">2 hours</option>
-          <option value="180">3 hours</option>
-          <option value="360">6 hours</option>
-          <option value="720">12 hours</option>
-          <option value="1440">24 hours</option>
-        </select></label>
+  <main id="main" class="account-page">
+    <header class="account-hero">
+      <h1>Account</h1>
+      <p class="muted">Profile, devices, billing, security, and the profiles you share.</p>
+      <nav class="account-jump" aria-label="Account sections">
+        <a href="#profile">Profile</a>
+        <a href="#devices">Devices</a>
+        <a href="#billing">Subscriptions and billing</a>
+        <a href="#security">Security</a>
+        <a href="#community">Community</a>
+      </nav>
+    </header>
+
+    <section class="account-section card" id="profile" aria-labelledby="profile-title">
+      <h2 id="profile-title">Profile</h2>
+      <p>Signed in as <strong id="who"></strong></p>
+      <p id="verified" class="muted"></p>
+    </section>
+
+    <section class="account-section card" id="devices" aria-labelledby="devices-title">
+      <h2 id="devices-title">Devices</h2>
+      <p class="muted">Linked chambers show species, live readings, and grow status. Open a card for the same controls the chamber page uses. Growing still works on the chamber if you unlink it.</p>
+      <p class="account-actions"><a class="button" href="/devices.html">Open devices</a> <a class="button secondary" href="/claim.html">How linking works</a></p>
+      <p id="fleet-link" class="hidden"><a class="button secondary" href="/fleet.html">Bulk tools</a></p>
+      <div id="device-cards"></div>
+      <h3 id="alerts">Alerts</h3>
+      <p class="muted">An email when a chamber drifts out of range, runs low on water, stops reporting, or reaches fruiting day. Open a device to change that chamber's alerts.</p>
+      <p id="alerts-status" class="notice hidden"></p>
+      <form id="alert-prefs" class="alert-form">
+        <label class="toggle"><input type="checkbox" name="email"> Email me alerts</label>
+        <div class="row">
+          <label>Time zone <select name="timezone"></select></label>
+          <label>Wait before repeating an alert <select name="cooldown_minutes">
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="180">3 hours</option>
+            <option value="360">6 hours</option>
+            <option value="720">12 hours</option>
+            <option value="1440">24 hours</option>
+          </select></label>
+        </div>
+        <label class="toggle"><input type="checkbox" name="quiet_enabled"> Hold alerts during quiet hours and send them together after</label>
+        <div class="row">
+          <label>Quiet from <input type="time" name="quiet_start"></label>
+          <label>Until <input type="time" name="quiet_end"></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit">Save alert settings</button>
+          <button type="button" class="secondary" id="alert-test">Send a test alert</button>
+          <span id="alert-prefs-msg" class="muted" role="status"></span>
+        </div>
+      </form>
+      <h3>Recent alerts</h3>
+      <ul id="alert-list" class="alert-feed"></ul>
+    </section>
+
+    <section class="account-section card" id="billing" aria-labelledby="billing-title">
+      <h2 id="billing-title">Subscriptions and billing</h2>
+      <div id="coach-billing" class="hidden">
+        <h3>Grow Coach</h3>
+        <p id="coach-account" class="muted"></p>
+        <p class="account-actions"><a class="button" href="/coach.html">Open Grow Coach</a></p>
       </div>
-      <label class="toggle"><input type="checkbox" name="quiet_enabled"> Hold alerts during quiet hours and send them together after</label>
-      <div class="row">
-        <label>Quiet from <input type="time" name="quiet_start"></label>
-        <label>Until <input type="time" name="quiet_end"></label>
-      </div>
-      <div class="form-actions">
-        <button type="submit">Save alert settings</button>
-        <button type="button" class="secondary" id="alert-test">Send a test alert</button>
-        <span id="alert-prefs-msg" class="muted" role="status"></span>
-      </div>
-    </form>
-    <h3>Recent alerts</h3>
-    <ul id="alert-list" class="alert-feed"></ul>
-    <h2>Grow Coach</h2>
-    <p id="coach-account" class="muted"></p>
-    <p><a class="button" href="/coach.html">Open Grow Coach</a></p>
-    <h2>Your profiles</h2>
-    <p class="muted">Private profiles work on your chambers right away. Community sharing waits for review.</p>
-    <p><a class="button" href="/publish.html">Build a profile</a></p>
-    <ul id="my-profiles"></ul>
-    <h2>Purchases</h2>
-    <ul id="ents"></ul>
+      <h3>Purchases</h3>
+      <p class="muted">Paid culinary recipes you have unlocked. Card billing history is not on this page yet.</p>
+      <ul id="ents"></ul>
+    </section>
+
+    <section class="account-section card" id="security" aria-labelledby="security-title">
+      <h2 id="security-title">Security</h2>
+      <h3>Sessions</h3>
+      <p class="muted">Sign out everywhere ends every open session on every device.</p>
+      <ul id="sessions"></ul>
+      <p class="account-actions"><button type="button" class="secondary" id="signout-all">Sign out everywhere</button></p>
+      <h3>Home hub</h3>
+      <p>Give your hub a name, then copy the connection once and paste it on that hub so it can reach Shroom Labs.</p>
+      <form id="mint" class="account-hub-form">
+        <label>Name <input name="name" value="home-hub"></label>
+        <button type="submit">Create hub connection</button>
+      </form>
+      <p id="new-token-wrap" class="notice hidden">Copy this now. It will not be shown again.<br><code id="new-token"></code></p>
+      <ul id="tokens"></ul>
+    </section>
+
+    <section class="account-section card" id="community" aria-labelledby="community-title">
+      <h2 id="community-title">Community</h2>
+      <p class="muted">Private profiles work on your chambers right away. Community sharing waits for review.</p>
+      <p class="account-actions"><a class="button" href="/publish.html">Build a profile</a></p>
+      <ul id="my-profiles"></ul>
+    </section>
   </main>
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">
     <p>Works with Shrooly devices running OpenShrooly.</p>
-    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html">Grow Coach</a><a href="/docs.html">Docs</a></nav>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html" class="hidden" data-coach-link>Grow Coach</a><a href="/docs.html">Docs</a></nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>

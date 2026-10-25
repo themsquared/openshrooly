@@ -200,7 +200,8 @@ test("FAQ answers read plainly", () => {
   const lion = FAQ.find((f) => /lion's mane/i.test(f.q));
   const fruiting = loadProfiles().find((p) => p.id === "lions-mane").stages.find((s) => s.id === "fruiting");
   assert.match(lion.a, new RegExp(`${fruiting.temperature_c} °C and ${fruiting.humidity_percent}% humidity`));
-  assert.match(FAQ.find((f) => /Grow Coach/.test(f.q)).a, /coming soon/i);
+  // Grow Coach is a private beta. Public FAQ copy never names or prices it.
+  assert.doesNotMatch(text, /Grow Coach|3\.99/);
 });
 
 test("visible site copy has no grower jargon or promises the product cannot keep", async () => {

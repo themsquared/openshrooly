@@ -17,6 +17,16 @@ static constexpr uint32_t BACKOFF_MAX_MS = 300000;
 static constexpr uint8_t MAX_CLAIM_CYCLES = 4;
 static constexpr uint8_t MAX_ROTATE_PER_HOUR = 8;
 static constexpr uint32_t ROTATE_HOUR_MS = 3600000;
+/** Inbox poll. 15 min * (nonce+GET) = 8 connects/hour. */
+static constexpr uint32_t PROBE_INTERVAL_MS = 15 * 60 * 1000;
+static constexpr uint32_t PROBE_JITTER_MS = 20 * 1000;
+/** Telemetry on ack, else this cadence. Same 15 min slot as inbox = 8 more connects/hour. */
+static constexpr uint32_t TELEMETRY_INTERVAL_MS = 15 * 60 * 1000;
+/** Hard cap on linked inbox/telemetry/rotate HTTPS connects (plus their nonces) in any rolling hour. Device limit is 20.
+ * Pairing (enroll, claim-status, CSR) and self-revoke are uncapped; they have their own poll window. */
+static constexpr uint8_t CONNECT_HOUR_CAP = 18;
+static constexpr uint32_t CONNECT_HOUR_MS = 3600000;
+static constexpr uint8_t CONNECT_HOUR_RING = 24;
 static constexpr uint32_t CLAIM_POLL_MS = 5000;
 static constexpr uint32_t CLAIM_POLL_JITTER_MS = 1500;
 static constexpr uint32_t RELINK_CONFIRM_MS = 3600u * 1000u;
@@ -26,6 +36,14 @@ static constexpr int64_t CERT_GRACE_MS = 30LL * 24 * 3600 * 1000;
 
 inline bool time_reached(uint32_t now, uint32_t deadline) {
   return static_cast<int32_t>(now - deadline) >= 0;
+}
+
+/** Only linked traffic counts toward CONNECT_HOUR_CAP. Pairing and revoke stay uncapped. */
+inline bool hour_capped_path(const char *path) {
+  if (path == nullptr)
+    return false;
+  return std::strstr(path, "/inbox") != nullptr || std::strstr(path, "/telemetry") != nullptr ||
+         std::strstr(path, "/rotate") != nullptr;
 }
 
 /** Local admin page. GET reads status. POST with action=connect|refresh|disconnect. */
@@ -54,7 +72,8 @@ inline const char *first_local_handler(const char *url) {
 inline bool cloud_action_ok(const char *action) {
   return action != nullptr &&
          (std::strcmp(action, "connect") == 0 || std::strcmp(action, "refresh") == 0 ||
-          std::strcmp(action, "disconnect") == 0);
+          std::strcmp(action, "disconnect") == 0 || std::strcmp(action, "remote_apply_on") == 0 ||
+          std::strcmp(action, "remote_apply_off") == 0);
 }
 
 struct HttpResponse {

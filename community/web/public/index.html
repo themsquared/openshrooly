@@ -36,7 +36,7 @@
   <header class="site-header" data-chrome="header">
     <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/" aria-current="page">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html">Grow Coach</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/" aria-current="page">Profiles</a><a href="/faq.html">FAQ</a><a id="nav-coach" href="/coach.html" class="hidden" data-coach-link>Grow Coach</a><a href="/docs.html">Docs</a><span id="session-nav"></span></nav>
   </header>
   <!--/CHROME_HEADER-->
   <main id="main">
@@ -79,11 +79,6 @@
         <article class="card" style="padding:1.2rem"><p class="chip">03</p><h3>Apply a stage</h3><p class="muted">The hub talks to OpenShrooly over the LAN. You watch the flush at home.</p></article>
       </div>
     </section>
-    <section id="coach-promo" class="how" aria-label="Grow Coach">
-      <h2 class="display" style="font-size:1.8rem">Grow Coach</h2>
-      <p class="muted">Coming soon. Grow Coach will use your device's readings and your past grows to tailor humidity and temperature advice for culinary Profiles. $3.99 a month. Photo checks come later. Not sold with Off-menu Profiles.</p>
-      <p><a class="button" href="/coach.html">About Grow Coach</a></p>
-    </section>
     <section id="supplies" class="supplies">
       <h2 class="display" style="font-size:1.8rem">Supplies</h2>
       <p class="muted">Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.</p>
@@ -96,7 +91,7 @@
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">
     <p>Works with Shrooly devices running OpenShrooly.</p>
-    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html">Grow Coach</a><a href="/docs.html">Docs</a></nav>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/faq.html">FAQ</a><a id="footer-nav-coach" href="/coach.html" class="hidden" data-coach-link>Grow Coach</a><a href="/docs.html">Docs</a></nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>

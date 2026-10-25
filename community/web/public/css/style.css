@@ -988,3 +988,53 @@ button.nav-toggle {
 .unsub-card h1 { margin: 0 0 0.6rem; font-size: clamp(2rem, 6vw, 2.6rem); line-height: 1.1; }
 .unsub-card .button { border-radius: 12px; }
 .back-link { margin: 0 0 0.4rem; font-size: 14px; }
+.account-page { display: grid; gap: 1.2rem; }
+.account-hero { margin: 0 0 0.2rem; }
+.account-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  margin: 0.8rem 0 0;
+}
+.account-jump a { font-weight: 700; }
+.account-section {
+  padding: 1.2rem 1.25rem 1.35rem;
+  overflow: visible;
+  scroll-margin-top: 96px;
+}
+.account-section h2 {
+  margin: 0 0 0.45rem;
+  font-family: var(--display);
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+}
+.account-section h3 {
+  margin: 1.2rem 0 0.4rem;
+  font-size: 1.15rem;
+}
+.account-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.account-hub-form { display: grid; gap: 0.7rem; margin: 0.8rem 0; max-width: 28rem; }
+.account-section #sessions,
+.account-section #tokens,
+.account-section #my-profiles,
+.account-section #ents {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  display: grid;
+  gap: 6px;
+}
+.account-section #sessions li,
+.account-section #tokens li,
+.account-section #my-profiles li,
+.account-section #ents li {
+  border: 1px solid var(--sl-line);
+  border-radius: 12px;
+  padding: 0.55rem 0.75rem;
+  background: rgba(7, 17, 14, 0.35);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+  .account-section { padding: 1rem 0.95rem 1.15rem; }
+  .account-actions .button,
+  .account-actions button { width: 100%; }
+}

@@ -2,7 +2,7 @@
 
 Every built-in profile stage names a complete light mix: sunrise hour, hours on, white lux, and RGB. Duration 0 is only for an explicit dark stage (lux 0 and RGB 0). A schedule with brightness on and duration 0 is invalid.
 
-Firmware 1.0.x still has one live schedule. Hub, cloud apply, and the device UI write that schedule when a grow starts or a stage changes. The firmware does not store the profile. If duration is 0 or unset while lux or RGB is on, firmware 1.0.3-sl.6 uses 12 h, logs a warning, and shows it on Light Status.
+Firmware 1.0.x still has one live schedule. Hub, cloud apply, and the device UI write that schedule when a grow starts or a stage changes. The firmware does not store the profile. If duration is 0 or unset while lux or RGB is on, firmware 1.0.3-sl.6 and later uses 12 h, logs a warning, and shows it on Light Status.
 
 Create and update are strict. Profiles saved before this rule are not rewritten in storage. When the API or Hub reads one, a stage with no light reads as dark, and a stage with lux or RGB on and 0 or missing hours reads as 12 h, the same as the firmware.
 

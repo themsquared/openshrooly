@@ -38,7 +38,7 @@ const pearlOyster = JSON.parse(
 );
 
 function env() {
-  return testEnv({ GROW_COACH_STUB: "1" });
+  return testEnv({ GROW_COACH_STUB: "1", COACH_AUTOPILOT_ENABLED: "1" });
 }
 
 async function subscribe(ctx, token) {
@@ -127,12 +127,16 @@ test("chat and photo check are gated until Grow Coach is paid", async () => {
   const ctx = env();
   const { token } = await register(ctx);
   const denied = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
-  assert.equal(denied.status, 402);
+  assert.equal(denied.status, 404);
+  assert.doesNotMatch(JSON.stringify(denied.data), /3\.99|Grow Coach/);
   const catalog = await call(ctx, "GET", "/api/coach", { token });
-  assert.equal(catalog.data.entitled, false);
-  assert.equal(catalog.data.product.amount_cents, 399);
-  assert.match(catalog.data.marketing, /not sold/i);
+  assert.deepEqual(catalog.data, { available: false });
   await subscribe(ctx, token);
+  const paidCatalog = await call(ctx, "GET", "/api/coach", { token });
+  assert.equal(paidCatalog.data.available, true);
+  assert.equal(paidCatalog.data.entitled, true);
+  assert.equal(paidCatalog.data.product.amount_cents, 399);
+  assert.match(paidCatalog.data.marketing, /not sold/i);
   const ok = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
   assert.equal(ok.status, 200, JSON.stringify(ok.data));
   assert.match(ok.data.reply, /Grow Coach/);
@@ -247,6 +251,7 @@ function mockWorkersAi(result) {
 function privateBetaEnv(extra = {}) {
   return testEnv({
     COACH_PUBLIC: "0",
+    COACH_AUTOPILOT_ENABLED: "1",
     GROW_COACH_PROVIDER: "workers-ai",
     GROW_COACH_STUB: "",
     ...extra,
@@ -290,7 +295,7 @@ test("beta user can chat on mocked AI; think tags are stripped", async () => {
   assert.doesNotMatch(chat.data.reply, /internal/);
 });
 
-test("non-beta user stays on preview; subscribe stays 503; public coach stays off", async () => {
+test("non-beta user sees no Coach; subscribe is 404; public coach stays off", async () => {
   const ctx = privateBetaEnv({
     COACH_BETA_USER_IDS: "82",
     AI: mockWorkersAi({ response: "hello" }),
@@ -303,19 +308,14 @@ test("non-beta user stays on preview; subscribe stays 503; public coach stays of
   assert.equal(capabilities(ctx).coach, false);
 
   const catalog = await call(ctx, "GET", "/api/coach", { token });
-  assert.equal(catalog.data.beta, false);
-  assert.equal(catalog.data.entitled, false);
-  assert.equal(catalog.data.preview, true);
-  assert.equal(catalog.data.waitlist, true);
-  assert.match(catalog.data.marketing, /coming soon/i);
+  assert.deepEqual(catalog.data, { available: false });
 
   const denied = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
-  assert.equal(denied.status, 402);
+  assert.equal(denied.status, 404);
 
   const sub = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
-  assert.equal(sub.status, 503);
-  assert.equal(sub.data.coming_soon, true);
-  assert.equal(sub.data.waitlist, true);
+  assert.equal(sub.status, 404);
+  assert.doesNotMatch(JSON.stringify(sub.data), /Grow Coach|3\.99/);
 });
 
 test("Workers AI REST is local-only and never turns on from tokens alone", () => {

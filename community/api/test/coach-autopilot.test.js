@@ -199,7 +199,7 @@ test("catalog hides Autopilot unless the kill switch is on", async () => {
   const { token } = await register(off, "off@example.com");
   await subscribe(off, token);
   const hidden = await call(off, "GET", "/api/coach", { token });
-  assert.equal(hidden.data.autopilot, false);
+  assert.deepEqual(hidden.data, { available: false });
   const ctx = env();
   const paid = await register(ctx, "on@example.com");
   await subscribe(ctx, paid.token);
@@ -913,7 +913,7 @@ test("Autopilot stays hidden without the allowlist or a paid sub", async () => {
   const { token, user } = await register(ctx, "nope@example.com");
   await addDevice(ctx, user.id, "dev-nope");
   const catalog = await call(ctx, "GET", "/api/coach", { token });
-  assert.equal(catalog.data.autopilot, false);
+  assert.deepEqual(catalog.data, { available: false });
   const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", {
     token,
     body: { device_id: "dev-nope", mode: "autopilot", profile_id: pearlOyster.id },

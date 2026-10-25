@@ -9,6 +9,7 @@ static const char *const TAG = "shroom_labs_cloud";
 #define ESP_LOGD(...)
 #endif
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -193,6 +194,43 @@ void CloudEngine::bump_backoff_(int retry_after_s) {
   next_rotate_ms_ = when;
 }
 
+void CloudEngine::schedule_probe_error_(int retry_after_s) {
+  bump_backoff_(retry_after_s);
+  const uint32_t wait = backoff_ms_ > PROBE_INTERVAL_MS ? backoff_ms_ : PROBE_INTERVAL_MS;
+  next_probe_ms_ = now_() + wait;
+}
+
+void CloudEngine::schedule_telemetry_error_(int retry_after_s) {
+  bump_backoff_(retry_after_s);
+  const uint32_t wait = backoff_ms_ > TELEMETRY_INTERVAL_MS ? backoff_ms_ : TELEMETRY_INTERVAL_MS;
+  next_telemetry_ms_ = now_() + wait;
+}
+
+void CloudEngine::note_connect_(bool count_hour) {
+  request_count_++;
+  if (!count_hour)
+    return;
+  const uint32_t now = now_();
+  uint8_t kept = 0;
+  for (uint8_t i = 0; i < connect_n_ && i < CONNECT_HOUR_RING; i++) {
+    if (!time_reached(now, connect_times_[i] + CONNECT_HOUR_MS))
+      connect_times_[kept++] = connect_times_[i];
+  }
+  connect_n_ = kept;
+  if (connect_n_ < CONNECT_HOUR_RING)
+    connect_times_[connect_n_++] = now;
+}
+
+bool CloudEngine::allow_connect_() {
+  const uint32_t now = now_();
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < connect_n_ && i < CONNECT_HOUR_RING; i++) {
+    if (!time_reached(now, connect_times_[i] + CONNECT_HOUR_MS))
+      n++;
+  }
+  return n < CONNECT_HOUR_CAP;
+}
+
 void CloudEngine::set_claim_poll_() { next_csr_ms_ = now_() + claim_poll_ms(clock_->random()); }
 
 bool CloudEngine::rotate_slot_open_() {
@@ -283,6 +321,9 @@ bool CloudEngine::run_job(CloudJob job) {
       break;
     case CloudJob::PROBE:
       ok = handle_probe_();
+      break;
+    case CloudJob::TELEMETRY:
+      ok = handle_telemetry_();
       break;
     case CloudJob::REVOKE:
       ok = handle_revoke_();
@@ -414,6 +455,10 @@ uint32_t CloudEngine::next_probe_ms() const {
   std::lock_guard<std::mutex> g(lock_);
   return next_probe_ms_;
 }
+uint32_t CloudEngine::next_telemetry_ms() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return next_telemetry_ms_;
+}
 bool CloudEngine::take_show_claim() { return show_claim_.exchange(false); }
 
 std::string CloudEngine::claim_code() const {
@@ -514,6 +559,8 @@ std::string CloudEngine::status_json() const {
   out += live ? claim_expires_ : "";
   out += "\",\"expires_in_s\":";
   out += std::to_string(left);
+  out += ",\"remote_apply\":";
+  out += remote_apply_ ? "true" : "false";
   out += ",\"message\":\"";
   if (pending_wipe_)
     out += "Disconnecting...";
@@ -566,12 +613,19 @@ bool CloudEngine::make_csr_(std::string *pem) {
 }
 
 HttpResponse CloudEngine::http_(const char *method, const char *path, const std::string &body, bool pop,
-                                bool with_serial) {
+                                bool with_serial, const char *query) {
   HttpResponse fail;
   fail.ok = false;
   if (transport_ == nullptr)
     return fail;
+  const bool count = hour_capped_path(path);
+  if (count && !allow_connect_())
+    return fail;
   std::string url = https_url(api_host_.c_str(), path);
+  if (query != nullptr && query[0]) {
+    url += '?';
+    url += query[0] == '?' ? query + 1 : query;
+  }
   if (!api_url_allowed(url.c_str(), api_host_.c_str()))
     return fail;
   JobSnap snap;
@@ -587,7 +641,7 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   if (pop) {
     std::string nonce;
     std::string nonce_body;
-    const int nonce_status = fetch_nonce_(&nonce, &nonce_body);
+    const int nonce_status = fetch_nonce_(&nonce, &nonce_body, count);
     if (nonce_status != 200) {
       fail.status = nonce_status;
       fail.body = nonce_body;
@@ -609,7 +663,9 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   }
   if (with_serial && !snap.serial.empty())
     req.headers.emplace_back("x-device-cert-serial", snap.serial);
-  request_count_++;
+  if (count && !allow_connect_())
+    return fail;
+  note_connect_(count);
   HttpResponse r = transport_->execute(req);
   if (!response_usable(r)) {
     r.ok = false;
@@ -618,7 +674,7 @@ HttpResponse CloudEngine::http_(const char *method, const char *path, const std:
   return r;
 }
 
-int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body) {
+int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body, bool count_hour) {
   std::string id;
   {
     std::lock_guard<std::mutex> g(lock_);
@@ -626,8 +682,10 @@ int CloudEngine::fetch_nonce_(std::string *nonce, std::string *body) {
   }
   if (id.empty())
     return 0;
+  if (count_hour && !allow_connect_())
+    return 0;
   std::string path = "/api/devices/" + id + "/nonce";
-  request_count_++;
+  note_connect_(count_hour);
   HttpResponse r = transport_->execute({"POST", https_url(api_host_.c_str(), path.c_str()), "", {}});
   if (body != nullptr)
     *body = r.body;
@@ -809,7 +867,8 @@ bool CloudEngine::handle_csr_() {
     claim_deadline_mono_ = 0;
     backoff_ms_ = BACKOFF_MIN_MS;
     apply_(CloudEvent::CsrOk);
-    next_probe_ms_ = now_() + 3600000;
+    next_probe_ms_ = now_() + PROBE_INTERVAL_MS;
+    next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     return true;
   }
   apply_(event_for_csr(o));
@@ -900,47 +959,288 @@ bool CloudEngine::handle_reclaim_() {
 
 bool CloudEngine::handle_probe_() {
   JobSnap snap;
+  uint32_t local_ms = 0;
   {
     std::lock_guard<std::mutex> g(lock_);
     snap = snap_();
+    local_ms = chamber_ ? chamber_->last_local_change_ms() : last_local_change_ms_;
   }
   if (snap.device_id.empty() || !snap.has_key)
     return false;
   std::string path = "/api/devices/" + snap.device_id + "/inbox";
-  HttpResponse r = http_("GET", path.c_str(), "", true, true);
+  std::string query;
+  const int64_t wall = wall_();
+  const uint32_t now = now_();
+  if (local_ms != 0 && wall > 0) {
+    const int32_t age = static_cast<int32_t>(now - local_ms);
+    if (age >= 0)
+      query = "last_local_change=" + format_iso8601_ms(wall - static_cast<int64_t>(age));
+  }
+  HttpResponse r = http_("GET", path.c_str(), "", true, true, query.empty() ? nullptr : query.c_str());
   const HttpOutcome o = probe_outcome(response_usable(r), r.status, r.body.c_str());
-  std::lock_guard<std::mutex> g(lock_);
-  if (o == HttpOutcome::AuthFail) {
-    apply_(CloudEvent::LinkRevoked);
-    wipe_();
-    state_ = CloudState::Revoked;
-    cloud_enabled_ = true;
-    save_identity_();
-    return false;
-  }
-  if (o == HttpOutcome::CertExpired) {
-    apply_(CloudEvent::CertExpired);
-    next_rotate_ms_ = now_();
-    return false;
-  }
-  if (o == HttpOutcome::RelinkRequired) {
-    if (!confirm_relink_()) {
-      apply_(CloudEvent::CertExpired);
-      bump_backoff_(r.retry_after_s);
+  {
+    std::lock_guard<std::mutex> g(lock_);
+    if (o == HttpOutcome::AuthFail) {
+      apply_(CloudEvent::LinkRevoked);
+      wipe_();
+      state_ = CloudState::Revoked;
+      cloud_enabled_ = true;
+      save_identity_();
       return false;
     }
-    apply_(CloudEvent::RelinkRequired);
-    relink_();
-    return false;
-  }
-  if (o == HttpOutcome::ProofInvalid) {
-    apply_(CloudEvent::ProofInvalid);
-    bump_backoff_(r.retry_after_s);
-    return false;
-  }
-  if (o == HttpOutcome::Success)
+    if (o == HttpOutcome::CertExpired) {
+      apply_(CloudEvent::CertExpired);
+      next_rotate_ms_ = now_();
+      return false;
+    }
+    if (o == HttpOutcome::RelinkRequired) {
+      if (!confirm_relink_()) {
+        apply_(CloudEvent::CertExpired);
+        schedule_probe_error_(r.retry_after_s);
+        return false;
+      }
+      apply_(CloudEvent::RelinkRequired);
+      relink_();
+      return false;
+    }
+    if (o == HttpOutcome::ProofInvalid) {
+      apply_(CloudEvent::ProofInvalid);
+      schedule_probe_error_(r.retry_after_s);
+      return false;
+    }
+    if (o != HttpOutcome::Success) {
+      schedule_probe_error_(r.retry_after_s);
+      return false;
+    }
     reset_relink_();
-  return o == HttpOutcome::Success;
+    backoff_ms_ = BACKOFF_MIN_MS;
+    next_probe_ms_ = now_() + PROBE_INTERVAL_MS + (clock_->random() % (PROBE_JITTER_MS + 1));
+  }
+  process_inbox_(r.body);
+  return true;
+}
+
+bool CloudEngine::process_inbox_(const std::string &body) {
+  InboxCommand cmds[MAX_INBOX_COMMANDS];
+  const size_t n = parse_inbox_commands(body.c_str(), cmds, MAX_INBOX_COMMANDS);
+  ChamberReading reading{};
+  uint32_t local_ms = last_local_change_ms_;
+  const bool apply_on = remote_apply_enabled_();
+  if (chamber_) {
+    reading = chamber_->read();
+    local_ms = chamber_->last_local_change_ms();
+  }
+  int64_t ack_id = 0;
+  std::string ack_status;
+  std::string ack_reason;
+  for (size_t i = 0; i < n; i++) {
+    if (cmds[i].id != 0 && cmds[i].id == last_applied_command_id_)
+      continue;
+    const SetpointPlan plan = plan_setpoint_command(cmds[i], wall_(), local_ms, now_(), apply_on);
+    if (plan.decision == SetpointDecision::Skip)
+      continue;
+    if (plan.decision == SetpointDecision::Apply && chamber_ == nullptr)
+      continue;
+    if (plan.decision == SetpointDecision::Refuse || plan.decision == SetpointDecision::Fail) {
+      ack_id = cmds[i].id;
+      ack_status = plan.ack_status ? plan.ack_status : "failed";
+      ack_reason = plan.reason ? plan.reason : "";
+      break;
+    }
+    if (!sync_jobs_) {
+      std::lock_guard<std::mutex> g(lock_);
+      pending_apply_.ready = true;
+      pending_apply_.command_id = cmds[i].id;
+      pending_apply_.plan = plan;
+      return true;
+    }
+    ChamberReading after = reading;
+    std::string reason;
+    const bool ok = apply_plan_now_(plan, cmds[i].id, &after, &reason);
+    reading = after;
+    ack_id = cmds[i].id;
+    ack_status = ok ? "applied" : "failed";
+    ack_reason = reason;
+    break;
+  }
+  const bool heartbeat = chamber_ != nullptr && next_telemetry_ms_ != 0 && time_reached(now_(), next_telemetry_ms_);
+  if (!ack_status.empty() || heartbeat) {
+    if (post_telemetry_(reading, ack_id, ack_status.empty() ? nullptr : ack_status.c_str(),
+                        ack_reason.empty() ? nullptr : ack_reason.c_str())) {
+      std::lock_guard<std::mutex> g(lock_);
+      pending_ack_ = false;
+      next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
+    } else {
+      if (!ack_status.empty()) {
+        std::lock_guard<std::mutex> g(lock_);
+        keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
+      }
+      schedule_telemetry_error_(0);
+    }
+  }
+  return true;
+}
+
+bool CloudEngine::apply_plan_now_(const SetpointPlan &plan, int64_t command_id, ChamberReading *after,
+                                 std::string *reason) {
+  if (chamber_ == nullptr) {
+    if (reason)
+      *reason = "no chamber";
+    return false;
+  }
+  const ChamberReading before = chamber_->read();
+  const EntityRange tr = chamber_->temperature_range();
+  const EntityRange hr = chamber_->humidity_range();
+  float t = plan.temperature_c;
+  float h = plan.humidity_percent;
+  if (plan.write_temp) {
+    if (tr.has) {
+      if (!value_in_entity_range(t, tr)) {
+        if (reason)
+          *reason = "temperature outside entity range";
+        if (after)
+          *after = before;
+        return false;
+      }
+      t = snap_entity_value(t, tr);
+    } else {
+      t = clamp_setpoint_temp(t);
+    }
+  }
+  if (plan.write_rh) {
+    if (hr.has) {
+      if (!value_in_entity_range(h, hr)) {
+        if (reason)
+          *reason = "humidity outside entity range";
+        if (after)
+          *after = before;
+        return false;
+      }
+      h = snap_entity_value(h, hr);
+    } else {
+      h = clamp_setpoint_rh(h);
+    }
+  }
+  bool ok_t = true;
+  bool ok_h = true;
+  if (plan.write_temp)
+    ok_t = chamber_->write_temperature(t);
+  if (ok_t && plan.write_rh)
+    ok_h = chamber_->write_humidity(h);
+  ChamberReading now = chamber_->read();
+  if (ok_t && plan.write_temp && now.has_temperature_target && std::fabs(now.temperature_target - t) > 0.15f)
+    ok_t = false;
+  if (ok_h && plan.write_rh && now.has_target_humidity && std::fabs(now.target_humidity - h) > 0.6f)
+    ok_h = false;
+  if (!ok_t || !ok_h) {
+    if (plan.write_temp && before.has_temperature_target)
+      chamber_->write_temperature(before.temperature_target);
+    if (plan.write_rh && before.has_target_humidity)
+      chamber_->write_humidity(before.target_humidity);
+    if (after)
+      *after = chamber_->read();
+    if (reason)
+      *reason = "write failed";
+    return false;
+  }
+  last_applied_command_id_ = command_id;
+  if (after)
+    *after = now;
+  return true;
+}
+
+bool CloudEngine::take_pending_apply(PendingApply *out) {
+  std::lock_guard<std::mutex> g(lock_);
+  if (out == nullptr || !pending_apply_.ready)
+    return false;
+  *out = pending_apply_;
+  pending_apply_.ready = false;
+  return true;
+}
+
+bool CloudEngine::apply_now(const PendingApply &pending, ChamberReading *after, std::string *reason) {
+  return apply_plan_now_(pending.plan, pending.command_id, after, reason);
+}
+
+void CloudEngine::keep_pending_ack_(int64_t command_id, const char *status, const char *reason,
+                                   const ChamberReading &reading) {
+  pending_ack_ = true;
+  pending_ack_id_ = command_id;
+  pending_ack_status_ = status ? status : "failed";
+  pending_ack_reason_ = reason ? reason : "";
+  pending_ack_reading_ = reading;
+}
+
+void CloudEngine::complete_apply(int64_t command_id, bool ok, const char *status, const char *reason,
+                                const ChamberReading &reading) {
+  std::lock_guard<std::mutex> g(lock_);
+  if (ok && command_id != 0)
+    last_applied_command_id_ = command_id;
+  keep_pending_ack_(command_id, status ? status : (ok ? "applied" : "failed"), reason, reading);
+}
+
+bool CloudEngine::apply_waiting() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return pending_apply_.ready;
+}
+
+bool CloudEngine::ack_waiting() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return pending_ack_;
+}
+
+int64_t CloudEngine::last_applied_command_id() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return last_applied_command_id_;
+}
+
+bool CloudEngine::telemetry_now() { return queue_(CloudJob::TELEMETRY); }
+
+bool CloudEngine::handle_telemetry_() {
+  ChamberReading reading{};
+  int64_t ack_id = 0;
+  std::string status;
+  std::string reason;
+  bool had_ack = false;
+  {
+    std::lock_guard<std::mutex> g(lock_);
+    if (pending_ack_) {
+      reading = pending_ack_reading_;
+      ack_id = pending_ack_id_;
+      status = pending_ack_status_;
+      reason = pending_ack_reason_;
+      had_ack = true;
+    } else if (chamber_) {
+      reading = chamber_->read();
+    }
+  }
+  if (post_telemetry_(reading, ack_id, status.empty() ? nullptr : status.c_str(),
+                      reason.empty() ? nullptr : reason.c_str())) {
+    std::lock_guard<std::mutex> g(lock_);
+    if (had_ack)
+      pending_ack_ = false;
+    next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
+    return true;
+  }
+  schedule_telemetry_error_(0);
+  return false;
+}
+
+bool CloudEngine::post_telemetry_(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
+                                 const char *ack_reason) {
+  std::string id;
+  {
+    std::lock_guard<std::mutex> g(lock_);
+    id = device_id_;
+  }
+  if (id.empty())
+    return false;
+  std::string path = "/api/devices/" + id + "/telemetry";
+  const EntityRange tr = chamber_ ? chamber_->temperature_range() : EntityRange{};
+  const EntityRange hr = chamber_ ? chamber_->humidity_range() : EntityRange{};
+  std::string body = telemetry_body_json(reading, ack_id, ack_status, ack_reason, &tr, &hr);
+  HttpResponse r = http_("POST", path.c_str(), body, true, true);
+  return response_usable(r) && r.status == 200;
 }
 
 bool CloudEngine::handle_revoke_() {
@@ -1008,6 +1308,7 @@ void CloudEngine::loop() {
   bool poll_due = false;
   bool enroll_due = false;
   bool probe_due = false;
+  bool telemetry_due = false;
   bool rotate_due = false;
   bool expired_again = false;
   {
@@ -1045,8 +1346,11 @@ void CloudEngine::loop() {
         next_rotate_ms_ = now + backoff_ms_;
         apply_(CloudEvent::RotateDue);
       } else if (time_reached(now, next_probe_ms_)) {
-        next_probe_ms_ = now + 3600000;
+        next_probe_ms_ = now + PROBE_INTERVAL_MS;
         probe_due = true;
+      } else if (next_telemetry_ms_ != 0 && time_reached(now, next_telemetry_ms_)) {
+        next_telemetry_ms_ = now + TELEMETRY_INTERVAL_MS;
+        telemetry_due = true;
       }
     }
   }
@@ -1058,6 +1362,8 @@ void CloudEngine::loop() {
     queue_(CloudJob::ROTATE);
   else if (probe_due)
     queue_(CloudJob::PROBE);
+  else if (telemetry_due)
+    queue_(CloudJob::TELEMETRY);
 }
 
 }  // namespace shroom_labs

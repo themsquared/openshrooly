@@ -234,10 +234,6 @@ export const FAQ = [
     a: "Hub is the local app that stores Profiles and sends each stage's temperature, humidity, light, and fresh air settings to a chamber. It runs on a computer on your network.",
   },
   {
-    q: "What is Grow Coach?",
-    a: "Grow Coach is a culinary subscription, coming soon at $3.99 per month. It will use your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later.",
-  },
-  {
     q: "Does this work with a Shrooly device?",
     a: "Yes. Works with Shrooly devices running OpenShrooly. Shroom Labs is the profile library, not the hardware brand.",
   },
@@ -348,13 +344,13 @@ function shell({ head, activeId, hideCoach = false, body }) {
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <script src="/js/config.js"></script>
 </head>
-<body data-page="${escapeHtml(activeId || "page")}">
+<body data-page="${escapeHtml(activeId || "page")}"${hideCoach ? ' data-coach-off' : ""}>
   <!--CHROME_HEADER-->
-  ${renderHeader(activeId, { hideCoach })}
+  ${renderHeader(activeId)}
   <!--/CHROME_HEADER-->
   <main id="main">${body}</main>
   <!--CHROME_FOOTER-->
-  ${renderFooter({ hideCoach })}
+  ${renderFooter()}
   <!--/CHROME_FOOTER-->
   <script type="module" src="/js/app.js"></script>
 </body>
@@ -452,7 +448,7 @@ ${culinary.map(line).join("\n")}
 
 ## Off-menu Profiles
 
-Reference conditions for research and education only. Not sold. Grow Coach does not cover these.
+Reference conditions for research and education only. Not sold.
 
 ${PSI_LEGAL_NOTICE}
 
@@ -470,7 +466,6 @@ ${PSI_RESOURCES.map((r) => `- [${r.name}](${r.url}). ${r.note}`).join("\n")}
 
 - ${TAGLINE}
 - ${POSITIONING}
-- Grow Coach is culinary only.
 `;
 }
 
@@ -520,7 +515,7 @@ export const PAGES = {
     sitemap: true,
     path: "/faq.html",
     title: "FAQ · Shroom Labs",
-    description: "Plain answers about Profiles, the Hub, Grow Coach, Off-menu Profiles, and running OpenShrooly on a home chamber.",
+    description: "Plain answers about Profiles, the Hub, Off-menu Profiles, and running OpenShrooly on a home chamber.",
     jsonLd: {
       "@context": "https://schema.org",
       "@graph": [
@@ -538,15 +533,16 @@ export const PAGES = {
     sitemap: true,
     path: "/docs.html",
     title: "Docs · Shroom Labs",
-    description: "What Profiles, the Hub, Grow Coach, and Community are, and how a chamber running OpenShrooly uses them.",
+    description: "What Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Docs", `${SITE}/docs.html`]]) },
   },
+  // Grow Coach is a private beta. Keep it out of search and the sitemap; the page itself sends anyone the API does not allow back home.
   "coach.html": {
     active: "coach",
-    sitemap: true,
     path: "/coach.html",
+    robots: "noindex,nofollow",
     title: "Grow Coach · Shroom Labs",
-    description: "Grow Coach is a culinary coaching subscription for one chamber running OpenShrooly. $3.99 a month.",
+    description: "Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach.html`]]) },
   },
   "claim.html": {
@@ -567,7 +563,7 @@ export const PAGES = {
   },
   "login.html": { active: "", path: "/login.html", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and claim a chamber. No password." },
   "register.html": { active: "", path: "/register.html", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and claim a chamber. No password." },
-  "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs sessions, home hub, claimed chambers, alerts, Grow Coach, and purchases." },
+  "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs profile, devices, billing, security, and shared profiles." },
   "devices.html": { active: "", path: "/devices.html", robots: PRIVATE, title: "Devices · Shroom Labs", description: "See the chambers linked to your Shroom Labs account, with species, live readings, and grow status." },
   "device.html": { active: "", path: "/device.html", robots: PRIVATE, title: "Device · Shroom Labs", description: "Live stats, grow identity, and chamber controls for one of your Shroom Labs devices." },
   "fleet.html": { active: "", path: "/fleet.html", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "Bulk tools for the chambers linked to your Shroom Labs account." },
@@ -580,7 +576,7 @@ export const PAGES = {
 };
 
 export function renderRobots() {
-  return `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /moderate.html\nDisallow: /device.html\nDisallow: /devices.html\nDisallow: /fleet.html\nDisallow: /alerts-unsub.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`;
+  return `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /moderate.html\nDisallow: /device.html\nDisallow: /devices.html\nDisallow: /fleet.html\nDisallow: /coach.html\nDisallow: /alerts-unsub.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`;
 }
 
 export function writeSeoFiles(dir = PUBLIC) {
