@@ -1195,6 +1195,50 @@ test("report photo approve copies first and is safe to retry after a failed dele
   assert.equal(publicAfter.status, 200);
 });
 
+test("report photo approve retries after a crash between ACL and report writes", async () => {
+  const ctx = testEnv();
+  const mallory = await register(ctx, "acl-crash@example.com");
+  const mod = await makeModerator(ctx, "acl-crash-mod@example.com");
+  const report = await call(ctx, "POST", "/api/profiles/chestnut/reports", {
+    token: mallory.token,
+    body: { outcome: "success", photo_base64: b64(jpeg()), photo_type: "image/jpeg" },
+  });
+  assert.equal(report.status, 201, JSON.stringify(report.data));
+  const pendingKey = report.data.photo_key;
+  const approvedKey = pendingKey.replace(/^pending\//, "");
+  const realRun = ctx.db.run.bind(ctx.db);
+  let failReport = true;
+  ctx.db.run = async (sql, params) => {
+    if (failReport && String(sql).startsWith("UPDATE grow_reports SET photo_key=")) {
+      failReport = false;
+      throw new Error("crash after ACL");
+    }
+    return realRun(sql, params);
+  };
+  const queue = await call(ctx, "GET", "/api/moderation/queue", { token: mod.token });
+  const item = queue.data.items.find((entry) => entry.kind === "report-photo" && entry.photo_key === pendingKey);
+  const first = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, {
+    token: mod.token,
+    body: {},
+  });
+  assert.equal(first.status, 500, JSON.stringify(first.data));
+  const mid = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item.report_id]);
+  assert.equal(mid.photo_status, "pending");
+  assert.equal(mid.photo_key, pendingKey);
+  assert.ok(await ctx.db.one("SELECT * FROM uploaded_media WHERE photo_key=?", [approvedKey]));
+  assert.equal(await ctx.db.one("SELECT * FROM uploaded_media WHERE photo_key=?", [pendingKey]), null);
+  const retry = await call(ctx, "POST", `/api/moderation/report-photos/${item.report_id}/approve`, {
+    token: mod.token,
+    body: {},
+  });
+  assert.equal(retry.status, 200, JSON.stringify(retry.data));
+  const live = await ctx.db.one("SELECT * FROM grow_reports WHERE id=?", [item.report_id]);
+  assert.equal(live.photo_status, "approved");
+  assert.equal(live.photo_key, approvedKey);
+  const publicAfter = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(approvedKey)}`);
+  assert.equal(publicAfter.status, 200);
+});
+
 test("/api/media hides Off-menu photos when SHOW_PSILOCYBIN is off", async () => {
   const ctx = testEnv();
   const owner = await register(ctx, "off-media@example.com");

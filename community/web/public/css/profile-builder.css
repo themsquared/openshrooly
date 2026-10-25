@@ -210,6 +210,11 @@ body[data-page="moderate"] #queue.cards {
   gap: 8px;
 }
 
+.pb-photos img {
+  max-width: 100%;
+  height: auto;
+}
+
 .pb-photo {
   position: relative;
   aspect-ratio: 1;

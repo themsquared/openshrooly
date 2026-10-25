@@ -740,6 +740,7 @@ button.nav-toggle {
 .profile-page-art { padding: 0; margin-bottom: 1.4rem; }
 .profile-page-art img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
 .profile-page-art .species-photo img { aspect-ratio: auto; object-fit: contain; background: #0c1410; }
+#reports img { max-width: 100%; height: auto; }
 .profile-page .grow-timeline p { margin: 0.35rem 0 0; color: var(--sl-ink-dim); }
 .light-recipe { margin: 1.6rem 0 0; }
 .light-recipe h3 { font-family: var(--display); font-size: 1.2rem; margin: 1.1rem 0 0.45rem; }

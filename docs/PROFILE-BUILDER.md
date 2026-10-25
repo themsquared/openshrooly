@@ -23,13 +23,7 @@ Pending and rejected profiles never appear on public profile pages, the sitemap,
 
 ## Photo storage
 
-Uploads go through the `PHOTOS` R2 binding (`shroomlabs-photos`). The Worker config is wired; uploads stay off until `PHOTOS_ENABLED=1`.
-
-Before production photo uploads work:
-
-1. `npx wrangler r2 bucket create shroomlabs-photos`
-2. Deploy the Worker so the `PHOTOS` binding attaches. Do **not** enable public listing or map this bucket on a public hostname.
-3. Flip `[vars] PHOTOS_ENABLED = "1"` in both `community/api/wrangler.toml` and `community/api/wrangler.deploy.toml` (or set the same var in the dashboard) and redeploy.
+Uploads go through the `PHOTOS` R2 binding (`shroomlabs-photos`). Production (`wrangler.deploy.toml`) has `PHOTOS_ENABLED=1`. Local `wrangler.toml` stays `0` so `wrangler dev` does not require the bucket.
 
 User photos are served only through `/api/media`. `cdn.shroomlabs.io` is not used for grow-report, profile, or coach uploads. Pending objects live under `pending/` and are copied off that prefix on approve.
 

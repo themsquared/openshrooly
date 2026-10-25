@@ -1,5 +1,6 @@
-# Production deploy config. Keep bindings in lockstep with wrangler.toml.
-# `npm run deploy` uses this file (`wrangler deploy -c wrangler.deploy.toml`).
+# Production deploy config. `npm run deploy` uses this file
+# (`wrangler deploy -c wrangler.deploy.toml`).
+# Photos are on. There is no [ai] binding: Grow Coach stays off until payments exist.
 # Secrets: npx wrangler secret put NAME -c wrangler.deploy.toml
 name = "shroomlabs-api"
 main = "src/index.js"
@@ -10,23 +11,17 @@ binding = "DB"
 database_name = "shroomlabs"
 database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
 
-# User photos. Create the bucket at ship time, then deploy, then flip the flag:
-#   npx wrangler r2 bucket create shroomlabs-photos
-# Binding: PHOTOS → shroomlabs-photos. Do not enable public listing or map this
-# bucket on a public hostname. Pending objects stay under pending/ and are
-# served only through /api/media. PHOTOS_ENABLED=0 until you flip it.
+# User photos. Binding: PHOTOS → shroomlabs-photos. Do not enable public listing
+# or map this bucket on a public hostname. Pending objects stay under pending/
+# and are served only through /api/media.
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "shroomlabs-photos"
 
-[ai]
-binding = "AI"
-
 [vars]
 SITE_NAME = "Shroom Labs"
 SHOW_PSILOCYBIN = "1"
-# Photo uploads stay off until this is "1" AND the R2 bucket exists.
-PHOTOS_ENABLED = "0"
+PHOTOS_ENABLED = "1"
 # Browser origins allowed to call api.shroomlabs.io with Authorization headers.
 CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
 # Not used for grow-report, profile, or coach photos. Those are served only
@@ -39,7 +34,7 @@ GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleuse
 # Sign in with Apple: set APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_SERVICES_ID, and APPLE_PRIVATE_KEY
 # as Wrangler secrets once the Developer portal items exist. See docs/AUTH.md.
 # The Worker mints the client secret at runtime. Do not commit the .p8 key.
-# Grow Coach: Workers AI in production; local Node defaults GROW_COACH_STUB=1.
+# Grow Coach stays off until payments exist. Do not add an [ai] binding here.
 GROW_COACH_PROVIDER = "workers-ai"
 GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
 GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
