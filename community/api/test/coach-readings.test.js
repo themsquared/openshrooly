@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createMemoryDb } from "../src/db.js";
-import { handleWranglerResult } from "../scripts/coach-local-d1.js";
+import { handleWranglerResult, isSqliteBusy, retryOnSqliteBusy, sqliteBusyDelayMs } from "../scripts/coach-local-d1.js";
 import {
   ERROR_BACKOFF_MS,
   POLL_INTERVAL_MS,
@@ -167,6 +167,57 @@ test("poll D1 errors back off 5 minutes instead of exiting", async () => {
     log() {},
   });
   assert.ok(sleeps.includes(ERROR_BACKOFF_MS));
+});
+
+test("SQLITE_BUSY local D1 calls retry with jitter, then throw", () => {
+  assert.equal(isSqliteBusy("SQLITE_BUSY: database is locked"), true);
+  assert.equal(isSqliteBusy("SQLITE_ERROR"), false);
+  assert.ok(sqliteBusyDelayMs(0, 40, 0.5) > 0);
+  assert.ok(sqliteBusyDelayMs(2, 40, 1) > sqliteBusyDelayMs(0, 40, 0));
+  let n = 0;
+  const sleeps = [];
+  const ok = retryOnSqliteBusy(
+    () => {
+      n += 1;
+      if (n < 3) throw new Error("SQLITE_BUSY: database is locked");
+      return "ok";
+    },
+    { sleep: (ms) => sleeps.push(ms), random: () => 0.5 }
+  );
+  assert.equal(ok, "ok");
+  assert.equal(n, 3);
+  assert.equal(sleeps.length, 2);
+  assert.ok(sleeps.every((ms) => ms > 0));
+  let fails = 0;
+  assert.throws(
+    () =>
+      retryOnSqliteBusy(
+        () => {
+          fails += 1;
+          throw new Error("SQLITE_BUSY");
+        },
+        { retries: 2, sleep() {}, random: () => 0 }
+      ),
+    /SQLITE_BUSY/
+  );
+  assert.equal(fails, 3);
+  let once = 0;
+  assert.throws(
+    () =>
+      retryOnSqliteBusy(
+        () => {
+          once += 1;
+          throw new Error("SQLITE_ERROR");
+        },
+        { sleep() {} }
+      ),
+    /SQLITE_ERROR/
+  );
+  assert.equal(once, 1);
+  assert.throws(() => handleWranglerResult({ status: 1, stderr: "SQLITE_BUSY" }, { throwOnError: false }), /SQLITE_BUSY/);
+  const d1 = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../scripts/coach-local-d1.js"), "utf8");
+  assert.match(d1, /retryOnSqliteBusy/);
+  assert.match(d1, /throwOnError = true/);
 });
 
 test("poll log rotates in-process at 1 MB, not only at start", () => {

@@ -113,6 +113,10 @@ npm run coach:local:bridge -- --chamber http://192.168.1.42 --loop
 COACH_BRIDGE_LIVE=1 npm run coach:local:bridge -- --chamber http://192.168.1.42 --loop
 ```
 
+`--loop` catches per-cycle errors, logs them, waits 60s, and retries. Local D1
+calls retry briefly with jitter on `SQLITE_BUSY`.
+
+
 ## Notes
 
 - `npm run deploy` still uses `wrangler.deploy.toml` (photos on, no `[ai]`,

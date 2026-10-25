@@ -27,6 +27,8 @@ import {
 } from "./coach-local-d1.js";
 import { POLL_INTERVAL_MS, normalizeChamberUrl, readChamber } from "./coach-readings.js";
 
+export const BRIDGE_LOOP_BACKOFF_MS = 60_000;
+
 function arg(name, fallback = "") {
   const prefix = `--${name}=`;
   const hit = process.argv.find((item) => item.startsWith(prefix));
@@ -74,6 +76,30 @@ function loadStage(deviceId) {
   const row = wranglerLocalD1Rows(`SELECT document FROM profiles WHERE id=${sqlQuote(profileId)} LIMIT 1;`)[0];
   const doc = parseRowPayload(row);
   return stageFromProfile(doc);
+}
+
+export async function runBridgeLoop({
+  runOnce,
+  looping = false,
+  intervalMs = POLL_INTERVAL_MS,
+  errorBackoffMs = BRIDGE_LOOP_BACKOFF_MS,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  log = console.error,
+  stop,
+} = {}) {
+  do {
+    try {
+      await runOnce();
+    } catch (err) {
+      log(`bridge error: ${err.message || err} (backoff ${errorBackoffMs / 1000}s)`);
+      if (!looping) throw err;
+      await sleep(errorBackoffMs);
+      continue;
+    }
+    if (!looping) break;
+    if (stop?.()) break;
+    await sleep(intervalMs);
+  } while (looping && !stop?.());
 }
 
 async function runOnce({ chamber, deviceId, env = process.env } = {}) {
@@ -145,11 +171,12 @@ export async function main() {
     if (expired) console.error(`Expired ${expired} stale pending command(s) on live start.`);
   }
 
-  do {
-    await runOnce({ chamber, deviceId });
-    if (!looping) break;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  } while (looping);
+  await runBridgeLoop({
+    looping,
+    intervalMs,
+    runOnce: () => runOnce({ chamber, deviceId }),
+    log: (line) => console.error(line),
+  });
 }
 
 const invoked = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
