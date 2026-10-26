@@ -371,7 +371,7 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     light: lightFromStage(stage),
     coach,
     firmware: caps.firmware,
-    capabilities: { source: caps.source, list: caps.list, ranges: caps.ranges, knob_ranges: caps.knob_ranges },
+    capabilities: { source: caps.source, firmware: caps.firmware, list: caps.list, ranges: caps.ranges, knob_ranges: caps.knob_ranges },
     controls,
     commands,
     cert_expires_at: activeCert?.not_after || null,

@@ -217,3 +217,7 @@ From 1.0.5-sl.1 one `setpoints` command can carry any of these, and the chamber 
 - Device: large 6-character code + claim URL (QR payload) after Connect to Shroom Labs. No account password on the chamber. The component is in the default 1.0.x-sl build and stays off until that toggle.
 - Site: `/claim.html` explains pairing. The code form is shown for `?code=` (camera / typed) or when `deviceClaiming` is on. Account list + revoke.
 - Copy: scan the QR code first. Typing the letters is the fallback. The chamber still works on your own network if cloud is off or down. If the cert is past the 30-day grace window the chamber shows Link again: "This chamber was offline too long. Press Connect to link it again."
+
+## Open beta link cap
+
+`POST /api/devices/claim` refuses a new link with 403 `beta_full` once `BETA_LINK_CAP` (default 50) chambers are linked (owner set, status claimed or active). Relinking a chamber you already own is not counted. Raise it with the `BETA_LINK_CAP` worker variable.

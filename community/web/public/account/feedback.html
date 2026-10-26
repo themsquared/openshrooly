@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Beta feedback · Shroom Labs</title>
+  <meta name="description" content="Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one.">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="canonical" href="https://shroomlabs.io/account/feedback">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Beta feedback · Shroom Labs">
+  <meta property="og:description" content="Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one.">
+  <meta property="og:url" content="https://shroomlabs.io/account/feedback">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Beta feedback · Shroom Labs">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Beta feedback · Shroom Labs">
+  <meta name="twitter:description" content="Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <!--/SEO_HEAD-->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="feedback">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main" class="account-page feedback-page">
+    <p class="back-link"><a href="/account">Back to account</a></p>
+    <h1>Beta feedback <span class="beta-badge">Beta</span></h1>
+    <p id="feedback-gate" class="card notice" role="status">Checking your account…</p>
+    <section id="feedback-thanks" class="card hidden" role="status" aria-live="polite">
+      <h2>Thanks, Mike reads every one.</h2>
+      <p class="muted">If something is broken, your chamber keeps growing on your own Wi-Fi while we fix it.</p>
+      <p class="account-actions"><a class="button" href="/account">Back to account</a> <button type="button" class="secondary" id="feedback-again">Send another</button></p>
+    </section>
+    <!-- Netlify Forms: this form is in the static HTML so Netlify registers it at deploy. -->
+    <form id="feedback-form" class="card feedback-form hidden" name="beta-feedback" method="POST" action="/account/feedback?sent=1" enctype="multipart/form-data" data-netlify="true" netlify-honeypot="company">
+      <input type="hidden" name="form-name" value="beta-feedback">
+      <input type="hidden" name="subject" value="Shroom Labs feedback: other">
+      <input type="hidden" name="user_id" value="">
+      <input type="hidden" name="username" value="">
+      <input type="hidden" name="device_id" value="">
+      <input type="hidden" name="firmware" value="">
+      <input type="hidden" name="page_url" value="">
+      <input type="hidden" name="browser" value="">
+      <p class="hp" aria-hidden="true"><label>Company <input name="company" tabindex="-1" autocomplete="off"></label></p>
+      <fieldset class="feedback-type">
+        <legend>What is it?</legend>
+        <label class="chip"><input type="radio" name="type" value="bug" required> Something broke</label>
+        <label class="chip"><input type="radio" name="type" value="confusing"> Something was confusing</label>
+        <label class="chip"><input type="radio" name="type" value="idea"> An idea</label>
+      </fieldset>
+      <label>Which chamber?
+        <select name="device" id="feedback-device"></select>
+      </label>
+      <label>What happened?
+        <textarea name="message" rows="6" maxlength="4000" required placeholder="What you tried, what you expected, what you saw."></textarea>
+      </label>
+      <label>Screenshot (optional, up to 5 MB)
+        <input type="file" name="screenshot" accept="image/*">
+      </label>
+      <p id="feedback-error" class="notice hidden" role="alert"></p>
+      <button type="submit">Send feedback</button>
+      <p class="muted small">We get your username, the chamber you picked, its firmware version, this page and your browser, so you don't have to type them.</p>
+    </form>
+  </main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
