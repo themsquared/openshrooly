@@ -23,6 +23,7 @@
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/feed.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -50,6 +51,7 @@
       <button type="button" id="buy">Buy</button>
     </section>
     <section id="full" class="hidden">
+      <p id="owned" class="notice hidden">You own this. It stays in your account for good.</p>
       <p><a id="json-link" href="#">Download profile</a></p>
       <p id="notes"></p>
       <p id="chamber" class="muted"></p>
@@ -98,12 +100,17 @@
     <ul id="ratings"></ul>
     <h2>Grow reports</h2>
     <ul id="reports"></ul>
+    <section id="grow-posts" class="grow-posts hidden" aria-labelledby="grow-posts-heading">
+      <h2 id="grow-posts-heading">Grow progress</h2>
+      <p class="muted">Photos from people growing this profile. <a href="/feed">See the whole feed</a>.</p>
+      <div id="grow-posts-feed"></div>
+    </section>
   </main>
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">
     <p>Works with Shrooly devices running OpenShrooly.</p>
     <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
-    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <nav class="footer-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>

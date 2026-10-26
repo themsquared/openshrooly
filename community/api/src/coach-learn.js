@@ -474,8 +474,9 @@ export function refuseRestrictedPack(profile) {
 /** Workers AI neuron rates for @cf/qwen/qwen3-30b-a3b-fp8 (text) and the vision model. */
 export const TEXT_NEURONS_PER_M_INPUT = 4625;
 export const TEXT_NEURONS_PER_M_OUTPUT = 30475;
-export const VISION_NEURONS_PER_M_INPUT = 4410;
-export const VISION_NEURONS_PER_M_OUTPUT = 61493;
+/** Vision rates are for @cf/meta/llama-4-scout-17b-16e-instruct ($0.27 / $0.85 per M tokens). */
+export const VISION_NEURONS_PER_M_INPUT = 24545;
+export const VISION_NEURONS_PER_M_OUTPUT = 77273;
 
 export function estimateNeurons({ inputTokens = 0, outputTokens = 0, vision = false }) {
   const inPerM = vision ? VISION_NEURONS_PER_M_INPUT : TEXT_NEURONS_PER_M_INPUT;

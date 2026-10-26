@@ -14,6 +14,7 @@ export const SQL = {
   insertCheckout:
     "INSERT INTO checkouts (id, user_id, item_id, provider, status, amount_cents, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   checkoutById: "SELECT * FROM checkouts WHERE id=?",
+  userById: "SELECT * FROM users WHERE id=?",
   setCheckoutStatus: "UPDATE checkouts SET status=? WHERE id=?",
   setCheckoutDetails: "UPDATE checkouts SET details=? WHERE id=?",
   paidCheckoutsFor: "SELECT * FROM checkouts WHERE user_id=? AND item_id=? AND status=? ORDER BY created_at DESC",
@@ -35,7 +36,9 @@ function parseDetails(row) {
  * Start a checkout. With keys set this creates a real Stripe Checkout Session and stores its id.
  * Local dev stubs keep the old fake session so tests never call Stripe.
  */
-export async function startCheckout(db, env, request, { user, itemId, amountCents, details, mode = "payment", priceId, name, successPath, cancelPath, plan }) {
+export const NOT_AVAILABLE_YET = "This profile is not available yet. Check back soon.";
+
+export async function startCheckout(db, env, request, { user, itemId, amountCents, details, mode = "payment", priceId, requirePrice = false, name, successPath, cancelPath, plan }) {
   const stubs = devStubsEnabled(env, request);
   if (!paymentsConfigured(env) && !stubs) return { ok: false, status: 503, ...comingSoonBody("Payments") };
   if (stubs) {
@@ -43,6 +46,7 @@ export async function startCheckout(db, env, request, { user, itemId, amountCent
     await db.run(SQL.insertCheckout, [sessionId, user.id, itemId, "stripe", "requires_payment", amountCents, JSON.stringify(details || {}), nowIso()]);
     return { ok: true, id: sessionId, provider: "stripe", status: "requires_payment", checkout_url: `/pay/stub/${sessionId}`, amount_cents: amountCents, item_id: itemId };
   }
+  if (requirePrice && !priceId) return { ok: false, status: 503, error: NOT_AVAILABLE_YET, coming_soon: true };
   const ref = `chk_${randomToken().slice(0, 20)}`;
   let session;
   try {
@@ -101,6 +105,12 @@ function checkoutUserItem(object) {
 const IGNORE = { ok: true, ignored: true };
 
 /**
+ * A verified event about a user or checkout this site does not have (a test event, a deleted
+ * account). Answer 200 so Stripe stops retrying, and log why.
+ */
+const skip = (reason) => ({ ok: true, ignored: true, reason });
+
+/**
  * Apply one verified Stripe event. The event id is recorded only after the change lands,
  * so a crash mid-way gets retried by Stripe, and every step below is safe to repeat.
  */
@@ -109,6 +119,7 @@ export async function applyStripeEvent(db, event) {
   const seen = await db.one(SQL.seenEvent, [event.id]);
   if (seen) return { ok: true, replayed: true, event_id: event.id };
   const result = await routeEvent(db, event);
+  if (result.reason) console.log(JSON.stringify({ msg: "stripe event skipped", event_id: event.id, type: event.type, reason: result.reason }));
   await db.run(SQL.recordEvent, [event.id, result.checkout_id || null, event.type, nowIso()]);
   return result;
 }
@@ -141,11 +152,12 @@ async function completeCheckout(db, event) {
   const { sessionId, claimedUser, claimedItem } = checkoutUserItem(event.object);
   if (!sessionId) throw new ValidationError("checkout session id required");
   const checkout = await db.one(SQL.checkoutById, [sessionId]);
-  if (!checkout) return IGNORE;
+  if (!checkout) return skip("unknown checkout");
   if (claimedUser && Number(claimedUser) !== Number(checkout.user_id)) throw new ValidationError("webhook user does not match checkout");
   if (claimedItem && claimedItem !== checkout.item_id) throw new ValidationError("webhook item does not match checkout");
   const base = { checkout_id: checkout.id, item_id: checkout.item_id, user_id: checkout.user_id };
   if (checkout.status === "paid") return { ok: true, replayed: true, ...base };
+  if (!(await db.one(SQL.userById, [Number(checkout.user_id)]))) return skip("unknown user");
   const obj = event.object;
   if (obj.customer || obj.subscription) {
     const details = { ...parseDetails(checkout), customer: obj.customer || undefined, subscription: obj.subscription || undefined };
@@ -169,7 +181,8 @@ async function completeCheckout(db, event) {
 
 async function closeCheckout(db, obj, status) {
   const checkout = obj.id ? await db.one(SQL.checkoutById, [String(obj.id)]) : null;
-  if (!checkout || checkout.status === "paid") return IGNORE;
+  if (!checkout) return skip("unknown checkout");
+  if (checkout.status === "paid") return IGNORE;
   await db.run(SQL.setCheckoutStatus, [status, checkout.id]);
   return { ok: true, checkout_id: checkout.id, status };
 }
@@ -196,6 +209,7 @@ async function renewCoach(db, invoice) {
     ...lines.map((line) => line.metadata),
   );
   if (!userId) return IGNORE;
+  if (!(await db.one(SQL.userById, [userId]))) return skip("unknown user");
   const end = Math.max(0, ...lines.map((line) => Number(line.period?.end || 0)));
   const periodEnd = isoFromUnix(end, RENEWAL_GRACE_MS);
   if (!periodEnd) return IGNORE;
@@ -221,6 +235,7 @@ async function cancelCoach(db, sub) {
   const userId = coachUserFrom(metadataOf(sub)) || Number(metadataOf(sub).user_id || 0);
   if (!userId) return IGNORE;
   const existing = await db.one(SQL.coachSub, [userId]);
-  if (existing) await db.run(SQL.setCoachSub, ["canceled", nowIso(), userId]);
+  if (!existing) return skip((await db.one(SQL.userById, [userId])) ? "no coach plan" : "unknown user");
+  await db.run(SQL.setCoachSub, ["canceled", nowIso(), userId]);
   return { ok: true, item_id: COACH_ITEM, item_type: "subscription", user_id: userId, status: "canceled" };
 }

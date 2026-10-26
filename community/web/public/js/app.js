@@ -1,6 +1,7 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { renderProfileCards } from "./profile-cards.js";
+import { INDEXED_PROFILES } from "./indexed-profiles.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav, setCoachNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
@@ -17,7 +18,6 @@ import {
   lastSeenLine,
   chamberStatus,
   renderChamberStatus,
-  autopilotSummary,
   luxPreview,
   readingWhenLine,
   renderControls,
@@ -38,8 +38,23 @@ import {
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
+import { mountPhotoCheck } from "./coach-photo.js";
+import { mountFeed } from "./feed.js";
+import { accessText, coachView, NO_DECISIONS, priceText, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
 import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
+import {
+  blockedReason,
+  COACH_ITEM,
+  detailItem,
+  enableProfileAnalytics,
+  profileItem,
+  reportCancel,
+  reportPurchase,
+  savePendingCheckout,
+  track,
+  trackNext,
+} from "./track.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -188,9 +203,11 @@ function renderNav() {
   }
 }
 
-function selectPack(pack) {
+function selectPack(pack, line = "") {
   const url = new URL(location.href);
   url.searchParams.set("pack", pack);
+  if (line) url.searchParams.set("line", line);
+  else url.searchParams.delete("line");
   url.hash = "library";
   history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
   document.getElementById("library")?.scrollIntoView();
@@ -227,22 +244,31 @@ async function renderHome() {
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
   const off = pack === "psilocybin";
+  const chef = !off && params().get("line") === "chef";
   const packLabel = $("#pack-label");
   if (packLabel) packLabel.textContent = off ? "Off-menu" : "Culinary Profiles";
   $("#legal")?.classList.toggle("hidden", !off);
   $("#q").value = q;
   $("#pack").value = pack;
-  $("#pack-culinary")?.classList.toggle("is-on", !off);
+  $("#pack-culinary")?.classList.toggle("is-on", !off && !chef);
+  $("#pack-chef")?.classList.toggle("is-on", chef);
   $("#pack-offmenu")?.classList.toggle("is-on", off);
-  $("#pack-culinary")?.setAttribute("aria-pressed", !off ? "true" : "false");
+  $("#pack-culinary")?.setAttribute("aria-pressed", !off && !chef ? "true" : "false");
+  $("#pack-chef")?.setAttribute("aria-pressed", chef ? "true" : "false");
   $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
+  $("#chef-intro")?.classList.toggle("hidden", !chef);
+  // The off-menu hint is about the off-menu pack. It reads oddly above paid culinary recipes.
+  $("#pack-hint")?.classList.toggle("hidden", chef);
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", off);
   setCoachOffMenu(off);
   setGetStarted();
-  const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
-  // First visit: show a handful of cards and one button for the rest. A search shows everything.
-  const preview = !q && profiles.length > HOME_PREVIEW_COUNT;
+  const all = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
+  // Chef's line is its own filter. In the plain culinary view, free profiles come first.
+  const isChef = (p) => (p.tags || []).includes("chef");
+  const profiles = chef ? all.filter(isChef) : [...all.filter((p) => !isChef(p)), ...all.filter(isChef)];
+  // First visit: show a handful of cards and one button for the rest. A search or the Chef's line shows everything.
+  const preview = !q && !chef && profiles.length > HOME_PREVIEW_COUNT;
   $("#cards").innerHTML = profiles.length
     ? renderProfileCards(preview ? profiles.slice(0, HOME_PREVIEW_COUNT) : profiles)
     : `<div class="empty-library">
@@ -251,6 +277,14 @@ async function renderHome() {
         <p>No profiles match that search. Try oyster, lion’s mane, or clear the query.</p>
         <a class="button ghost" href="/?pack=${encodeURIComponent(pack)}#library">Clear search</a>
       </div>`;
+  // js/ga.js reads the list name for select_item. Off-menu cards carry no item data and the list has no name.
+  const cards = $("#cards");
+  if (off) delete cards.dataset.slList;
+  else cards.dataset.slList = chef ? "chefs_line_filter" : q ? "search" : "library";
+  if (chef) {
+    cards.dataset.slListName = "Chef's line filter";
+    track("view_item_list", { item_list_id: "chefs_line_filter", item_list_name: "Chef's line filter", items: profiles.slice(0, 25).map((p, index) => ({ ...profileItem(p), index })) });
+  } else delete cards.dataset.slListName;
   const row = $("#see-all-row");
   const btn = $("#see-all");
   if (row && btn) {
@@ -320,6 +354,7 @@ async function renderGrowThis(profile) {
       const result = applied.results?.[0];
       if (!result || result.status === "failed") throw new Error(resultMessage(result));
       confirmRow.classList.add("hidden");
+      if (!isOffMenu(profile)) track("profile_apply", { item_id: profile.id, item_category: detailItem(profile).item_category, source: "profile" });
       const when = result.status === "queued" ? "Your chamber picks it up in about 15 minutes." : "Your chamber has it.";
       msg.innerHTML = `Sent. ${when} <a href="/device?id=${encodeURIComponent(deviceId)}">Open the chamber</a>`;
     } catch (err) {
@@ -330,6 +365,14 @@ async function renderGrowThis(profile) {
   });
 }
 
+function mountProfilePosts(profileId) {
+  const section = $("#grow-posts");
+  if (!section) return;
+  mountFeed({ root: $("#grow-posts-feed"), api, encodePhoto: encodePhotoForUpload, signedIn: isSignedIn(), profileId, apiBase: apiBase() })
+    .then((ok) => section.classList.toggle("hidden", !ok))
+    .catch(() => {});
+}
+
 async function renderProfile() {
   bindBlobUrlCleanup();
   const id = profileIdFromLocation();
@@ -337,7 +380,16 @@ async function renderProfile() {
   const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
   const p = data.profile;
   const off = isOffMenu(p);
+  // Grow progress photos: culinary only. Off-menu profiles never show or accept posts.
+  if (!off && !p.restricted) mountProfilePosts(p.id);
   const label = p.pack_label || packLabel(p.pack);
+  // GA on /profile only for public culinary profiles: never Off-menu, never a community upload's page.
+  const item = detailItem(p);
+  if (!off && (INDEXED_PROFILES.has(p.id) || p.pricing?.kind === "paid")) {
+    enableProfileAnalytics();
+    track("view_item", { currency: "USD", value: item.price, items: [item] });
+  }
+  const sale = { items: [item], value: item.price };
   $("#title").textContent = p.name;
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
@@ -385,18 +437,34 @@ async function renderProfile() {
     if (result === "success") {
       if (notice) notice.textContent = "Payment received. Unlocking your recipe...";
       $("#buy")?.classList.add("hidden");
-      waitForUnlock(() => api(`/api/profiles/${id}`).then((d) => d.unlocked), notice);
+      waitForUnlock(() => api(`/api/profiles/${id}`).then((d) => d.unlocked), notice, {
+        onConfirmed: () => reportPurchase(checkoutSessionId(), sale),
+      });
       return;
     }
-    if (result === "cancel" && notice) notice.textContent = "Checkout canceled. Nothing was charged.";
-    $("#buy")?.addEventListener("click", () =>
-      goToCheckout($("#buy"), () => api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} }), (err) => {
+    if (result === "cancel") {
+      if (notice) notice.textContent = "Checkout canceled. Nothing was charged.";
+      reportCancel(sale);
+    }
+    $("#buy")?.addEventListener("click", () => {
+      if (!getToken()) return checkoutNeedsSignIn(sale, `/profile?id=${encodeURIComponent(id)}`);
+      return goToCheckout($("#buy"), () => api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} }), (err) => {
+        if (err.status === 409) {
+          // Bought in another tab or device. Show the recipe instead of a second charge.
+          $("#buy")?.classList.add("hidden");
+          if (notice) notice.textContent = "You own this. Loading your recipe...";
+          location.reload();
+          return;
+        }
         if (notice) notice.textContent = err.message;
-      })
-    );
+      }, sale);
+    });
     return;
   }
+  // The webhook can land before the buyer is back from Stripe: the recipe is already unlocked here.
+  if (checkoutResult() === "success" && p.pricing?.kind === "paid") reportPurchase(checkoutSessionId(), sale).catch(() => {});
   $("#full").classList.remove("hidden");
+  if (p.pricing?.kind === "paid") $("#owned")?.classList.remove("hidden");
   renderGrowThis(p).catch(() => $("#grow-this")?.classList.add("hidden"));
   $("#notes").textContent = p.notes || "";
   $("#chamber").textContent = p.chamber_notes || "";
@@ -547,6 +615,10 @@ async function renderAuth(mode) {
     $(`#${provider}`)?.addEventListener("click", (ev) => {
       ev.preventDefault();
       if (!caps[provider]) return;
+      // The callback page reads this to label the GA sign_up or login event.
+      try {
+        sessionStorage.setItem("sl_auth_method", provider);
+      } catch {}
       location.href = oidcStart(provider, oidcNext);
     });
   }
@@ -580,6 +652,22 @@ async function renderAuth(mode) {
   });
 }
 
+function authMethodHint() {
+  try {
+    const m = sessionStorage.getItem("sl_auth_method");
+    sessionStorage.removeItem("sl_auth_method");
+    return m === "apple" ? "apple" : "google";
+  } catch {
+    return "google";
+  }
+}
+
+/** The callback page has no analytics. Queue sign_up or login for the next page that does. */
+function queueSignInEvent(data, method) {
+  if (!data?.access_token) return;
+  trackNext(data.new_account ? "sign_up" : "login", { method });
+}
+
 async function renderCallback() {
   const token = params().get("token");
   const hash = new URLSearchParams(location.hash.slice(1));
@@ -590,12 +678,14 @@ async function renderCallback() {
       history.replaceState(null, "", location.pathname);
       const data = await api("/api/auth/oidc/complete", { method: "POST", jsonBody: { token: handoff } });
       if (data.access_token) setToken(data.access_token);
+      queueSignInEvent(data, authMethodHint());
       location.replace(safeNext(hash.get("next")));
       return;
     }
     if (token) {
       const data = await api("/api/auth/magic/complete", { method: "POST", jsonBody: { token } });
       if (data.access_token) setToken(data.access_token);
+      queueSignInEvent(data, "email");
       location.href = safeNext(params().get("next"));
       return;
     }
@@ -618,9 +708,19 @@ async function renderAccount() {
     ? "Email verified. You can publish and buy."
     : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
+  // Purchases never expire. Show each owned profile by name with a link back to its recipe.
+  const owned = me.entitlements || [];
+  const names = owned.some((e) => e.item_type === "profile")
+    ? new Map(((await api("/api/profiles?pack=culinary").catch(() => [])) || []).map((p) => [p.id, p.name]))
+    : new Map();
   $("#ents").innerHTML =
-    me.entitlements.map((e) => `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`).join("") ||
-    "<li class='muted'>No paid items yet.</li>";
+    owned
+      .map((e) => {
+        if (e.item_type !== "profile") return `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`;
+        const since = e.granted_at ? ` <span class="muted">· yours since ${escapeHtml(String(e.granted_at).slice(0, 10))}</span>` : "";
+        return `<li><a href="/profile?id=${encodeURIComponent(e.item_id)}">${escapeHtml(names.get(e.item_id) || e.item_id)}</a>${since}</li>`;
+      })
+      .join("") || "<li class='muted'>No paid items yet.</li>";
   if (me.user.role === "moderator" || me.user.role === "admin") {
     $("#nav-moderate")?.classList.remove("hidden");
   }
@@ -642,10 +742,12 @@ async function renderAccount() {
       : "";
   }
   if ($("#coach-account") && me.grow_coach?.available) {
-    $("#coach-account").textContent =
-      me.grow_coach.entitled && !me.grow_coach.beta && me.grow_coach.period_end
-        ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
-        : "Private beta access. Culinary chambers only.";
+    const gc = me.grow_coach;
+    $("#coach-account").textContent = !gc.entitled
+      ? `Not on yet. ${priceText(gc.product)} Free during the beta for linked chambers.`
+      : gc.access === "paid" && gc.period_end
+        ? `Active culinary subscription through ${fmtDate(gc.period_end)}.`
+        : accessText(gc, gc.period_end ? fmtDate(gc.period_end) : "");
   }
   const portalButton = $("#billing-portal");
   if (portalButton && me.billing_portal) {
@@ -662,7 +764,9 @@ async function renderAccount() {
     const status = $("#billing-status");
     status.textContent = "Payment received. Turning on Grow Coach...";
     status.classList.remove("hidden");
-    waitForUnlock(() => api("/api/me").then((d) => Boolean(d.grow_coach?.entitled)), status);
+    waitForUnlock(() => api("/api/me").then((d) => Boolean(d.grow_coach?.entitled)), status, {
+      onConfirmed: () => reportPurchase(checkoutSessionId(), { items: [COACH_ITEM] }),
+    });
   }
   if (me.sessions) {
     $("#sessions").innerHTML = me.sessions
@@ -1009,6 +1113,7 @@ if (page === "home") {
   $("#pack-culinary")?.addEventListener("click", () => selectPack("culinary"));
   $("#pack-restricted")?.addEventListener("click", () => selectPack("psilocybin"));
   $("#pack-offmenu")?.addEventListener("click", () => selectPack("psilocybin"));
+  $("#pack-chef")?.addEventListener("click", () => selectPack("culinary", "chef"));
   window.addEventListener("popstate", () => renderHome().catch(() => {}));
 }
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));
@@ -1028,6 +1133,7 @@ if (page === "devices") renderDevices().catch((err) => {
 });
 if (page === "publish") renderPublish();
 if (page === "moderate") renderModerate();
+if (page === "feed") mountFeed({ root: $("#feed"), api, encodePhoto: encodePhotoForUpload, signedIn: isSignedIn(), apiBase: apiBase() });
 if (page === "device") renderDevice().catch((err) => {
   if (err.status === 401) {
     location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
@@ -1068,6 +1174,12 @@ function checkoutResult() {
   return new URLSearchParams(location.search).get("checkout") || "";
 }
 
+/** Stripe fills {CHECKOUT_SESSION_ID} into the success URL. Used only as the GA transaction_id. */
+function checkoutSessionId() {
+  const id = new URLSearchParams(location.search).get("session_id") || "";
+  return /^cs_(live|test)_[A-Za-z0-9]{8,200}$/.test(id) ? id : "";
+}
+
 // Only Stripe's own checkout page or a same-site path. Never an arbitrary URL from a response.
 function safeCheckoutUrl(url) {
   const value = String(url || "");
@@ -1080,29 +1192,47 @@ function safeCheckoutUrl(url) {
   }
 }
 
-async function goToCheckout(button, start, onError) {
+/**
+ * sale = { items, value, plan } for a purchase (not the billing portal). It sends begin_checkout, saves the
+ * session for the return page, and sends checkout_blocked with a reason when the click never reaches Stripe.
+ */
+async function goToCheckout(button, start, onError, sale = null) {
   if (!button || button.disabled) return;
   const label = button.textContent;
+  const ga = sale ? { currency: "USD", value: sale.value, items: sale.items, plan: sale.plan } : null;
+  if (ga) track("begin_checkout", ga);
   button.disabled = true;
   button.textContent = "Opening checkout...";
   try {
     const session = await start();
     const target = safeCheckoutUrl(session.checkout_url || session.url);
     if (!target) throw new Error("Checkout could not start. Try again in a minute.");
+    if (sale && session.id) savePendingCheckout({ id: String(session.id), items: sale.items, value: sale.value, plan: sale.plan });
     location.assign(target);
   } catch (err) {
     button.disabled = false;
     button.textContent = label;
+    if (ga) track("checkout_blocked", { ...ga, reason: blockedReason(err) });
     onError(err);
   }
 }
 
+/** A signed-out buy or subscribe click: count it, then send the visitor to sign in and come back. */
+function checkoutNeedsSignIn(sale, next) {
+  const ga = { currency: "USD", value: sale.value, items: sale.items, plan: sale.plan };
+  track("begin_checkout", ga);
+  track("checkout_blocked", { ...ga, reason: "signed_out" }, { done: () => (location.href = `/login?next=${encodeURIComponent(next)}`) });
+}
+
 // Stripe tells us about the payment a few seconds after the redirect. Poll briefly, then reload.
-async function waitForUnlock(check, notice, { tries = 15, delayMs = 2000 } = {}) {
+// onConfirmed runs once the server confirms (the GA purchase event), before the reload.
+async function waitForUnlock(check, notice, { tries = 15, delayMs = 2000, onConfirmed = null } = {}) {
   for (let i = 0; i < tries; i += 1) {
     if (await check().catch(() => false)) {
+      if (onConfirmed) await onConfirmed().catch(() => {});
       const clean = new URL(location.href);
       clean.searchParams.delete("checkout");
+      clean.searchParams.delete("session_id");
       location.replace(clean.href);
       return true;
     }
@@ -1165,6 +1295,13 @@ function coachPlanShort(plan) {
   return plan.period === "year" ? `${price}/yr` : `${price}/mo`;
 }
 
+/** GA item, value and plan for a Coach plan id. */
+function coachSale(product, planId) {
+  const plan = coachPlanList(product).find((p) => p.id === planId) || coachPlanList(product)[0];
+  const value = Number(plan?.amount_cents || 0) / 100;
+  return { items: [{ ...COACH_ITEM, price: value }], value, plan: plan?.period === "year" ? "yearly" : "monthly" };
+}
+
 /** Draw the plan radios and keep the button text in step. Returns a getter for the picked plan id. */
 function renderCoachPlans(product) {
   const plans = coachPlanList(product);
@@ -1205,6 +1342,11 @@ function renderCoachPlans(product) {
 
 async function renderCoach() {
   if (await consumeLocalSignIn()) return;
+  // The static page is the signed-out pitch (what search engines index). Signed-in visitors wait on a skeleton instead.
+  if (isSignedIn()) {
+    for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.add("hidden");
+    $("#coach-skeleton")?.classList.remove("hidden");
+  }
   const catalog = await api("/api/coach").catch((err) => {
     showCoachError(err);
     return null;
@@ -1216,38 +1358,177 @@ async function renderCoach() {
     location.replace("/");
     return;
   }
-  $("#coach-hero")?.classList.remove("hidden");
-  const canUse = Boolean(catalog.entitled || catalog.beta);
-  $("#coach-status").textContent = canUse
-    ? catalog.beta
-      ? "Private beta. Culinary chambers only."
-      : `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
-    : catalog.marketing;
-  if ((canUse || !catalog.waitlist) && $("#coach-eyebrow")) $("#coach-eyebrow").textContent = canUse ? "Private beta · Culinary chambers only" : "Culinary subscription";
-  if (!canUse && catalog.waitlist) {
+  const view = coachView(catalog, isSignedIn());
+  // People with access (paid, beta chamber, or comp) get the Coach page itself.
+  if (view === "dashboard") {
+    await renderCoachDashboard(catalog);
+    return;
+  }
+  const monthly = coachSale(catalog.product, "monthly");
+  track("view_item", { currency: "USD", value: monthly.value, items: monthly.items });
+  if (checkoutResult() === "cancel") reportCancel({ items: monthly.items, value: monthly.value });
+  for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.remove("hidden");
+  $("#gated")?.classList.add("hidden");
+  $("#coach-status").textContent = view === "waitlist" ? catalog.marketing : "";
+  // Only say "free" to people who might get it: signed out, or no chamber linked yet.
+  const mayBeBeta = catalog.beta_active && view !== "checkout";
+  if ($("#coach-eyebrow")) $("#coach-eyebrow").textContent = mayBeBeta ? "Free during the beta · Culinary chambers only" : "Culinary chambers only";
+  const betaLine = catalog.beta_active
+    ? `Free during the beta for chambers linked in the beta. After the beta, ${priceText(catalog.product)}`
+    : "";
+  if (view === "link") {
+    // Signed in with no chamber: say what Coach needs and how to link one. No checkout yet.
+    $("#coach-link")?.classList.remove("hidden");
+    if (betaLine && $("#coach-link-beta")) {
+      $("#coach-link-beta").textContent = betaLine;
+      $("#coach-link-beta").classList.remove("hidden");
+    }
+    return;
+  }
+  if (view === "waitlist") {
     $("#subscribe-panel")?.classList.add("hidden");
-    $("#gated")?.classList.add("hidden");
     return;
   }
   // Sales view: monthly or yearly, one button, three bullets, cancel anytime.
   const pickedPlan = renderCoachPlans(catalog.product);
-  $("#coach-status").textContent = "";
-  if (!isSignedIn()) {
-    $("#subscribe-panel").classList.remove("hidden");
-    $("#subscribe").addEventListener("click", () => {
-      location.href = `/login?next=${encodeURIComponent("/coach")}`;
-    });
+  $("#subscribe-panel").classList.remove("hidden");
+  if (view === "signin") {
+    if (betaLine && $("#coach-beta-note")) {
+      $("#coach-beta-note").textContent = `${betaLine} Sign in to check.`;
+      $("#coach-beta-note").classList.remove("hidden");
+    }
+    $("#subscribe").addEventListener("click", () => checkoutNeedsSignIn(coachSale(catalog.product, pickedPlan()), "/coach"));
     return;
   }
-  if (!canUse) {
-    $("#subscribe-panel").classList.remove("hidden");
-    if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
-    $("#subscribe").addEventListener("click", () =>
-      goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan: pickedPlan() } }), showCoachError)
-    );
-    return;
+  if (catalog.beta_active && $("#coach-beta-note")) {
+    $("#coach-beta-note").textContent = "The free beta covers the first chambers linked to Shroom Labs, and it is full. Grow Coach needs a plan for this account.";
+    $("#coach-beta-note").classList.remove("hidden");
   }
+  if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
+  $("#subscribe").addEventListener("click", () => {
+    const plan = pickedPlan();
+    goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan } }), showCoachError, coachSale(catalog.product, plan));
+  });
+}
+
+/** Recommendations, then the decision feed, then chamber status. The photo check and chat show for accounts with AI turned on. */
+async function renderCoachDashboard(catalog) {
+  for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.add("hidden");
   $("#gated").classList.remove("hidden");
+  // Where the paywall would be: "Free during the beta" plus the price after it, or the paid-through date.
+  $("#coach-head-status").textContent = accessText(catalog, catalog.period_end ? fmtDate(catalog.period_end) : "");
+  if (catalog.access === "beta") {
+    // Free beta access counts as a subscription at $0, once per browser.
+    const free = { currency: "USD", value: 0, items: [{ ...COACH_ITEM, price: 0 }] };
+    track("subscribe", { ...free, plan: "beta_free" }, { once: "subscribe:beta_free" });
+    track("beta_join", { method: "chamber" }, { once: "beta_join:chamber" });
+  }
+
+  let chambers = [];
+  const chamberFor = (id) => chambers.find((c) => c.device.id === id);
+  const cardMsg = (el, text) => {
+    const box = el?.closest("article")?.querySelector(".coach-msg");
+    if (box) box.textContent = text;
+    else if (text) showCoachError(new Error(text));
+  };
+
+  async function loadOverview() {
+    const data = await api("/api/coach/overview");
+    chambers = data.chambers || [];
+    $("#recs-list").removeAttribute("aria-busy");
+    $("#recs-list").innerHTML = renderRecommendations(chambers);
+    $("#chamber-list").innerHTML = renderChamberCards(chambers);
+  }
+
+  let before = null;
+  async function loadDecisions({ reset = false } = {}) {
+    if (reset) before = null;
+    const qs = new URLSearchParams({ limit: "10" });
+    if (before) qs.set("before", String(before));
+    const data = await api(`/api/coach/decisions?${qs}`);
+    const html = renderDecisions(data.decisions || []);
+    const list = $("#decision-list");
+    if (reset || !before) list.innerHTML = html || `<li class="muted">${escapeHtml(NO_DECISIONS)}</li>`;
+    else list.insertAdjacentHTML("beforeend", html);
+    before = data.next_before;
+    $("#decisions-more").classList.toggle("hidden", !data.has_more);
+  }
+
+  const refreshAll = () => Promise.all([loadOverview(), loadDecisions({ reset: true })]);
+
+  $("#decisions-more").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    try {
+      await loadDecisions();
+    } catch (err) {
+      showCoachError(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#gated").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-undo], button[data-accept], button[data-mode]");
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    try {
+      if (btn.dataset.undo) {
+        await api("/api/coach/autopilot/undo", { method: "POST", jsonBody: { action_id: Number(btn.dataset.undo) } });
+        await refreshAll();
+        return;
+      }
+      if (btn.dataset.accept) {
+        const chamber = chamberFor(btn.dataset.accept);
+        const s = chamber?.recommendation?.suggestion;
+        if (!s) throw new Error("That suggestion is gone. Refresh the page.");
+        const payload = { request_id: newRequestId(), temperature_c: s.temperature_c, humidity_percent: s.humidity_percent };
+        if (s.fan_speed_percent != null) payload.fan_speed_percent = s.fan_speed_percent;
+        const applied = await api(`/api/fleet/devices/${encodeURIComponent(chamber.device.id)}/apply`, {
+          method: "POST",
+          jsonBody: { action: "setpoints", payload },
+        });
+        const result = applied.results?.[0];
+        if (!result || result.status === "failed") throw new Error(resultMessage(result));
+        cardMsg(btn, resultMessage(result));
+        track("coach_suggestion_applied", { source: "coach", type: result.status === "queued" ? "queued" : "sent" });
+        btn.closest("p")?.remove();
+        return;
+      }
+      if (btn.dataset.mode) {
+        const chamber = chamberFor(btn.dataset.device);
+        if (!chamber) return;
+        const profileId = chamber.recommendation?.profile_id || chamber.device.profile?.id;
+        if (btn.dataset.mode === "autopilot" && !profileId) throw new Error("Pick a culinary profile for this chamber first.");
+        await api("/api/coach/autopilot/mode", {
+          method: "POST",
+          jsonBody: { device_id: chamber.device.id, mode: btn.dataset.mode, profile_id: profileId || undefined },
+        });
+        await loadOverview();
+      }
+    } catch (err) {
+      cardMsg(btn, err.message);
+    } finally {
+      if (btn.isConnected) btn.disabled = false;
+    }
+  });
+
+  if (catalog.autopilot) {
+    await Promise.all([loadOverview().catch(showCoachError), loadDecisions({ reset: true }).catch(showCoachError)]);
+  } else {
+    // Autopilot is switched off on this site, so there is nothing to recommend or log yet.
+    for (const id of ["#coach-recs", "#coach-feed", "#coach-chambers"]) $(id)?.classList.add("hidden");
+  }
+  // Photo checks and chat need an AI provider on the server. Without one they stay hidden.
+  if (catalog.entitled) {
+    await mountPhotoCheck({ root: $("#coach-photo"), api, encodePhoto: encodePhotoForUpload }).catch(() => false);
+    if ((await capabilities().catch(() => ({}))).coach_chat) await renderCoachTools(catalog).catch(showCoachError);
+  }
+}
+
+/** Chat and the auto-tune switch. These call the AI, so only accounts with Coach chat get them. Photo checks live in coach-photo.js. */
+async function renderCoachTools(catalog) {
+  $("#coach-tools").classList.remove("hidden");
   const devices = await api("/api/devices").catch(() => ({ devices: [] }));
   const claimed = (devices.devices || []).filter((d) => d.status !== "revoked");
   $("#device").innerHTML =
@@ -1257,207 +1538,31 @@ async function renderCoach() {
 
   const deviceId = () => $("#device").value || "";
   const profileId = () => $("#profile")?.value || "";
-  const photosOn = Boolean((await capabilities()).photos);
-  $("#photo-panel")?.classList.toggle("hidden", !photosOn);
   $("#auto-tune").checked = Boolean(catalog.auto_tune);
-  const autopilotOn = Boolean(catalog.autopilot);
-  $("#mode-panel")?.classList.toggle("hidden", !autopilotOn);
 
   async function refreshUsage() {
     const usage = await api("/api/coach/usage").catch(() => null);
     if (!usage) return;
-    $("#usage").textContent = photosOn
-      ? `${usage.chats}/${usage.caps.chats} chats · ${usage.photos}/${usage.caps.photos} photo checks today`
-      : `${usage.chats}/${usage.caps.chats} chats today`;
+    $("#usage").textContent = `${usage.chats} of ${usage.caps.chats} chats used today`;
   }
 
-  async function refreshModel() {
+  async function loadProfiles() {
+    if ($("#profile").dataset.ready) return;
     const qs = new URLSearchParams();
     if (deviceId()) qs.set("device_id", deviceId());
-    if (profileId()) qs.set("profile_id", profileId());
     const data = await api(`/api/coach/model${qs.toString() ? `?${qs}` : ""}`);
-    if ($("#profile") && !$("#profile").dataset.ready) {
-      const library = data.library || [];
-      $("#profile").innerHTML =
-        `<option value="">Selected from journal</option>` +
-        library.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.id)}</option>`).join("");
-      if (data.profile?.id) $("#profile").value = data.profile.id;
-      $("#profile").dataset.ready = "1";
-      $("#profile").disabled = false;
-    }
-    const m = data.model || {};
-    $("#stats").removeAttribute("aria-busy");
-    // Only show numbers that exist. A grid of "0" and "n/a" reads as broken, so a new chamber gets one plain line.
-    const stats = [
-      ["Readings so far", m.sample_count, 0, ""],
-      ["Humidity vs target, on average", m.humidity_error, 1, "%", true],
-      ["Temperature vs target, on average", m.temperature_offset, 1, " °C", true],
-      ["Grows that went well", m.outcome_success_rate == null ? null : m.outcome_success_rate * 100, 0, "%"],
-    ].filter(([, value]) => value != null && !Number.isNaN(Number(value)));
-    const signed = (value, digits) => `${Number(value) > 0 ? "+" : ""}${fmtNum(value, digits)}`;
-    $("#stats").innerHTML = Number(m.sample_count) > 0
-      ? stats
-          .map(([label, value, digits, unit, sign]) => `<div class="stat"><strong>${sign ? signed(value, digits) : fmtNum(value, digits)}${unit}</strong><span>${label}</span></div>`)
-          .join("")
-      : `<p class="muted stat-empty">No readings from this chamber yet. Numbers show up here after it has reported for a few hours.</p>`;
-    $("#alerts").innerHTML =
-      (data.alerts || [])
-        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong>. ${escapeHtml(a.message)}</li>`)
-        .join("") || `<li class="info">No alerts right now.</li>`;
-    const s = data.suggestion || {};
-    $("#suggestion").innerHTML = s.humidity_percent
-      ? `<p>Suggested <strong>${s.humidity_percent}% humidity</strong> · <strong>${s.temperature_c} °C</strong> · fan ${s.fan_speed_percent}%. ${
-          (s.reasons || []).join(" ") || "No change needed yet."
-        }</p>`
-      : "<p class='muted'>Need a few more readings from this chamber before I can tune it.</p>";
-    $("#suggestion").dataset.ready = s.within_bounds ? "1" : "0";
+    const library = data.library || [];
+    $("#profile").innerHTML =
+      `<option value="">Selected from journal</option>` +
+      library.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.id)}</option>`).join("");
+    if (data.profile?.id) $("#profile").value = data.profile.id;
+    $("#profile").dataset.ready = "1";
+    $("#profile").disabled = false;
   }
 
-  function setModeButtons(mode) {
-    const auto = mode === "autopilot";
-    $("#mode-advisor")?.setAttribute("aria-pressed", auto ? "false" : "true");
-    $("#mode-autopilot")?.setAttribute("aria-pressed", auto ? "true" : "false");
-  }
-
-  function formatEligible(iso) {
-    if (!iso) return "";
-    const at = Date.parse(iso);
-    if (!Number.isFinite(at)) return "";
-    return new Date(at).toLocaleString([], { hour: "numeric", minute: "2-digit" });
-  }
-
-  let coachMode = "advisor";
-
-  async function refreshAutopilot() {
-    if (!autopilotOn) return;
-    if (!deviceId()) {
-      coachMode = "advisor";
-      setModeButtons("advisor");
-      $("#mode-status").textContent = "Pick a chamber first.";
-      $("#run-autopilot")?.classList.add("hidden");
-      $("#autopilot-actions").innerHTML = "";
-      return;
-    }
-    const data = await api(`/api/coach/autopilot?device_id=${encodeURIComponent(deviceId())}`);
-    coachMode = data.mode || "advisor";
-    setModeButtons(data.mode);
-    if (data.status === "paused") {
-      const until = formatEligible(data.pause_until || data.next_eligible_at);
-      $("#mode-status").textContent = until
-        ? `Coach stopped adjusting. ${data.pause_reason} It can adjust again after ${until}.`
-        : `Coach stopped adjusting. ${data.pause_reason}`;
-    } else if (data.mode === "autopilot") {
-      const next = formatEligible(data.next_eligible_at);
-      $("#mode-status").textContent = next
-        ? `Coach adjusts it for you. Next change after ${next}.`
-        : "Coach adjusts it for you.";
-    } else {
-      $("#mode-status").textContent = "Coach suggests changes. You tap Apply.";
-    }
-    $("#run-autopilot")?.classList.toggle("hidden", data.mode !== "autopilot");
-    $("#autopilot-actions").innerHTML =
-      (data.actions || [])
-        .map((row) => {
-          const next = row.new_value || {};
-          const statusLabel = {
-            queued: "Queued for the chamber",
-            applied: "Applied",
-            failed: "Failed",
-            expired: "Expired",
-            refused: "Refused",
-          }[row.apply_status] || "";
-          const summary = row.action === "apply"
-            ? autopilotSummary(next)
-            : row.action === "undo"
-              ? "Restored the previous setpoints"
-              : row.action === "expired"
-                ? "Command expired"
-                : row.action === "failed" || row.action === "refused"
-                  ? `Command ${row.action}`
-                  : "Stopped adjusting";
-          const detail = [statusLabel, row.reason].filter(Boolean).join(". ");
-          const undo = row.action === "apply" && !row.undone_at && row.apply_status !== "failed" && row.apply_status !== "expired" && row.apply_status !== "refused"
-            ? `<button type="button" class="secondary" data-undo="${row.id}">Undo</button>`
-            : row.undone_at
-              ? `<span class="muted">Undone</span>`
-              : statusLabel && row.action === "apply"
-                ? `<span class="muted">${escapeHtml(statusLabel)}</span>`
-                : "";
-          return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(detail)}</p></div>${undo}</li>`;
-        })
-        .join("") || `<li class="muted">Coach has not changed anything yet.</li>`;
-  }
-
-  $("#device").addEventListener("change", () => {
-    refreshModel().catch(showCoachError);
-    refreshAutopilot().catch(showCoachError);
-  });
-  $("#profile")?.addEventListener("change", async () => {
-    try {
-      await refreshModel();
-      if (autopilotOn && coachMode === "autopilot" && deviceId() && profileId()) {
-        await api("/api/coach/autopilot/mode", {
-          method: "POST",
-          jsonBody: { device_id: deviceId(), mode: "autopilot", profile_id: profileId() },
-        });
-        await refreshAutopilot();
-      }
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  $("#refresh-model").addEventListener("click", () => refreshModel().catch(showCoachError));
   $("#auto-tune").addEventListener("change", async () => {
     try {
       await api("/api/coach/auto-tune", { method: "POST", jsonBody: { enabled: $("#auto-tune").checked } });
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  async function setCoachMode(mode) {
-    if (!deviceId()) {
-      showCoachError(new Error("Pick a chamber first."));
-      return;
-    }
-    if (mode === "autopilot" && !profileId()) {
-      showCoachError(new Error("Pick a published culinary profile first."));
-      return;
-    }
-    await api("/api/coach/autopilot/mode", {
-      method: "POST",
-      jsonBody: { device_id: deviceId(), mode, profile_id: profileId() || undefined },
-    });
-    await refreshAutopilot();
-  }
-  $("#mode-advisor")?.addEventListener("click", () => setCoachMode("advisor").catch(showCoachError));
-  $("#mode-autopilot")?.addEventListener("click", () => setCoachMode("autopilot").catch(showCoachError));
-  $("#run-autopilot")?.addEventListener("click", async () => {
-    try {
-      const data = await api("/api/coach/autopilot/run", { method: "POST", jsonBody: { device_id: deviceId() } });
-      if (!data.applied && data.reason) showCoachError(new Error(data.reason));
-      await refreshModel();
-      await refreshAutopilot();
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  $("#autopilot-actions")?.addEventListener("click", async (ev) => {
-    const id = ev.target?.dataset?.undo;
-    if (!id) return;
-    try {
-      await api("/api/coach/autopilot/undo", { method: "POST", jsonBody: { action_id: Number(id) } });
-      await refreshAutopilot();
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  $("#approve").addEventListener("click", async () => {
-    try {
-      const data = await api("/api/coach/suggest", {
-        method: "POST",
-        jsonBody: { device_id: deviceId() || undefined, profile_id: profileId() || undefined, apply: true, approve: true },
-      });
-      $("#suggestion").innerHTML += `<p class="muted">Queued for the chamber${data.applied ? "" : " (not applied)"}.</p>`;
     } catch (err) {
       showCoachError(err);
     }
@@ -1479,35 +1584,7 @@ async function renderCoach() {
       showCoachError(err);
     }
   });
-  $("#photo-form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const file = $("#photo-file").files?.[0];
-    if (!file) {
-      showCoachError(new Error("Choose a photo first."));
-      return;
-    }
-    try {
-      const data = await api("/api/coach/photo", {
-        method: "POST",
-        jsonBody: {
-          ...(await encodePhotoForUpload(file)),
-          hint: $("#photo-hint").value,
-        },
-      });
-      $("#photo-result").innerHTML = `
-        <p>Stage <strong>${escapeHtml(data.stage)}</strong> · confidence ${fmtNum((data.confidence || 0) * 100, 0)}%</p>
-        <div class="photo-flags">${(data.flags || [])
-          .map((f) => `<span class="chip">${escapeHtml(f.label || f.kind)} · ${fmtNum((f.confidence || 0) * 100, 0)}%</span>`)
-          .join("")}</div>
-        <p>${escapeHtml(data.next_steps || "")}</p>`;
-      await refreshUsage();
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-
-  await refreshModel().catch(showCoachError);
-  await refreshAutopilot().catch(showCoachError);
+  await loadProfiles().catch(showCoachError);
   await refreshUsage();
 }
 
@@ -1557,10 +1634,15 @@ async function renderClaim() {
     }
     try {
       const code = $("#code").value.trim().toUpperCase();
+      const method = preset ? "qr" : "code";
+      track("chamber_link_started", { method });
       const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code } });
+      // Sent from the chamber page, which has analytics. Never the code or the chamber id.
+      trackNext("chamber_linked", { method });
       location.href = `/device?id=${encodeURIComponent(data.device.id)}`;
     } catch (err) {
       if (err.status === 403 && err.data?.code === "beta_full") {
+        track("chamber_link_blocked", { reason: "beta_full" });
         $("#claim-code-panel")?.classList.add("hidden");
         $("#beta-full")?.classList.remove("hidden");
         return;
@@ -2249,6 +2331,8 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         // Keep this one up: the grower needs to know it is on its way, not just that a click happened.
         clearTimeout(msg._t);
         msg.textContent = resultMessage(result);
+        // No profile id here: the picker can hold an Off-menu Profile. Only that a profile was sent.
+        if (action === "profile" && !device.off_menu) track("profile_apply", { source: "device" });
         onSent();
       } catch (err) {
         flash(msg, err.message);
@@ -2708,7 +2792,9 @@ async function renderFeedback() {
     button.disabled = true;
     button.textContent = "Sending...";
     try {
+      const type = String(new FormData(form).get("type") || "other");
       await postNetlifyForm(form);
+      track("feedback_sent", { source: "beta_form", type: /^[a-z_]{1,20}$/.test(type) ? type : "other" });
       form.reset();
       form.classList.add("hidden");
       thanks.classList.remove("hidden");

@@ -14,7 +14,9 @@ USB installer: [`/install.html`](https://shroomlabs.io/install.html) offers only
 
 Opt-in device cloud: `/claim.html` explains pairing. The code form stays hidden until `?code=` or `deviceClaiming` is on. Firmware that shows a code is not shipped yet. See [`docs/DEVICES.md`](../docs/DEVICES.md). Default firmware does not open a cloud socket.
 
-**Grow Coach** (`/coach.html`) is a culinary subscription, coming soon at $4.99 a month or $49 a year. It uses a device's readings and past grows to tailor humidity and temperature advice. Photo checks come later. Not marketed with off-menu varieties. See [`docs/COACH.md`](../docs/COACH.md). Local private beta (Workers AI + a LAN chamber, prod unchanged): [`api/COACH-LOCAL.md`](api/COACH-LOCAL.md).
+**Grow feed** (`/feed`) lets signed-in growers post a progress photo and a short note for a culinary profile, with an optional chamber and grow day. Posts also show on the profile page. Photos lose location and camera data and are resized before they are stored. Anyone signed in can report a post; three reports hide it until a moderator restores or removes it. Off-menu profiles never take posts. Tables: `migrations/0012_grow_posts.sql`. Limit: `FEED_DAILY_POSTS` (default 5 a day).
+
+**Grow Coach** (`/coach.html`) is a culinary subscription, coming soon at $4.99 a month or $49 a year. It uses a device's readings and past grows to tailor humidity and temperature advice. Photo checks look at a grow photo with your chamber readings and say what to do next; the photo is not saved. Not marketed with off-menu varieties. See [`docs/COACH.md`](../docs/COACH.md). Local private beta (Workers AI + a LAN chamber, prod unchanged): [`api/COACH-LOCAL.md`](api/COACH-LOCAL.md).
 
 Psilocybin profiles are tagged, free-only, and never carry affiliate links or payment providers.
 

@@ -4,6 +4,8 @@ import { nowIso } from "./crypto.js";
 import { dispatchAlerts } from "./alerts/memory.js";
 import { dispatchReview } from "./review-memory.js";
 import { dispatchAccount } from "./account-memory.js";
+import { dispatchAdmin } from "./admin-memory.js";
+import { dispatchFeed } from "./feed-memory.js";
 
 export function createMemoryDb() {
   const tables = {
@@ -126,10 +128,14 @@ export function createD1Db(d1) {
 
 function dispatch(mode, tables, ids, sql, params) {
   const q = sql.replace(/\s+/g, " ").trim();
+  const admin = dispatchAdmin(tables, q);
+  if (admin) return admin(params);
   const accountResult = dispatchAccount(tables, q, params);
   if (accountResult !== undefined) return accountResult;
   const alertResult = dispatchAlerts(tables, ids, q, params);
   if (alertResult !== undefined) return alertResult;
+  const feedResult = dispatchFeed(tables, ids, q, params);
+  if (feedResult !== undefined) return feedResult;
   const reviewResult = dispatchReview(tables, ids, q, params);
   if (reviewResult !== undefined) return reviewResult;
   if (q.startsWith("INSERT INTO users")) {
@@ -524,9 +530,18 @@ function dispatch(mode, tables, ids, sql, params) {
     tables.api_tokens.push(row);
     return { lastRowId: row.id };
   }
+  if (q.startsWith("DELETE FROM api_tokens WHERE token_hash=? AND name=?")) {
+    tables.api_tokens = tables.api_tokens.filter((t) => !(t.token_hash === params[0] && t.name === params[1]));
+    return {};
+  }
+  if (q.startsWith("DELETE FROM api_tokens WHERE user_id=? AND name=?")) {
+    tables.api_tokens = tables.api_tokens.filter((t) => !(t.user_id === Number(params[0]) && t.name === params[1]));
+    return {};
+  }
   if (q.includes("FROM users JOIN api_tokens")) {
     const token = tables.api_tokens.find((t) => t.token_hash === params[0]);
     if (!token) return [];
+    if (params.length > 1 && token.name === params[1] && !(token.created_at > params[2])) return [];
     return tables.users.filter((u) => u.id === token.user_id);
   }
   if (q.startsWith("SELECT id, name, created_at FROM api_tokens")) {
@@ -1233,9 +1248,10 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("SELECT * FROM coach_autopilot_log WHERE device_id=")) {
     let rows = tables.coach_autopilot_log.filter((r) => r.device_id === params[0]);
+    if (q.includes("AND id<?")) rows = rows.filter((r) => Number(r.id) < Number(params[1]));
     if (q.includes("ORDER BY id DESC")) rows = rows.slice().sort((a, b) => Number(b.id) - Number(a.id));
     if (q.includes("LIMIT")) {
-      const limit = Number(params[1] ?? params[params.length - 1]);
+      const limit = Number(params[params.length - 1]);
       if (Number.isFinite(limit)) rows = rows.slice(0, limit);
     }
     return rows;

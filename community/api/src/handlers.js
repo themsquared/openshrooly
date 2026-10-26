@@ -19,10 +19,14 @@ import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
 import { handleFleet } from "./fleet.js";
 import { handleAccount } from "./account.js";
-import { coachBetaAccess, coachPlans, coachVisible, handleCoach, hasGrowCoach } from "./coach.js";
+import { handleAdmin } from "./admin.js";
+import { coachPlans, coachVisible, handleCoach } from "./coach.js";
+import { coachAccess } from "./coach-access.js";
+import { coachAutopilotFlagOn } from "./coach-autopilot.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, coachCustomerFor, openBillingPortal, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities, paymentsConfigured } from "./providers.js";
+import { profilePriceFor } from "./stripe.js";
 import { corsAllowlist, originAllowed, rateLimit, rateLimitClient, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
@@ -32,6 +36,7 @@ import { handleLive } from "./live.js";
 import { handleReview } from "./review-http.js";
 import { readJsonLimited } from "./http-body.js";
 import { canSeeMedia, getMedia, mediaApiUrl, mediaApproved } from "./media-acl.js";
+import { feedMediaHeaders, handleFeed } from "./feed.js";
 import {
   canSeeProfile,
   getReview,
@@ -296,6 +301,8 @@ async function route(method, path, url, request, env) {
   }
   const authResponse = await handleAuth(method, path, url, request, env);
   if (authResponse) return authResponse;
+  const adminResponse = await handleAdmin(method, path, url, request, env);
+  if (adminResponse) return adminResponse;
   const liveResponse = await handleLive(method, path, url, request, env);
   if (liveResponse) return liveResponse;
   const deviceResponse = await handleDevices(method, path, url, request, env);
@@ -308,6 +315,8 @@ async function route(method, path, url, request, env) {
   if (alertsResponse) return alertsResponse;
   const accountResponse = await handleAccount(method, path, url, request, env);
   if (accountResponse) return accountResponse;
+  const feedResponse = await handleFeed(method, path, url, request, env);
+  if (feedResponse) return feedResponse;
   const reviewResponse = await handleReview(method, path, url, request, env, {
     seeds: SEED_DOCS,
     parseProfileRow: parseProfile,
@@ -345,18 +354,22 @@ async function route(method, path, url, request, env) {
       tokens,
       entitlements,
       sessions,
-      // Grow Coach is hidden unless the server says this user can use it
-      // (flag on plus beta or entitlement) or Coach is on sale (COACH_PUBLIC plus checkout).
-      // Everyone else gets no Coach details.
+      // Grow Coach shows when this user has access (paid, beta or comp) or Coach is open to the
+      // public (COACH_PUBLIC). Everyone else gets no Coach details.
       grow_coach: (await coachVisible(env, db, user, request))
-        ? {
+        ? await (async () => {
+            const access = await coachAccess(env, db, user);
+            const entitled = coachAutopilotFlagOn(env) && access.entitled;
+            return {
             available: true,
-            entitled: await hasGrowCoach(db, user, env),
-            beta: coachBetaAccess(env, user),
+            entitled,
+            beta: entitled && access.via !== "paid",
+            access: entitled ? access.via : null,
             period_end: coachSub?.period_end || null,
             auto_tune: Boolean(Number(coachSub?.auto_tune)),
             product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, plans: coachPlans(env, request), pack: "culinary" },
-          }
+            };
+          })()
         : { available: false },
       // Show "Manage billing" only to people Stripe knows about.
       billing_portal: paymentsConfigured(env) && Boolean(await coachCustomerFor(db, user.id)),
@@ -538,15 +551,21 @@ async function route(method, path, url, request, env) {
       throw new ValidationError("Psilocybin pack is free-only. Card processors cannot be attached.");
     }
     if (isFree(profile)) throw new ValidationError("free items do not go through checkout");
+    // A purchase is for good, so a second checkout would only charge twice.
+    if (await canRead(db, user, profile)) return json({ error: "already owned" }, 409);
     const allowed = profile.allowed_payment_providers || [];
     if (!allowed.includes("stripe")) throw new ValidationError("no configured payment provider in " + allowed);
     const session = await startCheckout(db, env, request, {
       user,
       itemId: profile.id,
       amountCents: profile.pricing.amount_cents,
+      // Built-in paid profiles sell through their own synced Stripe Price. No price, no sale.
+      priceId: profilePriceFor(env, profile)?.price || "",
+      requirePrice: true,
       details: { note: "Culinary checkout." },
       name: profile.name || "Grow profile",
-      successPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=success`,
+      // Stripe fills in {CHECKOUT_SESSION_ID}. The site uses it only as the analytics transaction id.
+      successPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancelPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=cancel`,
     });
     if (!session.ok) return json({ error: session.error, coming_soon: true }, session.status || 503);
@@ -630,13 +649,15 @@ async function route(method, path, url, request, env) {
     }
     const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
     if (report && !(await canServeReportPhoto(db, env, viewer, report))) return json({ error: "not found" }, 404);
+    const feedPost = await feedMediaHeaders(db, key);
+    if (feedPost.gone) return json({ error: "not found" }, 404);
     const headers = {
       "content-type": PHOTO_TYPES[kind],
       "x-content-type-options": "nosniff",
       "content-disposition": `inline; filename="${mediaFilename(kind)}"`,
       "content-security-policy": "default-src 'none'",
     };
-    if (!mediaApproved(row) || (report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery))) {
+    if (!mediaApproved(row) || (report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery)) || feedPost.private) {
       headers["cache-control"] = "private, no-store";
     }
     return new Response(bytes, { headers });

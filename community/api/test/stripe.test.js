@@ -30,6 +30,8 @@ function fakeStripe({ fail = false } = {}) {
   return { calls, fetch };
 }
 
+const TEST_PRICES = { test: { "king-oyster-thick-stem": { product: "prod_test_king", price: "price_test_king", amount_cents: 299 } }, live: {} };
+
 function liveEnv(extra = {}) {
   const stripe = fakeStripe(extra.stripe || {});
   const ctx = testEnv({
@@ -37,6 +39,7 @@ function liveEnv(extra = {}) {
     STRIPE_SECRET_KEY: "sk_test_fake_not_real",
     STRIPE_PRICE_COACH: "price_coach_test",
     COACH_AUTOPILOT_ENABLED: "1",
+    profilePriceTable: TEST_PRICES,
     fetch: stripe.fetch,
     ...extra.env,
   });
@@ -87,11 +90,42 @@ test("profile checkout opens a real Stripe session with an idempotency key and s
   assert.equal(req.form.get("mode"), "payment");
   assert.equal(req.form.get("metadata[user_id]"), String(user.id));
   assert.equal(req.form.get("metadata[item_id]"), "king-oyster-thick-stem");
-  assert.equal(req.form.get("line_items[0][price_data][currency]"), "usd");
-  assert.ok(Number(req.form.get("line_items[0][price_data][unit_amount]")) > 0);
+  assert.equal(req.form.get("line_items[0][price]"), "price_test_king");
+  assert.equal(req.form.has("line_items[0][price_data][unit_amount]"), false);
   assert.match(req.form.get("success_url"), /checkout=success/);
+  // Stripe swaps in the session id; the site uses it as the analytics transaction id.
+  assert.match(req.form.get("success_url"), /&session_id=\{CHECKOUT_SESSION_ID\}$/);
   const row = await ctx.db.one("SELECT * FROM checkouts WHERE id=?", [res.data.id]);
   assert.equal(row.status, "requires_payment");
+});
+
+test("a paid profile with no synced Stripe price says not available yet and never calls Stripe", async () => {
+  const { ctx, stripe } = liveEnv({ env: { profilePriceTable: { test: {}, live: {} } } });
+  const { token } = await register(ctx, "noprice@example.com");
+  const res = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(res.status, 503);
+  assert.equal(res.data.coming_soon, true);
+  assert.match(res.data.error, /not available yet/);
+  assert.equal(stripe.calls.length, 0);
+});
+
+test("a stale synced price (amount changed) is treated as missing", async () => {
+  const stale = { test: { "king-oyster-thick-stem": { product: "prod_x", price: "price_old", amount_cents: 199 } }, live: {} };
+  const { ctx, stripe } = liveEnv({ env: { profilePriceTable: stale } });
+  const { token } = await register(ctx, "stale@example.com");
+  const res = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(res.status, 503);
+  assert.match(res.data.error, /not available yet/);
+  assert.equal(stripe.calls.length, 0);
+});
+
+test("a live key reads only the live price table", async () => {
+  const { profilePriceFor, stripeMode } = await import("../src/stripe.js");
+  const profile = { id: "king-oyster-thick-stem", pricing: { amount_cents: 299 } };
+  assert.equal(stripeMode({ STRIPE_SECRET_KEY: "sk_test_x" }), "test");
+  assert.equal(stripeMode({ STRIPE_SECRET_KEY: "rk_live_x" }), "live");
+  assert.equal(profilePriceFor({ STRIPE_SECRET_KEY: "sk_live_x", profilePriceTable: TEST_PRICES }, profile), null);
+  assert.equal(profilePriceFor({ STRIPE_SECRET_KEY: "sk_test_x", profilePriceTable: TEST_PRICES }, profile).price, "price_test_king");
 });
 
 test("a Stripe error returns a friendly 502 and stores nothing", async () => {
@@ -145,7 +179,7 @@ test("a missing yearly price id says not available yet and never calls Stripe; m
   assert.equal(bad.status, 400);
   const monthly = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { plan: "monthly" } });
   assert.equal(monthly.status, 200, JSON.stringify(monthly.data));
-  assert.equal(stripe.calls[0].form.get("line_items[0][price]"), "price_m");
+  assert.equal(stripe.calls[0].form.get("line_items[0][price]"), "price_m");  assert.match(stripe.calls[0].form.get("success_url"), /\/account\?checkout=success&session_id=\{CHECKOUT_SESSION_ID\}#billing$/);
 });
 
 test("yearly checkout uses the yearly price, and its webhooks give a year of access", async () => {
@@ -356,4 +390,60 @@ test("billing portal is only for people with a paid plan", async () => {
   assert.equal(me.data.billing_portal, false);
   const anon = await call(ctx, "POST", "/api/billing/portal", { body: {} });
   assert.equal(anon.status, 401);
+});
+
+test("a profile the buyer already owns cannot be bought twice", async () => {
+  const { ctx, stripe } = liveEnv();
+  const { token, user } = await register(ctx, "owner-twice@example.com");
+  const first = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  const done = await signedWebhook(
+    ctx,
+    event("evt_owned_1", "checkout.session.completed", {
+      id: first.data.id,
+      object: "checkout.session",
+      payment_status: "paid",
+      client_reference_id: String(user.id),
+      metadata: { user_id: String(user.id), item_id: "king-oyster-thick-stem" },
+    })
+  );
+  assert.equal(done.status, 200, JSON.stringify(done.data));
+  const profile = await call(ctx, "GET", "/api/profiles/king-oyster-thick-stem", { token });
+  assert.equal(profile.data.unlocked, true);
+  const callsBefore = stripe.calls.length;
+  const again = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(again.status, 409);
+  assert.deepEqual(again.data, { error: "already owned" });
+  assert.equal(stripe.calls.length, callsBefore, "no second Stripe session");
+});
+
+test("webhook events for an unknown user or checkout are skipped with a 200, so Stripe stops retrying", async () => {
+  const { ctx } = liveEnv();
+  const logs = [];
+  const orig = console.log;
+  console.log = (line) => logs.push(String(line));
+  try {
+    const meta = { user_id: "999999", item_id: "grow-coach" };
+    const end = unix(Date.now()) + 30 * 86400;
+    const events = [
+      event("evt_ghost_inv", "invoice.paid", { id: "in_ghost", object: "invoice", parent: { subscription_details: { metadata: meta } }, lines: { data: [{ metadata: meta, period: { end } }] } }),
+      event("evt_ghost_upd", "customer.subscription.updated", { id: "sub_ghost", object: "subscription", status: "canceled", metadata: meta }),
+      event("evt_ghost_del", "customer.subscription.deleted", { id: "sub_ghost", object: "subscription", status: "canceled", metadata: meta }),
+      event("evt_ghost_cs", "checkout.session.completed", { id: "cs_test_ghost", object: "checkout.session", payment_status: "paid", metadata: meta }),
+      event("evt_ghost_exp", "checkout.session.expired", { id: "cs_test_ghost", object: "checkout.session", metadata: meta }),
+    ];
+    for (const evt of events) {
+      const res = await signedWebhook(ctx, evt);
+      assert.equal(res.status, 200, `${evt.type}: ${JSON.stringify(res.data)}`);
+      assert.equal(res.data.ignored, true, evt.type);
+      assert.match(res.data.reason, /^unknown (user|checkout)$/, evt.type);
+      const again = await signedWebhook(ctx, evt);
+      assert.equal(again.data.replayed, true, `${evt.type} is recorded, so a resend is a no-op`);
+    }
+    assert.equal(await ctx.db.one("SELECT * FROM coach_subs WHERE user_id=?", [999999]), null);
+    const skipped = logs.filter((l) => l.includes("stripe event skipped"));
+    assert.equal(skipped.length, events.length);
+  } finally {
+    console.log = orig;
+  }
 });

@@ -26,6 +26,7 @@ export const OWNER_LINKS = [
   { href: "/what-happened-to-shrooly", label: "What happened to Shrooly?" },
   { href: "/reuse-your-shrooly", label: "Reuse your Shrooly" },
   { href: "/shrooly-faq", label: "Shrooly FAQ" },
+  { href: "/beta", label: "Join the beta" },
 ];
 
 /** Small legal links at the bottom of every footer. Stripe needs Privacy and Terms reachable from every page. */

@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { laterIso, nowIso, randomToken, sha256Hex } from "../src/crypto.js";
 import { allowedOrigins, pickCorsOrigin, withCors } from "../src/handlers.js";
@@ -148,7 +148,18 @@ test("magic link sign-in creates a verified user and session cookie", async () =
   const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@example.com"]);
   assertPublicHandle(row, done.data.user);
   const reuse = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
-  assert.equal(reuse.status, 401);
+  assert.equal(reuse.status, 401);  // The site labels its analytics sign_up vs login from this boolean.
+  assert.equal(done.data.new_account, true);
+  // An hour later the same email signing in is a login.
+  mock.timers.enable({ apis: ["Date"], now: Date.now() + 3600000 });
+  try {
+    const again = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "grower@example.com", turnstile: "ok" } });
+    const second = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: again.data.debug_token } });
+    assert.equal(second.status, 200);
+    assert.equal(second.data.new_account, false);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test("OIDC Google stub and passkey challenge", async () => {
@@ -191,8 +202,11 @@ test("refresh rotation and logout-everywhere", async () => {
   const replay = await call(ctx, "POST", "/api/auth/refresh", { body: { refresh_token: session.refresh_token } });
   assert.equal(replay.status, 401);
   await call(ctx, "POST", "/api/auth/logout-all", { token: rotated.data.access_token, body: {} });
-  const me = await call(ctx, "GET", "/api/me", { token: session.token });
-  assert.equal(me.status, 200);
+  // Sign out everywhere ends every sign-in access token, the old one and the rotated one.
+  for (const token of [session.token, rotated.data.access_token]) {
+    const me = await call(ctx, "GET", "/api/me", { token });
+    assert.equal(me.status, 401);
+  }
 });
 
 test("unverified email cannot publish (blocked when email_verified=0)", async () => {

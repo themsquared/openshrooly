@@ -22,6 +22,8 @@
   <meta name="twitter:description" content="Shrooly app not working? Install free OpenShrooly firmware from your browser, then grow oyster, lion's mane, and more with stage by stage profiles.">
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/","description":"Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.","logo":"https://shroomlabs.io/apple-touch-icon.png","sameAs":["https://github.com/themsquared/openshrooly"]},{"@type":"WebSite","@id":"https://shroomlabs.io/#website","url":"https://shroomlabs.io/","name":"Shroom Labs","description":"Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.","inLanguage":"en","publisher":{"@id":"https://shroomlabs.io/#org"},"potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://shroomlabs.io/?q={search_term_string}#library"},"query-input":"required name=search_term_string"}}]}</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RKQ4CBEZWY"></script>
+  <script src="/js/ga.js" defer></script>
   <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -50,6 +52,7 @@
           <a class="button hero-cta" id="get-started" href="/install">Install on your Shrooly</a>
           <a class="text-link hero-browse" href="/what-happened-to-shrooly">What happened to Shrooly?</a>
         </div>
+        <p class="hero-beta"><span class="beta-badge">Beta</span> Free beta, first 50 chambers. <a class="text-link" href="/beta">Join the beta</a></p>
         <form class="search-bar" method="get" role="search" action="#library">
           <input type="hidden" name="pack" id="pack" value="culinary">
           <label>Search Profiles
@@ -61,6 +64,7 @@
       </div>
     </section>
     <section class="owners-strip" aria-label="Shrooly owners start here">
+      <a class="owner-card owner-card-beta" href="/beta"><strong>Join the beta</strong><span>Free for the first 50 chambers. What you get and what we ask.</span></a>
       <a class="owner-card" href="/reuse-your-shrooly"><strong>Reuse your Shrooly</strong><span>What you get, what it costs, and how to go back.</span></a>
       <a class="owner-card" href="/what-happened-to-shrooly"><strong>What happened to Shrooly?</strong><span>What we can confirm, with sources.</span></a>
       <a class="owner-card" href="/shrooly-faq"><strong>Shrooly FAQ</strong><span>App not working, refunds, bricked units, firmware.</span></a>
@@ -69,10 +73,12 @@
       <div class="library-toolbar">
         <div class="pack-toggle browse-filters" role="group" aria-label="Browse filter">
           <button type="button" id="pack-culinary" class="filter-chip" aria-pressed="true">Culinary</button>
+          <button type="button" id="pack-chef" class="filter-chip chef" aria-pressed="false">Chef's line</button>
           <button type="button" id="pack-offmenu" class="filter-chip off-menu" aria-pressed="false">Off-menu</button>
         </div>
-        <p class="pack-hint">A few varieties stay off the printed menu. Open them only if growing them is legal where you live.</p>
+        <p class="pack-hint" id="pack-hint">A few varieties stay off the printed menu. Open them only if growing them is legal where you live.</p>
       </div>
+      <p id="chef-intro" class="chef-intro hidden">Chef's line: specialty methods for a better plate, like dense lion's mane, flower cap shiitake, and thick king oyster stems. Each is a one-time purchase. Once you buy one, it stays in your account for good. <a href="/chefs-line">See the whole line</a>.</p>
       <p id="legal" class="legal legal-prominent hidden">Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.</p>
       <div id="cards" class="cards"></div>
       <p id="see-all-row" class="see-all-row hidden"><button type="button" id="see-all" class="ghost">See all</button></p>
@@ -90,7 +96,7 @@
   <footer class="site-footer" data-chrome="footer">
     <p>Works with Shrooly devices running OpenShrooly.</p>
     <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
-    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <nav class="footer-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>

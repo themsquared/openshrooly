@@ -6,27 +6,28 @@ import {
   coachAutopilotAvailable,
   coachAutopilotFlagOn,
   getAutopilotStatus,
+  listAutopilotActions,
+  previewAutopilotSuggestion,
+  resolveAllowedProfile,
   runAutopilotForDevice,
   setDeviceAutopilotMode,
   undoAutopilotAction,
 } from "./coach-autopilot.js";
 import { requireVerified, userFromRequest } from "./auth.js";
+import { enrichDevice } from "./fleet.js";
 import { ValidationError, isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
 import { startCheckout } from "./payments.js";
 import { coachPriceId } from "./stripe.js";
 import {
   comingSoonBody,
-  capabilities,
-  coachAiConfigured,
   coachPublicEnabled,
   devStubsEnabled,
-  isCoachBetaUser,
   paymentsConfigured,
 } from "./providers.js";
-import { bytesToBase64, decodePhotoBase64, sanitizeGrowPhoto } from "./photos.js";
+import { betaActive, coachAccess, hasPaidCoach, linkedChamberCount } from "./coach-access.js";
+import { addVisionUsage, askVision, photoCheckOptions, preparePhotoCheck, visionNeurons } from "./coach-photo.js";
 import { readJsonLimited } from "./http-body.js";
-import { insertMedia, pendingPhotoKey } from "./media-acl.js";
 import {
   COACH_ITEM,
   COACH_PERIOD_DAYS,
@@ -49,7 +50,7 @@ export const CHAT_CAP = 40;
 export const PHOTO_CAP = 8;
 /**
  * Cost caps in Workers AI neurons ($0.011 per 1,000). A chat is about 10 neurons and a photo check
- * about 25, so these never bite normal use. They stop a runaway client from costing real money.
+ * about 35 (Llama 4 Scout, measured), so these never bite normal use. They stop a runaway client from costing real money.
  * Per user: 3,000 a day and 20,000 a month (about $0.22 a month, well under the plan price).
  * Everyone together: 100,000 a day (about $1.10). All four are overridable with env vars.
  */
@@ -108,24 +109,20 @@ export function coachCatalog(env = {}, request) {
     plans: coachPlans(env, request),
     pack: "culinary",
     summary:
-      "Coaching for culinary grows that uses your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later. Not sold or marketed with off-menu varieties.",
+      "Coaching for culinary grows that uses your device's readings and your past grows to tailor humidity and temperature advice. Snap a photo of your grow for a quick check. Not sold or marketed with off-menu varieties.",
   };
 }
 
-export function coachBetaAccess(env, user) {
-  return Boolean(user && isCoachBetaUser(env, user) && coachAiConfigured(env));
-}
+export { hasPaidCoach };
 
-export async function hasPaidCoach(db, user) {
-  if (!user) return false;
-  const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
-  // The subscription row is the only source of truth, so a cancel takes access away.
-  return Boolean(sub && sub.status === "active" && sub.period_end >= nowIso());
-}
-
+/** Paid, beta or comp access (src/coach-access.js). Chat and photo checks still need AI turned on to answer. */
 export async function hasGrowCoach(db, user, env = {}) {
-  if (coachBetaAccess(env, user)) return true;
-  return hasPaidCoach(db, user);
+  return (await coachAccess(env, db, user)).entitled;
+}
+
+/** Coach is open to the public (COACH_PUBLIC=1) and the kill switch is on. Checkout readiness is separate. */
+export function coachOpen(env = {}) {
+  return coachPublicEnabled(env) && coachAutopilotFlagOn(env);
 }
 
 /**
@@ -139,32 +136,27 @@ export function coachForSale(env = {}, request) {
   return coachPlanOnSale(env, request, "monthly") || coachPlanOnSale(env, request, "yearly");
 }
 
-/** Coach shows up for this visitor: beta or paying users, or anyone while it is on sale. */
+/** Coach shows up for this visitor: anyone with access, or everyone while Coach is open to the public. */
 export async function coachVisible(env, db, user, request) {
-  if (await coachAutopilotAvailable(env, db, user)) return true;
-  return coachForSale(env, request);
+  if (coachOpen(env)) return true;
+  return coachAutopilotAvailable(env, db, user);
 }
 
+/**
+ * Every Coach and Autopilot route: 401 signed out, 404 while Coach is hidden from this user
+ * (kill switch off, or not public and no access), 402 when Coach is public but this user has
+ * no paid, beta or comp access.
+ */
 async function requireCoach(request, db, env) {
   const { user } = await userFromRequest(request, db);
   requireVerified(user);
-  if (!(await coachAutopilotAvailable(env, db, user))) {
-    throw new ValidationError("not found", 404);
-  }
-  if (!(await hasGrowCoach(db, user, env))) {
-    throw new ValidationError("Grow Coach chat is not turned on for this account yet.", 402);
-  }
-  return user;
+  if (!coachAutopilotFlagOn(env)) throw new ValidationError("not found", 404);
+  if (await coachAutopilotAvailable(env, db, user)) return user;
+  if (coachOpen(env)) throw new ValidationError("Grow Coach needs a plan for this account. Pick one on the Coach page.", 402);
+  throw new ValidationError("not found", 404);
 }
 
-async function requireAutopilotUser(request, db, env) {
-  const { user } = await userFromRequest(request, db);
-  requireVerified(user);
-  if (!(await coachAutopilotAvailable(env, db, user))) {
-    throw new ValidationError("not found", 404);
-  }
-  return user;
-}
+const requireAutopilotUser = requireCoach;
 
 function dayKey() {
   return nowIso().slice(0, 10);
@@ -340,23 +332,114 @@ export function slimGrounding(grounding) {
   };
 }
 
+/** Owned chambers that still belong to the account, oldest first. */
+async function ownedChambers(db, user) {
+  const rows = (await db.all("SELECT * FROM cloud_devices WHERE owner_id=?", [user.id])) || [];
+  return rows
+    .filter((row) => row.status !== "revoked")
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")) || String(a.id).localeCompare(String(b.id)));
+}
+
+function setpointsDiffer(suggestion, current, { fan = false } = {}) {
+  const apart = (a, b, tolerance) => a != null && (b == null || Math.abs(Number(a) - Number(b)) >= tolerance);
+  return (
+    apart(suggestion.temperature_c, current.temperature_c, 0.5) ||
+    apart(suggestion.humidity_percent, current.humidity_percent, 1) ||
+    (fan && apart(suggestion.fan_speed_percent, current.fan_speed_percent, 5))
+  );
+}
+
+/** What Coach recommends for one chamber now: things to check, a setpoint suggestion, and any Autopilot change still on its way. */
+async function chamberRecommendation(db, user, row, device, autopilot, actions, now) {
+  const todo = (device.alerts || []).map((a) => ({ kind: a.kind, message: a.message }));
+  const pending = (actions || []).find((a) => a.action === "apply" && a.outcome === "waiting") || null;
+  const profileId = autopilot.mode === "autopilot" ? autopilot.profile_id || device.profile?.id : device.profile?.id || autopilot.profile_id;
+  const base = { profile_id: profileId || null, stage: null, suggestion: null, current: device.setpoints, differs: false, todo, pending };
+  if (!profileId) return { ...base, note: "Pick what you're growing so Coach knows the targets." };
+  const resolved = await resolveAllowedProfile(db, profileId);
+  if (resolved.error || !resolved.profile) return { ...base, note: resolved.error || "Pick a published culinary profile." };
+  const samples = await loadRecentTelemetry(db, row.id, { now });
+  const preview = await previewAutopilotSuggestion(db, { device: row, user, profile: resolved.profile, samples, now });
+  if (!preview) return { ...base, note: "Coach needs a reading from the chamber before it can suggest anything." };
+  for (const alert of preview.alerts || []) todo.push({ kind: alert.kind, message: alert.message });
+  const fan = Boolean(device.controls?.fan?.supported);
+  const s = preview.suggestion;
+  const suggestion = {
+    temperature_c: s.temperature_c,
+    humidity_percent: s.humidity_percent,
+    fan_speed_percent: fan ? s.fan_speed_percent : null,
+    reasons: s.reasons || [],
+    within_bounds: Boolean(s.within_bounds),
+  };
+  return {
+    ...base,
+    stage: { id: preview.stage_id, name: preview.stage_name },
+    suggestion,
+    differs: setpointsDiffer(suggestion, device.setpoints || {}, { fan }),
+  };
+}
+
+/** Everything the Coach page needs per chamber: status, Coach mode, and recommendations. Read only. */
+export async function coachOverview(db, env, user, { now = Date.now() } = {}) {
+  const chambers = [];
+  for (const row of await ownedChambers(db, user)) {
+    const device = await enrichDevice(db, env, user, row, { now, coachAvailable: true });
+    if (device.off_menu) {
+      // Off-menu grows get no Coach: name and check-in status only. No grow details, mode, or suggestions.
+      const { id, name, status, online, last_seen_at, linked_at, created_at } = device;
+      chambers.push({
+        device: { id, name, status, online, last_seen_at, linked_at, created_at, off_menu: true, profile: null, reading: null },
+        autopilot: null,
+        recommendation: null,
+      });
+      continue;
+    }
+    const { actions, ...autopilot } = await getAutopilotStatus(db, env, user, row.id);
+    const recommendation = await chamberRecommendation(db, user, row, device, autopilot, actions, now);
+    chambers.push({ device, autopilot, recommendation });
+  }
+  return { chambers, generated_at: new Date(now).toISOString() };
+}
+
+export const DECISIONS_PAGE = 10;
+
+/** Autopilot decisions across the account's chambers, newest first. Page with `before` (the last id shown). */
+export async function coachDecisions(db, user, { deviceId = null, before = null, limit = DECISIONS_PAGE } = {}) {
+  const size = Math.min(50, Math.max(1, Number(limit) || DECISIONS_PAGE));
+  const chambers = (await ownedChambers(db, user)).filter((row) => !deviceId || row.id === deviceId);
+  const names = new Map(chambers.map((row) => [row.id, row.name]));
+  const merged = [];
+  for (const row of chambers) {
+    merged.push(...(await listAutopilotActions(db, row.id, size + 1, { beforeId: before })));
+  }
+  merged.sort((a, b) => b.id - a.id);
+  const page = merged.slice(0, size).map((entry) => ({ ...entry, device_name: names.get(entry.device_id) || "Chamber" }));
+  const hasMore = merged.length > size;
+  return { decisions: page, has_more: hasMore, next_before: hasMore && page.length ? page[page.length - 1].id : null };
+}
+
 export async function handleCoach(method, path, url, request, env) {
-  const { db, storage } = env;
+  const { db } = env;
 
   if (method === "GET" && path === "/api/coach") {
     const { user } = await userFromRequest(request, db);
     const autopilot = await coachAutopilotAvailable(env, db, user);
+    const open = coachOpen(env);
     const forSale = coachForSale(env, request);
-    // Hidden for everyone except beta and paying users, unless Mike has put Coach on sale.
-    if (!autopilot && !forSale) return json({ available: false });
-    const beta = coachBetaAccess(env, user);
-    const entitled = user ? await hasGrowCoach(db, user, env) : false;
+    // Hidden for everyone without access unless Coach is open to the public (COACH_PUBLIC=1).
+    if (!autopilot && !open && !forSale) return json({ available: false });
+    const access = await coachAccess(env, db, user);
+    const entitled = autopilot && access.entitled;
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
     return json({
       available: true,
       product: coachCatalog(env, request),
       entitled,
-      beta,
+      // `beta` means free access (beta chamber or comp). `access` says which one, or "paid".
+      beta: entitled && access.via !== "paid",
+      access: entitled ? access.via : null,
+      beta_active: betaActive(env),
+      chambers: user ? await linkedChamberCount(db, user) : 0,
       signed_in: Boolean(user),
       for_sale: forSale,
       auto_tune: Boolean(Number(sub?.auto_tune)),
@@ -377,11 +460,11 @@ export async function handleCoach(method, path, url, request, env) {
     if (body.pack === "psilocybin") {
       throw new ValidationError("Grow Coach is not sold or marketed with off-menu varieties.", 400);
     }
-    // While COACH_PUBLIC is off, only beta users can reach checkout, and only once Stripe is set up.
-    // That lets Mike test real checkout on prod without putting Coach on sale to anyone else.
+    // Public: any signed-in user can reach checkout once Stripe is set up. While COACH_PUBLIC is
+    // off, only users who already have access can, so Mike can test real checkout on prod.
     const isPublic = coachPublicEnabled(env);
     const checkoutReady = paymentsConfigured(env) || (isPublic && devStubsEnabled(env, request));
-    if ((!isPublic || !checkoutReady) && !(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
+    if (!isPublic && !(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
     if (!checkoutReady) {
       return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }
@@ -403,7 +486,7 @@ export async function handleCoach(method, path, url, request, env) {
       plan,
       priceId: coachPriceId(env, plan),
       name: "Grow Coach",
-      successPath: "/account?checkout=success#billing",
+      successPath: "/account?checkout=success&session_id={CHECKOUT_SESSION_ID}#billing",
       cancelPath: "/coach?checkout=cancel",
     });
     if (!session.ok) return json({ error: session.error, coming_soon: session.status === 503 }, session.status || 503);
@@ -488,6 +571,23 @@ export async function handleCoach(method, path, url, request, env) {
     return json(result);
   }
 
+  if (method === "GET" && path === "/api/coach/overview") {
+    const user = await requireAutopilotUser(request, db, env);
+    return json(await coachOverview(db, env, user));
+  }
+
+  if (method === "GET" && path === "/api/coach/decisions") {
+    const user = await requireAutopilotUser(request, db, env);
+    const before = Number(url.searchParams.get("before"));
+    return json(
+      await coachDecisions(db, user, {
+        deviceId: url.searchParams.get("device_id") || null,
+        before: Number.isFinite(before) && before > 0 ? before : null,
+        limit: url.searchParams.get("limit"),
+      })
+    );
+  }
+
   if (method === "POST" && path === "/api/coach/autopilot/mode") {
     const user = await requireAutopilotUser(request, db, env);
     const body = await request.json().catch(() => ({}));
@@ -561,37 +661,44 @@ export async function handleCoach(method, path, url, request, env) {
     });
   }
 
+  if (method === "GET" && path === "/api/coach/photo") {
+    const user = await requireCoach(request, db, env);
+    const options = await photoCheckOptions(db, env, user);
+    const row = await usageRow(db, user.id);
+    return json({
+      available: createModelProvider(env, request).name !== "disabled",
+      ...options,
+      usage: { photos: Number(row.photos || 0), cap: coachCaps(env).photos },
+    });
+  }
+
   if (method === "POST" && path === "/api/coach/photo") {
     const user = await requireCoach(request, db, env);
-    const body = await readJsonLimited(request);
-    if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
-      throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
-    }
-    await assertCap(db, env, user.id, "photos");
-    if (!body.photo_base64) throw new ValidationError("photo_base64 required");
-    const photo = sanitizeGrowPhoto(decodePhotoBase64(body.photo_base64));
-    const caps = capabilities(env, request);
-    if (!caps.photos) return json({ error: "Photo checks are coming later.", coming_soon: true }, 503);
-    const key = pendingPhotoKey("coach", String(user.id), photo.ext);
-    await storage.put(key, photo.bytes, photo.contentType);
-    await insertMedia(db, { photo_key: key, owner_id: user.id, status: "pending", kind: "coach" });
     const provider = createModelProvider(env, request);
-    const result = await provider.vision({ imageBase64: bytesToBase64(photo.bytes), hint: body.hint || body.notes || "" });
+    if (provider.name === "disabled") return json({ error: "Photo checks are not turned on yet.", coming_soon: true }, 503);
+    const body = await readJsonLimited(request);
+    // Validates the photo, strips EXIF and location, refuses off-menu grows, and builds context.
+    const prepared = await preparePhotoCheck(db, env, user, body);
+    await assertCap(db, env, user.id, "photos");
+    let result;
+    try {
+      result = await askVision(provider, prepared);
+    } catch (err) {
+      console.error(JSON.stringify({ event: "coach_photo_error", user_id: user.id, message: String(err?.message || err).slice(0, 200) }));
+      return json({ error: "The photo check did not finish. Try again in a minute." }, 502);
+    }
     if (result.unavailable) return json(comingSoonBody("Grow Coach"), 503);
-    const neurons = estimateNeurons({
-      inputTokens: result.input_tokens,
-      outputTokens: result.output_tokens,
-      vision: true,
-    });
+    const neurons = visionNeurons(result.model, result.usage);
     await bumpUsage(db, user.id, "photos", neurons);
+    await addVisionUsage(db, user.id, neurons);
+    const row = await usageRow(db, user.id);
+    // The photo is not stored anywhere. Only the recommendation goes back.
     return json({
-      photo_key: key,
-      stage: result.stage,
-      flags: result.flags,
-      confidence: result.confidence,
-      next_steps: result.next_steps,
+      recommendation: result.recommendation,
+      context: { source: prepared.context.source, label: prepared.context.label },
       provider: provider.name,
       neurons,
+      usage: { photos: Number(row.photos || 0), cap: coachCaps(env).photos },
     });
   }
 

@@ -127,8 +127,8 @@ test("chat and photo check are gated until Grow Coach is paid", async () => {
   const ctx = env();
   const { token } = await register(ctx);
   const denied = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
-  assert.equal(denied.status, 404);
-  assert.doesNotMatch(JSON.stringify(denied.data), /3\.99|4\.99|Grow Coach/);
+  assert.equal(denied.status, 402);
+  assert.doesNotMatch(JSON.stringify(denied.data), /3\.99/);
   // COACH_PUBLIC=1 in the test env, so the catalog is on sale but not unlocked.
   const catalog = await call(ctx, "GET", "/api/coach", { token });
   assert.equal(catalog.data.available, true);
@@ -205,22 +205,18 @@ test("approved suggestion can queue setpoints; body auto flag cannot skip approv
   assert.equal(autoApply.data.suggestion.auto_eligible, true);
 });
 
-test("photo check returns stage flags and next steps", async () => {
+test("photo check returns a recommendation and chat caches", async () => {
   const ctx = env();
   const { token } = await register(ctx, "photo@example.com");
   await subscribe(ctx, token);
   const photo = await call(ctx, "POST", "/api/coach/photo", {
     token,
-    body: { photo_base64: toBase64(buildJpeg()), hint: "green mold on the block" },
+    body: { photo_base64: toBase64(buildJpeg()), note: "green mold on the block" },
   });
   assert.equal(photo.status, 200, JSON.stringify(photo.data));
-  assert.ok(photo.data.flags.some((f) => f.kind === "contamination"));
-  assert.match(photo.data.next_steps, /Isolate/i);
-  assert.match(photo.data.photo_key, /^pending\/coach\/[0-9a-f]+\.(jpe?g|png|webp)$/);
-  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`);
-  assert.equal(anon.status, 404);
-  const owner = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`, { token });
-  assert.equal(owner.status, 200);
+  assert.ok(photo.data.recommendation.issues.some((i) => i.severity === "high"));
+  assert.ok(photo.data.recommendation.next_steps.some((s) => /Isolate/i.test(s)));
+  assert.equal(photo.data.photo_key, undefined);
 
   const first = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
   assert.equal(first.status, 200);
@@ -387,9 +383,11 @@ test("tokens without ENVIRONMENT=local do not open Coach REST", async () => {
   const { token, user } = await register(ctx, "no-rest@example.com");
   ctx.COACH_BETA_USER_IDS = String(user.id);
   const catalog = await call(ctx, "GET", "/api/coach", { token });
-  assert.equal(catalog.data.beta, false);
+  // Comp access is on, but REST never runs: chat falls back to the local stub.
+  assert.equal(catalog.data.beta, true);
   const chat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "hi" } });
-  assert.equal(chat.status, 402);
+  assert.equal(chat.status, 200, JSON.stringify(chat.data));
+  assert.equal(chat.data.provider, "stub");
 });
 
 test("oyster fruiting grounding uses the profile warning band, not a 14-16 C lore range", () => {

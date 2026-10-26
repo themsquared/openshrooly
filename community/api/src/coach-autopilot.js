@@ -2,8 +2,8 @@
 
 import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
-import { isCoachBetaUser } from "./providers.js";
-import { chamberKnobs, deviceCapabilities, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
+import { coachAccess } from "./coach-access.js";
+import { chamberKnobs, deviceCapabilities, KNOBS, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
 import { knobTargets, knobsMismatch, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
 import {
   applyJevDecision,
@@ -26,6 +26,7 @@ import {
   READINGS_STALE_MINUTES,
   READINGS_STALE_MS,
   buildDeviceModel,
+  detectAlerts,
   latestReading,
   loadRecentTelemetry,
   parseTelemetry,
@@ -58,12 +59,11 @@ export function coachAutopilotFlagOn(env = {}) {
   return String(env.COACH_AUTOPILOT_ENABLED || "") === "1";
 }
 
+/** Can this user use Coach and Autopilot right now: kill switch on, plus paid, beta or comp access (src/coach-access.js). */
 export async function coachAutopilotAvailable(env, db, user) {
   if (!coachAutopilotFlagOn(env)) return false;
   if (!user) return false;
-  if (isCoachBetaUser(env, user)) return true;
-  const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
-  return Boolean(sub && sub.status === "active" && sub.period_end >= nowIso());
+  return (await coachAccess(env, db, user)).entitled;
 }
 
 export const AUTOPILOT_SOURCES = new Set(["grow-coach-autopilot", "grow-coach-autopilot-undo"]);
@@ -451,23 +451,127 @@ async function updateLogStatus(db, { id, commandId, applyStatus }) {
   }
 }
 
-export async function listAutopilotActions(db, deviceId, limit = 12) {
-  const rows = await db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", [
-    deviceId,
-    limit,
-  ]);
-  return (rows || []).map((row) => ({
-      id: row.id,
-      action: row.action,
-      old_value: parseJson(row.old_value),
-      new_value: parseJson(row.new_value),
-      reason: row.reason,
-      readings: parseJson(row.readings),
-      undone_at: row.undone_at || null,
-      command_id: row.command_id == null ? null : Number(row.command_id),
-      apply_status: row.apply_status || null,
-      created_at: row.created_at,
+const LIST_ACTIONS_SQL = "SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?";
+const LIST_ACTIONS_BEFORE_SQL = "SELECT * FROM coach_autopilot_log WHERE device_id=? AND id<? ORDER BY id DESC LIMIT ?";
+
+/** Fields a decision can change, in the order the page lists them. "fan" reads air_exchange_speed, then fan_speed_percent. */
+const CHANGE_FIELDS = [
+  { key: "temperature_c", label: "Temperature", unit: "°C" },
+  { key: "humidity_percent", label: "Humidity", unit: "%" },
+  { key: "fan", label: "Fan", unit: "%" },
+  ...KNOBS.filter((k) => k.key !== "air_exchange_speed").map((k) => ({
+    key: k.key,
+    label: k.label.charAt(0).toUpperCase() + k.label.slice(1),
+    unit: k.unit.trim(),
+  })),
+  { key: "grow_phase", label: "Phase", unit: "" },
+];
+/** Jev knob name to the change field it moves. */
+const JEV_KNOB_FIELD = { temperature: "temperature_c", humidity: "humidity_percent", fan: "fan", light: "white_intensity" };
+const NOT_APPLIED = new Set(["failed", "expired", "refused"]);
+
+function changeValue(values, key) {
+  if (key === "fan") return values.air_exchange_speed ?? values.fan_speed_percent ?? null;
+  return values[key] ?? null;
+}
+
+function sameValue(a, b) {
+  const x = num(a);
+  const y = num(b);
+  if (x != null && y != null) return Math.abs(x - y) < 1e-9;
+  return String(a) === String(b);
+}
+
+/**
+ * What a log row changed, knob by knob. Apply and undo rows store from in old_value and to in
+ * new_value; failed, expired and refused rows store them the other way round.
+ */
+export function autopilotChanges(action, oldValue, newValue) {
+  if (!oldValue || !newValue || typeof oldValue !== "object" || typeof newValue !== "object") return [];
+  const [from, to] = NOT_APPLIED.has(action) ? [newValue, oldValue] : [oldValue, newValue];
+  const out = [];
+  for (const field of CHANGE_FIELDS) {
+    const next = changeValue(to, field.key);
+    if (next == null) continue;
+    const prev = changeValue(from, field.key);
+    if (prev != null && sameValue(prev, next)) continue;
+    out.push({ key: field.key, label: field.label, unit: field.unit, from: prev, to: next });
+  }
+  return out;
+}
+
+/** Who made the call. Jev rows carry the decider audit in readings; rule rows carry none or a fallback note. */
+export function autopilotDecider(readings) {
+  const audit = readings && typeof readings === "object" ? readings.decider : null;
+  if (audit?.decider === "jev") {
+    const knobs = Object.entries(audit.knobs || {}).map(([knob, entry]) => ({
+      knob,
+      field: JEV_KNOB_FIELD[knob] || knob,
+      choice: entry?.choice ?? null,
+      confidence: num(entry?.confidence),
+      used: entry?.used === "jev",
     }));
+    const used = knobs.filter((k) => k.used && k.confidence != null);
+    return {
+      who: "jev",
+      model: audit.model || null,
+      confidence: used.length ? Math.min(...used.map((k) => k.confidence)) : null,
+      knobs,
+      abnormal: Boolean(audit.abnormal),
+    };
+  }
+  return { who: "rules", fallback: audit?.fallback || null };
+}
+
+function autopilotOutcome(row) {
+  if (row.undone_at) return "undone";
+  const status = String(row.apply_status || "");
+  if (status === "applied") return "applied";
+  if (status === "queued" || status === "sent") return "waiting";
+  if (NOT_APPLIED.has(status)) return "not_applied";
+  return null;
+}
+
+/** A log row for the page: parsed values plus what changed, who decided, whether it reached the chamber, and Undo. */
+export function describeAutopilotAction(row) {
+  const oldValue = parseJson(row.old_value);
+  const newValue = parseJson(row.new_value);
+  const readings = parseJson(row.readings);
+  const decider = autopilotDecider(readings);
+  const changes = autopilotChanges(row.action, oldValue, newValue);
+  if (decider.who === "jev") {
+    for (const change of changes) {
+      const knob = decider.knobs.find((k) => k.field === change.key && k.used);
+      if (knob) change.confidence = knob.confidence;
+    }
+  }
+  return {
+    id: Number(row.id),
+    device_id: row.device_id,
+    action: row.action,
+    old_value: oldValue,
+    new_value: newValue,
+    reason: row.reason,
+    readings,
+    undone_at: row.undone_at || null,
+    command_id: row.command_id == null ? null : Number(row.command_id),
+    apply_status: row.apply_status || null,
+    created_at: row.created_at,
+    changes,
+    decider,
+    outcome: autopilotOutcome(row),
+    undoable:
+      row.action === "apply" && !row.undone_at && ["queued", "applied"].includes(String(row.apply_status || "")) && Boolean(oldValue),
+  };
+}
+
+export async function listAutopilotActions(db, deviceId, limit = 12, { beforeId = null } = {}) {
+  const before = num(beforeId);
+  const rows =
+    before != null
+      ? await db.all(LIST_ACTIONS_BEFORE_SQL, [deviceId, before, limit])
+      : await db.all(LIST_ACTIONS_SQL, [deviceId, limit]);
+  return (rows || []).map(describeAutopilotAction);
 }
 
 function publicStatus(state, now = Date.now()) {
@@ -519,6 +623,38 @@ export async function getAutopilotStatus(db, env, user, deviceId) {
     delivery: state.delivery || inferDelivery(device),
     pending_command_id: state.pending_command_id || null,
     actions: available ? await listAutopilotActions(db, deviceId) : [],
+  };
+}
+
+/**
+ * What Coach would aim for on this chamber right now, using the same stage pick, model, and fan
+ * steering as an Autopilot pass. Read only: nothing is queued or logged. Null without a reading.
+ */
+export async function previewAutopilotSuggestion(db, { device, user, profile, samples, now = Date.now() } = {}) {
+  if (!device || !profile) return null;
+  const doc = latestDoc(samples);
+  const caps = deviceCapabilities(doc, device.device_type || "shrooly_chamber");
+  const knobs = chamberKnobs(doc);
+  const current = withKnobs(latestReading(samples, now), doc);
+  if (!current || (current.temperature == null && current.humidity == null)) return null;
+  const chosenStage = await chosenStageFor(db, device.id, profile.id);
+  const pick = pickAutopilotStage(profile, knobs, caps, { chosenStage });
+  const stage = expandStage(pick.stage);
+  const reports = await db.all("SELECT * FROM grow_reports WHERE author_id=?", [user.id]);
+  const model = buildDeviceModel(samples, (reports || []).filter((r) => !String(r.profile_id || "").includes("psilocybin")));
+  const suggestion = suggestSetpoints(model, stage, { reading: current });
+  const fanKnob = knobSupported(caps, "air_exchange_speed");
+  const fanSteer = fanKnob ? steerFan(stage, current, caps) : null;
+  if (fanSteer) {
+    suggestion.fan_speed_percent = fanSteer.fan;
+    if (fanSteer.reason) suggestion.reasons = [...(suggestion.reasons || []), fanSteer.reason];
+  }
+  return {
+    stage_id: pick.stageId,
+    stage_name: pick.stage?.name || pick.stageId || null,
+    suggestion,
+    fan_knob: fanKnob,
+    alerts: detectAlerts(model, samples, stage, now),
   };
 }
 

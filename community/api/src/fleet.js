@@ -259,11 +259,23 @@ function todayUtc(now = Date.now()) {
   return new Date(now).toISOString().slice(0, 10);
 }
 
-function growFromProfile(profile, stage, { day = null, startedOn = null } = {}) {
+/**
+ * Grow day convention, matching the chamber firmware (update_growing_screen.yaml):
+ * days count from 1. `grow_day` is the day of the whole grow (day 1 is the day it
+ * started); `stage_day` is the day inside the current stage, also from 1.
+ */
+function growFromProfile(profile, stage, { growDay = null, startedOn = null } = {}) {
   const stages = Array.isArray(profile?.stages) ? profile.stages : [];
   const total = stages.reduce((sum, item) => sum + (Number(item.duration_days) || 0), 0) || null;
+  const day = growDay != null && growDay !== "" && Number.isFinite(Number(growDay)) && Number(growDay) >= 1 ? Math.floor(Number(growDay)) : null;
+  const index = stage?.id ? stages.findIndex((item) => item.id === stage.id) : -1;
+  const stageDays = index >= 0 ? Number(stages[index].duration_days) || null : null;
+  // Day inside the stage, when the grow day actually falls in (or past) that stage.
+  const stageDay = day != null && index >= 0 ? day - daysBeforeStage(profile, stage.id) : null;
   return {
-    day: day != null && Number.isFinite(Number(day)) ? Number(day) : null,
+    grow_day: day,
+    stage_day: stageDay != null && stageDay >= 1 ? stageDay : null,
+    stage_days: stageDays,
     phase: stage?.name || stage?.id || null,
     started_on: startedOn || null,
     total_days: total,
@@ -279,11 +291,12 @@ async function loadGrowTracking(db, user, device, modeRow, current, now) {
   const tracked = profile && rules.grow?.started_on ? growStage(profile, rules.grow.started_on, todayUtc(now)) : null;
   const stageId = tracked?.stage?.id || current?.stage || null;
   const stage = stageFromProfile(profile, stageId);
-  const day = tracked?.day ?? current?.grow_day ?? null;
+  // growStage counts whole days elapsed (0 on the start date); the chamber already counts from 1.
+  const growDay = tracked ? (tracked.day >= 0 ? tracked.day + 1 : null) : current?.grow_day ?? null;
   return {
     profile,
     stage,
-    grow: growFromProfile(profile, stage, { day, startedOn: rules.grow?.started_on || null }),
+    grow: growFromProfile(profile, stage, { growDay, startedOn: rules.grow?.started_on || null }),
   };
 }
 
@@ -371,6 +384,16 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     chamber: knobs,
     chamber_light: lightFromKnobs(knobs),
     light: lightFromStage(stage),
+    // The recipe band for the current stage, so pages can show readings against it.
+    targets: stage.id
+      ? {
+          temperature_min: num(stage.temperature_target_min),
+          temperature_max: num(stage.temperature_target_max),
+          humidity_min: num(stage.humidity_target_min),
+          humidity_max: num(stage.humidity_target_max),
+          fan_speed_percent: num(stage.fan?.speed_percent ?? stage.fan_speed_percent),
+        }
+      : null,
     coach,
     firmware: caps.firmware,
     capabilities: { source: caps.source, firmware: caps.firmware, list: caps.list, ranges: caps.ranges, knob_ranges: caps.knob_ranges },
@@ -520,26 +543,29 @@ function requestIdFrom(payload = {}) {
   return raw ? String(raw).slice(0, 64) : null;
 }
 
-/** Whole days of the profile before `stageId` starts (day 0 for the first stage). */
+/** Whole days of the profile before `stageId` starts (0 for the first stage). */
 function daysBeforeStage(profile, stageId) {
   const stages = Array.isArray(profile?.stages) ? profile.stages : [];
   const index = stages.findIndex((s) => s.id === stageId);
   return Math.floor(stages.slice(0, Math.max(0, index)).reduce((sum, s) => sum + (Number(s.duration_days) || 0), 0));
 }
 
+/** The chamber's grow day (counted from 1) on the first day of `stageId`. */
+function firstGrowDayOfStage(profile, stageId) {
+  return daysBeforeStage(profile, stageId) + 1;
+}
+
 /** Day the grow would have started for `stageId` to be today's phase. */
 function startForStage(profile, stageId, now, reportedDay = null) {
   // The chamber's own grow day wins: use it when it puts the grow in the chosen stage,
   // and leave the start unset (the page shows the chamber's day) when it does not.
+  // The chamber counts from 1, so grow day 1 means it started today. 0 means it is not counting.
   const day = reportedDay == null || reportedDay === "" ? NaN : Number(reportedDay);
-  if (Number.isFinite(day) && day >= 0) {
-    const start = isoSeconds(now - Math.floor(day) * 86400000).slice(0, 10);
+  if (Number.isFinite(day) && day >= 1) {
+    const start = isoSeconds(now - (Math.floor(day) - 1) * 86400000).slice(0, 10);
     return growStage(profile, start, todayUtc(now))?.stage?.id === stageId ? start : null;
   }
-  const stages = Array.isArray(profile?.stages) ? profile.stages : [];
-  const index = stages.findIndex((s) => s.id === stageId);
-  const before = stages.slice(0, Math.max(0, index)).reduce((sum, s) => sum + (Number(s.duration_days) || 0), 0);
-  return isoSeconds(now - Math.floor(before) * 86400000).slice(0, 10);
+  return isoSeconds(now - daysBeforeStage(profile, stageId) * 86400000).slice(0, 10);
 }
 
 /** Make the applied profile the chamber's tracked grow so the Devices card and device page show it. */
@@ -603,8 +629,15 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   };
   const plan = validateFleetChange({ action, payload, profile, stage, currentSetpoints });
   const cloudKind = plan.ok && ["setpoints", "apply_profile", "schedule", "stage"].includes(plan.kind);
-  // The chamber's grow day only carries over for the same grow; otherwise it restarts at 0.
-  const growDay = plan.kind === "apply_profile" && caps.grow_day ? (trustReported && knobs.grow_day != null ? knobs.grow_day : daysBeforeStage(profile, plan.payload.stage)) : null;
+  // The chamber's grow day only carries over for the same grow. Otherwise send the grow day the
+  // stage starts on, counted from 1 like the chamber does (its grow_day setter ignores 0).
+  const reportedDay = Number(knobs.grow_day);
+  const growDay =
+    plan.kind === "apply_profile" && caps.grow_day
+      ? trustReported && Number.isFinite(reportedDay) && reportedDay >= 1
+        ? reportedDay
+        : firstGrowDayOfStage(profile, plan.payload.stage)
+      : null;
   const translated = cloudKind ? planForCapabilities(plan, caps, { stage, requested: payload, current: knobs, growDay }) : null;
   return { modeRow, profile, stage, current, caps, plan, translated, trustReported };
 }

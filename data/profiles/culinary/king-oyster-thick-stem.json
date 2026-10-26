@@ -8,23 +8,24 @@
   "pack": "culinary",
   "tags": [
     "culinary",
+    "chef",
     "intermediate",
-    "oyster",
-    "premium"
+    "oyster"
   ],
   "restricted": false,
-  "summary": "Cooler, drier fruiting to favor thick stems.",
-  "notes": "Demo premium profile for the community store. Same species as the free king oyster card.",
-  "chamber_notes": "Top-fruit in a shallow tray or restrict side pins. Top-dress with a thin casing if stems stay skinny.",
+  "summary": "Cooler, drier fruiting with controlled fresh air for thick, meaty stems you can slice into scallop-style rounds.",
+  "notes": "Fewer, larger pins beat a full flush of thin fruits. Pull extra pins early so one or two stems get the food.",
+  "chamber_notes": "Top-fruit in a shallow tray or restrict side pins. Top-dress with a thin casing if stems stay skinny. Chamber limits: there is no heater or cooler, so temperature targets only hold if the room sits near them. There is no CO2 sensor, so the fan schedule stands in for fresh air. The humidifier can only add moisture, so a low humidity target depends on dry room air.",
   "legal_notice": null,
   "source_notes": [
     {
-      "title": "Stamets",
-      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Stem morphology in P. eryngii responds to CO2 and humidity."
+      "title": "Journal of Life Science 2007, king oyster ventilation",
+      "detail": "Effects of various ventilation systems on CO2 and fruiting of P. eryngii in bottles, Journal of Life Science 17(1), 2007. The ventilation that held about 800 ppm CO2 beat a system at about 1,400 ppm for stipe length, cap diameter, yield, and quality, and cut rot.",
+      "url": "https://doi.org/10.5352/jls.2007.17.1.082"
     },
     {
-      "title": "Practice",
-      "detail": "Growers often drop humidity into the low 80s after pins set and keep fresh air moderate, not oyster-high."
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Stem morphology in P. eryngii responds to CO2 and humidity."
     }
   ],
   "stages": [
@@ -42,7 +43,7 @@
       "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 0,
+        "duration_hours": 0.0,
         "white_led_lux": 0,
         "red_percent": 0,
         "green_percent": 0,
@@ -69,7 +70,7 @@
       "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 12,
+        "duration_hours": 12.0,
         "white_led_lux": 92,
         "red_percent": 0,
         "green_percent": 0,
@@ -96,16 +97,16 @@
       "humidifier_speed_percent": 75.0,
       "light": {
         "sunrise_hour": 8,
-        "duration_hours": 12,
+        "duration_hours": 12.0,
         "white_led_lux": 92,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "fan": {
-        "period_min": 30,
-        "run_duration_s": 20,
-        "speed_percent": 20
+        "period_min": 20,
+        "run_duration_s": 25,
+        "speed_percent": 30
       },
       "notes": ""
     }
@@ -153,22 +154,22 @@
     ],
     "phases": {
       "colonization": {
-        "photoperiod_hours": 0,
-        "white_brightness_percent": 0,
+        "photoperiod_hours": 0.0,
+        "white_brightness_percent": 0.0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
       },
       "fruiting": {
-        "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 20.0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "pinning": {
-        "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 20.0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

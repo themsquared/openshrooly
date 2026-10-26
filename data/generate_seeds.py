@@ -340,7 +340,8 @@ def build_profiles() -> list[MushroomProfile]:
             variety_group="oyster",
             tags=["culinary", "intermediate", "oyster", "premium"],
             summary="Cooler, drier fruiting to favor thick stems.",
-            notes="Demo premium profile for the community store. Same species as the free king oyster card.",
+            # Chef's line: data/generate_chefs_line.py rewrites this card after this script runs.
+            notes="Fewer, larger pins beat a full flush of thin fruits. Pull extra pins early so one or two stems get the food.",
             chamber_notes="Top-fruit in a shallow tray or restrict side pins. Top-dress with a thin casing if stems stay skinny.",
             pricing=Pricing(kind="paid", amount_cents=299, currency="USD", creator_share_percent=70),
             allowed_payment_providers=["stripe"],

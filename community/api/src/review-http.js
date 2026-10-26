@@ -28,6 +28,8 @@ import {
   storePhoto,
   submitForReview,
 } from "./review.js";
+import { isOffMenu } from "./pack.js";
+import { queueIndexNow } from "./indexnow.js";
 import { decodePhotoBase64 } from "./photos.js";
 import { readJsonLimited } from "./http-body.js";
 
@@ -241,6 +243,12 @@ export async function handleReview(method, path, url, request, env, { seeds, par
     const row = await db.one("SELECT * FROM users WHERE id=?", [(await db.one("SELECT * FROM profiles WHERE id=?", [profile.id])).author_id]);
     const body = await readJson(request);
     const review = await approveReview(db, env, request, { profile, user, row, pack: body.pack });
+    // A newly published culinary profile may be a search page. The ping checks the live page first
+    // and skips it while profile pages from the community are noindex. Off-menu is never pinged.
+    const live = review?.live_document ? safeParse(review.live_document) : null;
+    if (Number(review?.published_live) === 1 && !Number(review?.offmenu_flag) && live && !isOffMenu(live)) {
+      queueIndexNow(request, [`/profiles/${encodeURIComponent(profile.id)}`]);
+    }
     return json({ review: reviewView(review) });
   }
 
@@ -332,3 +340,11 @@ async function serveStored(env, key) {
 }
 
 export { listPublicProfiles, publicDocument, parseProfile };
+
+function safeParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}

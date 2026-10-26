@@ -1,6 +1,6 @@
 # Photo credits
 
-Licensed photos on built-in Off-menu profile pages. Culinary card art is original generated harvest photography and is not listed here.
+Licensed photos on built-in Off-menu profile pages and Chef's line profile pages. Other culinary card art is original generated harvest photography and is not listed here. Chef's line photos show the species, not a harvest grown with that profile.
 
 Allowed licenses: public domain, CC0, CC BY, and CC BY-SA. No CC NC or ND. No AI-generated images presented as the species.
 
@@ -81,3 +81,135 @@ Allowed licenses: public domain, CC0, CC BY, and CC BY-SA. No CC NC or ND. No AI
 - License URL: https://creativecommons.org/publicdomain/zero/1.0/
 - Identification: generic cultivated Psilocybe cubensis. No freely licensed photo of the Treasure Coast strain was found, so the caption says it is not that strain.
 - Changes: Cropped. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Lion's Mane: dense white heads (Hericium erinaceus)
+
+- Profile: `lions-mane-dense-head`
+- Files: `lions-mane-dense-head-1200.webp`, `lions-mane-dense-head-640.webp`, `/og/lions-mane-dense-head.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Hericium_erinaceus_%28cultivated%29_%2848646657473%29.jpg
+- Author: Dr. Hans-Günter Wagner
+- License: CC BY-SA 2.0
+- License URL: https://creativecommons.org/licenses/by-sa/2.0/
+- Identification: Commons file title says cultivated Hericium erinaceus. The frame shows a white spined head. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Shiitake: flower cap (Lentinula edodes)
+
+- Profile: `shiitake-flower-cap`
+- Files: `shiitake-flower-cap-1200.webp`, `shiitake-flower-cap-640.webp`, `/og/shiitake-flower-cap.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Lentinula_edodes_20101113_c.jpg
+- Author: Batholith
+- License: Public domain
+- License URL: https://creativecommons.org/publicdomain/mark/1.0/
+- Identification: Commons page names this as shiitake, Lentinula edodes. The caps are not cracked flower caps. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Shiitake: thick winter cap (Lentinula edodes)
+
+- Profile: `shiitake-donko`
+- Files: `shiitake-donko-1200.webp`, `shiitake-donko-640.webp`, `/og/shiitake-donko.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Lentinula_edodes_20101113_a.jpg
+- Author: Batholith
+- License: Public domain
+- License URL: https://creativecommons.org/publicdomain/mark/1.0/
+- Identification: Commons page names this as shiitake, Lentinula edodes. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Cordyceps: deep orange under pink light (Cordyceps militaris)
+
+- Profile: `cordyceps-high-color`
+- Files: `cordyceps-high-color-1200.webp`, `cordyceps-high-color-640.webp`, `/og/cordyceps-high-color.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Cordyceps_Militaris.jpg
+- Author: mushroomclinicaltrials.com
+- License: CC BY 2.0
+- License URL: https://creativecommons.org/licenses/by/2.0/
+- Identification: Commons page describes these as Cordyceps militaris fruiting bodies. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Pearl Oyster: baby clusters (Pleurotus ostreatus)
+
+- Profile: `pearl-oyster-baby-clusters`
+- Files: `pearl-oyster-baby-clusters-1200.webp`, `pearl-oyster-baby-clusters-640.webp`, `/og/pearl-oyster-baby-clusters.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:20210719_Pleurotus_ostreatus_098-127.jpg
+- Author: Zinnmann
+- License: CC BY-SA 3.0
+- License URL: https://creativecommons.org/licenses/by-sa/3.0/
+- Identification: Commons page identifies this as cultivated Pleurotus ostreatus on wood chip substrate. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Pearl Oyster: dark cap (Pleurotus ostreatus)
+
+- Profile: `pearl-oyster-dark-cap`
+- Files: `pearl-oyster-dark-cap-1200.webp`, `pearl-oyster-dark-cap-640.webp`, `/og/pearl-oyster-dark-cap.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:20210718_Pleurotus_ostreatus_116-138.jpg
+- Author: Zinnmann
+- License: CC BY-SA 3.0
+- License URL: https://creativecommons.org/licenses/by-sa/3.0/
+- Identification: Commons page identifies these as young grey oyster, Pleurotus ostreatus, fruiting bodies from a growing kit. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Golden Oyster: deep yellow (Pleurotus citrinopileatus)
+
+- Profile: `golden-oyster-deep-yellow`
+- Files: `golden-oyster-deep-yellow-1200.webp`, `golden-oyster-deep-yellow-640.webp`, `/og/golden-oyster-deep-yellow.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Pleurotus_citrinopileatus_2017.jpg
+- Author: Innagasaki
+- License: CC0 1.0
+- License URL: https://creativecommons.org/publicdomain/zero/1.0/
+- Identification: Commons page names this as Pleurotus citrinopileatus. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Pink Oyster: bright pink (Pleurotus djamor)
+
+- Profile: `pink-oyster-bright`
+- Files: `pink-oyster-bright-1200.webp`, `pink-oyster-bright-640.webp`, `/og/pink-oyster-bright.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:20210628_Pleurotus_djamor_1.jpg
+- Author: Zinnmann
+- License: CC BY-SA 3.0
+- License URL: https://creativecommons.org/licenses/by-sa/3.0/
+- Identification: Commons page identifies this as cultivated pink oyster, Pleurotus djamor. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Beech Shimeji: tight bouquet (Hypsizygus marmoreus)
+
+- Profile: `beech-shimeji-bouquet`
+- Files: `beech-shimeji-bouquet-1200.webp`, `beech-shimeji-bouquet-640.webp`, `/og/beech-shimeji-bouquet.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Hypsizygus_marmoreus_Shimeji.jpg
+- Author: Batholith
+- License: Public domain
+- License URL: https://creativecommons.org/publicdomain/mark/1.0/
+- Identification: Commons page identifies this as cultivated Hypsizygus marmoreus in Japan. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Chestnut: long stem (Pholiota adiposa)
+
+- Profile: `chestnut-long-stem`
+- Files: `chestnut-long-stem-1200.webp`, `chestnut-long-stem-640.webp`, `/og/chestnut-long-stem.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Pholiota_adiposa_104243710.jpg
+- Author: bjoerns
+- License: CC BY-SA 4.0
+- License URL: https://creativecommons.org/licenses/by-sa/4.0/
+- Identification: Commons page names this as Pholiota adiposa. It is a wild find, not a cultivated block. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## Wood Ear: deep black (Auricularia)
+
+- Profile: `wood-ear-dark`
+- Files: `wood-ear-dark-1200.webp`, `wood-ear-dark-640.webp`, `/og/wood-ear-dark.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Wood_ear_mushroom_farm.jpg
+- Author: 트리오구
+- License: CC BY-SA 3.0
+- License URL: https://creativecommons.org/licenses/by-sa/3.0/
+- Identification: Commons page describes this as wood ear on a farm. The page does not name the Auricularia species. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.
+
+## King Oyster: thick-stem method (Pleurotus eryngii)
+
+- Profile: `king-oyster-thick-stem`
+- Files: `king-oyster-thick-stem-1200.webp`, `king-oyster-thick-stem-640.webp`, `/og/king-oyster-thick-stem.jpg`
+- Source page: https://commons.wikimedia.org/wiki/File:Pleurotus_eryngii_%281%29.jpg
+- Author: Fumikas Sagisavas
+- License: CC0 1.0
+- License URL: https://creativecommons.org/publicdomain/zero/1.0/
+- Identification: Commons page names this as Pleurotus eryngii. This photo was not grown with the profile.
+- Changes: Center cropped to 3:2. Resized. Converted to WebP. EXIF stripped. The Open Graph JPEG is a 1200 by 630 crop of the same frame.

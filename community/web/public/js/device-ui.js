@@ -21,23 +21,40 @@ export function speciesLine(device) {
 
 export function growLine(device) {
   const profile = device?.profile?.name || "";
-  const parts = [profile, phaseLine(device)].filter(Boolean);
-  return parts.join(" · ") || "No grow selected";
+  const parts = [profile, growDaysLine(device)].filter(Boolean);
+  return parts.join(". ") || "No grow selected";
 }
 
-/** Phase and grow day only, for places that already show the profile name. */
+function wholeDay(value) {
+  if (value == null || value === "") return null;
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+/**
+ * Stage and stage day, for places that already show the profile name: "Fruiting, day 2 of 12".
+ * Days count from 1, like the chamber's own screen.
+ */
 export function phaseLine(device) {
   const phase = device?.grow?.phase || device?.stage?.name || "";
-  const day = device?.grow?.day;
-  const total = device?.grow?.total_days;
-  const parts = [];
-  if (phase) parts.push(phase);
-  if (day != null && day !== "" && Number.isFinite(Number(day))) {
-    // The API counts days elapsed (0 on the day the grow starts). People count from day 1.
-    const shown = Math.max(1, Math.floor(Number(day)) + 1);
-    parts.push(total ? `day ${Math.min(shown, total)} of ${total}` : `day ${shown}`);
-  }
-  return parts.join(" · ");
+  const day = wholeDay(device?.grow?.stage_day);
+  const of = wholeDay(device?.grow?.stage_days);
+  if (!phase) return "";
+  if (day == null) return phase;
+  return of ? `${phase}, day ${Math.min(day, of)} of ${of}` : `${phase}, day ${day}`;
+}
+
+/** Day of the whole grow: "Grow day 23 of 33". Empty when the chamber is not counting. */
+export function growDayLine(device) {
+  const day = wholeDay(device?.grow?.grow_day);
+  const of = wholeDay(device?.grow?.total_days);
+  if (day == null) return "";
+  return of ? `Grow day ${Math.min(day, of)} of ${of}` : `Grow day ${day}`;
+}
+
+/** Both day lines, stage first. */
+export function growDaysLine(device) {
+  return [phaseLine(device), growDayLine(device)].filter(Boolean).join(". ");
 }
 
 /**
@@ -49,7 +66,7 @@ export function growingLabels(device) {
   const name = device?.profile?.name || "";
   const title = name || latin || "No species selected";
   const sub = latin && latin !== title ? latin : "";
-  const phase = phaseLine(device) || (device?.profile ? "" : "No grow selected");
+  const phase = growDaysLine(device) || (device?.profile ? "" : "No grow selected");
   return { title, latin: sub, phase };
 }
 
@@ -147,7 +164,7 @@ export function reports(device, field) {
   return v != null && v !== "" && Number.isFinite(Number(v));
 }
 
-function identityArt(device) {
+export function identityArt(device) {
   const p = device?.profile;
   if (!p) return "";
   return speciesArt(p.species, p.strain, p.name, p.pack, { id: p.id, linked: false });
@@ -592,7 +609,7 @@ export function demoDevices() {
       last_seen_at: new Date().toISOString(),
       profile: { id: "pearl-oyster", name: "Pearl Oyster", pack: "culinary", species: "Pleurotus ostreatus", strain: "" },
       stage: { id: "fruiting", name: "Fruiting" },
-      grow: { day: 6, phase: "Fruiting", started_on: "2026-10-19", total_days: 29, stages: [{ id: "colonization", name: "Colonization", duration_days: 14 }, { id: "fruiting", name: "Fruiting", duration_days: 15 }] },
+      grow: { grow_day: 20, stage_day: 6, stage_days: 15, phase: "Fruiting", started_on: "2026-10-07", total_days: 29, stages: [{ id: "colonization", name: "Colonization", duration_days: 14 }, { id: "fruiting", name: "Fruiting", duration_days: 15 }] },
       reading: { temperature: 16.2, humidity: 88, water_level: 54, fan_speed: 30 },
       setpoints: { temperature_c: 16, humidity_percent: 88, fan_speed_percent: 30 },
       light: { sunrise_hour: 8, duration_hours: 12, white_led_lux: 90, red_percent: 0, green_percent: 0, blue_percent: 80 },

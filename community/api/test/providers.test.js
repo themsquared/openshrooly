@@ -108,7 +108,9 @@ test("stubs are inert in a prod-like config even when leftover stub flags are se
   assert.equal(paid.data.coming_soon, true);
 
   const sub = await call(authed, "POST", "/api/coach/subscribe", { host, token, body: {} });
-  assert.equal(sub.status, 404, "no Coach for a user without beta or entitlement");
+  // Coach is public, so checkout is reachable but says coming soon without Stripe.
+  assert.equal(sub.status, 503, "no checkout without Stripe");
+  assert.equal(sub.data.coming_soon, true);
 });
 
 test("DEV_STUBS still completes local magic and OIDC flows", async () => {

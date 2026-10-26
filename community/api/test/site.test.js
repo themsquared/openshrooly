@@ -16,7 +16,7 @@ function read(file) {
 }
 
 function allPages() {
-  return [...Object.keys(PAGES), "grow.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
+  return [...Object.keys(PAGES), "grow.html", "chefs-line.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
 }
 
 /** Clean public URL path for a page file: no .html anywhere. */
@@ -230,14 +230,15 @@ test("Off-menu pages carry the legal note and no prices, affiliate links, or Gro
 
 const LEGAL_PAGES = ["privacy.html", "tos.html", "contact.html"];
 
-test("Grow Coach is hidden by default on every static page", () => {
+test("Grow Coach stays off every static page except /coach, which is public and indexed", () => {
   for (const file of allPages()) {
     const html = read(file);
     // No Coach link in static chrome. app.js inserts it only when /api/me says grow_coach.available.
     const navs = (html.match(/<nav[\s\S]*?<\/nav>/g) || []).join("");
     assert.doesNotMatch(navs, /nav-coach|data-coach-link|Grow Coach|href="\/coach"/, `${file} has a static Coach link`);
-    // The terms have to state the plan price and renewal. Every other static page stays price free.
-    if (file !== "tos.html") assert.doesNotMatch(html, /\$[34]\.99|[34]\.99 (a|per) month|\$49 (a|per) year|\$49\/yr/, `${file} prices Coach`);
+    // The terms have to state the plan price and renewal, and /coach is the sales page. Every other static page stays free of Coach prices.
+    // Chef's line profiles cost $2.99 or $3.99 one time, so only the Coach plan price and any monthly price are banned.
+    if (file !== "tos.html" && file !== "coach.html") assert.doesNotMatch(html, /\$4\.99|\d\.99 (a|per) month|\$49 (a|per) year|\$49\/yr/, `${file} prices Coach`);
     if (file === "coach.html") continue;
     // The terms and privacy policy must describe the Grow Coach plan and what it does with data
     // (Stripe asks for both). They name it in text but never link to it.
@@ -251,14 +252,16 @@ test("Grow Coach is hidden by default on every static page", () => {
   // account.html keeps an empty slot; app.js fills it only for users the API says can use Coach.
   assert.match(read("account.html"), /<div id="coach-billing" hidden><\/div>/);
   assert.match(readFileSync(join(PUBLIC, "js/app.js"), "utf8"), /const show = Boolean\(me\.grow_coach\?\.available\);\s*coachBilling\.hidden = !show;/);
-  for (const file of ["llms.txt", "llms-full.txt", "sitemap.xml"]) assert.doesNotMatch(read(file), /Grow Coach|\/coach\b/, file);
+  for (const file of ["llms.txt", "llms-full.txt"]) assert.doesNotMatch(read(file), /Grow Coach|\/coach\b/, file);
+  // /coach is the one Coach URL in the sitemap.
+  assert.deepEqual(read("sitemap.xml").match(/<loc>[^<]*\/coach[^<]*<\/loc>/g), ["<loc>https://shroomlabs.io/coach</loc>"]);
   for (const file of ["faq.html", "docs.html"]) {
     const html = read(file);
     const head = html.slice(0, html.indexOf("</head>"));
     assert.doesNotMatch(head, /Grow Coach/, `${file} head`);
   }
-  assert.match(meta(read("coach.html"), "name", "robots")[0], /noindex/);
-  assert.match(read("robots.txt"), /Disallow: \/coach$/m);
+  assert.doesNotMatch(meta(read("coach.html"), "name", "robots")[0] || "", /noindex/);
+  assert.doesNotMatch(read("robots.txt"), /Disallow: \/coach/);
   const app = readFileSync(join(PUBLIC, "js/app.js"), "utf8");
   assert.doesNotMatch(app, /3\.99/);
   assert.match(app, /grow_coach\?\.available/);
@@ -295,7 +298,7 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
       '<main id="main"',
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
     // Guide and profile pages are static reading pages: the small lite.js runs the menu. App pages load app.js.
-    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "faq.html" || LEGAL_PAGES.includes(file) || OWNER_PAGES.some((p) => file === `${p.slug}.html`);
+    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "chefs-line.html" || file === "faq.html" || LEGAL_PAGES.includes(file) || OWNER_PAGES.some((p) => file === `${p.slug}.html`);
     assert.ok(html.includes(`<script type="module" src="/js/${lite ? "lite" : "app"}.js"></script>`), `${file} script`);
   }
 });
@@ -321,4 +324,26 @@ test("the Coach nav link is inserted at runtime only when the API says it is ava
   assert.match(js("lite.js"), /isSignedIn\(\) && !document\.body\.hasAttribute\("data-coach-off"\)/);
   assert.match(js("lite.js"), /setCoachNav\(Boolean\(me\?\.grow_coach\?\.available\)\)/);
   assert.match(js("chrome.js"), /if \(!show\) \{\s*existing\?\.remove\(\);/);
+});
+
+test("the Chef's line page lists every chef profile with its price and no recipe numbers", () => {
+  const html = read("chefs-line.html");
+  const chefs = profiles.filter((p) => isPaid(p) && (p.tags || []).includes("chef"));
+  assert.ok(chefs.length >= 10, "at least ten Chef's line profiles");
+  for (const p of chefs) {
+    assert.ok(html.includes(`href="/profiles/${p.id}"`), `${p.id} card`);
+    assert.ok(html.includes(`$${(p.pricing.amount_cents / 100).toFixed(2)}`), `${p.id} price`);
+    for (const stage of p.stages) if (stage.notes) assert.ok(!html.includes(stage.notes), `${p.id} leaks notes`);
+  }
+  assert.doesNotMatch(html, /°C|% humidity|% RH|[\u2013\u2014\u2192]/);
+  assert.match(read("index.html"), /id="pack-chef"/);
+  assert.match(read("grow.html"), /href="\/chefs-line"/);
+});
+
+test("owned paid profiles say You own this and the Chef's line view hides the off-menu hint", () => {
+  assert.match(read("profile.html"), /id="owned"[^>]*>You own this\./);
+  const app = read("js/app.js");
+  assert.match(app, /\$\("#owned"\)\?\.classList\.remove\("hidden"\)/);
+  assert.match(app, /err\.status === 409/);
+  assert.match(app, /\$\("#pack-hint"\)\?\.classList\.toggle\("hidden", chef\)/);
 });

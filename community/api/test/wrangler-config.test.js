@@ -44,13 +44,19 @@ test("platform workflow runs on every pull request, including stacked branches",
   assert.doesNotMatch(on, /pull_request:\s*\n\s+branches:/);
 });
 
-test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
+test("wrangler.deploy.toml matches prod: photos on, Workers AI bound for Coach", () => {
   assert.deepEqual(r2Photos(deploy), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
   assert.equal(quoted(deploy, "PHOTOS_ENABLED"), "1");
-  assert.equal(hasAiTable(deploy), false);
-  assert.equal(quoted(deploy, "COACH_PUBLIC"), null);
-  // Cloud Autopilot is on in prod for the beta user only. Coach stays hidden (COACH_PUBLIC unset).
+  // Mike approved AI in prod on 2026-10-26 for Coach chat and photo checks.
+  assert.equal(hasAiTable(deploy), true);
+  assert.equal(quoted(tableBlock(deploy, "[ai]"), "binding"), "AI");
+  assert.equal(quoted(deploy, "GROW_COACH_VISION_MODEL"), "@cf/meta/llama-4-scout-17b-16e-instruct");
+  // Coach and Autopilot are public. Beta chambers get them free while BETA_ACTIVE is "1".
+  assert.equal(quoted(deploy, "COACH_PUBLIC"), "1");
+  assert.equal(quoted(deploy, "BETA_ACTIVE"), "1");
   assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), "82");
+  // Jev stays the Autopilot decider, with its caps in code (src/jev.js jevCaps).
+  assert.equal(quoted(deploy, "AUTOPILOT_DECIDER"), "jev");
   assert.equal(quoted(deploy, "ENVIRONMENT"), null);
   assert.equal(quoted(deploy, "CF_ACCOUNT_ID"), null);
   assert.equal(quoted(deploy, "WORKERS_AI_TOKEN"), null);
@@ -98,5 +104,4 @@ test("both configs bind the live cache objects as SQLite-backed Durable Objects"
     assert.match(src, /\[\[durable_objects\.bindings\]\]\s*\nname = "USER_LIVE"\s*\nclass_name = "UserLive"/);
     assert.match(src, /\[\[migrations\]\]\s*\ntag = "v1"\s*\nnew_sqlite_classes = \["DeviceLive", "UserLive"\]/);
   }
-  assert.equal(hasAiTable(deploy), false);
 });

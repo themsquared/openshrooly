@@ -395,7 +395,9 @@ test("device identity includes type, species, and grow day without the fleet fla
   assert.equal(d.profile.species, pearlOyster.species);
   assert.equal(d.profile.name, pearlOyster.name);
   assert.equal(d.stage.id, "fruiting");
-  assert.equal(d.grow.day, 6);
+  // The chamber's grow day is already counted from 1: shown as is, not bumped.
+  assert.equal(d.grow.grow_day, 6);
+  assert.equal(d.grow.stage_day, null, "grow day 6 is not in pearl's fruiting stage yet");
   assert.equal(d.grow.phase, d.stage.name);
   assert.equal(d.reading.water_level, 42);
   assert.ok(Array.isArray(d.cloud_controls));
@@ -403,7 +405,8 @@ test("device identity includes type, species, and grow day without the fleet fla
 });
 
 test("device payload hides Coach from users without Coach beta or entitlement", async () => {
-  const ctx = env();
+  // BETA_ACTIVE off: otherwise this chamber is a beta chamber and gets Coach free.
+  const ctx = env({ BETA_ACTIVE: "0" });
   const { token, user } = await register(ctx, "nocoach@example.com");
   await addDevice(ctx, user.id, "dev-nocoach");
   const detail = await call(ctx, "GET", "/api/fleet/devices/dev-nocoach", { token });
@@ -507,7 +510,9 @@ test("applying a new profile starts at day 1 of the first stage, not fruiting", 
   const detail = await call(ctx, "GET", "/api/fleet/devices/dev-fresh", { token });
   const d = detail.data.device;
   assert.equal(d.stage.id, first.id);
-  assert.equal(d.grow.day, 0, "day 0 elapsed, shown as day 1");
+  assert.equal(d.grow.grow_day, 1, "the start date is grow day 1, like the chamber");
+  assert.equal(d.grow.stage_day, 1);
+  assert.equal(d.grow.stage_days, first.duration_days);
 });
 
 test("a linked chamber that never checked in is waiting, not offline, and carries linked_at", async () => {

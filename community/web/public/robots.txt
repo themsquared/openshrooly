@@ -5,11 +5,11 @@ Disallow: /profile?
 Disallow: /account
 Disallow: /publish
 Disallow: /moderate
+Disallow: /admin
 Disallow: /device$
 Disallow: /device?
 Disallow: /devices
 Disallow: /fleet
-Disallow: /coach
 Disallow: /alerts-unsub
 Disallow: /auth/
 Sitemap: https://shroomlabs.io/sitemap.xml

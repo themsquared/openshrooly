@@ -1,6 +1,6 @@
 # Production deploy config. `npm run deploy` uses this file
 # (`wrangler deploy -c wrangler.deploy.toml`).
-# Photos are on. There is no [ai] binding: Grow Coach stays off until payments exist.
+# Photos are on. Workers AI is bound ([ai] below) for Coach chat and photo checks (Mike approved 2026-10-26).
 # Secrets: npx wrangler secret put NAME -c wrangler.deploy.toml
 name = "shroomlabs-api"
 main = "src/index.js"
@@ -56,22 +56,33 @@ GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleuse
 # Sign in with Apple: set APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_SERVICES_ID, and APPLE_PRIVATE_KEY
 # as Wrangler secrets once the Developer portal items exist. See docs/AUTH.md.
 # The Worker mints the client secret at runtime. Do not commit the .p8 key.
-# Grow Coach stays off until payments exist. Do not add an [ai] binding here.
+# Coach chat and photo checks run on the [ai] binding below. Photo checks use Llama 4 Scout because
+# Llama 3.2 Vision needs a separate Meta license acceptance on the account.
 GROW_COACH_PROVIDER = "workers-ai"
 GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
-GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
-# Cloud Autopilot (no [ai] needed). Only beta users can arm it; COACH_PUBLIC stays unset so Coach stays hidden.
+GROW_COACH_VISION_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
+# Grow Coach and Autopilot are public: anyone signed in sees /coach and the plans.
+# Access (src/coach-access.js): a paid plan, a beta chamber, or a comp id in COACH_BETA_USER_IDS.
+# COACH_AUTOPILOT_ENABLED = "0" is the kill switch: it hides Coach and stops Autopilot for everyone.
+COACH_PUBLIC = "1"
 COACH_AUTOPILOT_ENABLED = "1"
 COACH_BETA_USER_IDS = "82"
+# Beta: owners of the first BETA_LINK_CAP (50) linked chambers get Coach free while this is "1".
+# To end the beta, set BETA_ACTIVE = "0" and ship. Beta users then need a paid plan.
+BETA_ACTIVE = "1"
 # Autopilot decider: "rules" (default) or "jev" (TypeSafe System One; needs the TYPESAFE_API_KEY secret).
 # See docs/AUTOPILOT-JEV.md. Jev caps default in code (src/jev.js jevCaps).
-AUTOPILOT_DECIDER = "rules"
+AUTOPILOT_DECIDER = "jev"
 # Coach cost caps default in code (src/coach.js coachCaps): per user 40 chats, 8 photos, 3000 neurons a day,
 # 20000 neurons a month; everyone 100000 neurons a day. To change one, add it here as a var, e.g.
 # COACH_MONTHLY_NEURONS = "20000"  (also COACH_DAILY_NEURONS, COACH_DAILY_CHATS, COACH_DAILY_PHOTOS, COACH_GLOBAL_DAILY_NEURONS)
 
 # Email send caps per UTC day default in code (src/email.js): 300 total, 200 for anything that is not a
 # sign-in link. Override with EMAIL_DAILY_CAP and EMAIL_DAILY_BULK_CAP vars if the Resend plan changes.
+
+# Workers AI for Grow Coach chat and photo checks. Spend is capped per user and globally in src/coach.js coachCaps.
+[ai]
+binding = "AI"
 
 # Workers Logs: keep what the code logs (errors carry a request id and are redacted).
 # Invocation logs stay off so request URLs and headers (magic links, tokens) are never stored.

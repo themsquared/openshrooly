@@ -46,13 +46,12 @@ export async function fetchAuthedImageUrl(href, { apiBase, token, fetchImpl, cre
   return typeof makeUrl === "function" ? trackBlobUrl(makeUrl(blob)) : "";
 }
 
-export async function encodePhotoForUpload(file, { createImageBitmap: bitmapFn, document: doc } = {}) {
+export async function encodePhotoForUpload(file, { createImageBitmap: bitmapFn, document: doc, maxEdge = 2048, quality = 0.92 } = {}) {
   const makeBitmap = bitmapFn || globalThis.createImageBitmap;
   const documentRef = doc || globalThis.document;
   if (typeof makeBitmap === "function" && documentRef?.createElement) {
     try {
       const bitmap = await makeBitmap(file, { imageOrientation: "from-image" });
-      const maxEdge = 2048;
       const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
       const width = Math.max(1, Math.round(bitmap.width * scale));
       const height = Math.max(1, Math.round(bitmap.height * scale));
@@ -63,7 +62,7 @@ export async function encodePhotoForUpload(file, { createImageBitmap: bitmapFn, 
       ctx.drawImage(bitmap, 0, 0, width, height);
       if (typeof bitmap.close === "function") bitmap.close();
       const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((next) => (next ? resolve(next) : reject(new Error("encode failed"))), "image/jpeg", 0.92);
+        canvas.toBlob((next) => (next ? resolve(next) : reject(new Error("encode failed"))), "image/jpeg", quality);
       });
       return {
         photo_base64: await blobToBase64(blob),
