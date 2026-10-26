@@ -129,8 +129,10 @@ test("chat and photo check are gated until Grow Coach is paid", async () => {
   const denied = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
   assert.equal(denied.status, 404);
   assert.doesNotMatch(JSON.stringify(denied.data), /3\.99|Grow Coach/);
+  // COACH_PUBLIC=1 in the test env, so the catalog is on sale but not unlocked.
   const catalog = await call(ctx, "GET", "/api/coach", { token });
-  assert.deepEqual(catalog.data, { available: false });
+  assert.equal(catalog.data.available, true);
+  assert.equal(catalog.data.entitled, false);
   await subscribe(ctx, token);
   const paidCatalog = await call(ctx, "GET", "/api/coach", { token });
   assert.equal(paidCatalog.data.available, true);

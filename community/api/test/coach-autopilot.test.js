@@ -957,7 +957,7 @@ test("Autopilot works for a beta user without an AI binding", async () => {
 });
 
 test("Autopilot stays hidden without the allowlist or a paid sub", async () => {
-  const ctx = env({ COACH_BETA_USER_IDS: "82" });
+  const ctx = env({ COACH_BETA_USER_IDS: "82", COACH_PUBLIC: "" });
   const { token, user } = await register(ctx, "nope@example.com");
   await addDevice(ctx, user.id, "dev-nope");
   const catalog = await call(ctx, "GET", "/api/coach", { token });

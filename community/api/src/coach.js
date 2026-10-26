@@ -106,6 +106,24 @@ export async function hasGrowCoach(db, user, env = {}) {
   return hasPaidCoach(db, user);
 }
 
+/**
+ * Coach is on sale to everyone (not just beta) only when Mike turns on COACH_PUBLIC=1,
+ * the Coach kill switch (COACH_AUTOPILOT_ENABLED) is on, and checkout can really run:
+ * Stripe keys plus the Coach price id, or local dev stubs. With COACH_PUBLIC unset this
+ * is always false, so Coach stays hidden except for beta and paying users.
+ */
+export function coachForSale(env = {}, request) {
+  if (!coachPublicEnabled(env) || !coachAutopilotFlagOn(env)) return false;
+  if (devStubsEnabled(env, request)) return true;
+  return paymentsConfigured(env) && Boolean(coachPriceId(env));
+}
+
+/** Coach shows up for this visitor: beta or paying users, or anyone while it is on sale. */
+export async function coachVisible(env, db, user, request) {
+  if (await coachAutopilotAvailable(env, db, user)) return true;
+  return coachForSale(env, request);
+}
+
 async function requireCoach(request, db, env) {
   const { user } = await userFromRequest(request, db);
   requireVerified(user);
@@ -307,23 +325,25 @@ export async function handleCoach(method, path, url, request, env) {
   if (method === "GET" && path === "/api/coach") {
     const { user } = await userFromRequest(request, db);
     const autopilot = await coachAutopilotAvailable(env, db, user);
-    // Hidden for everyone except beta and entitled users while the flag is on.
-    if (!autopilot) return json({ available: false });
+    const forSale = coachForSale(env, request);
+    // Hidden for everyone except beta and paying users, unless Mike has put Coach on sale.
+    if (!autopilot && !forSale) return json({ available: false });
     const beta = coachBetaAccess(env, user);
     const entitled = user ? await hasGrowCoach(db, user, env) : false;
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
-    const publicOn = capabilities(env, request).coach;
     return json({
       available: true,
       product: coachCatalog(),
       entitled,
       beta,
+      signed_in: Boolean(user),
+      for_sale: forSale,
       auto_tune: Boolean(Number(sub?.auto_tune)),
       period_end: sub?.period_end || null,
-      waitlist: !entitled && !publicOn,
-      preview: !entitled && !publicOn,
+      waitlist: !entitled && !forSale,
+      preview: !entitled && !forSale,
       autopilot,
-      marketing: publicOn || entitled
+      marketing: forSale || entitled
         ? "Culinary chambers only. Not sold or marketed with off-menu varieties."
         : "Coming soon. Chat and checkout open at launch. Not sold with off-menu varieties.",
     });
