@@ -336,12 +336,20 @@ async function renderProfile() {
       $("#buy")?.classList.add("hidden");
       return;
     }
-    $("#buy")?.addEventListener("click", async () => {
-      await api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} });
-      const notice = $("#locked")?.querySelector("p");
-      if (notice) notice.textContent = "Checkout started. This recipe unlocks after the payment provider confirms.";
-      $("#buy")?.remove();
-    });
+    const notice = $("#locked")?.querySelector("p");
+    const result = checkoutResult();
+    if (result === "success") {
+      if (notice) notice.textContent = "Payment received. Unlocking your recipe...";
+      $("#buy")?.classList.add("hidden");
+      waitForUnlock(() => api(`/api/profiles/${id}`).then((d) => d.unlocked), notice);
+      return;
+    }
+    if (result === "cancel" && notice) notice.textContent = "Checkout canceled. Nothing was charged.";
+    $("#buy")?.addEventListener("click", () =>
+      goToCheckout($("#buy"), () => api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} }), (err) => {
+        if (notice) notice.textContent = err.message;
+      })
+    );
     return;
   }
   $("#full").classList.remove("hidden");
@@ -583,6 +591,22 @@ async function renderAccount() {
       me.grow_coach.entitled && !me.grow_coach.beta && me.grow_coach.period_end
         ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
         : "Private beta access. Culinary chambers only.";
+  }
+  const portalButton = $("#billing-portal");
+  if (portalButton && me.billing_portal) {
+    portalButton.classList.remove("hidden");
+    portalButton.addEventListener("click", () =>
+      goToCheckout(portalButton, () => api("/api/billing/portal", { method: "POST", jsonBody: {} }), (err) => {
+        $("#billing-status").textContent = err.message;
+        $("#billing-status").classList.remove("hidden");
+      })
+    );
+  }
+  if (checkoutResult() === "success" && $("#billing-status")) {
+    const status = $("#billing-status");
+    status.textContent = "Payment received. Turning on Grow Coach...";
+    status.classList.remove("hidden");
+    waitForUnlock(() => api("/api/me").then((d) => Boolean(d.grow_coach?.entitled)), status);
   }
   if (me.sessions) {
     $("#sessions").innerHTML = me.sessions
@@ -898,6 +922,55 @@ if (page === "fleet") renderFleet().catch((err) => {
   }
 });
 
+/* Checkout: hand off to Stripe's page, then wait for the webhook on the way back. */
+function checkoutResult() {
+  return new URLSearchParams(location.search).get("checkout") || "";
+}
+
+// Only Stripe's own checkout page or a same-site path. Never an arbitrary URL from a response.
+function safeCheckoutUrl(url) {
+  const value = String(url || "");
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && (parsed.hostname === "checkout.stripe.com" || parsed.hostname === "billing.stripe.com") ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
+async function goToCheckout(button, start, onError) {
+  if (!button || button.disabled) return;
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = "Opening checkout...";
+  try {
+    const session = await start();
+    const target = safeCheckoutUrl(session.checkout_url || session.url);
+    if (!target) throw new Error("Checkout could not start. Try again in a minute.");
+    location.assign(target);
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = label;
+    onError(err);
+  }
+}
+
+// Stripe tells us about the payment a few seconds after the redirect. Poll briefly, then reload.
+async function waitForUnlock(check, notice, { tries = 15, delayMs = 2000 } = {}) {
+  for (let i = 0; i < tries; i += 1) {
+    if (await check().catch(() => false)) {
+      const clean = new URL(location.href);
+      clean.searchParams.delete("checkout");
+      location.replace(clean.href);
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  if (notice) notice.textContent = "Payment received. It is taking longer than usual to confirm. Refresh this page in a minute.";
+  return false;
+}
+
 function showCoachError(err) {
   const box = $("#coach-error");
   if (!box) return;
@@ -963,14 +1036,10 @@ async function renderCoach() {
   }
   if (!canUse) {
     $("#subscribe-panel").classList.remove("hidden");
-    $("#subscribe").addEventListener("click", async () => {
-      try {
-        await api("/api/coach/subscribe", { method: "POST", jsonBody: {} });
-        showCoachError(new Error("Checkout started. Grow Coach unlocks after the payment provider confirms."));
-      } catch (err) {
-        showCoachError(err);
-      }
-    });
+    if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
+    $("#subscribe").addEventListener("click", () =>
+      goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: {} }), showCoachError)
+    );
     return;
   }
   $("#gated").classList.remove("hidden");

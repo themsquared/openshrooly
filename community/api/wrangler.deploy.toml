@@ -68,7 +68,10 @@ custom_domain = true
 
 # Secrets (do not put live payment keys here):
 #   npx wrangler secret put COMMUNITY_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put STRIPE_SECRET_KEY -c wrangler.deploy.toml
 #   npx wrangler secret put PAYMENTS_WEBHOOK_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put STRIPE_PRICE_COACH -c wrangler.deploy.toml   (price_ id, not secret, kept here so no deploy is needed)
+# Checkout stays "coming soon" until the first two are set. See docs/PAYMENTS.md.
 #   npx wrangler secret put TOTP_ENC_KEY -c wrangler.deploy.toml
 #   npx wrangler secret put TURNSTILE_SECRET_KEY -c wrangler.deploy.toml
 #   npx wrangler secret put CF_API_TOKEN -c wrangler.deploy.toml

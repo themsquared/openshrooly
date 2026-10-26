@@ -13,6 +13,8 @@ import {
 import { requireVerified, userFromRequest } from "./auth.js";
 import { ValidationError, isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
+import { startCheckout } from "./payments.js";
+import { coachPriceId } from "./stripe.js";
 import {
   comingSoonBody,
   capabilities,
@@ -72,9 +74,8 @@ export function coachBetaAccess(env, user) {
 export async function hasPaidCoach(db, user) {
   if (!user) return false;
   const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
-  if (sub && sub.status === "active" && sub.period_end >= nowIso()) return true;
-  const row = await db.one("SELECT * FROM entitlements WHERE user_id=? AND item_id=?", [user.id, COACH_ITEM]);
-  return Boolean(row);
+  // The subscription row is the only source of truth, so a cancel takes access away.
+  return Boolean(sub && sub.status === "active" && sub.period_end >= nowIso());
 }
 
 export async function hasGrowCoach(db, user, env = {}) {
@@ -302,27 +303,25 @@ export async function handleCoach(method, path, url, request, env) {
       if (!(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
       return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }
-    const sessionId = `cs_test_${randomToken().slice(0, 16)}`;
-    await db.run(
-      "INSERT INTO checkouts (id, user_id, item_id, provider, status, amount_cents, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        sessionId,
-        user.id,
-        COACH_ITEM,
-        "stripe",
-        "requires_payment",
-        COACH_PRICE_CENTS,
-        JSON.stringify({ item_type: "subscription", note: "Culinary Grow Coach only." }),
-        nowIso(),
-      ]
-    );
-    return json({
-      id: sessionId,
-      provider: "stripe",
-      amount_cents: COACH_PRICE_CENTS,
-      item_id: COACH_ITEM,
-      checkout_url: devStubsEnabled(env, request) ? `/pay/stub/${sessionId}` : null,
+    if (paymentsConfigured(env) && !coachPriceId(env) && !devStubsEnabled(env, request)) {
+      return json({ error: "Grow Coach checkout opens soon.", coming_soon: true }, 503);
+    }
+    if (await hasPaidCoach(db, user)) {
+      return json({ error: "You already have Grow Coach. Manage it from your account page.", already_active: true }, 409);
+    }
+    const session = await startCheckout(db, env, request, {
+      user,
+      itemId: COACH_ITEM,
+      amountCents: COACH_PRICE_CENTS,
+      details: { item_type: "subscription", note: "Culinary Grow Coach only." },
+      mode: "subscription",
+      priceId: coachPriceId(env),
+      name: "Grow Coach",
+      successPath: "/account.html?checkout=success#billing",
+      cancelPath: "/coach.html?checkout=cancel",
     });
+    if (!session.ok) return json({ error: session.error, coming_soon: session.status === 503 }, session.status || 503);
+    return json(session);
   }
 
   if (method === "POST" && path === "/api/coach/complete-entitlement") {
@@ -519,18 +518,16 @@ export async function handleCoach(method, path, url, request, env) {
   return null;
 }
 
-export async function activateCoachSub(db, userId, { replaySafe = false } = {}) {
+/**
+ * Turn Grow Coach on until periodEnd (default: one period from now). replaySafe keeps an
+ * active plan as is, so a repeated checkout event never moves the end date.
+ */
+export async function activateCoachSub(db, userId, { replaySafe = false, periodEnd: explicitEnd = "" } = {}) {
   const existing = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [userId]);
   if (replaySafe && existing && existing.status === "active" && existing.period_end >= nowIso()) {
-    await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
-      userId,
-      COACH_ITEM,
-      "subscription",
-      nowIso(),
-    ]);
     return existing.period_end;
   }
-  const periodEnd = laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
+  const periodEnd = explicitEnd || laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
   if (existing) {
     await db.run("UPDATE coach_subs SET status=?, period_end=? WHERE user_id=?", ["active", periodEnd, userId]);
   } else {
@@ -542,11 +539,5 @@ export async function activateCoachSub(db, userId, { replaySafe = false } = {}) 
       nowIso(),
     ]);
   }
-  await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
-    userId,
-    COACH_ITEM,
-    "subscription",
-    nowIso(),
-  ]);
   return periodEnd;
 }
