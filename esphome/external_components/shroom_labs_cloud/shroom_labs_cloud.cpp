@@ -361,6 +361,9 @@ ShroomLabsCloud::ShroomLabsCloud(web_server_base::WebServerBase *base)
   engine_.set_sync_jobs(false);
   engine_.set_start_job(&ShroomLabsCloud::start_job, this);
   engine_.set_chamber(&chamber_impl_);
+#ifdef ESPHOME_PROJECT_VERSION
+  engine_.set_firmware_version(ESPHOME_PROJECT_VERSION);
+#endif
 }
 
 bool ShroomLabsCloud::start_job(void *ctx, CloudJob job) {
@@ -503,13 +506,19 @@ static const char *entity_object_id(EntityBase *entity, char (&buf)[OBJECT_ID_MA
 void ShroomLabsCloud::attach_local_watchers_() {
   this->watchers_on_ = true;
   char id_buf[OBJECT_ID_MAX_LEN];
-  for (auto *n : App.get_numbers()) {
-    if (n == nullptr || !setpoint_object_id(entity_object_id(n, id_buf)))
-      continue;
+  auto watch = [this](number::Number *n) {
     n->add_on_state_callback([this](float) {
       if (!this->applying_remote_)
         this->note_local_change();
     });
+  };
+  for (auto *n : App.get_numbers()) {
+    if (n != nullptr && setpoint_object_id(entity_object_id(n, id_buf)))
+      watch(n);
+  }
+  for (auto *n : this->knobs_) {
+    if (n != nullptr)
+      watch(n);
   }
 }
 
@@ -540,6 +549,15 @@ ChamberReading ShroomLabsCloud::read_chamber() {
       out.target_humidity = n->state;
     }
   }
+  for (uint8_t k = 0; k < KNOB_COUNT; k++) {
+    number::Number *n = this->knobs_[k];
+    if (n == nullptr || std::isnan(n->state))
+      continue;
+    out.knob_mask |= static_cast<uint16_t>(1u << k);
+    out.knob[k] = n->state;
+  }
+  if (this->grow_phase_ != nullptr && this->grow_phase_->active_index().has_value())
+    out.grow_phase = this->grow_phase_->current_option().str();
   return out;
 }
 
@@ -551,49 +569,60 @@ static bool ids_match(const char *id, const char *const *ids) {
   return false;
 }
 
-static EntityRange number_range(const char *const *ids) {
+static EntityRange range_of(number::Number *n) {
   EntityRange range{};
-  char id_buf[OBJECT_ID_MAX_LEN];
-  for (auto *n : App.get_numbers()) {
-    if (n == nullptr)
-      continue;
-    if (!ids_match(entity_object_id(n, id_buf), ids))
-      continue;
-    range.has = true;
-    range.min = n->traits.get_min_value();
-    range.max = n->traits.get_max_value();
-    range.step = n->traits.get_step();
+  if (n == nullptr)
     return range;
-  }
+  range.has = true;
+  range.min = n->traits.get_min_value();
+  range.max = n->traits.get_max_value();
+  range.step = n->traits.get_step();
   return range;
 }
 
-static bool write_number(const char *const *ids, float value, ShroomLabsCloud *self) {
+static bool write_one(number::Number *n, float value, ShroomLabsCloud *self) {
+  const EntityRange range = range_of(n);
+  if (!range.has || !value_in_entity_range(value, range))
+    return false;
+  const float snapped = snap_entity_value(value, range);
+  self->set_applying_remote(true);
+  auto call = n->make_call();
+  call.set_value(snapped);
+  call.perform();
+  self->set_applying_remote(false);
+  const float slop = range.step > 0 ? range.step / 2.0f + 0.01f : 0.15f;
+  return !std::isnan(n->state) && std::fabs(n->state - snapped) <= slop;
+}
+
+static number::Number *find_number(const char *const *ids) {
   char id_buf[OBJECT_ID_MAX_LEN];
   for (auto *n : App.get_numbers()) {
-    if (n == nullptr)
-      continue;
-    if (!ids_match(entity_object_id(n, id_buf), ids))
-      continue;
-    EntityRange range;
-    range.has = true;
-    range.min = n->traits.get_min_value();
-    range.max = n->traits.get_max_value();
-    range.step = n->traits.get_step();
-    if (!value_in_entity_range(value, range))
-      return false;
-    const float snapped = snap_entity_value(value, range);
-    self->set_applying_remote(true);
-    auto call = n->make_call();
-    call.set_value(snapped);
-    call.perform();
-    self->set_applying_remote(false);
-    const float slop = range.step > 0 ? range.step / 2.0f + 0.01f : 0.15f;
-    if (std::isnan(n->state) || std::fabs(n->state - snapped) > slop)
-      return false;
-    return true;
+    if (n != nullptr && ids_match(entity_object_id(n, id_buf), ids))
+      return n;
   }
-  return false;
+  return nullptr;
+}
+
+static EntityRange number_range(const char *const *ids) { return range_of(find_number(ids)); }
+
+static bool write_number(const char *const *ids, float value, ShroomLabsCloud *self) {
+  number::Number *n = find_number(ids);
+  return n != nullptr && write_one(n, value, self);
+}
+
+EntityRange ShroomLabsCloud::knob_range(uint8_t k) { return k < KNOB_COUNT ? range_of(this->knobs_[k]) : EntityRange{}; }
+
+bool ShroomLabsCloud::write_knob(uint8_t k, float v) {
+  return k < KNOB_COUNT && this->knobs_[k] != nullptr && write_one(this->knobs_[k], v, this);
+}
+
+bool ShroomLabsCloud::write_grow_phase(const std::string &phase) {
+  if (this->grow_phase_ == nullptr || !this->grow_phase_->has_option(phase))
+    return false;
+  this->set_applying_remote(true);
+  this->grow_phase_->make_call().set_option(phase).perform();
+  this->set_applying_remote(false);
+  return this->grow_phase_->current_option().str() == phase;
 }
 
 static const char *const TEMP_TARGET_IDS[] = {"temperature_target", "temperature__target", nullptr};
@@ -613,6 +642,9 @@ EntityRange EspChamber::humidity_range() { return cloud_->humidity_target_range(
 bool EspChamber::write_temperature(float c) { return cloud_->write_temperature_target(c); }
 bool EspChamber::write_humidity(float rh) { return cloud_->write_humidity_target(rh); }
 uint32_t EspChamber::last_local_change_ms() { return cloud_->last_local_change_ms(); }
+EntityRange EspChamber::knob_range(uint8_t k) { return cloud_->knob_range(k); }
+bool EspChamber::write_knob(uint8_t k, float v) { return cloud_->write_knob(k, v); }
+bool EspChamber::write_grow_phase(const std::string &phase) { return cloud_->write_grow_phase(phase); }
 
 }  // namespace shroom_labs
 }  // namespace esphome

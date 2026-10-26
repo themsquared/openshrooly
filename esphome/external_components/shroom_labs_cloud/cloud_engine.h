@@ -26,6 +26,8 @@ class CloudEngine {
   void set_site_origin(const std::string &site) { site_origin_ = site.empty() ? DEFAULT_SITE : site; }
   void set_sync_jobs(bool sync) { sync_jobs_ = sync; }
   void set_chamber(CloudChamber *chamber) { chamber_ = chamber; }
+  // Static string, reported in telemetry as firmware_version.
+  void set_firmware_version(const char *version) { firmware_version_ = version; }
   void set_remote_apply(bool on) { remote_apply_ = on; }
   bool remote_apply() const { return remote_apply_; }
   void note_local_change(uint32_t when_ms) { last_local_change_ms_ = when_ms; }
@@ -107,6 +109,8 @@ class CloudEngine {
   bool allow_connect_();
   void note_connect_(bool count_hour);
   void keep_pending_ack_(int64_t command_id, const char *status, const char *reason, const ChamberReading &reading);
+  void clear_pending_ack_(int64_t posted_id);
+  std::string capabilities_json_(const EntityRange *ranges, bool has_phase) const;
   void set_claim_poll_();
   bool rotate_slot_open_();
   JobSnap snap_() const;
@@ -159,6 +163,7 @@ class CloudEngine {
   bool has_key_{false};
   bool has_cert_{false};
   std::string device_id_;
+  const char *firmware_version_{nullptr};
   std::string enroll_token_;
   std::string claim_code_;
   std::string claim_url_;

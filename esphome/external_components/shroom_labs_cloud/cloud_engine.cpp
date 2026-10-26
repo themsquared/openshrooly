@@ -1091,12 +1091,14 @@ bool CloudEngine::process_inbox_(const std::string &body) {
                         carried_ack && !ack_reason.empty() ? ack_reason.c_str() : nullptr)) {
       std::lock_guard<std::mutex> g(lock_);
       if (carried_ack)
-        pending_ack_ = false;
+        clear_pending_ack_(ack_id);
       next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     } else {
       if (carried_ack) {
         std::lock_guard<std::mutex> g(lock_);
-        keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
+        // A newer ack recorded while this POST was in flight wins; do not overwrite it.
+        if (!pending_ack_ || pending_ack_id_ == ack_id)
+          keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
       }
       schedule_telemetry_error_(0);
     }
@@ -1104,13 +1106,52 @@ bool CloudEngine::process_inbox_(const std::string &body) {
   return true;
 }
 
+std::string CloudEngine::capabilities_json_(const EntityRange *kr, bool has_phase) const {
+  std::string out = "[\"setpoints.temperature\",\"setpoints.humidity\",\"setpoints.multi\",\"ack.refused\"";
+  if (chamber_ == nullptr)
+    return out + "]";
+  auto all = [&](uint8_t a, uint8_t b) {
+    for (uint8_t k = a; k <= b; k++)
+      if (!kr[k].has)
+        return false;
+    return true;
+  };
+  if (kr[KNOB_FAN].has)
+    out += ",\"setpoints.fan\"";
+  if (all(KNOB_AIR_PERIOD, KNOB_AIR_RUN))
+    out += ",\"air.schedule\"";
+  if (all(KNOB_SUNRISE, KNOB_LIGHT_HOURS))
+    out += ",\"light.schedule\"";
+  if (all(KNOB_WHITE, KNOB_BLUE))
+    out += ",\"light.color\"";
+  if (kr[KNOB_GROW_DAY].has)
+    out += ",\"grow.day\"";
+  if (has_phase)
+    out += ",\"grow.phase\"";
+  return out + "]";
+}
+
+// Write order. With the light ending on, the schedule goes first so the lighting script never
+// sees light with zero hours (it would write its 12 h fallback). With it ending off, the
+// intensities go first for the same reason.
+static const uint8_t ORDER_LIGHT_ON[KNOB_COUNT] = {KNOB_FAN,   KNOB_AIR_PERIOD, KNOB_AIR_RUN, KNOB_SUNRISE,
+                                                   KNOB_LIGHT_HOURS, KNOB_WHITE, KNOB_RED, KNOB_GREEN,
+                                                   KNOB_BLUE,  KNOB_GROW_DAY};
+static const uint8_t ORDER_LIGHT_OFF[KNOB_COUNT] = {KNOB_FAN, KNOB_AIR_PERIOD, KNOB_AIR_RUN, KNOB_WHITE,
+                                                    KNOB_RED, KNOB_GREEN,      KNOB_BLUE,    KNOB_SUNRISE,
+                                                    KNOB_LIGHT_HOURS, KNOB_GROW_DAY};
+
 bool CloudEngine::apply_plan_now_(const SetpointPlan &plan, int64_t command_id, ChamberReading *after,
                                  std::string *reason) {
-  if (chamber_ == nullptr) {
+  auto fail = [&](const std::string &why, const ChamberReading &state) {
     if (reason)
-      *reason = "no chamber";
+      *reason = why;
+    if (after)
+      *after = state;
     return false;
-  }
+  };
+  if (chamber_ == nullptr)
+    return fail("no chamber", ChamberReading{});
   const ChamberReading before = chamber_->read();
   const EntityRange tr = chamber_->temperature_range();
   const EntityRange hr = chamber_->humidity_range();
@@ -1118,13 +1159,8 @@ bool CloudEngine::apply_plan_now_(const SetpointPlan &plan, int64_t command_id, 
   float h = plan.humidity_percent;
   if (plan.write_temp) {
     if (tr.has) {
-      if (!value_in_entity_range(t, tr)) {
-        if (reason)
-          *reason = "temperature outside entity range";
-        if (after)
-          *after = before;
-        return false;
-      }
+      if (!value_in_entity_range(t, tr))
+        return fail("temperature outside entity range", before);
       t = snap_entity_value(t, tr);
     } else {
       t = clamp_setpoint_temp(t);
@@ -1132,39 +1168,109 @@ bool CloudEngine::apply_plan_now_(const SetpointPlan &plan, int64_t command_id, 
   }
   if (plan.write_rh) {
     if (hr.has) {
-      if (!value_in_entity_range(h, hr)) {
-        if (reason)
-          *reason = "humidity outside entity range";
-        if (after)
-          *after = before;
-        return false;
-      }
+      if (!value_in_entity_range(h, hr))
+        return fail("humidity outside entity range", before);
       h = snap_entity_value(h, hr);
     } else {
       h = clamp_setpoint_rh(h);
     }
   }
-  bool ok_t = true;
-  bool ok_h = true;
-  if (plan.write_temp)
-    ok_t = chamber_->write_temperature(t);
-  if (ok_t && plan.write_rh)
-    ok_h = chamber_->write_humidity(h);
-  ChamberReading now = chamber_->read();
-  if (ok_t && plan.write_temp && now.has_temperature_target && std::fabs(now.temperature_target - t) > 0.15f)
-    ok_t = false;
-  if (ok_h && plan.write_rh && now.has_target_humidity && std::fabs(now.target_humidity - h) > 0.6f)
-    ok_h = false;
-  if (!ok_t || !ok_h) {
-    if (plan.write_temp && before.has_temperature_target)
-      chamber_->write_temperature(before.temperature_target);
-    if (plan.write_rh && before.has_target_humidity)
-      chamber_->write_humidity(before.target_humidity);
-    if (after)
-      *after = chamber_->read();
-    if (reason)
-      *reason = "write failed";
+  // Validate every knob before touching anything.
+  float kv[KNOB_COUNT];
+  for (uint8_t k = 0; k < KNOB_COUNT; k++) {
+    kv[k] = plan.knob[k];
+    if (!(plan.knob_mask & (1u << k)))
+      continue;
+    const EntityRange r = chamber_->knob_range(k);
+    if (!r.has)
+      return fail(std::string(KNOB_KEYS[k]) + " not on this chamber", before);
+    if (std::isnan(kv[k]) || !value_in_entity_range(kv[k], r))
+      return fail(std::string(KNOB_KEYS[k]) + " outside entity range", before);
+    kv[k] = snap_entity_value(kv[k], r);
+  }
+  auto final_knob = [&](uint8_t k, float *v) {
+    if (plan.knob_mask & (1u << k)) {
+      *v = kv[k];
+      return true;
+    }
+    if (before.knob_mask & (1u << k)) {
+      *v = before.knob[k];
+      return true;
+    }
     return false;
+  };
+  bool light_on = false;
+  for (uint8_t k = KNOB_WHITE; k <= KNOB_BLUE; k++) {
+    float v = 0;
+    if (final_knob(k, &v) && v > 0.5f)
+      light_on = true;
+  }
+  const uint16_t light_bits = 0x3F << KNOB_SUNRISE;  // sunrise .. blue
+  float hours = 0;
+  if ((plan.knob_mask & light_bits) && light_on && final_knob(KNOB_LIGHT_HOURS, &hours) && !(hours > 0))
+    return fail("light_hours must be above 0 while the light is on", before);
+
+  // Writes, phase first (an unknown option fails before anything else changes).
+  bool ok = true;
+  std::string why = "write failed";
+  bool phase_written = false;
+  if (!plan.grow_phase.empty() && plan.grow_phase != before.grow_phase) {
+    ok = chamber_->write_grow_phase(plan.grow_phase);
+    if (!ok)
+      why = "grow_phase is not an option";
+    phase_written = ok;
+  }
+  bool wrote_t = false, wrote_h = false;
+  if (ok && plan.write_temp) {
+    ok = chamber_->write_temperature(t);
+    wrote_t = true;
+  }
+  if (ok && plan.write_rh) {
+    ok = chamber_->write_humidity(h);
+    wrote_h = true;
+  }
+  const uint8_t *order = light_on ? ORDER_LIGHT_ON : ORDER_LIGHT_OFF;
+  uint8_t written[KNOB_COUNT];
+  uint8_t nwritten = 0;
+  for (uint8_t i = 0; ok && i < KNOB_COUNT; i++) {
+    const uint8_t k = order[i];
+    if (!(plan.knob_mask & (1u << k)))
+      continue;
+    written[nwritten++] = k;
+    ok = chamber_->write_knob(k, kv[k]);
+    if (!ok)
+      why = std::string(KNOB_KEYS[k]) + " write failed";
+  }
+  ChamberReading now = chamber_->read();
+  if (ok && wrote_t && now.has_temperature_target && std::fabs(now.temperature_target - t) > 0.15f)
+    ok = false;
+  if (ok && wrote_h && now.has_target_humidity && std::fabs(now.target_humidity - h) > 0.6f)
+    ok = false;
+  for (uint8_t i = 0; ok && i < nwritten; i++) {
+    const uint8_t k = written[i];
+    if ((now.knob_mask & (1u << k)) && std::fabs(now.knob[k] - kv[k]) > 0.15f) {
+      ok = false;
+      why = std::string(KNOB_KEYS[k]) + " did not stick";
+    }
+  }
+  if (ok && phase_written && now.grow_phase != plan.grow_phase) {
+    ok = false;
+    why = "grow_phase did not stick";
+  }
+  if (!ok) {
+    // Roll back in reverse write order so the light passes through the same safe states.
+    for (uint8_t i = nwritten; i > 0; i--) {
+      const uint8_t k = written[i - 1];
+      if (before.knob_mask & (1u << k))
+        chamber_->write_knob(k, before.knob[k]);
+    }
+    if (wrote_h && before.has_target_humidity)
+      chamber_->write_humidity(before.target_humidity);
+    if (wrote_t && before.has_temperature_target)
+      chamber_->write_temperature(before.temperature_target);
+    if (phase_written && !before.grow_phase.empty())
+      chamber_->write_grow_phase(before.grow_phase);
+    return fail(why, chamber_->read());
   }
   last_applied_command_id_ = command_id;
   if (after)
@@ -1192,6 +1298,13 @@ void CloudEngine::keep_pending_ack_(int64_t command_id, const char *status, cons
   pending_ack_status_ = status ? status : "failed";
   pending_ack_reason_ = reason ? reason : "";
   pending_ack_reading_ = reading;
+}
+
+// Caller holds lock_. Clears the pending ack only if it is still the one that was posted,
+// so an ack recorded while the POST was in flight is sent on the next pass instead of lost.
+void CloudEngine::clear_pending_ack_(int64_t posted_id) {
+  if (pending_ack_ && pending_ack_id_ == posted_id)
+    pending_ack_ = false;
 }
 
 void CloudEngine::complete_apply(int64_t command_id, bool ok, const char *status, const char *reason,
@@ -1241,7 +1354,7 @@ bool CloudEngine::handle_telemetry_() {
                       reason.empty() ? nullptr : reason.c_str())) {
     std::lock_guard<std::mutex> g(lock_);
     if (had_ack)
-      pending_ack_ = false;
+      clear_pending_ack_(ack_id);
     next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     return true;
   }
@@ -1261,7 +1374,15 @@ bool CloudEngine::post_telemetry_(const ChamberReading &reading, int64_t ack_id,
   std::string path = "/api/devices/" + id + "/telemetry";
   const EntityRange tr = chamber_ ? chamber_->temperature_range() : EntityRange{};
   const EntityRange hr = chamber_ ? chamber_->humidity_range() : EntityRange{};
-  std::string body = telemetry_body_json(reading, ack_id, ack_status, ack_reason, &tr, &hr);
+  EntityRange kr[KNOB_COUNT];
+  for (uint8_t k = 0; k < KNOB_COUNT; k++)
+    kr[k] = chamber_ ? chamber_->knob_range(k) : EntityRange{};
+  const std::string caps = capabilities_json_(kr, !reading.grow_phase.empty());
+  TelemetryExtras ex;
+  ex.firmware_version = firmware_version_;
+  ex.capabilities = caps.c_str();
+  ex.ranges = kr;
+  std::string body = telemetry_body_json(reading, ack_id, ack_status, ack_reason, &tr, &hr, &ex);
   HttpResponse r = http_("POST", path.c_str(), body, true, true);
   return response_usable(r) && r.status == 200;
 }

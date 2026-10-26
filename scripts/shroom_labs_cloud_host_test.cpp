@@ -1465,6 +1465,49 @@ int main() {
       return true;
     }
     uint32_t last_local_change_ms() override { return local_ms; }
+    // Knobs. Light writes emulate lighting_control_manager: light wanted with hours <= 0 makes
+    // the script write its 12 h fallback back, which a bad write order would trip over.
+    EntityRange k_range[KNOB_COUNT]{};
+    int fail_knob = -1;
+    std::vector<int> order;
+    std::vector<std::string> phases{"Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"};
+    bool fallback_fired = false;
+    EntityRange knob_range(uint8_t k) override { return k_range[k]; }
+    bool write_knob(uint8_t k, float v) override {
+      order.push_back(k);
+      if (static_cast<int>(k) == fail_knob)
+        return false;
+      cur.knob_mask |= static_cast<uint16_t>(1u << k);
+      cur.knob[k] = v;
+      bool want = false;
+      for (uint8_t j = KNOB_WHITE; j <= KNOB_BLUE; j++)
+        want = want || ((cur.knob_mask & (1u << j)) && cur.knob[j] > 0.5f);
+      if (want && (cur.knob_mask & (1u << KNOB_LIGHT_HOURS)) && !(cur.knob[KNOB_LIGHT_HOURS] > 0)) {
+        cur.knob[KNOB_LIGHT_HOURS] = 12;
+        fallback_fired = true;
+      }
+      return true;
+    }
+    bool write_grow_phase(const std::string &p) override {
+      for (const auto &o : phases)
+        if (o == p) {
+          cur.grow_phase = p;
+          return true;
+        }
+      return false;
+    }
+    void all_knobs() {
+      const float r[KNOB_COUNT][3] = {{15, 100, 5}, {1, 240, 1}, {5, 900, 5}, {0, 23, 1}, {0, 24, 0.25f},
+                                      {0, 4000, 5}, {0, 100, 1}, {0, 100, 1}, {0, 100, 1}, {0, 90, 1}};
+      for (uint8_t k = 0; k < KNOB_COUNT; k++)
+        k_range[k] = {true, r[k][0], r[k][1], r[k][2]};
+      const float v[KNOB_COUNT] = {30, 60, 120, 8, 12, 300, 0, 0, 0, 3};
+      for (uint8_t k = 0; k < KNOB_COUNT; k++) {
+        cur.knob_mask |= static_cast<uint16_t>(1u << k);
+        cur.knob[k] = v[k];
+      }
+      cur.grow_phase = "Colonizing";
+    }
   };
 
   const char *inbox_nested =
@@ -1517,6 +1560,193 @@ int main() {
   expect(tel_body.find("\"temperature_target_min\":15.00") != std::string::npos, "telemetry reports temp min");
   expect(tel_body.find("\"target_humidity_min\":30.00") != std::string::npos, "telemetry reports rh min");
   expect(engApply.last_applied_command_id() == 9, "remembers applied command");
+
+  // S4: an ack recorded while a telemetry POST is in flight must survive that POST's success.
+  HostStore storeRace;
+  ScriptTransport trRace;
+  FakeChamber chamberRace;
+  chamberRace.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberRace.h_range = {true, 30.f, 100.f, 0.5f};
+  trRace.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                  {"/csr", ok_body(200, cert_ok)},
+                  {"/inbox", ok_body(200, inbox_apply)},
+                  {"/telemetry", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine engRace(&trRace, &clk, &storeRace, &crypto);
+  engRace.set_chamber(&chamberRace);
+  engRace.connect();
+  engRace.csr_now();
+  bool raced = false;
+  trRace.hook = [&](const HttpRequest &req) {
+    if (!raced && req.url.find("/telemetry") != std::string::npos) {
+      raced = true;
+      engRace.complete_apply(10, true, nullptr, nullptr, ChamberReading{});
+    }
+  };
+  expect(engRace.probe_now(), "probe race");
+  expect(raced, "race hook ran");
+  expect(engRace.ack_waiting(), "newer ack survives the older ack's POST");
+
+  // Knobs: one command sets fan, air cycle, light schedule and mix, grow day and phase at once.
+  {
+    const char *knob_inbox =
+        "{\"commands\":[{\"id\":31,\"kind\":\"setpoints\",\"issued_at\":\"2026-10-25T15:00:00Z\",\"apply\":true,"
+        "\"payload\":{\"temperature_target\":21,\"target_humidity\":92,\"air_exchange_speed\":45,"
+        "\"air_exchange_period_min\":30,\"air_exchange_run_sec\":90,\"sunrise_hour\":7,\"light_hours\":10.5,"
+        "\"white_intensity\":800,\"color_r\":20,\"color_g\":0,\"color_b\":40,\"grow_day\":12,"
+        "\"grow_phase\":\"Fruiting\",\"expires_at\":\"2099-01-01T00:00:00Z\"}}]}";
+    InboxCommand kc[2];
+    expect(parse_inbox_commands(knob_inbox, kc, 2) == 1, "parse knob command");
+    expect(kc[0].knob_mask == (1u << KNOB_COUNT) - 1 && kc[0].knob[KNOB_WHITE] == 800 &&
+               kc[0].knob[KNOB_LIGHT_HOURS] == 10.5f && kc[0].grow_phase == "Fruiting",
+           "knob keys parsed");
+    const SetpointPlan kp = plan_setpoint_command(kc[0], parse_iso8601_ms("2026-10-25T15:05:00Z"), 0, 1000, true);
+    expect(kp.decision == SetpointDecision::Apply && kp.knob_mask == kc[0].knob_mask, "knob plan applies");
+
+    HostStore st;
+    ScriptTransport tr;
+    FakeChamber ch;
+    ch.t_range = {true, 15.f, 35.f, 0.5f};
+    ch.h_range = {true, 30.f, 100.f, 0.5f};
+    ch.cur.has_temperature_target = true;
+    ch.cur.temperature_target = 24;
+    ch.cur.has_target_humidity = true;
+    ch.cur.target_humidity = 85;
+    ch.all_knobs();
+    tr.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                {"/csr", ok_body(200, cert_ok)},
+                {"/inbox", ok_body(200, knob_inbox)},
+                {"/telemetry", ok_body(200, "{\"ok\":true}")}};
+    CloudEngine eng(&tr, &clk, &st, &crypto);
+    eng.set_chamber(&ch);
+    eng.set_firmware_version("1.0.5-sl.1");
+    eng.connect();
+    eng.csr_now();
+    std::string body;
+    tr.hook = [&](const HttpRequest &req) {
+      if (req.url.find("/telemetry") != std::string::npos)
+        body = req.body;
+    };
+    expect(eng.probe_now(), "probe knobs");
+    expect(ch.cur.temperature_target == 21 && ch.cur.target_humidity == 92, "knob command sets temp and rh");
+    expect(ch.cur.knob[KNOB_FAN] == 45 && ch.cur.knob[KNOB_AIR_PERIOD] == 30 && ch.cur.knob[KNOB_AIR_RUN] == 90,
+           "knob command sets air");
+    expect(ch.cur.knob[KNOB_SUNRISE] == 7 && ch.cur.knob[KNOB_LIGHT_HOURS] == 10.5f &&
+               ch.cur.knob[KNOB_WHITE] == 800 && ch.cur.knob[KNOB_RED] == 20 && ch.cur.knob[KNOB_BLUE] == 40,
+           "knob command sets light");
+    expect(ch.cur.knob[KNOB_GROW_DAY] == 12 && ch.cur.grow_phase == "Fruiting", "knob command sets stage");
+    expect(!ch.fallback_fired, "light schedule written before intensities");
+    expect(body.find("\"ack_status\":\"applied\"") != std::string::npos, "knob ack applied");
+    expect(body.find("\"air_exchange_speed\":45.00") != std::string::npos, "telemetry reports fan");
+    expect(body.find("\"white_intensity\":800.00") != std::string::npos, "telemetry reports white");
+    expect(body.find("\"grow_phase\":\"Fruiting\"") != std::string::npos, "telemetry reports phase");
+    expect(body.find("\"firmware_version\":\"1.0.5-sl.1\"") != std::string::npos, "telemetry reports version");
+    expect(body.find("\"setpoints.fan\"") != std::string::npos && body.find("\"light.color\"") != std::string::npos &&
+               body.find("\"light.schedule\"") != std::string::npos &&
+               body.find("\"air.schedule\"") != std::string::npos && body.find("\"grow.phase\"") != std::string::npos,
+           "telemetry reports capabilities");
+    expect(body.find("\"white_intensity\":[0.00,4000.00,5.00]") != std::string::npos, "telemetry reports ranges");
+  }
+
+  // Apply-level checks drive the engine through its sync path with a fake chamber.
+  auto knob_cmd = [](const char *payload) {
+    std::string j = std::string("{\"commands\":[{\"id\":40,\"kind\":\"setpoints\",\"issued_at\":"
+                                "\"2026-10-25T15:00:00Z\",\"apply\":true,\"payload\":") +
+                    payload + "}]}";
+    InboxCommand c[1];
+    parse_inbox_commands(j.c_str(), c, 1);
+    return plan_setpoint_command(c[0], parse_iso8601_ms("2026-10-25T15:05:00Z"), 0, 1000, true);
+  };
+  auto run_apply = [&](FakeChamber &ch, const char *payload, std::string *why) {
+    HostStore st;
+    ScriptTransport tr;
+    CloudEngine eng(&tr, &clk, &st, &crypto);
+    eng.set_chamber(&ch);
+    PendingApply pa;
+    pa.ready = true;
+    pa.command_id = 40;
+    pa.plan = knob_cmd(payload);
+    ChamberReading after;
+    return eng.apply_now(pa, &after, why);
+  };
+  {
+    FakeChamber ch;
+    ch.all_knobs();
+    std::string why;
+    // Turning the light off: intensities go first so hours 0 never meets a lit LED.
+    expect(run_apply(ch, "{\"white_intensity\":0,\"light_hours\":0}", &why), "light off applies");
+    expect(!ch.fallback_fired && ch.cur.knob[KNOB_LIGHT_HOURS] == 0 && ch.cur.knob[KNOB_WHITE] == 0,
+           "light off without 12 h fallback");
+    expect(ch.order.size() == 2 && ch.order[0] == KNOB_WHITE, "light off writes white first");
+  }
+  {
+    FakeChamber ch;
+    ch.all_knobs();
+    std::string why;
+    expect(!run_apply(ch, "{\"light_hours\":0}", &why) && why.find("light_hours") != std::string::npos,
+           "zero hours with the light on is refused");
+    expect(ch.order.empty() && ch.cur.knob[KNOB_LIGHT_HOURS] == 12, "nothing written for zero hours");
+  }
+  {
+    FakeChamber ch;
+    ch.all_knobs();
+    std::string why;
+    expect(!run_apply(ch, "{\"air_exchange_speed\":50,\"color_r\":101}", &why) &&
+               why == "color_r outside entity range",
+           "out-of-range knob fails with its name");
+    expect(ch.order.empty() && ch.cur.knob[KNOB_FAN] == 30, "out of range writes nothing");
+  }
+  {
+    FakeChamber ch;
+    ch.all_knobs();
+    ch.fail_knob = KNOB_BLUE;
+    ch.cur.has_temperature_target = true;
+    ch.cur.temperature_target = 24;
+    ch.t_range = {true, 15.f, 35.f, 0.5f};
+    std::string why;
+    expect(!run_apply(ch, "{\"temperature_target\":20,\"air_exchange_speed\":60,\"white_intensity\":900,"
+                          "\"color_b\":30,\"grow_phase\":\"Pinning\"}",
+                      &why),
+           "failed knob write fails the command");
+    expect(why == "color_b write failed", "failure names the knob");
+    expect(ch.cur.knob[KNOB_FAN] == 30 && ch.cur.knob[KNOB_WHITE] == 300 && ch.cur.temperature_target == 24 &&
+               ch.cur.grow_phase == "Colonizing",
+           "all-or-nothing rollback");
+  }
+  {
+    FakeChamber ch;
+    ch.all_knobs();
+    std::string why;
+    expect(!run_apply(ch, "{\"air_exchange_speed\":50,\"grow_phase\":\"Party\"}", &why) &&
+               why.find("grow_phase") != std::string::npos,
+           "unknown phase fails");
+    expect(ch.order.empty() && ch.cur.knob[KNOB_FAN] == 30, "unknown phase writes nothing");
+  }
+  {
+    FakeChamber ch;  // stock chamber without bound knobs
+    std::string why;
+    expect(!run_apply(ch, "{\"air_exchange_speed\":50}", &why) && why == "air_exchange_speed not on this chamber",
+           "missing knob fails");
+  }
+  {
+    FakeChamber ch;
+    ch.all_knobs();
+    std::string why;
+    expect(run_apply(ch, "{\"light_hours\":13.1,\"white_intensity\":802}", &why), "snapped values apply");
+    expect(ch.cur.knob[KNOB_LIGHT_HOURS] == 13.0f && ch.cur.knob[KNOB_WHITE] == 800, "knob values snap to step");
+  }
+  {
+    InboxCommand c[1];
+    parse_inbox_commands("{\"commands\":[{\"id\":41,\"kind\":\"apply_profile\",\"issued_at\":"
+                         "\"2026-10-25T15:00:00Z\",\"apply\":true,\"payload\":{}}]}",
+                         c, 1);
+    const SetpointPlan p = plan_setpoint_command(c[0], parse_iso8601_ms("2026-10-25T15:05:00Z"), 0, 1000, true);
+    expect(p.decision == SetpointDecision::Refuse && std::string(p.ack_status) == "refused" &&
+               std::string(p.reason) == "Unknown command.",
+           "unknown kind refused");
+    expect(plan_setpoint_command(c[0], parse_iso8601_ms("2026-10-25T15:05:00Z"), 0, 1000, false).decision ==
+               SetpointDecision::Skip,
+           "unknown kind skipped while remote apply is off");
+  }
   bool saw_query = false;
   for (const auto &u : trApply.urls)
     saw_query = saw_query || u.find("/inbox?") != std::string::npos;
