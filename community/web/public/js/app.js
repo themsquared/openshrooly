@@ -15,6 +15,8 @@ import {
   growLine,
   growingLabels,
   lastSeenLine,
+  chamberStatus,
+  renderChamberStatus,
   autopilotSummary,
   luxPreview,
   readingWhenLine,
@@ -1725,7 +1727,8 @@ function setLiveBadge(el, state, at) {
   const text = {
     cached: `Updating… showing what this phone saw ${ageText(at) || "earlier"}`,
     loading: "Updating…",
-    live: "Live",
+    // A working live connection is the normal case and says nothing about the chamber, so it shows nothing.
+    live: "",
     polling: "Live updates paused. Numbers refresh every 30 seconds.",
     gone: "This chamber is no longer on your account.",
   }[shown] || "";
@@ -1938,7 +1941,7 @@ async function renderDevice() {
         .filter(([rule]) => rule !== "fruiting")
         .map(([rule, label]) => {
           const open = states?.[rule] === "open";
-          const text = rule === "offline" ? (open ? "Offline" : "Online") : `${label} ${open ? "needs a look" : "ok"}`;
+          const text = rule === "offline" ? chamberStatus(view.snapshot?.device).label : `${label} ${open ? "needs a look" : "ok"}`;
           return `<li class="${open ? "is-open" : "is-ok"}">${escapeHtml(text)}</li>`;
         })
         .join("")
@@ -1969,6 +1972,7 @@ async function renderDevice() {
     $("#device-name").textContent = device.name;
     document.title = `${device.name} · Shroom Labs`;
     $("#device-meta").textContent = deviceMetaLine(device, { showCoach });
+    swap("#device-state", renderChamberStatus(device));
     buildDash();
     swap("#dev-identity", renderIdentity(device));
     swap("#dev-gauges", renderGauges(device));
@@ -1981,7 +1985,8 @@ async function renderDevice() {
     }
     paintControls();
     // A card or link with #grow lands on the profile picker once it exists.
-    if (!view.jumped && location.hash === "#grow" && $("#grow")) {
+    // Not before its first check-in: the status at the top is what matters then.
+    if (!view.jumped && location.hash === "#grow" && $("#grow") && device.last_seen_at) {
       view.jumped = true;
       $("#grow").scrollIntoView({ block: "start" });
       $("#device-controls")?.profile_id?.focus({ preventScroll: true });
@@ -2413,7 +2418,7 @@ async function renderFleet() {
           (d) => `<tr>
             <td><label class="cell-check"><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></label></td>
             <td><a href="/fleet?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
-            <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(lastSeenLine(d))}</span></td>
+            <td>${escapeHtml(chamberStatus(d).label)}<br><span class="muted">${escapeHtml(lastSeenLine(d))}</span></td>
             <td>${d.reading ? `${safeDisplay(d.reading.temperature, "not reported")} °C · ${safeDisplay(d.reading.humidity, "not reported")}%` : "No reading"}</td>
             <td>${escapeHtml(d.profile?.name || "None")}${d.profile?.species ? `<br><span class="muted">${escapeHtml(d.profile.species)}</span>` : ""}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
             <td>${safeDisplay(d.setpoints?.temperature_c, "?")} °C · ${safeDisplay(d.setpoints?.humidity_percent, "?")}%</td>

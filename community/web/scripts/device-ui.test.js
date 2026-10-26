@@ -286,7 +286,37 @@ test("each grow fact shows once on the identity card and the device card", async
   // The page header says what the hardware is doing, not what is growing again.
   const meta = deviceMetaLine(lion);
   assert.doesNotMatch(meta, /Hericium|Lion|Fruiting/);
-  assert.match(meta, /Shrooly chamber · Online/);
+  assert.match(meta, /Shrooly chamber/);
+  assert.doesNotMatch(meta, /Online|Offline/);
+});
+
+test("a just linked chamber reads as waiting for its first check-in, never offline", async () => {
+  const { chamberStatus, renderChamberStatus, renderDeviceCard, renderGauges, renderControls, deviceMetaLine } = await import("../public/js/device-ui.js");
+  const now = Date.parse("2026-10-26T18:00:00Z");
+  const fresh = { id: "d2", name: "Chamber", device_type: "shrooly_chamber", online: false, controllable: true, last_seen_at: null, linked_at: "2026-10-26T17:56:12Z", reading: null, setpoints: {} };
+  const st = chamberStatus(fresh, now);
+  assert.equal(st.kind, "waiting");
+  assert.equal(st.label, "Waiting for first check-in");
+  assert.match(st.detail, /about 15 minutes/);
+  assert.match(st.detail, /plugged in and connected to Wi-Fi/);
+  const late = chamberStatus(fresh, now + 60 * 60 * 1000);
+  assert.equal(late.kind, "waiting");
+  assert.match(late.detail, /not checked in yet/);
+  const all = [renderChamberStatus(fresh, now), renderDeviceCard(fresh), renderGauges(fresh), renderControls(fresh, {}), deviceMetaLine(fresh)].join(" ");
+  assert.doesNotMatch(all, /[Oo]ffline|Never seen/);
+  assert.doesNotMatch(all, /[\u2013\u2014]/);
+  assert.match(renderGauges(fresh), /after the first check-in/);
+  assert.equal(chamberStatus({ online: true, last_seen_at: "2026-10-26T17:59:00Z" }, now).label, "Online");
+  assert.equal(chamberStatus({ online: false, last_seen_at: "2026-10-26T12:00:00Z" }, now).label, "Offline");
+});
+
+test("the page connection badge never shows a status dot or says Live", () => {
+  const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/js/app.js"), "utf8");
+  assert.doesNotMatch(app, /live: "Live"/);
+  const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/css/style.css"), "utf8");
+  assert.doesNotMatch(css, /\.live-badge\[data-state="live"\]::before/);
+  const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/device.html"), "utf8");
+  assert.ok(html.indexOf('id="device-state"') < html.indexOf('id="device-live"'));
 });
 
 test("a chamber that does not report water gets no Water tile and never n/a", async () => {
