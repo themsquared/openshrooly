@@ -105,3 +105,12 @@ test("published release, when present, is signed with the device key", async () 
     await checkImage(e, readFileSync(join(pub, new URL(e.url).pathname)));
   }
 });
+
+test("no published release says coming soon, a real failure says network", async () => {
+  const notFound = async () => ({ ok: false, status: 404, json: async () => ({}) });
+  await assert.rejects(loadVerifiedRelease(notFound), (e) => e.message === "unreleased");
+  const serverError = async () => ({ ok: false, status: 503, json: async () => ({}) });
+  await assert.rejects(loadVerifiedRelease(serverError), (e) => e.message === "network");
+  const offline = async () => { throw new TypeError("Failed to fetch"); };
+  await assert.rejects(loadVerifiedRelease(offline), (e) => e.message === "network");
+});

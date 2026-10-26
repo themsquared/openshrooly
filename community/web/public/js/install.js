@@ -16,6 +16,7 @@ const MAX_IMAGE = 16 * 1024 * 1024;
 export class ReleaseError extends Error {}
 
 const PLAIN = {
+  unreleased: "The first public release is coming soon. Shroom Labs will post it here when it's ready.",
   network: "Could not load the latest release from shroomlabs.io. Check your connection and reload this page.",
   invalid: "The latest release did not pass the Shroom Labs signature check, so the installer is turned off. Try again later.",
   browser: "Your browser cannot check release signatures. Update Chrome or Edge and reload this page.",
@@ -83,9 +84,12 @@ export async function loadVerifiedRelease(fetchFn = (p) => fetch(p, { cache: "no
   let manifest;
   try {
     const res = await fetchFn(MANIFEST_PATH);
+    // No manifest on the site means nothing has been published yet, not a network problem.
+    if (res.status === 404) throw new ReleaseError("unreleased");
     if (!res.ok) throw new Error();
     manifest = await res.json();
-  } catch {
+  } catch (err) {
+    if (err instanceof ReleaseError) throw err;
     throw new ReleaseError("network");
   }
   const usb = await verifyEntry(manifest?.usb, { ...opts, product: "openshrooly-usb" });
@@ -123,6 +127,10 @@ async function main() {
     status.textContent = `Version ${entry.version} is ready. It passed the Shroom Labs signature check.`;
   } catch (err) {
     const kind = err instanceof ReleaseError ? err.message : "network";
+    if (kind === "unreleased") {
+      status.textContent = PLAIN.unreleased;
+      return;
+    }
     error.textContent = PLAIN[kind] || PLAIN.network;
     error.classList.remove("hidden");
     status.textContent = "The installer is not available right now.";
