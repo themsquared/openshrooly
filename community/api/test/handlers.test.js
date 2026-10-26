@@ -318,4 +318,8 @@ test("placeholder affiliate links are never shown or followed", async () => {
   const ctx = testEnv();
   const supplies = await call(ctx, "GET", "/api/supplies");
   assert.deepEqual(supplies.data.items, []);
+  assert.equal(supplies.data.disclosure, "", "no affiliate note without affiliate links");
+  const { disclosureFor } = await import("../src/handlers.js");
+  assert.equal(disclosureFor([]), "");
+  assert.match(disclosureFor([{ id: "real" }]), /affiliate links/);
 });
