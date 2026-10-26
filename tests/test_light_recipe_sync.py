@@ -85,7 +85,8 @@ def test_variety_specific_and_dark_recipes_sync():
 
 def test_every_seed_recipe_has_a_source_and_matches_catalog():
     for profile in load_seed_profiles(ROOT / "data", include_psilocybin=True):
-        catalog = recipe_for(profile.id)
+        # Chef's line cards carry their own cited recipe in the JSON (data/generate_chefs_line.py).
+        catalog = profile.light_recipe if "chef" in profile.tags else recipe_for(profile.id)
         assert profile.light_recipe is not None
         assert profile.light_recipe.sources
         assert profile.light_recipe.why == catalog.why

@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "id": "shiitake-flower-cap",
+  "name": "Shiitake: flower cap (huagu)",
+  "species": "Lentinula edodes",
+  "strain": "Cold-tolerant shiitake",
+  "variety_group": "shiitake",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "chef",
+    "advanced",
+    "woodlover"
+  ],
+  "restricted": false,
+  "summary": "The cracked white-patterned cap prized in Chinese cooking. Thick buttons, then cold dry air forces the skin to split while the flesh keeps growing.",
+  "notes": "Start the dry stage only when most buttons are 2 to 3 cm across. If they are smaller, hold the Buttons stage longer. Pick before the caps flatten. Cracking is not guaranteed; a crack-free cap from this run is still a thick winter-style shiitake.",
+  "chamber_notes": "Use a cold-tolerant strain. Run it in a cool, dry room in winter. The chamber cannot make the large day and night swings the method relies on, so a room that cools at night helps. Chamber limits: there is no heater or cooler, so temperature targets only hold if the room sits near them. There is no CO2 sensor, so the fan schedule stands in for fresh air. The humidifier can only add moisture, so a low humidity target depends on dry room air.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Chen, MushWorld 2004, shiitake",
+      "detail": "Alice W. Chen, Growing Shiitake Mushrooms, Mushroom Growers' Handbook 1, ch. 11, MushWorld 2004. Huagu (flower shiitake) and dongu (winter shiitake) are thick caps made at winter-like temperatures. Huagu forcing starts when buttons are 2 to 3 cm. Under 1.5 cm buttons can die; over 3.5 cm they do not respond. Cold, dry air with large day-night swings dries the cap skin while the flesh keeps growing, which cracks the cap. Use a cold-tolerant strain. The Stamets table in the chapter gives primordia induction at 10 to 16 \u00b0C for cold strains, 95 to 100% RH, development at 60 to 80% RH, and 500 to 2,000 lux, with long stems under 500 lux. Lower humidity to 60% for 6 to 12 h before harvest.",
+      "url": "https://www.fungifun.org/docs/mushworld/Oyster-Mushroom-Cultivation/mushroom-growers-handbook-1-mushworld-com-chapter-11-1.pdf"
+    },
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). L. edodes: long spawn run, bark-like browning, then 5 to 10 \u00b0C shock and 13 to 18 \u00b0C fruiting."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 42.0,
+      "humidity_percent": 88.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 24.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0.0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Wait for full white, then browning: do not fruit early."
+    },
+    {
+      "id": "browning",
+      "name": "Browning / skin",
+      "duration_days": 21.0,
+      "humidity_percent": 80.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16.0,
+      "temperature_warning_max_c": 26.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 190,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 45,
+        "run_duration_s": 20,
+        "speed_percent": 20
+      },
+      "notes": "Block forms a protective brown skin. Keep it a bit drier."
+    },
+    {
+      "id": "cold_shock",
+      "name": "Cold shock (off-device)",
+      "duration_days": 1.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 20.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0.0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "The chamber can't get fridge cold. Shock 12 to 24 h at 5 to 10 \u00b0C, then apply fruiting."
+    },
+    {
+      "id": "pinning",
+      "name": "Buttons",
+      "duration_days": 7.0,
+      "humidity_percent": 95.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 14.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 9.0,
+      "temperature_warning_max_c": 19.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 506,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 12,
+        "run_duration_s": 35,
+        "speed_percent": 40
+      },
+      "notes": "Grow buttons to 2 to 3 cm before the dry stage."
+    },
+    {
+      "id": "fruiting",
+      "name": "Dry forcing",
+      "duration_days": 12.0,
+      "humidity_percent": 60.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 14.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 9.0,
+      "temperature_warning_max_c": 19.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 1229,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 10,
+        "run_duration_s": 60,
+        "speed_percent": 60
+      },
+      "notes": "Dry air hardens the cap skin while the flesh grows. Mist nothing."
+    }
+  ],
+  "pricing": {
+    "kind": "paid",
+    "amount_cents": 399,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [
+    "stripe"
+  ],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Shiitake caps need 500 to 2,000 lux in the cited table, and less than 500 lux gives long stems. 37% white is about 506 lux and 51% is about 1,229 lux. Browning keeps the free card light.",
+    "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
+    "sources": [
+      {
+        "title": "Chen, MushWorld 2004, shiitake",
+        "detail": "Alice W. Chen, Growing Shiitake Mushrooms, Mushroom Growers' Handbook 1, ch. 11, MushWorld 2004. Huagu (flower shiitake) and dongu (winter shiitake) are thick caps made at winter-like temperatures. Huagu forcing starts when buttons are 2 to 3 cm. Under 1.5 cm buttons can die; over 3.5 cm they do not respond. Cold, dry air with large day-night swings dries the cap skin while the flesh keeps growing, which cracks the cap. Use a cold-tolerant strain. The Stamets table in the chapter gives primordia induction at 10 to 16 \u00b0C for cold strains, 95 to 100% RH, development at 60 to 80% RH, and 500 to 2,000 lux, with long stems under 500 lux. Lower humidity to 60% for 6 to 12 h before harvest.",
+        "url": "https://www.fungifun.org/docs/mushworld/Oyster-Mushroom-Cultivation/mushroom-growers-handbook-1-mushworld-com-chapter-11-1.pdf"
+      },
+      {
+        "title": "Kim 2024 shiitake blue light",
+        "detail": "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). Blocks were incubated 60 days in the dark, then 40 to 60 days under blue or white LED at 4 umol/m2/s, and browning happened in that light period. The paper cites Park et al. 2017 (J. Mushrooms 15) for high browning efficiency at 200 lux regardless of light source. Blue light was applied during incubation, not during fruiting. Yield and ergothioneine rose versus white in two cultivars. This recipe does not treat that as a fruiting-stage blue mix.",
+        "url": "https://doi.org/10.1080/12298093.2024.2430052"
+      },
+      {
+        "title": "Koo 2018 shiitake browning LED",
+        "detail": "Jinmo Koo et al., Browning technology for shiitake in sawdust using LED source, Journal of Mushrooms 16(4) (2018). Light was used to induce browning on a 1 h on, 1 h off cycle at 20 C for 60 days. The best browning came at 1.5 umol/m2/s red and blue LED; the strongest settings tested (20.5 umol/m2/s and 300 lux fluorescent) browned less. The chamber has one daily light window, so 12 h at about 200 lux stands in for that cycle.",
+        "url": "https://www.earticle.net/Article/A348305"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0.0,
+        "white_brightness_percent": 0.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "browning": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 26.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "cold_shock": {
+        "photoperiod_hours": 0.0,
+        "white_brightness_percent": 0.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 37.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fruiting": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 51.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
+  }
+}

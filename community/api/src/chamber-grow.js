@@ -8,7 +8,7 @@ import { SQL as ALERT_SQL } from "./alerts/store.js";
 import { readRules } from "./alerts/rules.js";
 import { isOffMenu, profilePath } from "./pack.js";
 
-// Off-menu profiles with a licensed photo, and the smallest copy the site has of each.
+// Profiles with a licensed photo (Off-menu and Chef's line), and the smallest copy the site has of each.
 const LICENSED = {
   "golden-teacher": "/img/species/golden-teacher-640.webp",
   "b-plus": "/img/species/b-plus-640.webp",
@@ -17,6 +17,19 @@ const LICENSED = {
   "p-natalensis": "/img/species/p-natalensis-528.webp",
   "acadian-coast": "/img/species/acadian-coast-640.webp",
   "treasure-coast": "/img/species/treasure-coast-640.webp",
+  // Chef's line profiles with a licensed photo.
+  "lions-mane-dense-head": "/img/species/lions-mane-dense-head-640.webp",
+  "shiitake-flower-cap": "/img/species/shiitake-flower-cap-640.webp",
+  "shiitake-donko": "/img/species/shiitake-donko-640.webp",
+  "cordyceps-high-color": "/img/species/cordyceps-high-color-640.webp",
+  "pearl-oyster-baby-clusters": "/img/species/pearl-oyster-baby-clusters-640.webp",
+  "pearl-oyster-dark-cap": "/img/species/pearl-oyster-dark-cap-640.webp",
+  "golden-oyster-deep-yellow": "/img/species/golden-oyster-deep-yellow-640.webp",
+  "pink-oyster-bright": "/img/species/pink-oyster-bright-640.webp",
+  "beech-shimeji-bouquet": "/img/species/beech-shimeji-bouquet-640.webp",
+  "chestnut-long-stem": "/img/species/chestnut-long-stem-640.webp",
+  "wood-ear-dark": "/img/species/wood-ear-dark-640.webp",
+  "king-oyster-thick-stem": "/img/species/king-oyster-thick-stem-640.webp",
 };
 
 const PHOTOS = [

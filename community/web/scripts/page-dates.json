@@ -7,6 +7,10 @@
     "hash": "84eda856377c4380",
     "date": "2026-10-26"
   },
+  "beech-shimeji-bouquet": {
+    "hash": "85d66ed0a8a1c6f1",
+    "date": "2026-10-26"
+  },
   "blue-oyster": {
     "hash": "eed1814c35d91a72",
     "date": "2026-10-26"
@@ -17,6 +21,14 @@
   },
   "chestnut": {
     "hash": "c79edf8ebdd58ed3",
+    "date": "2026-10-26"
+  },
+  "chestnut-long-stem": {
+    "hash": "bc08e09aedc6ea16",
+    "date": "2026-10-26"
+  },
+  "cordyceps-high-color": {
+    "hash": "35366c05498bdcd5",
     "date": "2026-10-26"
   },
   "cordyceps-militaris": {
@@ -35,6 +47,10 @@
     "hash": "8d87fa66a1cc37f2",
     "date": "2026-10-26"
   },
+  "golden-oyster-deep-yellow": {
+    "hash": "0e72bdd98c9e7b73",
+    "date": "2026-10-26"
+  },
   "golden-teacher": {
     "hash": "48f7f419e908f3c8",
     "date": "2026-10-26"
@@ -44,11 +60,15 @@
     "date": "2026-10-26"
   },
   "king-oyster-thick-stem": {
-    "hash": "d7a275d11a213db7",
+    "hash": "0fda94f1880aaf8e",
     "date": "2026-10-26"
   },
   "lions-mane": {
     "hash": "9ec14348cdfa22fb",
+    "date": "2026-10-26"
+  },
+  "lions-mane-dense-head": {
+    "hash": "168fc0db492058cf",
     "date": "2026-10-26"
   },
   "maitake": {
@@ -71,12 +91,24 @@
     "hash": "4f3e52f528ed624c",
     "date": "2026-10-26"
   },
+  "pearl-oyster-baby-clusters": {
+    "hash": "417f701be6ce5d35",
+    "date": "2026-10-26"
+  },
+  "pearl-oyster-dark-cap": {
+    "hash": "8b391a13c5fc4c64",
+    "date": "2026-10-26"
+  },
   "penis-envy": {
     "hash": "a3e1652491b2f698",
     "date": "2026-10-26"
   },
   "pink-oyster": {
     "hash": "0f70032c1aed581b",
+    "date": "2026-10-26"
+  },
+  "pink-oyster-bright": {
+    "hash": "7c8ff192fc4bf78c",
     "date": "2026-10-26"
   },
   "pioppino": {
@@ -91,6 +123,14 @@
     "hash": "3c93cb361c7c0622",
     "date": "2026-10-26"
   },
+  "shiitake-donko": {
+    "hash": "7ecd8329e30e3cc6",
+    "date": "2026-10-26"
+  },
+  "shiitake-flower-cap": {
+    "hash": "1954dd6333404d6a",
+    "date": "2026-10-26"
+  },
   "turkey-tail": {
     "hash": "94acac58cde31578",
     "date": "2026-10-26"
@@ -101,6 +141,10 @@
   },
   "wood-ear": {
     "hash": "2c44995512b1a4df",
+    "date": "2026-10-26"
+  },
+  "wood-ear-dark": {
+    "hash": "927015f9b140f5a0",
     "date": "2026-10-26"
   }
 }
