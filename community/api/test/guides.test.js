@@ -54,7 +54,7 @@ test("guide copy stays plain: no dashes, arrows, jargon, or Coach", () => {
   }
 });
 
-test("guide links resolve: profiles are free and indexed, guides exist, partners are disclosed", () => {
+test("guide links resolve: profiles are free and indexed, guides exist, affiliate links are disclosed", () => {
   const indexed = new Set(FREE_IDS);
   for (const g of GUIDES) {
     const html = main(page(g.slug));
@@ -69,7 +69,9 @@ test("guide links resolve: profiles are free and indexed, guides exist, partners
       else if (href.startsWith("/guides/")) assert.ok(existsSync(join(PUBLIC, `${href}.html`)), `${g.slug} ${href}`);
       else assert.ok(["/", "/grow", "/install", "/docs", "/faq"].includes(href), `${g.slug} ${href}`);
     }
-    if (/northspore|pnwspore/.test(html)) assert.match(text(html), /affiliate links/, `${g.slug} discloses partners`);
+    // The affiliate note shows only when the page holds a tagged affiliate link, and then it must.
+    if (/\sdata-affiliate[\s>]/.test(html)) assert.match(text(html), /commission/, `${g.slug} discloses affiliate links`);
+    else assert.doesNotMatch(text(html), /affiliate|commission/i, `${g.slug} claims affiliate links it does not have`);
     assert.ok(/href="\/profiles\//.test(html) || /href="\/grow"/.test(html), `${g.slug} links to profiles`);
   }
 });
@@ -111,5 +113,28 @@ test("guide pages preload the body and heading fonts so text does not shift", ()
     const html = page(g.slug);
     assert.match(html, /<link rel="preload" href="\/fonts\/atkinson-400\.woff2" as="font" type="font\/woff2" crossorigin>/, g.slug);
     assert.match(html, /<link rel="preload" href="\/fonts\/fraunces-600\.woff2" as="font" type="font\/woff2" crossorigin>/, g.slug);
+  }
+});
+
+test("the affiliate note switches on by itself once a partner link has a tagged URL", async () => {
+  const mod = await import("../../web/scripts/guides/suppliers.js");
+  const { SUPPLIERS, supplier, withAffiliateNote, isAffiliate } = mod;
+  // Today no supplier is tagged, so no note.
+  for (const key of Object.keys(SUPPLIERS)) assert.equal(isAffiliate(key), false, key);
+  assert.equal(withAffiliateNote(`<p>${supplier("north-spore")}</p>`), `<p>${supplier("north-spore")}</p>`);
+  const saved = { ...SUPPLIERS["north-spore"] };
+  const pnw = { ...SUPPLIERS["pnw-spore"] };
+  try {
+    SUPPLIERS["north-spore"].affiliateUrl = "https://northspore.com/?ref=shroomlabs";
+    const tagged = supplier("north-spore");
+    assert.match(tagged, /href="https:\/\/northspore\.com\/\?ref=shroomlabs" rel="sponsored noopener" data-affiliate/);
+    assert.match(withAffiliateNote(`<p>${tagged}</p>`), /commission/);
+    // A neutral mention never becomes an affiliate link, even with a URL set.
+    SUPPLIERS["pnw-spore"].affiliateUrl = "https://pnwspore.com/?ref=x";
+    assert.equal(isAffiliate("pnw-spore"), false);
+    assert.doesNotMatch(supplier("pnw-spore"), /data-affiliate|sponsored/);
+  } finally {
+    Object.assign(SUPPLIERS["north-spore"], saved);
+    Object.assign(SUPPLIERS["pnw-spore"], pnw);
   }
 });

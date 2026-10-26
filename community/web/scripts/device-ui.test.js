@@ -75,7 +75,7 @@ test("grow line falls back when no profile is set", () => {
 
 test("account page is a short menu of collapsed sections that keeps the old hooks", () => {
   const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/account.html"), "utf8");
-  for (const id of ["devices", "alerts", "billing", "security", "community", "your-data", "first-chamber", "who", "verified", "device-cards", "alert-prefs", "sessions", "signout", "signout-all", "mint", "my-profiles", "ents", "coach-account"]) {
+  for (const id of ["devices", "alerts", "billing", "security", "community", "your-data", "first-chamber", "who", "verified", "device-cards", "alert-prefs", "sessions", "signout", "signout-all", "mint", "my-profiles", "ents", "coach-billing", "billing-portal"]) {
     assert.match(html, new RegExp(`id="${id}"`), id);
   }
   // Menu order: Chambers, Email alerts, Billing first, then the rest, each collapsed.

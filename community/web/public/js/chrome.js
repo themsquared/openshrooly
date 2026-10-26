@@ -5,8 +5,6 @@ export const TAGLINE = "Chamber profiles for OpenShrooly.";
 export const PRODUCT =
   "Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.";
 export const POSITIONING = "Works with Shrooly devices running OpenShrooly.";
-export const DISCLOSURE =
-  "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
 
 export const NAV_ITEMS = [
   { id: "profiles", href: "/", label: "Profiles" },
