@@ -48,6 +48,7 @@
         <a href="#billing">Subscriptions and billing</a>
         <a href="#security">Security</a>
         <a href="#community">Community</a>
+        <a href="#your-data">Your data</a>
       </nav>
     </header>
 
@@ -128,6 +129,24 @@
       <p class="muted">Private profiles work on your chambers right away. Community sharing waits for review.</p>
       <p class="account-actions"><a class="button" href="/publish.html">Build a profile</a></p>
       <ul id="my-profiles"></ul>
+    </section>
+
+    <section class="account-section card" id="your-data" aria-labelledby="your-data-title">
+      <h2 id="your-data-title">Your data</h2>
+      <h3>Download a copy</h3>
+      <p class="muted">One file with your account, chambers, profiles, alerts, and purchases. Your password is never in it.</p>
+      <p class="account-actions"><button type="button" class="secondary" id="export-data">Download my data</button> <span id="export-msg" class="muted" role="status"></span></p>
+      <h3>Delete your account</h3>
+      <p class="muted">This can't be undone. Your chambers get unlinked and keep growing on your Wi-Fi. Your profiles, ratings, grow reports, photos, and alerts are removed.</p>
+      <form id="delete-account" class="danger-zone">
+        <label>Type your username, <strong id="delete-username"></strong>, to confirm
+          <input name="confirm" autocomplete="off" autocapitalize="none" spellcheck="false">
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="danger" disabled>Delete my account</button>
+          <span id="delete-msg" class="muted" role="status"></span>
+        </div>
+      </form>
     </section>
   </main>
   <!--CHROME_FOOTER-->

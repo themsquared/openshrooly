@@ -83,6 +83,15 @@ test("account page keeps the old hooks inside named sections", () => {
   assert.doesNotMatch(html.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " "), DASH);
 });
 
+test("account page lets people download their data and delete their account", () => {
+  const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/account.html"), "utf8");
+  for (const id of ["your-data", "export-data", "delete-account", "delete-username"]) assert.match(html, new RegExp(`id="${id}"`), id);
+  assert.match(html, /href="#your-data"/);
+  // The delete button stays off until the username is typed.
+  assert.match(html, /<button type="submit" class="danger" disabled>Delete my account<\/button>/);
+  assert.match(html, /can't be undone/);
+});
+
 test("public device pages stay dash-free", () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), "../public");
   for (const name of ["devices.html", "device.html"]) {
