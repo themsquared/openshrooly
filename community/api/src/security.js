@@ -70,21 +70,26 @@ export async function verifyPaymentWebhook(env, rawBody, signatureHeader) {
   if (!secret) return { ok: false, error: "webhook secret not configured" };
   const header = String(signatureHeader || "");
   if (!header) return { ok: false, error: "missing signature" };
-  const fields = {};
+  // Stripe sends several v1 signatures while a signing secret is being rolled. Any one may match.
+  let t = "";
+  const signatures = [];
   for (const part of header.split(",")) {
     const idx = part.indexOf("=");
     if (idx < 0) continue;
-    fields[part.slice(0, idx).trim()] = part.slice(idx + 1).trim();
+    const key = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (key === "t") t = value;
+    else if (key === "v1" && value) signatures.push(value.toLowerCase());
   }
-  const t = fields.t;
-  const v1 = String(fields.v1 || "").toLowerCase();
-  if (!t || !v1) return { ok: false, error: "bad signature header" };
+  if (!t || !signatures.length) return { ok: false, error: "bad signature header" };
   const age = Math.abs(Date.now() / 1000 - Number(t));
   if (!Number.isFinite(Number(t)) || age > 300) return { ok: false, error: "stale webhook" };
   const expected = (await hmacSha256Hex(secret, `${t}.${rawBody}`)).toLowerCase();
-  if (expected.length !== v1.length || !timingSafeEqual(expected, v1)) {
-    return { ok: false, error: "invalid signature" };
+  let matched = false;
+  for (const v1 of signatures) {
+    if (expected.length === v1.length && timingSafeEqual(expected, v1)) matched = true;
   }
+  if (!matched) return { ok: false, error: "invalid signature" };
   return { ok: true };
 }
 

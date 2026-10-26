@@ -29,7 +29,7 @@ import {
   workersAiRestUrl,
   workersAiText,
 } from "../src/coach-models.js";
-import { pickCoachProfile, profileStageTargets, slimCulinaryProfile } from "../src/coach.js";
+import { coachCaps, pickCoachProfile, profileStageTargets, slimCulinaryProfile } from "../src/coach.js";
 import { call, callRaw, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 import { buildJpeg, toBase64 } from "./image-fixtures.js";
 
@@ -631,4 +631,42 @@ test("subscribe stays 503 for a beta user while COACH_PUBLIC is off", async () =
   const sub = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
   assert.equal(sub.status, 503);
   assert.equal(sub.data.coming_soon, true);
+});
+
+test("coach cost caps: defaults stay small and env vars override them", () => {
+  const caps = coachCaps({});
+  assert.ok(estimateUsd(caps.monthly_neurons) < 1, "monthly per-user AI cost stays well under the plan price");
+  assert.ok(estimateUsd(caps.neurons) * 31 >= estimateUsd(caps.monthly_neurons) / 4);
+  assert.equal(coachCaps({ COACH_DAILY_CHATS: "5", COACH_MONTHLY_NEURONS: "nope" }).chats, 5);
+  assert.equal(coachCaps({ COACH_MONTHLY_NEURONS: "nope" }).monthly_neurons, caps.monthly_neurons);
+});
+
+test("coach stops at the monthly allowance and at the global daily budget", async () => {
+  const ctx = testEnv({ GROW_COACH_STUB: "1", COACH_AUTOPILOT_ENABLED: "1", COACH_DAILY_NEURONS: "1000000", COACH_GLOBAL_DAILY_NEURONS: "50000" });
+  const { token } = await register(ctx, "budget@example.com");
+  await subscribe(ctx, token);
+  const me = await call(ctx, "GET", "/api/me", { token });
+  const day = nowIso().slice(0, 10);
+  const ok = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "first" } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+
+  await ctx.db.run("UPDATE coach_usage SET chats=?, photos=?, neurons=? WHERE user_id=? AND day=?", [1, 0, 20000, me.data.user.id, day]);
+  const monthly = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "second" } });
+  assert.equal(monthly.status, 429);
+  assert.match(monthly.data.error, /this month/);
+
+  await ctx.db.run("UPDATE coach_usage SET chats=?, photos=?, neurons=? WHERE user_id=? AND day=?", [1, 0, 0, me.data.user.id, day]);
+  await ctx.db.run("INSERT INTO coach_usage (user_id, day, chats, photos, neurons) VALUES (?, ?, 0, 0, 0)", [999999, day]);
+  await ctx.db.run("UPDATE coach_usage SET chats=?, photos=?, neurons=? WHERE user_id=? AND day=?", [0, 0, 50000, 999999, day]);
+  const errors = [];
+  const origError = console.error;
+  console.error = (line) => errors.push(String(line));
+  try {
+    const busy = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "third" } });
+    assert.equal(busy.status, 503);
+    assert.match(busy.data.error, /busy today/);
+  } finally {
+    console.error = origError;
+  }
+  assert.ok(errors.some((line) => line.includes("coach.budget")));
 });
