@@ -1,18 +1,28 @@
 ![OpenShrooly logo](https://github.com/user-attachments/assets/9fa4725c-00c0-42ce-ba5d-a9dcd2bbc7c9)
 
 
-**OpenShrooly** is a very early experimental replacement firmware for the Shrooly mushroom growing device.  
-The intent is to convert the Shrooly into a **Wi-Fi–only device**, controllable from a local web interface or integrated with [Home Assistant](https://www.home-assistant.io/).
+**OpenShrooly** is free, open source replacement firmware for the Shrooly mushroom growing chamber. It runs the chamber on your own Wi-Fi, with a local web page for temperature, humidity, fresh air and light, and it can work with [Home Assistant](https://www.home-assistant.io/). No cloud account is needed.
 
-The 1.0.2 release is recommended if you are using an earlier version.
+This fork adds [Shroom Labs](https://shroomlabs.io): stage by stage grow profiles for culinary and functional mushrooms, an optional account to see your chamber from anywhere, and a "Link this device" option in the chamber's own menu. It is in open beta.
 
-⚠️ **Warning:** Use at your own risk! This project is experimental and may brick your device.
+## Get started
+
+1. **Install:** plug the Shrooly into a computer with a USB-C data cable and use the installer at **[shroomlabs.io/install](https://shroomlabs.io/install)** (Chrome or Edge, about 5 minutes). It replaces the stock firmware, so if you might want that back, save a backup first with step 2.
+2. **Back up and recover:** the [USB recovery guide](docs/RECOVERY.md) shows how to save your original firmware, and how to get a chamber back if an update goes wrong. If the screen doesn't change after installing, unplug USB and power for 10 seconds, then plug in power only.
+3. **Grow:** pick a profile at [shroomlabs.io/grow](https://shroomlabs.io/grow). Each one lists the temperature, humidity, fresh air and light for every stage.
+4. **Link (optional):** on the chamber, press button 4 to open the menu, choose "Link this device" and scan the QR code while signed in to shroomlabs.io.
+
+Signed releases and update rollback are built in, and USB is always the way back. Still, this is beta firmware, so use it at your own risk.
+
+## Credit
+
+OpenShrooly was created by Graham Stewart: [grahamsz/openshrooly](https://github.com/grahamsz/openshrooly), with firmware docs at [OpenShrooly.com](https://openshrooly.com). This fork builds on that work. Shroom Labs is not made by or affiliated with the maker of Shrooly.
 
 ---
 
-## Shroom Labs (this fork)
+## For developers
 
-Mike's fork adds a **local hub** and **[Shroom Labs](https://shroomlabs.io)** on top of the stock firmware. Devices stay offline-first. Shroom Labs works with Shrooly devices running OpenShrooly; it is not a Shrooly-branded product.
+What else is in this repo:
 
 - Architecture, data model, sync, monetization, Grow Coach, and hosting costs: [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/COACH.md`](docs/COACH.md)
 - Profile JSON (culinary + optional restricted pack): [`data/profiles/`](data/profiles/)
@@ -21,10 +31,6 @@ Mike's fork adds a **local hub** and **[Shroom Labs](https://shroomlabs.io)** on
 - Shroom Labs (shroomlabs.io frontend, api.shroomlabs.io, cdn.shroomlabs.io): [`community/README.md`](community/README.md)
 - Design system: [`design/`](design/) · UX: [`docs/UX.md`](docs/UX.md) · Security: [`SECURITY.md`](SECURITY.md) · Auth keys: [`docs/AUTH.md`](docs/AUTH.md)
 - Expo iOS scaffold: [`mobile/`](mobile/)
-
-## Documentation
-
-See [OpenShrooly.com](https://openshrooly.com) for firmware documentation. Upstream project: [grahamsz/openshrooly](https://github.com/grahamsz/openshrooly) by Graham Stewart.
 
 ## Continuous Integration
 
