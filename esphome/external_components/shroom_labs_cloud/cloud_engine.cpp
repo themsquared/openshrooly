@@ -579,6 +579,15 @@ std::string CloudEngine::status_json() const {
   out += live ? claim_expires_ : "";
   out += "\",\"expires_in_s\":";
   out += std::to_string(left);
+  // Only while linked, so an unlinked chamber shows nothing from the site.
+  const bool show_grow = !pending_wipe_ && state_ == CloudState::Linked && has_cert_;
+  out += ",\"grow_name\":\"";
+  out += show_grow ? grow_.name : "";
+  out += "\",\"grow_url\":\"";
+  out += show_grow ? grow_.url : "";
+  out += "\",\"grow_image\":\"";
+  out += show_grow ? grow_.image : "";
+  out += "\"";
   out += ",\"remote_apply\":";
   out += remote_apply_ ? "true" : "false";
   out += ",\"message\":\"";
@@ -1044,6 +1053,13 @@ bool CloudEngine::handle_probe_() {
 }
 
 bool CloudEngine::process_inbox_(const std::string &body) {
+  {
+    InboxGrow grow;
+    if (parse_inbox_grow(body.c_str(), &grow)) {
+      std::lock_guard<std::mutex> g(lock_);
+      grow_ = grow;
+    }
+  }
   InboxCommand cmds[MAX_INBOX_COMMANDS];
   const size_t n = parse_inbox_commands(body.c_str(), cmds, MAX_INBOX_COMMANDS);
   ChamberReading reading{};

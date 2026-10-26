@@ -770,6 +770,42 @@ int main() {
   expect(eng.owner_name() == "Mike M", "engine keeps owner name from csr");
   expect(!eng.wiping(), "engine not wiping when linked");
 
+  // What is growing rides on the inbox and shows on the chamber's own page while linked.
+  expect(std::strstr(eng.status_json().c_str(), "\"grow_name\":\"\"") != nullptr, "no grow before inbox");
+  tr.steps = {{"/inbox", ok_body(200,
+      "{\"commands\":[],\"cloud_enabled\":true,\"offline_ok\":true,\"grow_name\":\"Lion's Mane\","
+      "\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\","
+      "\"grow_image\":\"https://shroomlabs.io/img/species/species-lions-mane-640.webp\"}")}};
+  tr.i = 0;
+  eng.probe_now();
+  {
+    const std::string js = eng.status_json();
+    expect(js.find("\"grow_name\":\"Lion's Mane\"") != std::string::npos, "grow name in status");
+    expect(js.find("\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\"") != std::string::npos, "grow url in status");
+    expect(js.find("species-lions-mane-640.webp\"") != std::string::npos, "grow image in status");
+  }
+  // An older server sends no grow keys: keep what the page shows.
+  tr.steps = {{"/inbox", ok_body(200, "{\"commands\":[]}")}};
+  tr.i = 0;
+  eng.probe_now();
+  expect(eng.status_json().find("Lion's Mane") != std::string::npos, "grow kept when server sends none");
+  // Empty name clears it.
+  tr.steps = {{"/inbox", ok_body(200, "{\"commands\":[],\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\"}")}};
+  tr.i = 0;
+  eng.probe_now();
+  expect(eng.status_json().find("\"grow_name\":\"\"") != std::string::npos, "grow cleared");
+  {
+    InboxGrow g;
+    expect(!parse_inbox_grow("{\"commands\":[]}", &g), "grow absent on old server");
+    expect(!parse_inbox_grow("{\"commands\":[{\"payload\":{\"grow_name\":\"x\"}}]}", &g), "grow only at top level");
+    expect(parse_inbox_grow("{\"grow_name\":\"A\\\"<b>\",\"grow_url\":\"http://evil\",\"grow_image\":\"javascript:x\"}", &g),
+           "grow parsed");
+    expect(g.name == "Ab", "grow name stripped of quotes and tags");
+    expect(g.url.empty() && g.image.empty(), "grow links https only");
+    expect(parse_inbox_grow("{\"grow_name\":\"\",\"grow_url\":\"https://shroomlabs.io/x\"}", &g) && g.url.empty(),
+           "no link without a name");
+  }
+
   tr.steps = {{"/rotate", ok_body(429, "{}", true, 120)}};
   tr.i = 0;
   clk.now = 5000;

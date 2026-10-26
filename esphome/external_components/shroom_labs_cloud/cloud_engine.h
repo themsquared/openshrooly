@@ -174,6 +174,7 @@ class CloudEngine {
   std::string serial_;
   std::string fingerprint_;
   std::string owner_name_;
+  InboxGrow grow_;
   std::string not_after_;
   int64_t rotate_after_ms_{ROTATE_AFTER_MS};
   int64_t issued_ms_{0};
