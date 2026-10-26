@@ -5,6 +5,7 @@ import { dispatchAlerts } from "./alerts/memory.js";
 import { dispatchReview } from "./review-memory.js";
 import { dispatchAccount } from "./account-memory.js";
 import { dispatchAdmin } from "./admin-memory.js";
+import { dispatchFeed } from "./feed-memory.js";
 
 export function createMemoryDb() {
   const tables = {
@@ -133,6 +134,8 @@ function dispatch(mode, tables, ids, sql, params) {
   if (accountResult !== undefined) return accountResult;
   const alertResult = dispatchAlerts(tables, ids, q, params);
   if (alertResult !== undefined) return alertResult;
+  const feedResult = dispatchFeed(tables, ids, q, params);
+  if (feedResult !== undefined) return feedResult;
   const reviewResult = dispatchReview(tables, ids, q, params);
   if (reviewResult !== undefined) return reviewResult;
   if (q.startsWith("INSERT INTO users")) {
