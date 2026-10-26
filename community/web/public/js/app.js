@@ -234,15 +234,45 @@ async function renderHome() {
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", off);
   setCoachOffMenu(off);
+  setGetStarted();
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
+  // First visit: show a handful of cards and one button for the rest. A search shows everything.
+  const preview = !q && profiles.length > HOME_PREVIEW_COUNT;
   $("#cards").innerHTML = profiles.length
-    ? renderProfileCards(profiles)
+    ? renderProfileCards(preview ? profiles.slice(0, HOME_PREVIEW_COUNT) : profiles)
     : `<div class="empty-library">
         <svg class="empty-mark" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg>
         <h2>Nothing in this flush</h2>
         <p>No profiles match that search. Try oyster, lion’s mane, or clear the query.</p>
         <a class="button ghost" href="/?pack=${encodeURIComponent(pack)}#library">Clear search</a>
       </div>`;
+  const row = $("#see-all-row");
+  const btn = $("#see-all");
+  if (row && btn) {
+    row.classList.toggle("hidden", !preview);
+    btn.textContent = `See all ${profiles.length}`;
+    btn.onclick = () => {
+      $("#cards").innerHTML = renderProfileCards(profiles);
+      row.classList.add("hidden");
+    };
+  }
+}
+
+const HOME_PREVIEW_COUNT = 6;
+
+/** "Get started" goes to install for newcomers, and to their chambers once they have one linked. */
+function setGetStarted() {
+  const cta = $("#get-started");
+  if (!cta || cta.dataset.ready || !isSignedIn()) return;
+  cta.dataset.ready = "1";
+  loadDeviceList()
+    .then((list) => {
+      const linked = (list?.devices || []).filter((d) => d.status !== "revoked");
+      if (!linked.length) return;
+      cta.textContent = "Open my chambers";
+      cta.href = "/devices.html";
+    })
+    .catch(() => {});
 }
 
 /** "Grow this" on a profile page: send the profile to a chamber, starting at day 1. */
@@ -610,6 +640,7 @@ async function renderAccount() {
       })
     );
   }
+  if (checkoutResult() && $("#billing")) $("#billing").open = true;
   if (checkoutResult() === "success" && $("#billing-status")) {
     const status = $("#billing-status");
     status.textContent = "Payment received. Turning on Grow Coach...";
@@ -631,8 +662,24 @@ async function renderAccount() {
       if (caps.fleet) $("#fleet-link")?.classList.remove("hidden");
     })
     .catch(() => {});
+  $("#signout")?.addEventListener("click", async () => {
+    try {
+      await api("/api/auth/logout", { method: "POST", jsonBody: {} });
+    } catch {
+      /* still clear local token */
+    }
+    setToken("");
+    location.href = "/";
+  });
+  openAccountSectionFromHash();
+  window.addEventListener("hashchange", openAccountSectionFromHash);
   const devices = await api("/api/fleet/devices").catch(() => ({ devices: [] }));
-  $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No devices linked yet." });
+  const linked = (devices.devices || []).filter((d) => d.status !== "revoked");
+  // New accounts see one card, "Link your first chamber", instead of an empty Chambers section.
+  $("#first-chamber")?.classList.toggle("hidden", linked.length > 0);
+  $("#devices")?.classList.toggle("hidden", linked.length === 0);
+  if ($("#devices-summary")) $("#devices-summary").textContent = linked.length === 1 ? "1 linked" : `${linked.length} linked`;
+  $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No chambers linked yet." });
   renderAlertSettings().catch((err) => showAlertsStatus(err.message));
   wireYourData(me);
   $("#mint").addEventListener("submit", async (ev) => {
@@ -642,6 +689,17 @@ async function renderAccount() {
     $("#new-token").textContent = data.token;
     $("#new-token-wrap").classList.remove("hidden");
   });
+}
+
+/** Account sections are collapsed; a link like /account.html#alerts opens that one. */
+function openAccountSectionFromHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (!id) return;
+  const el = document.getElementById(id);
+  const section = el?.closest("details.account-section");
+  if (!section) return;
+  section.open = true;
+  el.scrollIntoView({ block: "start" });
 }
 
 function wireYourData(me) {
@@ -1061,6 +1119,11 @@ async function consumeLocalSignIn() {
   return true;
 }
 
+function coachPriceText(product) {
+  const cents = Number(product?.amount_cents);
+  return Number.isFinite(cents) && cents > 0 ? `$${(cents / 100).toFixed(2)}` : "";
+}
+
 async function renderCoach() {
   if (await consumeLocalSignIn()) return;
   const catalog = await api("/api/coach").catch((err) => {
@@ -1087,9 +1150,14 @@ async function renderCoach() {
     $("#gated")?.classList.add("hidden");
     return;
   }
+  // Sales view: one price, one button, three bullets, cancel anytime.
+  const price = coachPriceText(catalog.product);
+  $("#coach-price").textContent = price;
+  $("#coach-price-line")?.classList.toggle("hidden", !price);
+  $("#subscribe").textContent = price ? `Start Grow Coach, ${price}/mo` : "Start Grow Coach";
+  $("#coach-status").textContent = "";
   if (!isSignedIn()) {
     $("#subscribe-panel").classList.remove("hidden");
-    $("#subscribe").textContent = "Sign in to subscribe";
     $("#subscribe").addEventListener("click", () => {
       location.href = `/login.html?next=${encodeURIComponent("/coach.html")}`;
     });
@@ -1430,7 +1498,7 @@ async function renderClaim() {
 
 const ALERT_STATUS = {
   sent: "Emailed",
-  stub: "Saved here. Email sending is not switched on yet.",
+  stub: "Saved here. Email alerts are off for now.",
   pending: "Sending",
   sending: "Sending",
   held: "Waiting for quiet hours to end",
@@ -1465,7 +1533,7 @@ function alertItems(alerts) {
 function deliveryNotice(data) {
   if (!data.email_ready) return "Verify your email to get alert emails. Alerts are still saved here.";
   if (data.prefs?.unsubscribed && !data.prefs?.email) return "You turned off alert emails from a link in an email. Turn on Email me alerts in alert settings to get them again.";
-  if (data.delivery?.email !== "live") return "Email sending is not switched on yet. Alerts are saved here so you can see them.";
+  if (data.delivery?.email !== "live") return "Email alerts are off for now.";
   return "";
 }
 
@@ -1574,18 +1642,72 @@ function loginRedirect() {
   location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
 }
 
+/**
+ * In-page sheet for unlinking: "Keep linked" is the big safe button, "Unlink" is red.
+ * Resolves true only when the person taps Unlink.
+ */
+function confirmUnlink() {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "sheet";
+    dialog.setAttribute("aria-labelledby", "sheet-title");
+    dialog.innerHTML = `
+      <h2 id="sheet-title">Unlink this chamber?</h2>
+      <p class="muted">It leaves your account. Growing keeps working on the chamber itself, and you can link it again later.</p>
+      <div class="sheet-actions">
+        <button type="button" class="sheet-keep" value="keep">Keep linked</button>
+        <button type="button" class="danger" value="unlink">Unlink</button>
+      </div>`;
+    const done = (yes) => {
+      dialog.close();
+      dialog.remove();
+      resolve(yes);
+    };
+    dialog.querySelector(".sheet-keep").addEventListener("click", () => done(false));
+    dialog.querySelector(".danger").addEventListener("click", () => done(true));
+    dialog.addEventListener("cancel", (ev) => {
+      ev.preventDefault();
+      done(false);
+    });
+    document.body.append(dialog);
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+      dialog.querySelector(".sheet-keep").focus();
+    } else {
+      dialog.remove();
+      resolve(confirm("Unlink this chamber from your account? Growing still works on the chamber itself."));
+    }
+  });
+}
+
+/** Only mention a lost live connection after this long, so a short blip never shows a banner. */
+const POLL_NOTICE_AFTER_MS = 2 * 60 * 1000;
+
 /** Small "Live" / "Updating…" badge next to a page title. */
 function setLiveBadge(el, state, at) {
   if (!el) return;
+  clearTimeout(el._pollNoticeTimer);
+  let shown = state;
+  if (state === "polling") {
+    const since = Number(el.dataset.pollingSince) || Date.now();
+    el.dataset.pollingSince = String(since);
+    const wait = since + POLL_NOTICE_AFTER_MS - Date.now();
+    if (wait > 0) {
+      shown = "quiet";
+      el._pollNoticeTimer = setTimeout(() => setLiveBadge(el, "polling", at), wait);
+    }
+  } else if (state === "live" || state === "gone" || !state) {
+    delete el.dataset.pollingSince;
+  }
   const text = {
     cached: `Updating… showing what this phone saw ${ageText(at) || "earlier"}`,
     loading: "Updating…",
     live: "Live",
-    polling: "Reconnecting. Checking every 30 seconds.",
+    polling: "Live updates paused. Numbers refresh every 30 seconds.",
     gone: "This chamber is no longer on your account.",
-  }[state] || "";
+  }[shown] || "";
   el.textContent = text;
-  el.dataset.state = state;
+  el.dataset.state = shown;
   el.classList.toggle("hidden", !text);
 }
 
@@ -1774,7 +1896,7 @@ async function renderDevice() {
       </p>`;
     dash.classList.remove("hidden");
     $("#unlink-device")?.addEventListener("click", async () => {
-      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      if (!(await confirmUnlink())) return;
       try {
         await api(`/api/fleet/devices/${enc}/unlink`, { method: "POST", jsonBody: { confirm: true } });
         liveCache.clear();
@@ -2139,7 +2261,7 @@ async function renderFleet() {
       }
     });
     $("#unlink-device").addEventListener("click", async () => {
-      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      if (!(await confirmUnlink())) return;
       try {
         await api(`/api/fleet/devices/${encodeURIComponent(detailId)}/unlink`, {
           method: "POST",
