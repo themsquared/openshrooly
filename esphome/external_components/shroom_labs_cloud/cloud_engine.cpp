@@ -1091,12 +1091,14 @@ bool CloudEngine::process_inbox_(const std::string &body) {
                         carried_ack && !ack_reason.empty() ? ack_reason.c_str() : nullptr)) {
       std::lock_guard<std::mutex> g(lock_);
       if (carried_ack)
-        pending_ack_ = false;
+        clear_pending_ack_(ack_id);
       next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     } else {
       if (carried_ack) {
         std::lock_guard<std::mutex> g(lock_);
-        keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
+        // A newer ack recorded while this POST was in flight wins; do not overwrite it.
+        if (!pending_ack_ || pending_ack_id_ == ack_id)
+          keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
       }
       schedule_telemetry_error_(0);
     }
@@ -1194,6 +1196,13 @@ void CloudEngine::keep_pending_ack_(int64_t command_id, const char *status, cons
   pending_ack_reading_ = reading;
 }
 
+// Caller holds lock_. Clears the pending ack only if it is still the one that was posted,
+// so an ack recorded while the POST was in flight is sent on the next pass instead of lost.
+void CloudEngine::clear_pending_ack_(int64_t posted_id) {
+  if (pending_ack_ && pending_ack_id_ == posted_id)
+    pending_ack_ = false;
+}
+
 void CloudEngine::complete_apply(int64_t command_id, bool ok, const char *status, const char *reason,
                                 const ChamberReading &reading) {
   std::lock_guard<std::mutex> g(lock_);
@@ -1241,7 +1250,7 @@ bool CloudEngine::handle_telemetry_() {
                       reason.empty() ? nullptr : reason.c_str())) {
     std::lock_guard<std::mutex> g(lock_);
     if (had_ack)
-      pending_ack_ = false;
+      clear_pending_ack_(ack_id);
     next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     return true;
   }

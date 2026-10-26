@@ -107,6 +107,7 @@ class CloudEngine {
   bool allow_connect_();
   void note_connect_(bool count_hour);
   void keep_pending_ack_(int64_t command_id, const char *status, const char *reason, const ChamberReading &reading);
+  void clear_pending_ack_(int64_t posted_id);
   void set_claim_poll_();
   bool rotate_slot_open_();
   JobSnap snap_() const;
