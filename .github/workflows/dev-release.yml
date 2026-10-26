@@ -45,9 +45,10 @@ jobs:
           echo "SHOULD_PUBLISH_DEV=false" >> $GITHUB_ENV
           echo "SHOULD_PUBLISH_RELEASE=false" >> $GITHUB_ENV
 
-          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            echo "SHOULD_PUBLISH_DEV=true" >> $GITHUB_ENV
-          fi
+          # Pushes to main only build and upload Actions artifacts. Public dev
+          # prereleases and tags are opt in through a manual run, so merging to
+          # main never publishes an unsigned firmware build. Signed releases
+          # are served from shroomlabs.io/install.
 
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == refs/tags/* && "${GITHUB_REF_NAME}" != dev-* ]]; then
             echo "SHOULD_PUBLISH_RELEASE=true" >> $GITHUB_ENV
