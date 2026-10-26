@@ -1,0 +1,23 @@
+{
+  "disclosure": "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.",
+  "items": [
+    {
+      "id": "hardwood-pellets",
+      "name": "Hardwood fuel pellets",
+      "category": "substrate",
+      "notes": "Useful for supplemented sawdust blocks (shiitake, lion's mane, reishi)."
+    },
+    {
+      "id": "master-spawn-bag",
+      "name": "Spawn / grow bag",
+      "category": "bags",
+      "notes": "Filter-patch bags for grain spawn or fruiting blocks."
+    },
+    {
+      "id": "oyster-sawdust-spawn",
+      "name": "Oyster sawdust spawn",
+      "category": "spawn",
+      "notes": "Culinary oyster spawn only. Never listed on restricted profiles."
+    }
+  ]
+}

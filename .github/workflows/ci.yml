@@ -2,11 +2,10 @@ name: Firmware CI
 
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
+      - cursor/community-platform-fa9c
   workflow_dispatch:
 
 concurrency:
@@ -52,7 +51,7 @@ jobs:
       - name: Install RP2040 toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc-arm-none-eabi libnewlib-arm-none-eabi
+          sudo apt-get install --yes gcc-arm-none-eabi libnewlib-arm-none-eabi libmbedtls-dev
 
       - name: Build RP2040 coprocessor
         run: |
@@ -92,6 +91,12 @@ jobs:
           echo "NEXT_BUILD_ID=$NEXT_BUILD_ID"
           npm run build
 
+      - name: Dashboard and signed update tests
+        run: |
+          (cd webapp && npm test)
+          python3 scripts/test_signed_update.py
+          python3 scripts/test_shroom_labs_cloud.py
+
       - name: Verify embedded assets are current
         run: |
           python3 esphome/external_components/web_server/embed_static_files.py \
@@ -108,7 +113,14 @@ jobs:
           path: webapp/out
           retention-days: 7
 
+      - name: Growing screen previews, fonts, and font-merge IDs
+        run: |
+          python -m pip install pillow
+          python3 scripts/test_epaper_previews.py
+
       - name: Validate configuration
+        env:
+          REQUIRE_ESPHOME_CONFIG: "1"
         run: esphome config esphome/openshrooly.yaml
 
       - name: Compile firmware

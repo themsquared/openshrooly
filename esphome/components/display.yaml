@@ -3,17 +3,71 @@
 # E-paper display setup for use with LVGL
 # ========================================================================
 
-# Fonts for display (if needed for non-LVGL components)
+# All LVGL fonts live here. display.yaml is merged before lvgl_config.yaml,
+# so a second font: block there is dropped and font_ui / font_hero go missing.
 font:
   - file: 'fonts/spleen-6x12.bdf'
     id: font1
+    bpp: 1
+  - file: 'fonts/spleen-12x24.bdf'
+    id: font_ui
+    bpp: 1
+  - file: 'fonts/spleen-24x48.bdf'
+    id: font_hero
+    bpp: 1
 
-# Background image (not used with LVGL)
+# LVGL draws a BINARY image as an alpha mask (A1) painted in the widget's
+# image_recolor color, which defaults to black. On this panel black in memory
+# is white paper, so every LVGL image widget must set
+# image_recolor: paper_black, and every BINARY image it shows needs
+# invert_alpha: true so the dark PNG pixels are the ones that get painted.
+# scripts/test_epaper_previews.py fails the build if either is missing.
 image:
   - platform: file
     file: "images/background.bmp"
-    id: background
+    id: background  # not used with LVGL
     type: BINARY
+  - platform: file
+    file: "images/splash_logo.png"
+    id: splash_logo
+    type: BINARY
+    invert_alpha: true
+  - platform: file
+    file: "images/mark_16.png"
+    id: mark_16
+    type: BINARY
+    invert_alpha: true
+  # Growing-screen mushroom, 24x26 1-bit. Drawn by scripts/shroom_mascot.py.
+  - platform: file
+    file: "images/mascot_idle.png"
+    id: mascot_idle
+    type: BINARY
+    invert_alpha: true
+  - platform: file
+    file: "images/mascot_meh.png"
+    id: mascot_meh
+    type: BINARY
+    invert_alpha: true
+  - platform: file
+    file: "images/mascot_blink.png"
+    id: mascot_blink
+    type: BINARY
+    invert_alpha: true
+  - platform: file
+    file: "images/mascot_surprise.png"
+    id: mascot_surprise
+    type: BINARY
+    invert_alpha: true
+  - platform: file
+    file: "images/mascot_lean_left.png"
+    id: mascot_lean_left
+    type: BINARY
+    invert_alpha: true
+  - platform: file
+    file: "images/mascot_lean_right.png"
+    id: mascot_lean_right
+    type: BINARY
+    invert_alpha: true
 
 # E-paper Display Configuration
 display:

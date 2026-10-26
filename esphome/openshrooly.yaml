@@ -1,5 +1,5 @@
 substitutions:
-  device_version: "1.0.2"
+  device_version: "1.0.6-sl.1"
 
 esphome:
   name: openshrooly
@@ -36,16 +36,21 @@ esphome:
           id: apply_display_layout
           flipped: !lambda 'return id(flip_screen).state;'
 
-      # Force main page to show after LVGL initializes
+      # Splash is display-only. SWD still finishes 5s after LVGL is ready.
       - delay: 200ms
       - lambda: |-
-          ESP_LOGI("boot", "Forcing main page display...");
+          ESP_LOGI("boot", "Showing splash, then growing screen...");
+      - lvgl.page.show: splash
+      - delay: 100ms
+      - component.update: my_display
+      - delay: 2s
       - lvgl.page.show: aaaa
-      - delay: 100ms  # Small delay between page show and update
+      - delay: 100ms
+      - script.execute: update_growing_screen
       - component.update: my_display
 
       # Wait for SWD programming to complete (typically takes 5-7 seconds total)
-      - delay: 5s
+      - delay: 3s
       - lambda: |-
           ESP_LOGI("boot", "SWD programming should be complete, starting fan control...");
           // The RP2040 restarts with its humidifier output at 0%. Discard any
@@ -90,10 +95,17 @@ logger:
 
 api:
   reboot_timeout: 0s
+  # Each chamber makes its own key on first boot. See docs/SECURITY.md.
+  encryption: {}
 
-ota:
-  platform: esphome
+# No "ota: platform: esphome": it installs files without checking who made them.
+# Updates come through the web page (signed files only) or USB.
 
+# Listed deviations from grahamsz/openshrooly: recovery after a bad OTA,
+# and USB serial Wi-Fi provisioning for the browser installer.
+safe_mode:
+
+improv_serial:
 
 external_components:
   - source:
@@ -102,8 +114,11 @@ external_components:
 # LVGL is now a native component in ESPHome 2024.8.0+
 
 wifi:
+  # The setup network only runs in Wi-Fi setup mode, with this chamber's own
+  # name and password (set by device_security). It never starts by itself
+  # when the home network drops.
   ap:
-    ssid: "OpenShrooly"
+    ap_timeout: 0s
     manual_ip:
       static_ip: 192.168.4.1
       gateway: 192.168.4.1
@@ -117,7 +132,11 @@ wifi:
 
   on_disconnect:
     then:
-      - script.execute: wifi_ap_bounce
+      - if:
+          condition:
+            lambda: 'return id(device_sec)->in_setup();'
+          then:
+            - script.execute: wifi_ap_bounce
 
 captive_portal:
 
@@ -170,7 +189,7 @@ interval:
       - lambda: |-
           const uint32_t now = millis();
 
-          if (wifi::global_wifi_component->is_connected()) {
+          if (wifi::global_wifi_component->is_connected() || !id(device_sec)->in_setup()) {
             return;
           }
 
@@ -209,125 +228,11 @@ interval:
 
           id(wifi_ap_bounce).execute();
 
-  # Update LVGL labels every 10 seconds
+  # Partial refresh of the growing screen. Cadence matches upstream (10s).
+  # full_update_every: 300 on the Waveshare panel is unchanged.
   - interval: 10s
     then:
-      # Update main screen value labels
-      - lvgl.label.update:
-          id: main_temp_value
-          text: !lambda |-
-            if (id(temperature).has_state()) {
-              char str[20];
-              sprintf(str, "%.1f°C", id(temperature).state);
-              return std::string(str);
-            }
-            return std::string("--.-°C");
-
-      - lvgl.label.update:
-          id: main_humidity_value
-          text: !lambda |-
-            if (id(humidity).has_state()) {
-              char str[20];
-              sprintf(str, "%.1f%%", id(humidity).state);
-              return std::string(str);
-            }
-            return std::string("--.-%");
-
-      - lvgl.label.update:
-          id: main_water_value
-          text: !lambda |-
-            if (id(water_level_percent).has_state()) {
-              char str[20];
-              sprintf(str, "%.0f%%", id(water_level_percent).state);
-              return std::string(str);
-            }
-            return std::string("---%");
-
-      - lvgl.label.update:
-          id: main_fan_value
-          text: !lambda |-
-            if (id(air_exchange_on_flag)) {
-              return std::string("ON");
-            } else {
-              return std::string("OFF");
-            }
-
-      - lvgl.label.update:
-          id: main_light_value
-          text: !lambda |-
-            if (id(lights_on_flag)) {
-              char str[20];
-              sprintf(str, "%.0f lux", id(white_intensity).state);
-              return std::string(str);
-            } else {
-              return std::string("OFF");
-            }
-
-      - lvgl.label.update:
-          id: main_wifi_value
-          text: !lambda |-
-            if (id(ap_restart_in_progress)) {
-              return std::string("Restarting AP...");
-            }
-
-            if (wifi::global_wifi_component->is_connected()) {
-              return std::string("Connected");
-            }
-
-            return std::string("AP Mode");
-
-      - lvgl.label.update:
-          id: main_ip_value
-          text: !lambda |-
-            if (id(ap_restart_in_progress)) {
-              return std::string("--.--.--.--");
-            }
-
-            if (wifi::global_wifi_component->is_connected()) {
-              auto addresses = wifi::global_wifi_component->wifi_sta_ip_addresses();
-              if (addresses.empty()) {
-                return std::string("--.--.--.--");
-              }
-              char ip[network::IP_ADDRESS_BUFFER_SIZE];
-              addresses[0].str_to(ip);
-              return std::string(ip);
-            }
-
-            return std::string("192.168.4.1");
-
-      - lvgl.label.update:
-          id: main_time_label
-          text: !lambda |-
-            auto time = id(sntp_time).now();
-            if (time.is_valid()) {
-              char str[10];
-              sprintf(str, "%02d:%02d", time.hour, time.minute);
-              return std::string(str);
-            }
-            return std::string("00:00");
-
-      - lvgl.label.update:
-          id: main_uptime_value
-          text: !lambda |-
-            uint32_t uptime_sec = millis() / 1000;
-            uint32_t hours = uptime_sec / 3600;
-            uint32_t minutes = (uptime_sec % 3600) / 60;
-            char str[20];
-            snprintf(
-              str,
-              sizeof(str),
-              "%luh %lum",
-              static_cast<unsigned long>(hours),
-              static_cast<unsigned long>(minutes)
-            );
-            return std::string(str);
-
-      - lvgl.label.update:
-          id: main_status_message
-          text: !lambda |-
-            return id(ap_status_text).c_str();
-
-      # Force display update
+      - script.execute: update_growing_screen
       - component.update: my_display
 
 
@@ -348,3 +253,11 @@ script: !include_dir_merge_list scripts/
 <<: !include components/buttons.yaml
 <<: !include components/lvgl_config.yaml
 <<: !include components/webserver.yaml
+
+# Signed software updates (see components/updates.yaml). A package, not a
+# '<<' merge, so its buttons and switch are added to the existing lists.
+packages:
+  updates: !include components/updates.yaml
+  security: !include components/security.yaml
+  daily_range: !include components/daily_range.yaml
+  cloud: !include components/cloud.yaml

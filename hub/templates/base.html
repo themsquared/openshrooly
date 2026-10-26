@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}OpenShrooly Hub{% endblock %}</title>
+  <link rel="stylesheet" href="/design/tokens.css">
+  <link rel="stylesheet" href="/static/style.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <a class="brand" href="/">
+      <svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>OpenShrooly Hub<small>Shroom Labs · local-first</small></span>
+    </a>
+    <nav>
+      <a href="/">Fleet</a>
+      <a href="/devices">Devices</a>
+      <a href="/smart-home">Smart Home</a>
+      <a href="/profiles">Profiles</a>
+      <a href="/history">History</a>
+      {% if admin_signed_in %}
+      <form class="nav-auth" method="post" action="/logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="link">Sign out</button>
+      </form>
+      {% else %}
+      <a href="/login">Sign in</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main>
+    {% if not enable_psilocybin %}
+    <p class="muted">Psilocybin pack is disabled. Set <code>HUB_ENABLE_PSILOCYBIN=1</code> only where legal.</p>
+    {% else %}
+    <p class="notice">Psilocybin pack is enabled on this hub. Legality varies by jurisdiction.</p>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="muted">Local-first. Works with Shrooly devices running OpenShrooly. Optional sync to Shroom Labs (shroomlabs.io).</footer>
+</body>
+</html>

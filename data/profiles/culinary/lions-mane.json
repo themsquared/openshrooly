@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "id": "lions-mane",
+  "name": "Lion's Mane",
+  "species": "Hericium erinaceus",
+  "strain": "Standard",
+  "variety_group": "hericium",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "beginner",
+    "medicinal"
+  ],
+  "restricted": false,
+  "summary": "Tooth fungus. Moderate fresh air, since too much air yellows the spines.",
+  "notes": "",
+  "chamber_notes": "If spines brown or yellow, cut fresh air and raise humidity slightly. Original Shrooly lion's mane recipe used a gentle fan ramp.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). H. erinaceus colonizes ~21 to 24 \u00b0C and fruits cooler, often 16 to 20 \u00b0C."
+    },
+    {
+      "title": "Vendor cards",
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Lion's mane cards usually 85 to 95% humidity and 8 to 12 h light."
+    },
+    {
+      "title": "Stock firmware",
+      "detail": "Shipped lion's mane LUA: 10 h photoperiod, 5% white LED, ramped fan over ~161 s."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 16.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 5.0,
+      "humidity_percent": 94.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 18.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 23.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 190,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 20,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": "Look for dense white primordia, not fuzzy overlay."
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 12.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 17.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 22.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 190,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 18,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": "Harvest when spines elongate but before they yellow."
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 26% white, mapped from Jozifek et al. 2025 additional tests at 200 lux on a 12 h cycle, which produced white basidiocarps. Their main 500 lux treatment was 24 h continuous light and caused pink stress coloring, so that schedule is not used. RGB is the general blue mix; that paper used white fluorescent, not a measured blue ratio.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Jozifek et al. 2025",
+        "detail": "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). The main cultivation used 500 lux for 24 h continuous light and caused pink stress coloring. Additional tests at 200 lux or lower on a 12 h cycle produced white basidiocarps. This recipe uses that 200 lux, 12 h schedule. 200 lux maps to 26% white.",
+        "url": "https://doi.org/10.3390/agriculture15050460"
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 26,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "pinning": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 26,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
+  }
+}

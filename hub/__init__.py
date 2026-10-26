@@ -1,0 +1,1 @@
+"""OpenShrooly local hub."""

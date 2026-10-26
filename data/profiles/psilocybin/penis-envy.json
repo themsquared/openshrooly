@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "id": "penis-envy",
+  "name": "Penis Envy",
+  "species": "Psilocybe cubensis",
+  "strain": "Penis Envy",
+  "variety_group": "cubensis",
+  "pack": "psilocybin",
+  "tags": [
+    "psilocybin",
+    "cubensis",
+    "slow"
+  ],
+  "restricted": true,
+  "summary": "Slower cubensis. Same climate band as Golden Teacher with longer stage timers.",
+  "notes": "Informational climate only. Dense fruits often mature slowly.",
+  "chamber_notes": "",
+  "legal_notice": "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
+  "source_notes": [
+    {
+      "title": "Chamber consensus",
+      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. PE is repeatedly reported as a slower colonizer and longer fruiter than GT/B+."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 24.0,
+      "humidity_percent": 92.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 25.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 20.0,
+      "temperature_warning_max_c": 30.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 10.0,
+      "humidity_percent": 95.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 22,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 16.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 16,
+        "run_duration_s": 30,
+        "speed_percent": 28
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": false,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Same species as Golden Teacher. No strain-specific light paper was found. Hours and mix follow Badham 1980 and the 12 h Waldbillig protocol. Intensity is the labeled general default.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Badham 1980",
+        "detail": "Edmond R. Badham, The Effect of Light Upon Basidiocarp Initiation in Psilocybe cubensis, Mycologia 72 (1980). Initials formed only after light. 370, 440, and 460 nm were effective. Wavelengths longer than 510 nm were not. The saturating dose is a flash energy, not a room lux, so intensity here is the general default.",
+        "url": "https://doi.org/10.1080/00275514.1980.12021162"
+      },
+      {
+        "title": "Waldbillig et al. 2023 fruiting protocol",
+        "detail": "Adam Waldbillig et al., Exploring Psilocybe spp. mycelium and fruiting body chemistry for potential therapeutic compounds, Frontiers in Fungal Biology 4 (2023). Fruiting used a 12 h photoperiod at about 6400 K. No lux number.",
+        "url": "https://doi.org/10.3389/ffunb.2023.1295223"
+      },
+      {
+        "title": "General default",
+        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "pinning": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
+  }
+}

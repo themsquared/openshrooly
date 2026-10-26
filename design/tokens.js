@@ -1,0 +1,30 @@
+/** Shroom Labs design tokens — JS/Expo source. Keep in sync with tokens.css. */
+export const tokens = {
+  bg: "#07110e",
+  bg2: "#0c1a15",
+  bgElev: "#12241c",
+  bgGlass: "rgba(12, 26, 21, 0.78)",
+  ink: "#e8f3ea",
+  inkDim: "#c5d6c8",
+  muted: "#8aa396",
+  line: "rgba(125, 255, 179, 0.16)",
+  lineStrong: "rgba(125, 255, 179, 0.32)",
+  spore: "#7dffb3",
+  sporeDeep: "#2f8f5c",
+  mycelium: "#c9a45c",
+  myceliumGlow: "rgba(201, 164, 92, 0.45)",
+  cap: "#d4784a",
+  humid: "#5ee4ff",
+  heat: "#ff8a6a",
+  co2: "#c9a6ff",
+  ok: "#7dffb3",
+  warn: "#ffb347",
+  bad: "#ff6b6b",
+  radius: 20,
+  radiusSm: 12,
+  font: "Avenir Next, Segoe UI, system-ui, sans-serif",
+  mono: "ui-monospace, SF Mono, Menlo, Consolas, monospace",
+  space: { 1: 8, 2: 16, 3: 24, 4: 32 },
+};
+
+export default tokens;

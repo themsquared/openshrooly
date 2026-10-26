@@ -1,0 +1,27 @@
+{
+  "name": "shroom-labs-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle-seeds": "node scripts/bundle-seeds.js",
+    "dev": "npm run bundle-seeds && node server.js",
+    "dev:worker": "npm run bundle-seeds && wrangler dev",
+    "coach:local": "npm run bundle-seeds && node scripts/coach-local-user.js && wrangler dev -c wrangler.coach-local.toml --persist-to .wrangler/coach-local --ip 127.0.0.1 --port 8787",
+    "coach:local:init": "npm run bundle-seeds && node scripts/coach-local-init.js",
+    "coach:local:user": "node scripts/coach-local-user.js",
+    "coach:local:readings": "node scripts/coach-import-readings.js",
+    "coach:local:poll": "node scripts/coach-import-readings.js --poll",
+    "coach:local:bridge": "node scripts/coach-local-bridge.js",
+    "coach:local:cron": "bash scripts/coach-local-cron.sh",
+    "test": "npm run bundle-seeds && node --test test/*.test.js",
+    "db:init": "wrangler d1 execute shroomlabs --file=schema.sql",
+    "db:init:remote": "wrangler d1 execute shroomlabs --remote --file=schema.sql",
+    "db:seed": "npm run bundle-seeds && node scripts/seed-d1.js",
+    "db:seed:remote": "npm run bundle-seeds && node scripts/seed-d1.js --remote",
+    "deploy": "npm run bundle-seeds && wrangler deploy -c wrangler.deploy.toml"
+  },
+  "devDependencies": {
+    "miniflare": "4.20260426.0",
+    "wrangler": "^4.40.0"
+  }
+}

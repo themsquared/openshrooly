@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>My chambers · Shroom Labs</title>
+  <meta name="description" content="See the chambers linked to your Shroom Labs account, with species, live readings, and grow status.">
+  <meta name="robots" content="noindex,follow">
+  <link rel="canonical" href="https://shroomlabs.io/devices">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="My chambers · Shroom Labs">
+  <meta property="og:description" content="See the chambers linked to your Shroom Labs account, with species, live readings, and grow status.">
+  <meta property="og:url" content="https://shroomlabs.io/devices">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="My chambers · Shroom Labs">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="My chambers · Shroom Labs">
+  <meta name="twitter:description" content="See the chambers linked to your Shroom Labs account, with species, live readings, and grow status.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <!--/SEO_HEAD-->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="modulepreload" href="/js/app.js">
+  <link rel="modulepreload" href="/js/api.js">
+  <link rel="modulepreload" href="/js/live.js">
+  <link rel="modulepreload" href="/js/device-ui.js">
+  <link rel="modulepreload" href="/js/safe-markdown.js">
+  <link rel="modulepreload" href="/js/species-art.js">
+  <link rel="modulepreload" href="/js/species-photos.js">
+  <link rel="modulepreload" href="/js/pack.js">
+  <link rel="modulepreload" href="/js/chrome.js">
+  <link rel="modulepreload" href="/js/profile-schema.js">
+  <link rel="modulepreload" href="/js/profile-cards.js">
+  <link rel="modulepreload" href="/js/indexed-profiles.js">
+  <link rel="modulepreload" href="/js/hero.js">
+  <link rel="modulepreload" href="/js/photo-upload.js">
+  <link rel="modulepreload" href="/js/moderate-queue.js">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="devices">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <p class="back-link"><a href="/account#devices">Back to account</a></p>
+    <h1>My chambers</h1>
+    <p id="devices-intro" class="muted hidden">Tap a chamber for live numbers and controls.</p>
+    <p id="devices-error" class="notice hidden" role="alert"></p>
+    <div id="devices-toolbar" class="coach-toolbar card hidden">
+      <label>Filter
+        <input id="devices-filter" type="search" placeholder="Name, species, or profile">
+      </label>
+      <label>Sort
+        <select id="devices-sort">
+          <option value="name">Name</option>
+          <option value="status">Online first</option>
+          <option value="seen">Last seen</option>
+        </select>
+      </label>
+    </div>
+    <p id="devices-live" class="live-badge muted hidden" aria-live="polite"></p>
+    <div id="devices-list"><div class="device-skeleton" aria-hidden="true"><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>
+    <p id="devices-bulk" class="hidden"><a class="button secondary" href="/fleet">Bulk tools</a></p>
+    <p id="devices-add" class="hidden"><a class="button secondary" href="/claim">Link another chamber</a></p>
+  </main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

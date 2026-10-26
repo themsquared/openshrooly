@@ -1,0 +1,29 @@
+name: Uptime
+# Copy to .github/workflows/uptime.yml on main to turn it on. See docs/UPTIME.md.
+
+# Checks shroomlabs.io and api.shroomlabs.io every 30 minutes. A failed run makes GitHub email
+# the account that last changed this schedule (themsquared). Nobody else is notified.
+# GitHub only runs schedules from the default branch, so this starts once it is on main.
+on:
+  schedule:
+    - cron: "11,41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/uptime_check.sh
+          sparse-checkout-cone-mode: false
+      - name: Check site and API
+        run: bash scripts/uptime_check.sh

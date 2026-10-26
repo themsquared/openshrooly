@@ -16,3 +16,22 @@ webapp/out/
 
 **/__pycache__/
 esphome/data/www/_next/static/
+.venv/
+hub/data/*.sqlite
+hub/data/*.sqlite-*
+hub/data/admin.json
+hub/data/sessions.json
+hub/data/*.secret
+community/api/node_modules/
+community/web/node_modules/
+bridge/node_modules/
+bridge/data/
+community/api/src/seeds.json
+community/api/.wrangler/
+community/api/.dev.vars
+
+# Netlify CLI local state
+.netlify/
+
+# Signed releases are published to Netlify, never committed
+community/web/public/firmware/

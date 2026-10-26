@@ -1,0 +1,50 @@
+# Tiny mushroom in the bottom right of the growing screen.
+# Runs at the end of update_growing_screen (every 10s), so it adds no extra
+# e-paper refreshes. Display-only: reads state, never calls a control manager.
+#   dance  one step per refresh: idle, lean left, bob 2px down, lean right
+#   blink  on an upright step about once a minute
+#   meh    flat mouth and a sweat drop on the upright steps while humidity is off target
+#   it dances day and night, lights on or off
+#   and very rarely it does something else.
+
+- id: update_mascot
+  mode: single
+  then:
+    - lambda: |-
+        static uint32_t tick = 0;
+        static uint32_t last_odd = 0;
+        tick++;
+        lv_obj_t *m = id(grow_mascot);
+
+        const bool covered = !lv_obj_has_flag(id(grow_alert_bar), LV_OBJ_FLAG_HIDDEN) ||
+                             !lv_obj_has_flag(id(setup_overlay), LV_OBJ_FLAG_HIDDEN);
+        if (!id(screen_mushroom).state || covered) {
+          lv_obj_add_flag(m, LV_OBJ_FLAG_HIDDEN);
+          return;
+        }
+
+        const bool rh_ok = !id(humidity).has_state() || !id(target_humidity).has_state() ||
+            fabsf(id(humidity).state - id(target_humidity).state) <=
+                (id(humidity_hysteresis).has_state() ? id(humidity_hysteresis).state : 0.0f);
+
+        // Four step dance, one step per 10 s refresh.
+        static image::Image *const dance[4] = {
+            id(mascot_idle), id(mascot_lean_left), id(mascot_idle), id(mascot_lean_right)};
+        const uint32_t step = tick % 4;
+        image::Image *frame = dance[step];
+        int dy = step == 2 ? 2 : 0;
+        if (tick - last_odd > 30 && esp_random() % 90 == 0) {
+          // Roughly once every 15 minutes, never twice in five.
+          frame = id(mascot_surprise);
+          last_odd = tick;
+          dy = 0;
+        } else if (step % 2 == 0 && !rh_ok) {
+          // Still dances, with a worried face on the upright steps.
+          frame = id(mascot_meh);
+        } else if (step % 2 == 0 && tick % 6 == 0) {
+          frame = id(mascot_blink);
+        }
+
+        lv_image_set_src(m, frame->get_lv_image_dsc());
+        lv_obj_set_style_translate_y(m, dy, LV_PART_MAIN);
+        lv_obj_clear_flag(m, LV_OBJ_FLAG_HIDDEN);

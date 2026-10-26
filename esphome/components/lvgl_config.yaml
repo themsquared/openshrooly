@@ -10,12 +10,6 @@ color:
   - id: paper_black  # Shows as black on e-paper (actually white in memory)
     hex: "FFFFFF"
 
-# Define the Spleen font for LVGL
-font:
-  - file: 'fonts/spleen-6x12.bdf'
-    id: font1
-    bpp: 1  # 1 bit per pixel for monochrome
-
 # LVGL Configuration
 lvgl:
   displays:
@@ -37,19 +31,19 @@ lvgl:
   # Log level for LVGL - disabled to reduce log noise
   log_level: NONE
 
-  # Show aaaa page when LVGL is ready
+  # First paint is the splash. Boot then shows the growing screen (aaaa).
   on_ready:
     - lvgl.display.set_rotation:
         rotation: !lambda |-
           return id(flip_screen).state ? 270 : 90;
     - lambda: |-
         id(display_ready) = true;
-        ESP_LOGI("lvgl", "LVGL ready, showing aaaa page");
+        ESP_LOGI("lvgl", "LVGL ready, showing splash");
     - script.execute:
         id: apply_display_layout
         flipped: !lambda 'return id(flip_screen).state;'
     - delay: 100ms  # Reduced from 500ms for faster response
-    - lvgl.page.show: aaaa
+    - lvgl.page.show: splash
     - delay: 100ms  # Small delay between page show and update
     - component.update: my_display
 

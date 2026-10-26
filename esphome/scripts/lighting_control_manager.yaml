@@ -75,8 +75,38 @@
 
       // ---- window calc using LOCAL time ----
       const int sunrise_h = (int) id(sunrise_hour).state;
+      const float raw_hours = id(light_hours).state;
+      const float white_now = id(white_intensity).state;
+      const float rgb_now = id(color_r).state + id(color_g).state + id(color_b).state;
+      const bool light_wanted = (white_now > 0.5f) || (rgb_now > 0.5f);
+      const bool hours_missing = isnan(raw_hours) || isinf(raw_hours) || raw_hours < 0.0f;
+      const bool hours_zero_while_on = light_wanted && raw_hours <= 0.0f;
+      float used_hours = raw_hours;
+      bool used_default_hours = false;
+      // Write 12 h back so the entity matches what runs. Each write requeues this
+      // script through light_hours set_action, so cap the attempts in case a write
+      // does not take. NaN needs its own check: fabsf(NaN - 12) > 0.01 is false.
+      static uint8_t hours_fix_attempts = 0;
+      if (hours_missing || hours_zero_while_on) {
+        used_hours = 12.0f;
+        used_default_hours = true;
+        static bool warned_missing_duration = false;
+        if (!warned_missing_duration) {
+          ESP_LOGW("shrooly", "Light duration is 0 or unset while lux/RGB is on; using 12 h");
+          warned_missing_duration = true;
+        }
+        const bool needs_write = !std::isfinite(raw_hours) || fabsf(raw_hours - 12.0f) > 0.01f;
+        if (needs_write && hours_fix_attempts < 3) {
+          hours_fix_attempts++;
+          auto fix = id(light_hours).make_call();
+          fix.set_value(12.0f);
+          fix.perform();
+        }
+      } else {
+        hours_fix_attempts = 0;
+      }
       const int start_min = sunrise_h * 60;
-      const int duration_min = (int)(id(light_hours).state * 60);
+      const int duration_min = (int)(used_hours * 60);
       const int end_min = start_min + duration_min;
 
       // Debug logging - commented out now that timezone is working
@@ -130,7 +160,12 @@
         // Calculate turn OFF time
         int off_hour = (end_min / 60) % 24;
         int off_minute = end_min % 60;
-        id(lights_status).publish_state(str_sprintf("ON — turns OFF at %02d:%02d", off_hour, off_minute).c_str());
+        if (used_default_hours) {
+          id(lights_status).publish_state(str_sprintf(
+              "Duration was 0; using 12h. ON, turns OFF at %02d:%02d", off_hour, off_minute).c_str());
+        } else {
+          id(lights_status).publish_state(str_sprintf("ON, turns OFF at %02d:%02d", off_hour, off_minute).c_str());
+        }
       } else {
         // Determine if lights turn on today or tomorrow
         if (end_min > 1440) {
@@ -141,15 +176,15 @@
           if (local_min < end_min_today) {
             // We're in early morning, lights already turned on yesterday at start_min
             // They'll turn on again today at start_min
-            id(lights_status).publish_state(str_sprintf("OFF — turns ON at %02d:%02d",
+            id(lights_status).publish_state(str_sprintf("OFF, turns ON at %02d:%02d",
                                                        sunrise_h, 0).c_str());
           } else if (local_min < start_min) {
             // We're before today's start time - lights turn on today
-            id(lights_status).publish_state(str_sprintf("OFF — turns ON at %02d:%02d",
+            id(lights_status).publish_state(str_sprintf("OFF, turns ON at %02d:%02d",
                                                        sunrise_h, 0).c_str());
           } else {
             // We're after today's start time - lights turn on tomorrow
-            id(lights_status).publish_state(str_sprintf("OFF — turns ON at %02d:%02d tomorrow",
+            id(lights_status).publish_state(str_sprintf("OFF, turns ON at %02d:%02d tomorrow",
                                                        sunrise_h, 0).c_str());
           }
         } else {
@@ -158,12 +193,12 @@
             // Before start time today
             int on_hour = (start_min / 60) % 24;
             int on_minute = start_min % 60;
-            id(lights_status).publish_state(str_sprintf("OFF — turns ON at %02d:%02d", on_hour, on_minute).c_str());
+            id(lights_status).publish_state(str_sprintf("OFF, turns ON at %02d:%02d", on_hour, on_minute).c_str());
           } else {
             // After end time today, turns on tomorrow
             int on_hour = (start_min / 60) % 24;
             int on_minute = start_min % 60;
-            id(lights_status).publish_state(str_sprintf("OFF — turns ON at %02d:%02d tomorrow", on_hour, on_minute).c_str());
+            id(lights_status).publish_state(str_sprintf("OFF, turns ON at %02d:%02d tomorrow", on_hour, on_minute).c_str());
           }
         }
       }
@@ -179,9 +214,9 @@
 
       if (schedule_changed) {
         ESP_LOGI("shrooly", "Schedule changed: sunrise=%dh, duration=%.1fh, in_window=%s",
-                 sunrise_h, id(light_hours).state, in_win ? "YES" : "NO");
+                 sunrise_h, used_hours, in_win ? "YES" : "NO");
         prev_sunrise_h = sunrise_h;
-        prev_light_hours = id(light_hours).state;
+        prev_light_hours = used_hours;
 
         // When schedule changes, force evaluation regardless of prev_on state
         if (in_win) {
@@ -202,7 +237,7 @@
           // RGB channel - use the helper function
           apply_rgb_settings(2000);  // 2 second transition
 
-          ESP_LOGI("shrooly", "Lights ON (schedule change) — white=%.0f lux (%.1f%%), rgb=(%d,%d,%d)",
+          ESP_LOGI("shrooly", "Lights ON (schedule change), white=%.0f lux (%.1f%%), rgb=(%d,%d,%d)",
                    id(white_intensity).state, brightness_pct,
                    (int) id(color_r).state, (int) id(color_g).state, (int) id(color_b).state);
         } else if (!in_win) {
@@ -254,7 +289,7 @@
           rgb_on.set_transition_length(60000);
           rgb_on.perform();
 
-          ESP_LOGI("shrooly", "Lights ON — white=%.0f lux (%.1f%%), rgb=(%d,%d,%d)",
+          ESP_LOGI("shrooly", "Lights ON, white=%.0f lux (%.1f%%), rgb=(%d,%d,%d)",
                    id(white_intensity).state, brightness_pct,
                    (int) id(color_r).state, (int) id(color_g).state, (int) id(color_b).state);
 

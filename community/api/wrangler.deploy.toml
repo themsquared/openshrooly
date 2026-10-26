@@ -1,0 +1,99 @@
+# Production deploy config. `npm run deploy` uses this file
+# (`wrangler deploy -c wrangler.deploy.toml`).
+# Photos are on. There is no [ai] binding: Grow Coach stays off until payments exist.
+# Secrets: npx wrangler secret put NAME -c wrangler.deploy.toml
+name = "shroomlabs-api"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shroomlabs"
+database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
+
+# User photos. Binding: PHOTOS → shroomlabs-photos. Do not enable public listing
+# or map this bucket on a public hostname. Pending objects stay under pending/
+# and are served only through /api/media.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "shroomlabs-photos"
+
+# Nightly D1 backups (src/backup.js): d1/YYYY-MM-DD.json.gz, newest 30 kept.
+# Private bucket. Never map it on a public hostname or turn on r2.dev.
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "shroomlabs-backups"
+
+# Live device cache (src/live.js). One SQLite-backed object per device keeps
+# the device page snapshot and pushes changes over hibernatable WebSockets;
+# one per user fans changes out to the Devices and Fleet pages. D1 stays the
+# source of truth: objects rebuild from D1, never the other way round.
+[[durable_objects.bindings]]
+name = "DEVICE_LIVE"
+class_name = "DeviceLive"
+
+[[durable_objects.bindings]]
+name = "USER_LIVE"
+class_name = "UserLive"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DeviceLive", "UserLive"]
+
+[vars]
+SITE_NAME = "Shroom Labs"
+SHOW_PSILOCYBIN = "1"
+PHOTOS_ENABLED = "1"
+# Browser origins allowed to call api.shroomlabs.io with Authorization headers.
+CORS_ORIGIN = "https://shroomlabs.io,https://www.shroomlabs.io"
+# Not used for grow-report, profile, or coach photos. Those are served only
+# through /api/media. Pending objects live under pending/ and must never be
+# mapped on a public R2 domain. Approval copies off pending/; reject/takedown
+# deletes the object.
+CDN_BASE_URL = "https://cdn.shroomlabs.io"
+# Google sign-in. The client ID is public; GOOGLE_CLIENT_SECRET is a Wrangler secret (see docs/AUTH.md).
+GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleusercontent.com"
+# Sign in with Apple: set APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_SERVICES_ID, and APPLE_PRIVATE_KEY
+# as Wrangler secrets once the Developer portal items exist. See docs/AUTH.md.
+# The Worker mints the client secret at runtime. Do not commit the .p8 key.
+# Grow Coach stays off until payments exist. Do not add an [ai] binding here.
+GROW_COACH_PROVIDER = "workers-ai"
+GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
+GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+# Cloud Autopilot (no [ai] needed). Only beta users can arm it; COACH_PUBLIC stays unset so Coach stays hidden.
+COACH_AUTOPILOT_ENABLED = "1"
+COACH_BETA_USER_IDS = "82"
+# Coach cost caps default in code (src/coach.js coachCaps): per user 40 chats, 8 photos, 3000 neurons a day,
+# 20000 neurons a month; everyone 100000 neurons a day. To change one, add it here as a var, e.g.
+# COACH_MONTHLY_NEURONS = "20000"  (also COACH_DAILY_NEURONS, COACH_DAILY_CHATS, COACH_DAILY_PHOTOS, COACH_GLOBAL_DAILY_NEURONS)
+
+# Email send caps per UTC day default in code (src/email.js): 300 total, 200 for anything that is not a
+# sign-in link. Override with EMAIL_DAILY_CAP and EMAIL_DAILY_BULK_CAP vars if the Resend plan changes.
+
+# Workers Logs: keep what the code logs (errors carry a request id and are redacted).
+# Invocation logs stay off so request URLs and headers (magic links, tokens) are never stored.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
+
+# Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[routes]]
+pattern = "api.shroomlabs.io"
+custom_domain = true
+
+# Secrets (do not put live payment keys here):
+#   npx wrangler secret put COMMUNITY_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put STRIPE_SECRET_KEY -c wrangler.deploy.toml
+#   npx wrangler secret put PAYMENTS_WEBHOOK_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put STRIPE_PRICE_COACH -c wrangler.deploy.toml   (price_ id, not secret, kept here so no deploy is needed)
+# Checkout stays "coming soon" until the first two are set. See docs/PAYMENTS.md.
+#   npx wrangler secret put TOTP_ENC_KEY -c wrangler.deploy.toml
+#   npx wrangler secret put TURNSTILE_SECRET_KEY -c wrangler.deploy.toml
+#   npx wrangler secret put CF_API_TOKEN -c wrangler.deploy.toml
+# Optional: CF_ZONE_ID in [vars] once DNS is on Cloudflare. See docs/DEVICES.md.
+# Do not set DEV_STUBS on this Worker. Completing stubs refuse api.shroomlabs.io.

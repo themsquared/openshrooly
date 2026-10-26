@@ -1,161 +1,211 @@
 # ========================================================================
-# MAIN SCREEN - Primary status display
-# Shows all critical information with single Settings button
+# MAIN SCREEN - Across-the-room growing status
+# Display-only layout on top of upstream climate / light / FAE / water
+# entities. Select (button 4) still opens the settings menu.
+# Canvas is 296x128 after LVGL rotation 90 (Waveshare 2.90inv2-r2).
+# Type: 24x48 heroes, 12x24 clock, 6x12 stage / targets / status.
 # ========================================================================
 
 - id: aaaa
   bg_color: paper_white
   widgets:
-    # Title and Version (y: 0-12)
-    - label:
-        text: "OpenShrooly v${device_version}"
+    # 16px mark + clock. Header ink sits in rows 3..18.
+    - image:
+        id: header_mark
+        src: mark_16
         align: TOP_LEFT
         x: 5
-        y: 2
-        text_font: font1
+        y: 3
+        image_recolor: paper_black
+        image_recolor_opa: COVER
 
     - label:
         id: main_time_label
-        text: "00:00"
+        text: "--:--"
+        align: TOP_LEFT
+        x: 25
+        y: 0
+        text_font: font_ui
+
+    - label:
+        id: grow_phase_label
+        text: "Idle"
         align: TOP_RIGHT
         x: -5
-        y: 2
+        y: 6
         text_font: font1
 
-    # Status Grid - Left Column Labels (fixed width for alignment)
-    - label:
-        text: "Temp:"
-        align: TOP_LEFT
+    # Thin grow-progress bar (day / total). Hidden when Idle.
+    - bar:
+        id: grow_progress
         x: 5
-        y: 18
-        text_font: font1
+        y: 21
+        width: 286
+        height: 4
+        min_value: 0
+        max_value: 100
+        value: 0
+        radius: 0
+        bg_color: paper_white
+        bg_opa: COVER
+        border_width: 1
+        border_color: paper_black
+        pad_all: 0
+        hidden: true
+        indicator:
+          bg_color: paper_black
+          bg_opa: COVER
+          radius: 0
 
-    - label:
-        text: "Humidity:"
-        align: TOP_LEFT
-        x: 5
-        y: 30
-        text_font: font1
-
-    - label:
-        text: "Water:"
-        align: TOP_LEFT
-        x: 5
-        y: 42
-        text_font: font1
-
-    - label:
-        text: "Fan:"
-        align: TOP_LEFT
-        x: 5
-        y: 54
-        text_font: font1
-
-    - label:
-        text: "Light:"
-        align: TOP_LEFT
-        x: 5
-        y: 66
-        text_font: font1
-
-    - label:
-        text: "WiFi:"
-        align: TOP_LEFT
-        x: 5
-        y: 78
-        text_font: font1
-
-    # Status Grid - Left Column Values (aligned at x: 65)
+    # 24x48 heroes. Digit ink sits in cell rows 8..37, so y 20 puts ink at 28..57.
     - label:
         id: main_temp_value
-        text: "--.-°C"
+        text: "--.-C"
         align: TOP_LEFT
-        x: 65
-        y: 18
-        text_font: font1
+        x: 6
+        y: 20
+        text_font: font_hero
 
     - label:
         id: main_humidity_value
-        text: "--.-%"
+        text: "--%"
         align: TOP_LEFT
-        x: 65
-        y: 30
+        x: 218
+        y: 20
+        text_font: font_hero
+
+    # In-range lines under each number: "target 24  OK", LOW / HIGH inverted.
+    - label:
+        id: grow_temp_target
+        text: ""
+        align: TOP_LEFT
+        x: 6
+        y: 62
         text_font: font1
 
     - label:
-        id: main_water_value
-        text: "---%"
+        id: grow_temp_band
+        text: ""
         align: TOP_LEFT
-        x: 65
-        y: 42
+        x: 72
+        y: 62
         text_font: font1
 
     - label:
-        id: main_fan_value
-        text: "OFF"
+        id: grow_temp_band_bad
+        text: ""
         align: TOP_LEFT
-        x: 65
-        y: 54
+        x: 72
+        y: 62
+        text_font: font1
+        text_color: paper_white
+        bg_color: paper_black
+        bg_opa: COVER
+        pad_left: 1
+        pad_right: 1
+        hidden: true
+
+    - label:
+        id: grow_rh_target
+        text: ""
+        align: TOP_LEFT
+        x: 206  # set at runtime so the line right-aligns to x 290
+        y: 62
         text_font: font1
 
     - label:
-        id: main_light_value
-        text: "---- lux"
+        id: grow_rh_band
+        text: ""
         align: TOP_LEFT
-        x: 65
-        y: 66
+        x: 278
+        y: 62
         text_font: font1
 
     - label:
-        id: main_wifi_value
-        text: "---"
+        id: grow_rh_band_bad
+        text: ""
         align: TOP_LEFT
-        x: 65
+        x: 278
+        y: 62
+        text_font: font1
+        text_color: paper_white
+        bg_color: paper_black
+        bg_opa: COVER
+        pad_left: 1
+        pad_right: 1
+        hidden: true
+
+    - label:
+        id: grow_next_event
+        text: ""
+        align: TOP_LEFT
+        x: 5
+        y: 84
+        text_font: font1
+
+    # Tiny mushroom, bottom right above Select. Before the alert bar and the
+    # setup overlay so both draw over it. update_mascot picks the frame.
+    - image:
+        id: grow_mascot
+        src: mascot_idle
+        align: TOP_LEFT
+        x: 264
+        y: 77
+        hidden: true
+        image_recolor: paper_black
+        image_recolor_opa: COVER
+
+    - obj:
+        id: grow_alert_bar
+        x: 0
         y: 78
-        text_font: font1
+        width: 296
+        height: 24
+        bg_color: paper_black
+        radius: 0
+        pad_all: 0
+        hidden: true
+        widgets:
+          - label:
+              id: grow_alert_text
+              text: ""
+              align: CENTER
+              text_color: paper_white
+              text_font: font_ui
 
-    # Right Column Labels
-    - label:
-        text: "IP:"
-        align: TOP_LEFT
-        x: 150
-        y: 18
-        text_font: font1
+    # Wi-Fi setup details. Shown only while the setup network is on.
+    - obj:
+        id: setup_overlay
+        x: 0
+        y: 20
+        width: 296
+        height: 86
+        bg_color: paper_white
+        border_width: 2
+        border_color: paper_black
+        radius: 0
+        pad_all: 0
+        hidden: true
+        widgets:
+          - label:
+              id: setup_overlay_text
+              text: ""
+              align: TOP_LEFT
+              x: 4
+              y: 3
+              text_font: font1
+              text_line_space: 3
 
-    - label:
-        text: "Uptime:"
-        align: TOP_LEFT
-        x: 150
-        y: 30
-        text_font: font1
-
-    # Right Column Values
-    - label:
-        id: main_ip_value
-        text: "---"
-        align: TOP_LEFT
-        x: 185
-        y: 18
-        text_font: font1
-
-    - label:
-        id: main_uptime_value
-        text: "--h --m"
-        align: TOP_LEFT
-        x: 200
-        y: 30
-        text_font: font1
-
+    # Kept so apply_display_layout can skip it when flipping the panel.
     - label:
         id: main_status_message
         text: ""
-        align: BOTTOM_LEFT
+        align: TOP_LEFT
         x: 5
-        y: -5
+        y: 112
         text_font: font1
 
-    # Button Bar - Settings button aligned with button 4 position
-    # Single button on the right (20px tall, at bottom)
+    # Button 4: same size and place as upstream so navigation stays identical.
     - obj:
         x: 224
         y: 107

@@ -6,7 +6,7 @@
   then:
     - lambda: |-
         // Only restart if we're in AP mode (not connected to WiFi)
-        if (!wifi::global_wifi_component->is_connected()) {
+        if (!wifi::global_wifi_component->is_connected() && id(device_sec)->in_setup()) {
           ESP_LOGI("wifi", "Device is in AP mode. Restarting WiFi AP to ensure DHCP server is running...");
           wifi::global_wifi_component->restart_adapter();
           ESP_LOGI("wifi", "WiFi adapter restart requested.");

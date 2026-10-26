@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Grow Coach · Shroom Labs</title>
+  <meta name="description" content="Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="canonical" href="https://shroomlabs.io/coach">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Grow Coach · Shroom Labs">
+  <meta property="og:description" content="Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.">
+  <meta property="og:url" content="https://shroomlabs.io/coach">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Grow Coach · Shroom Labs">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Grow Coach · Shroom Labs">
+  <meta name="twitter:description" content="Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Grow Coach","item":"https://shroomlabs.io/coach"}]}</script>
+  <!--/SEO_HEAD-->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="coach">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <div id="coach-skeleton" class="device-skeleton" aria-hidden="true"><div class="sk sk-identity"></div><div class="sk-row"><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div><div class="sk sk-card"></div></div>
+    <section id="coach-hero" class="hero coach-hero hidden" aria-label="Grow Coach">
+      <div class="hero-copy">
+        <p id="coach-eyebrow" class="eyebrow">Private beta · Culinary chambers only</p>
+        <h1>Advice tuned to your chamber.</h1>
+        <p class="lede">Grow Coach uses your device's readings and your past grows to tailor humidity and temperature advice for culinary Profiles. Photo checks come later.</p>
+        <p class="muted">Sold for general home cultivation only.</p>
+        <p id="coach-status" class="muted"></p>
+        <p id="coach-error" class="notice hidden" role="alert"></p>
+        <div id="subscribe-panel" class="coach-sales hidden">
+          <p class="coach-price hidden" id="coach-price-line"><strong id="coach-price"></strong> a month</p>
+          <ul class="coach-bullets">
+            <li>Advice for your chamber, based on its live readings and your past grows.</li>
+            <li>Suggested humidity and temperature changes you approve with one tap.</li>
+            <li>Works with culinary Profiles on a linked Shrooly.</li>
+          </ul>
+          <button type="button" id="subscribe">Start Grow Coach</button>
+          <p class="muted coach-cancel">Cancel anytime.</p>
+        </div>
+      </div>
+    </section>
+
+    <div id="gated" class="hidden">
+      <div class="coach-toolbar card">
+        <label>Chamber
+          <select id="device" disabled><option>Loading chambers…</option></select>
+        </label>
+        <label>Profile
+          <select id="profile" disabled><option>Loading profiles…</option></select>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="auto-tune">
+          Let Coach adjust targets for me (only inside the profile's safe range, undo anytime)
+        </label>
+        <p id="usage" class="muted"></p>
+      </div>
+
+      <section id="mode-panel" class="card coach-panel hidden" aria-labelledby="mode-title">
+        <h2 id="mode-title">Coach mode</h2>
+        <div class="mode-toggle" role="group" aria-label="Coach mode">
+          <button type="button" id="mode-advisor" aria-pressed="true">I approve changes</button>
+          <button type="button" id="mode-autopilot" aria-pressed="false">Coach adjusts it for me</button>
+        </div>
+        <p id="mode-status" class="muted">Coach suggests changes. You tap Apply.</p>
+        <p class="row">
+          <button type="button" class="secondary hidden" id="run-autopilot">Adjust now</button>
+        </p>
+        <ul id="autopilot-actions" class="action-list"></ul>
+      </section>
+
+      <div class="coach-grid">
+        <section class="card coach-panel" aria-labelledby="model-title">
+          <h2 id="model-title">This chamber</h2>
+          <div id="stats" class="stat-grid" aria-busy="true"><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div>
+          <ul id="alerts" class="alert-list"></ul>
+          <div id="suggestion"></div>
+          <p class="row">
+            <button type="button" class="secondary" id="refresh-model">Refresh</button>
+            <button type="button" id="approve">Approve and send to chamber</button>
+          </p>
+        </section>
+
+        <section class="card coach-panel" aria-labelledby="chat-title">
+          <h2 id="chat-title">Ask the coach</h2>
+          <p class="muted">Answers use this chamber’s readings and the selected profile’s stage targets. Plain prose, culinary only.</p>
+          <div id="chat-log" class="chat-log" aria-live="polite"></div>
+          <form id="chat-form">
+            <label>Message
+              <textarea id="chat-message" rows="3" maxlength="800" placeholder="Why is humidity below the target?"></textarea>
+            </label>
+            <button type="submit">Send</button>
+          </form>
+        </section>
+      </div>
+
+      <section id="photo-panel" class="card coach-panel hidden" aria-labelledby="photo-title">
+        <h2 id="photo-title">Photo check</h2>
+        <p class="muted">Upload a culinary grow photo. The coach returns stage, contamination or dryness flags, confidence, and a next step. Stored privately with your account.</p>
+        <form id="photo-form">
+          <label>Photo
+            <input id="photo-file" type="file" accept="image/*">
+          </label>
+          <label>Notes
+            <input id="photo-hint" maxlength="200" placeholder="Optional. What you are seeing">
+          </label>
+          <button type="submit">Check photo</button>
+        </form>
+        <div id="photo-result"></div>
+      </section>
+    </div>
+  </main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

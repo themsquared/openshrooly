@@ -1,0 +1,45 @@
+import type { EntityState } from './entity-types'
+
+/** Offline preview for screenshots and local work without a chamber. */
+export const DEMO_ENTITIES: EntityState = {
+  'sensor-temperature': { value: 21.6, state: '21.6' },
+  'sensor-humidity': { value: 87.4, state: '87.4' },
+  'sensor-co2': { value: 912, state: '912' },
+  'sensor-water_level_percent': { value: 64, state: '64' },
+  'sensor-grow_day': { value: 6, state: '6' },
+  'sensor-stage_days': { value: 10, state: '10' },
+  'sensor-system_voltage': { value: 5.02, state: '5.02' },
+  'number-target_humidity': { value: 88, state: '88' },
+  'number-humidity__hysteresis': { value: 2, state: '2' },
+  'number-temperature__target': { value: 21, state: '21' },
+  'number-temperature__hysteresis': { value: 1, state: '1' },
+  'number-air_exchange__period__min_': { value: 15, state: '15' },
+  'number-air_exchange__run_duration__s_': { value: 30, state: '30' },
+  'number-air_exchange__speed': { value: 40, state: '40' },
+  'number-lights__sunrise_hour': { value: 7, state: '7' },
+  'number-lights__duration__hours_': { value: 12, state: '12' },
+  'number-white_led_intensity': { value: 180, state: '180' },
+  'number-red_led_intensity': { value: 8, state: '8' },
+  'number-green_led_intensity': { value: 4, state: '4' },
+  'number-blue_led_intensity': { value: 18, state: '18' },
+  'switch-temperature_control_enabled': { value: true, state: 'ON' },
+  'switch-humidifier': { value: true, state: 'ON' },
+  'binary_sensor-humidifier_on': { value: true, state: 'ON' },
+  'binary_sensor-water_calibrated': { value: true, state: 'ON' },
+  'binary_sensor-heat_requested': { value: false, state: 'OFF' },
+  'text_sensor-current_profile': { value: "Lion's Mane", state: "Lion's Mane" },
+  'text_sensor-current_stage': { value: 'Fruiting', state: 'Fruiting' },
+  'text_sensor-wifi_mode': { value: 'STA', state: 'STA' },
+  'text_sensor-wifi_ssid': { value: 'mycelium-lab', state: 'mycelium-lab' },
+  'text_sensor-ip_address': { value: '192.168.1.42', state: '192.168.1.42' },
+  'text_sensor-update_state': { value: 'available', state: 'available' },
+  'text_sensor-update_status': { value: 'Version 1.0.4 is available.', state: 'Version 1.0.4 is available.' },
+  'text_sensor-available_version': { value: '1.0.4', state: '1.0.4' },
+  'switch-allow_older_versions': { value: false, state: 'OFF' },
+}
+
+export const DEMO_STAGES = [
+  { id: 'colonization', name: 'Colonization', days: 12 },
+  { id: 'pinning', name: 'Pinning', days: 5 },
+  { id: 'fruiting', name: 'Fruiting', days: 10 },
+]

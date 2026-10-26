@@ -108,6 +108,8 @@ text_sensor:
         char ip[network::IP_ADDRESS_BUFFER_SIZE];
         addresses[0].str_to(ip);
         return {std::string(ip)};
-      } else {
+      } else if (id(device_sec)->in_setup()) {
         return {"192.168.4.1"};
+      } else {
+        return {"--"};
       }

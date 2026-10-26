@@ -4,13 +4,13 @@ A Next.js-based web dashboard for monitoring OpenShrooly sensor data in real-tim
 
 ## Features
 
-- 📊 Real-time sensor data display
-- 🌡️ Temperature monitoring
-- 💧 Humidity tracking
-- 💦 Water level indicator
-- 💡 Light intensity display
-- 🔄 Auto-refresh every 5 seconds
-- ⚡ EventSource support for real-time updates
+- First-run Wi-Fi, empty-grow presets, and an unreachable retry
+- Culinary presets that write `grow_phase` / day plus existing setpoint numbers
+- Real-time gauges over ESPHome REST + `/events`
+- Temperature, humidity, water, lights
+- No webfonts or CDN (flash budget)
+
+See [`docs/device-web.md`](../docs/device-web.md).
 
 ## Development
 
@@ -18,6 +18,7 @@ Install dependencies:
 
 ```bash
 npm install
+npm test
 ```
 
 Run the development server:
@@ -83,7 +84,7 @@ Create a script to upload files via the ESP32's OTA mechanism (advanced).
 
 Once uploaded, access your dashboard at:
 
-- **When connected to AP mode:** http://192.168.4.1/app/
+- **When joined to the chamber's setup network:** http://192.168.4.1/app/ (changes need the web login, see docs/SECURITY.md)
 - **When connected to WiFi:** http://[your-esp-ip]/app/
 
 The ESPHome interface remains at the root `/` path.

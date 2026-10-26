@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "id": "enoki",
+  "name": "Enoki",
+  "species": "Flammulina velutipes",
+  "strain": "White enoki",
+  "variety_group": "enoki",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "advanced",
+    "cool"
+  ],
+  "restricted": false,
+  "summary": "Needs cold fruiting and little fresh air for supermarket-long stems.",
+  "notes": "",
+  "chamber_notes": "A Shrooly cannot reach true 4 to 10 \u00b0C enoki rooms. This profile uses the coolest firmware target (15 \u00b0C) and very little fresh air as a chamber approximation.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Commercial enoki: ~10 to 16 \u00b0C, high CO2, low light, 90 to 95% humidity."
+    },
+    {
+      "title": "Vendor cards",
+      "detail": "Home growers who lack a cold room get shorter, darker, more petaled fruits: still edible."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 18.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 7.0,
+      "humidity_percent": 95.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 20.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 90,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Keep still and wet to pile up pins."
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 18.0,
+      "humidity_percent": 93.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 19.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 90,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Little fresh air stretches stems. More air makes stocky wild-type caps."
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Commercial long-stem enoki is grown with little light. Sakamoto 2004 showed a cold dark room makes long pale pinhead fruits; light then forms a cap. This recipe keeps both phases at 0 h so stems stay long. That is a morphology choice from the paper, not a lux number.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Sakamoto 2004 enoki",
+        "detail": "Yuichi Sakamoto, Influence of light on the morphological changes that take place during the development of the Flammulina velutipes fruit body, Mycoscience 45 (2004). A temperature drop induces fruiting in the dark. Dark fruits are long, pale, and pinhead. Light then forms a cap.",
+        "url": "https://doi.org/10.1007/s10267-004-0195-7"
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      }
+    }
+  }
+}

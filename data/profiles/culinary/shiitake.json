@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "id": "shiitake",
+  "name": "Shiitake",
+  "species": "Lentinula edodes",
+  "strain": "Warm-weather block",
+  "variety_group": "shiitake",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "intermediate",
+    "woodlover"
+  ],
+  "restricted": false,
+  "summary": "Needs a full colonize + browning rest, then a cold shock before fruiting.",
+  "notes": "",
+  "chamber_notes": "OpenShrooly cannot refrigerate a block. Cold-shock in a fridge, then return the block to the device.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). L. edodes: long spawn run, bark-like browning, then 5 to 10 \u00b0C shock and 13 to 18 \u00b0C fruiting."
+    },
+    {
+      "title": "Vendor cards",
+      "detail": "Published grow-card ranges from culinary spawn suppliers (FreshCap, North Spore, Out-Grow and similar). Block shiitake cards commonly list 80 to 90% humidity and lots of fresh air after shock."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 42.0,
+      "humidity_percent": 88.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 24.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Wait for full white, then browning: do not fruit early."
+    },
+    {
+      "id": "browning",
+      "name": "Browning / skin",
+      "duration_days": 21.0,
+      "humidity_percent": 80.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16.0,
+      "temperature_warning_max_c": 26.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 190,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 45,
+        "run_duration_s": 20,
+        "speed_percent": 20
+      },
+      "notes": "Block forms a protective brown skin. Keep it a bit drier."
+    },
+    {
+      "id": "cold_shock",
+      "name": "Cold shock (off-device)",
+      "duration_days": 1.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 13.0,
+      "temperature_warning_max_c": 20.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "The chamber can't get fridge cold. Shock 12 to 24 h at 5 to 10 \u00b0C, then apply fruiting."
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 10.0,
+      "humidity_percent": 85.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 12,
+        "run_duration_s": 35,
+        "speed_percent": 40
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Colonization stays dark (mycelium grows faster without strong light). The browning rest gets low light: 12 h at 26% white (about 200 lux) with the general blue mix. Browning of the block skin is light induced (Yoo 2019). Kim 2024 browned blocks under 40 to 60 days of blue or white light and cites high browning efficiency at 200 lux. Koo 2018 saw less browning at the highest intensities tested. Cold shock stays dark. Fruiting uses 12 h and the general 20% white / blue mix. Leatham found blue helped only on high-calcium media and suppressed fruiting on low-calcium media. Kim 2024 applied blue during incubation, not fruiting. No shiitake-specific fruiting lux for this chamber was found.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Leatham and Stahmann 1987",
+        "detail": "Gary F. Leatham and Mark A. Stahmann, Effect of light and aeration on fruiting of Lentinula edodes, Trans. Br. Mycol. Soc. 88 (1987). Light is required for normal fruiting. Blue 400 to 500 nm stimulated fruiting on high-calcium media and suppressed fruiting on low-calcium media. Only pigmented primordia expanded.",
+        "url": "https://doi.org/10.1016/s0007-1536(87)80180-8"
+      },
+      {
+        "title": "Kim 2024 shiitake blue light",
+        "detail": "Min-Jun Kim et al., Effects of Blue Light on Fruiting Body Production and Ergothioneine Content During Sawdust Cultivation of Shiitake, Mycobiology (2024). Blocks were incubated 60 days in the dark, then 40 to 60 days under blue or white LED at 4 umol/m2/s, and browning happened in that light period. The paper cites Park et al. 2017 (J. Mushrooms 15) for high browning efficiency at 200 lux regardless of light source. Blue light was applied during incubation, not during fruiting. Yield and ergothioneine rose versus white in two cultivars. This recipe does not treat that as a fruiting-stage blue mix.",
+        "url": "https://doi.org/10.1080/12298093.2024.2430052"
+      },
+      {
+        "title": "Koo 2018 shiitake browning LED",
+        "detail": "Jinmo Koo et al., Browning technology for shiitake in sawdust using LED source, Journal of Mushrooms 16(4) (2018). Light was used to induce browning on a 1 h on, 1 h off cycle at 20 C for 60 days. The best browning came at 1.5 umol/m2/s red and blue LED; the strongest settings tested (20.5 umol/m2/s and 300 lux fluorescent) browned less. The chamber has one daily light window, so 12 h at about 200 lux stands in for that cycle.",
+        "url": "https://www.earticle.net/Article/A348305"
+      },
+      {
+        "title": "Yoo 2019 shiitake browning transcriptome",
+        "detail": "Sung-Il Yoo et al., Comparative transcriptome analysis identified candidate genes involved in mycelium browning in Lentinula edodes, BMC Genomics 20 (2019). Describes light-induced brown film formation on the mycelium as an important process for shiitake yield and quality.",
+        "url": "https://doi.org/10.1186/s12864-019-5509-4"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      },
+      {
+        "title": "General default",
+        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "browning": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 26,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "cold_shock": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      }
+    }
+  }
+}

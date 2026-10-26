@@ -1,0 +1,50 @@
+/* Shroom Labs design tokens — source of truth.
+   Copied into webapp, hub, community, and Expo. No CDN fonts or assets. */
+
+:root {
+  --sl-bg: #07110e;
+  --sl-bg-2: #0c1a15;
+  --sl-bg-elev: #12241c;
+  --sl-bg-glass: rgba(12, 26, 21, 0.78);
+  --sl-ink: #e8f3ea;
+  --sl-ink-dim: #c5d6c8;
+  --sl-muted: #8aa396;
+  --sl-line: rgba(125, 255, 179, 0.16);
+  --sl-line-strong: rgba(125, 255, 179, 0.32);
+
+  --sl-spore: #7dffb3;
+  --sl-spore-deep: #2f8f5c;
+  --sl-mycelium: #c9a45c;
+  --sl-mycelium-glow: rgba(201, 164, 92, 0.45);
+  --sl-cap: #d4784a;
+  --sl-humid: #5ee4ff;
+  --sl-heat: #ff8a6a;
+  --sl-co2: #c9a6ff;
+  --sl-ok: #7dffb3;
+  --sl-warn: #ffb347;
+  --sl-bad: #ff6b6b;
+
+  --sl-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --sl-radius: 20px;
+  --sl-radius-sm: 12px;
+  --sl-font: "Avenir Next", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --sl-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --sl-space-1: 8px;
+  --sl-space-2: 16px;
+  --sl-space-3: 24px;
+  --sl-space-4: 32px;
+  --sl-max: 1120px;
+}
+
+[data-theme="light"] {
+  --sl-bg: #f4efe4;
+  --sl-bg-2: #efe6d4;
+  --sl-bg-elev: #fffaf1;
+  --sl-bg-glass: rgba(255, 250, 241, 0.86);
+  --sl-ink: #1c241d;
+  --sl-ink-dim: #3a463c;
+  --sl-muted: #6a756c;
+  --sl-line: rgba(47, 93, 70, 0.18);
+  --sl-line-strong: rgba(47, 93, 70, 0.32);
+}

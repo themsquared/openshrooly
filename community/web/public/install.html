@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Install on your Shrooly: free OpenShrooly software over USB</title>
+  <meta name="description" content="Shrooly app not working? Put free OpenShrooly software on your Shrooly from Chrome or Edge with a USB-C cable in about 5 minutes. Signed releases only.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/install">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Install on your Shrooly: free OpenShrooly software over USB">
+  <meta property="og:description" content="Shrooly app not working? Put free OpenShrooly software on your Shrooly from Chrome or Edge with a USB-C cable in about 5 minutes. Signed releases only.">
+  <meta property="og:url" content="https://shroomlabs.io/install">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Install on your Shrooly: free OpenShrooly software over USB">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Install on your Shrooly: free OpenShrooly software over USB">
+  <meta name="twitter:description" content="Shrooly app not working? Put free OpenShrooly software on your Shrooly from Chrome or Edge with a USB-C cable in about 5 minutes. Signed releases only.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Install over USB","item":"https://shroomlabs.io/install"}]}</script>
+  <!--/SEO_HEAD-->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="install">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install" aria-current="page">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <section class="card auth-panel install-panel">
+      <p class="eyebrow">Install over USB</p>
+      <h1>Put OpenShrooly on your Shrooly</h1>
+      <p class="beta-note"><span class="beta-badge">Beta</span> The installer is in open beta. If anything looks off, tell us. <a href="/account/feedback" data-feedback-link>Send feedback</a></p>
+      <p class="install-lead"><strong>You need a computer with Chrome or Edge and a USB-C data cable. It takes about 5 minutes.</strong></p>
+      <p class="muted">New to this? Read <a href="/reuse-your-shrooly">what you get and how to back up first</a>, or <a href="/what-happened-to-shrooly">what happened to Shrooly</a>.</p>
+      <p class="muted">OpenShrooly is free, open source software that runs your Shrooly and lets it use Shroom Labs profiles. Write down your current humidity and temperature settings first, in case you need to set them again.</p>
+      <p class="muted">This page only offers releases signed by Shroom Labs, and your browser checks the signature before anything is sent to your Shrooly.</p>
+      <p id="status" class="install-status" aria-live="polite">Checking the latest signed release…</p>
+      <p id="error" class="notice hidden" role="alert"></p>
+      <esp-web-install-button id="install-button" class="hidden">
+        <button slot="activate" class="button" type="button">Install</button>
+        <span slot="unsupported" class="muted">This installer needs Chrome or Edge on a computer.</span>
+        <span slot="not-allowed" class="muted">Open this page from https://shroomlabs.io to use the installer.</span>
+      </esp-web-install-button>
+      <ol class="muted install-steps">
+        <li>Plug your Shrooly into this computer with a USB-C data cable.</li>
+        <li>Press Install and choose your Shrooly from the list. If it does not show up, hold the BOOT button while you plug it in.</li>
+        <li>When it finishes, you can enter your Wi-Fi details right here. If you skip that, join the Wi-Fi network named <strong>OpenShrooly</strong> on your phone and follow the setup page that opens.</li>
+      </ol>
+      <details class="install-help" id="screen-stuck">
+        <summary>If the screen doesn't change after installing</summary>
+        <p>Sometimes the Shrooly stays in install mode after the USB cable comes out. The screen keeps its old picture and the light may turn red. Your Shrooly is fine. To wake it up:</p>
+        <ol>
+          <li>Unplug the USB cable <strong>and</strong> the Shrooly's power cable. Both have to come out so it fully turns off.</li>
+          <li>Wait 10 seconds.</li>
+          <li>Plug in only the power cable. The screen should change within a minute.</li>
+        </ol>
+        <p>Still stuck? Plug it back into this computer and press Install again. Installing twice does no harm.</p>
+      </details>
+      <p class="muted">To link your Shrooly to your account after installing, press button 4 on it to open the menu, choose Link this device, and scan the QR code. This needs 1.0.6-sl.1 or later. See the <a href="/docs#releases">release notes</a>.</p>
+      <p class="muted">Already running OpenShrooly? <a href="/claim">Link it to your account</a>. To update, open your Shrooly's page, go to Settings, and press Check for updates. New versions install over Wi-Fi and are checked the same way.</p>
+    </section>
+  </main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/vendor/esp-web-tools-10.4.0/install-button.js"></script>
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/install.js"></script>
+</body>
+</html>

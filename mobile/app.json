@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Shroom Labs",
+    "slug": "shroom-labs",
+    "scheme": "shroomlabs",
+    "ios": {
+      "bundleIdentifier": "io.shroomlabs.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Grow journal photos stay on-device until you publish a report."
+      }
+    },
+    "plugins": []
+  }
+}

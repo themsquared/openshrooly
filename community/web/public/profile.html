@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Profile · Shroom Labs</title>
+  <meta name="description" content="Mushroom grow profile with stages, growing conditions, and grow reports.">
+  <meta name="robots" content="noindex,follow">
+  <link rel="canonical" href="https://shroomlabs.io/profile">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Profile · Shroom Labs">
+  <meta property="og:description" content="Mushroom grow profile with stages, growing conditions, and grow reports.">
+  <meta property="og:url" content="https://shroomlabs.io/profile">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Profile · Shroom Labs">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Profile · Shroom Labs">
+  <meta name="twitter:description" content="Mushroom grow profile with stages, growing conditions, and grow reports.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <!--/SEO_HEAD-->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="profile">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/" aria-current="page">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <div id="art" class="card" hidden style="padding:0;margin-bottom:1rem;overflow:hidden"></div>
+    <p><span id="chips"></span></p>
+    <h1 id="title">Profile</h1>
+    <p id="meta" class="muted"></p>
+    <p id="summary"></p>
+    <section id="grow-this" class="grow-this card hidden" aria-live="polite"></section>
+    <section id="locked" class="hidden card" style="padding:1.2rem">
+      <p class="notice">Paid recipe. It unlocks as soon as payment goes through.</p>
+      <button type="button" id="buy">Buy</button>
+    </section>
+    <section id="full" class="hidden">
+      <p><a id="json-link" href="#">Download profile</a></p>
+      <p id="notes"></p>
+      <p id="chamber" class="muted"></p>
+      <aside id="legal" class="legal legal-prominent hidden" role="note"></aside>
+      <h2>Grow parameters</h2>
+      <ol id="stages" class="grow-timeline"></ol>
+      <section id="light-recipe" class="light-recipe hidden" aria-labelledby="light-recipe-heading"></section>
+      <section id="resources" class="resources hidden" aria-labelledby="microscopy-heading" hidden></section>
+      <div id="affiliates"></div>
+      <p><button type="button" id="fork" class="secondary">Fork</button></p>
+      <h2>Rate</h2>
+      <form id="rate" class="card" style="padding:1.2rem">
+        <label>Stars <input name="stars" type="number" min="1" max="5" value="5"></label>
+        <label>Comment <input name="comment"></label>
+        <button type="submit">Save rating</button>
+      </form>
+      <h2>Grow report</h2>
+      <form id="report" class="card" style="padding:1.2rem">
+        <label>Outcome
+          <select name="outcome">
+            <option value="success">success</option>
+            <option value="partial">partial</option>
+            <option value="fail">fail</option>
+          </select>
+        </label>
+        <label>Days <input name="days"></label>
+        <label>Flushes <input name="flushes"></label>
+        <label>Notes <input name="notes"></label>
+        <label>Photo <input name="photo" type="file" accept="image/*"></label>
+        <button type="submit">Publish report</button>
+      </form>
+      <details id="sources-block" class="sources-block hidden">
+        <summary>Sources</summary>
+        <ul id="sources"></ul>
+      </details>
+    </section>
+    <section id="flag-box" class="card hidden" style="padding:1.2rem;margin:1.2rem 0">
+      <h2>Report this profile</h2>
+      <p class="muted">Send it back to the review queue if the photos or text should not be public.</p>
+      <form id="flag">
+        <label>Why <input name="reason" required></label>
+        <button type="submit">Report</button>
+      </form>
+    </section>
+    <h2>Ratings</h2>
+    <ul id="ratings"></ul>
+    <h2>Grow reports</h2>
+    <ul id="reports"></ul>
+  </main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -125,6 +125,7 @@ def verify_embedded_files(webapp_out_dir, input_header, input_cpp):
         ".css": "text/css",
         ".ico": "image/x-icon",
         ".js": "application/javascript",
+        ".woff2": "font/woff2",
     }
 
     for index, file_path in enumerate(static_files):
@@ -210,6 +211,7 @@ namespace web_server {
         ".css": "text/css",
         ".ico": "image/x-icon",
         ".js": "application/javascript",
+        ".woff2": "font/woff2",
     }
 
     for file_path in STATIC_FILES:

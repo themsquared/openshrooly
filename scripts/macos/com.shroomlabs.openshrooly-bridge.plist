@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.shroomlabs.openshrooly-bridge</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/REPLACE/WITH/REPO/scripts/macos/run-matter-bridge.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HUB_URL</key>
+    <string>http://127.0.0.1:8090</string>
+    <key>MATTER_STORAGE_PATH</key>
+    <string>/Users/REPLACE/shroom-labs-bridge</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/REPLACE/WITH/REPO/bridge</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/REPLACE/Library/Logs/openshrooly-bridge.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/REPLACE/Library/Logs/openshrooly-bridge.log</string>
+</dict>
+</plist>

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Chambers · Shroom Labs</title>
+  <meta name="description" content="Bulk tools for the chambers linked to your Shroom Labs account.">
+  <meta name="robots" content="noindex,follow">
+  <link rel="canonical" href="https://shroomlabs.io/fleet">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Chambers · Shroom Labs">
+  <meta property="og:description" content="Bulk tools for the chambers linked to your Shroom Labs account.">
+  <meta property="og:url" content="https://shroomlabs.io/fleet">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Chambers · Shroom Labs">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Chambers · Shroom Labs">
+  <meta name="twitter:description" content="Bulk tools for the chambers linked to your Shroom Labs account.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <!--/SEO_HEAD-->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="modulepreload" href="/js/app.js">
+  <link rel="modulepreload" href="/js/api.js">
+  <link rel="modulepreload" href="/js/live.js">
+  <link rel="modulepreload" href="/js/device-ui.js">
+  <link rel="modulepreload" href="/js/safe-markdown.js">
+  <link rel="modulepreload" href="/js/species-art.js">
+  <link rel="modulepreload" href="/js/species-photos.js">
+  <link rel="modulepreload" href="/js/pack.js">
+  <link rel="modulepreload" href="/js/chrome.js">
+  <link rel="modulepreload" href="/js/profile-schema.js">
+  <link rel="modulepreload" href="/js/profile-cards.js">
+  <link rel="modulepreload" href="/js/indexed-profiles.js">
+  <link rel="modulepreload" href="/js/hero.js">
+  <link rel="modulepreload" href="/js/photo-upload.js">
+  <link rel="modulepreload" href="/js/moderate-queue.js">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="fleet">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <p class="back-link"><a href="/account">Back to account</a></p>
+    <h1>Change many chambers at once</h1>
+    <p class="muted">Pick chambers, preview a change, then apply it to all of them. Everyday readings and controls live on <a href="/devices">My chambers</a>.</p>
+    <p id="fleet-live" class="live-badge muted hidden" aria-live="polite"></p>
+    <p id="fleet-error" class="notice hidden" role="alert"></p>
+    <p id="fleet-off" class="notice hidden">Chamber list is off on this site.</p>
+
+    <section id="fleet-list" class="hidden">
+      <div class="coach-toolbar card">
+        <label>Filter
+          <input id="fleet-filter" type="search" placeholder="Name or profile">
+        </label>
+        <label>Sort
+          <select id="fleet-sort">
+            <option value="name">Name</option>
+            <option value="status">Online first</option>
+            <option value="seen">Last seen</option>
+          </select>
+        </label>
+        <label>Group
+          <select id="fleet-group-filter">
+            <option value="">All chambers</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table class="fleet-table" id="fleet-table">
+          <thead>
+            <tr>
+              <th><label class="cell-check"><input type="checkbox" id="fleet-all" aria-label="Select all"></label></th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Readings</th>
+              <th>Profile</th>
+              <th>Targets</th>
+              <th class="hidden" data-coach-only>Coach</th>
+              <th>Alerts</th>
+            </tr>
+          </thead>
+          <tbody id="fleet-rows"></tbody>
+        </table>
+      </div>
+
+      <section class="card coach-panel" aria-labelledby="bulk-title">
+        <h2 id="bulk-title">Change selected chambers</h2>
+        <p class="muted">Preview first. Offline chambers keep the change until they come back, for 24 hours.</p>
+        <div class="row">
+          <label>Action
+            <select id="bulk-action">
+              <option value="setpoints">Temperature and humidity</option>
+              <option value="profile">Profile and stage</option>
+              <option value="air">Fan and fresh air</option>
+              <option value="light">Light recipe</option>
+              <option value="stage">Chamber phase and day</option>
+              <option value="coach_mode">Coach mode</option>
+            </select>
+          </label>
+          <label data-bulk-for="setpoints">Temperature (°C)
+            <input id="bulk-temp" type="number" step="0.1" min="10" max="32">
+          </label>
+          <label data-bulk-for="setpoints">Humidity (%)
+            <input id="bulk-rh" type="number" step="1" min="60" max="98">
+          </label>
+          <label data-bulk-for="profile coach_mode" class="hidden">Profile
+            <select id="bulk-profile"><option value="">Choose what you're growing</option></select>
+          </label>
+          <label data-bulk-for="profile" class="hidden">Phase
+            <select id="bulk-stage"><option value="">Start from the beginning</option></select>
+          </label>
+          <label data-bulk-for="light" class="hidden">Lights on at (hour)
+            <input id="bulk-sunrise" type="number" min="0" max="23" step="1" placeholder="8">
+          </label>
+          <label data-bulk-for="light" class="hidden">Hours on
+            <input id="bulk-duration" type="number" min="0" max="24" step="0.25" placeholder="12">
+          </label>
+          <label data-bulk-for="light" class="hidden">White brightness (%)
+            <input id="bulk-white" type="number" min="0" max="100" step="1" placeholder="20">
+            <span class="muted" id="bulk-lux-preview" aria-live="polite"></span>
+          </label>
+          <label data-bulk-for="light" class="hidden">Red %
+            <input id="bulk-red" type="number" min="0" max="100" step="1">
+          </label>
+          <label data-bulk-for="light" class="hidden">Green %
+            <input id="bulk-green" type="number" min="0" max="100" step="1">
+          </label>
+          <label data-bulk-for="light" class="hidden">Blue %
+            <input id="bulk-blue" type="number" min="0" max="100" step="1">
+          </label>
+          <label data-bulk-for="air" class="hidden">Fan (%)
+            <input id="bulk-fan" type="number" min="15" max="100" step="5">
+          </label>
+          <label data-bulk-for="air" class="hidden">Fresh air every (minutes)
+            <input id="bulk-air-period" type="number" min="1" max="240" step="1">
+          </label>
+          <label data-bulk-for="air" class="hidden">For (seconds)
+            <input id="bulk-air-run" type="number" min="5" max="900" step="5">
+          </label>
+          <label data-bulk-for="stage" class="hidden">Phase on the chamber
+            <select id="bulk-phase">
+              <option value="">Leave as is</option>
+              <option>Idle</option>
+              <option>Colonizing</option>
+              <option>Pinning</option>
+              <option>Fruiting</option>
+              <option>Harvest</option>
+            </select>
+          </label>
+          <label data-bulk-for="stage" class="hidden">Grow day
+            <input id="bulk-day" type="number" min="0" max="90" step="1">
+          </label>
+          <label class="hidden" data-coach-only data-bulk-for="coach_mode">Coach mode
+            <select id="bulk-coach">
+              <option value="advisor">I approve changes</option>
+              <option value="autopilot">Coach adjusts it for me</option>
+            </select>
+          </label>
+        </div>
+        <p class="row">
+          <button type="button" class="secondary" id="bulk-preview">Preview</button>
+          <button type="button" id="bulk-apply">Apply</button>
+        </p>
+        <ul id="bulk-results" class="action-list"></ul>
+      </section>
+
+      <section class="card coach-panel" aria-labelledby="groups-title">
+        <h2 id="groups-title">Groups</h2>
+        <form id="group-form" class="row">
+          <label>New group
+            <input id="group-name" type="text" maxlength="80" placeholder="Garage rack">
+          </label>
+          <button type="submit">Create</button>
+        </form>
+        <ul id="group-list" class="action-list"></ul>
+      </section>
+
+      <section class="card coach-panel" aria-labelledby="audit-title">
+        <h2 id="audit-title">Recent changes</h2>
+        <ul id="fleet-audit" class="action-list"></ul>
+      </section>
+    </section>
+
+    <section id="fleet-detail" class="hidden">
+      <p class="back-link"><a href="/fleet">Back to chambers</a></p>
+      <h2 id="detail-name">Chamber</h2>
+      <p id="detail-meta" class="muted"></p>
+      <form id="rename-form" class="row">
+        <label>Name
+          <input id="rename-name" type="text" maxlength="80">
+        </label>
+        <button type="submit">Save name</button>
+        <button type="button" class="secondary" id="unlink-device">Unlink</button>
+      </form>
+      <ul id="detail-alerts" class="alert-list"></ul>
+      <div id="fleet-skeleton" class="device-skeleton" aria-hidden="true"><div class="sk-row"><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div></div>
+      <div id="detail-stats" class="stat-grid"></div>
+      <p id="detail-when" class="muted"></p>
+      <form id="detail-light-form" class="card alert-form">
+        <fieldset>
+          <legend>Light schedule</legend>
+          <p class="muted">Duration is required when the light is on. Leave duration empty to use this profile stage.</p>
+          <p id="detail-light-summary" class="muted"></p>
+          <div class="row">
+            <label>Sunrise hour <input type="number" id="detail-sunrise" min="0" max="23" step="1"></label>
+            <label>Duration hours <input type="number" id="detail-duration" min="0" max="24" step="0.25"></label>
+            <label>White lux <input type="number" id="detail-lux" min="0" max="4000" step="1"></label>
+          </div>
+          <div class="row">
+            <label>Red % <input type="number" id="detail-red" min="0" max="100" step="1"></label>
+            <label>Green % <input type="number" id="detail-green" min="0" max="100" step="1"></label>
+            <label>Blue % <input type="number" id="detail-blue" min="0" max="100" step="1"></label>
+          </div>
+          <p class="row">
+            <button type="submit">Send light schedule</button>
+            <span id="detail-light-msg" class="muted" role="status"></span>
+          </p>
+        </fieldset>
+      </form>
+      <figure class="fleet-chart card">
+        <figcaption>Readings, last 24 hours</figcaption>
+        <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>
+      </figure>
+    </section>
+  </main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

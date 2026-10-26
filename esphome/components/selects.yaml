@@ -212,3 +212,21 @@ select:
 
             // Recalculate the lighting schedule immediately after a timezone change.
             id(lighting_control_manager).execute();
+
+  # Display-only grow phase. Idle shows "Idle" in small type. Climate logic is unchanged.
+  - platform: template
+    id: grow_phase
+    name: "Grow Phase"
+    icon: mdi:mushroom
+    entity_category: diagnostic
+    optimistic: true
+    restore_value: true
+    initial_option: "Idle"
+    web_server:
+      sorting_group_id: grp_hidden
+    options:
+      - "Idle"
+      - "Colonizing"
+      - "Pinning"
+      - "Fruiting"
+      - "Harvest"

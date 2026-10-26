@@ -1,0 +1,36 @@
+# Local Grow Coach beta. Do not deploy this file.
+# No [ai] binding: wrangler dev stays fully local (no remote preview).
+# Workers AI is called over REST using CF_ACCOUNT_ID + WORKERS_AI_TOKEN from .dev.vars.
+# D1 stays on disk under .wrangler/coach-local. See COACH-LOCAL.md.
+name = "shroomlabs-api-coach-local"
+main = "src/index.js"
+compatibility_date = "2026-05-03"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shroomlabs-coach-local"
+database_id = "00000000-0000-4000-8000-00000000c0ac"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "shroomlabs-photos-coach-local"
+
+[vars]
+SITE_NAME = "Shroom Labs"
+SHOW_PSILOCYBIN = "1"
+PHOTOS_ENABLED = "1"
+ENVIRONMENT = "local"
+COACH_PUBLIC = "0"
+COACH_BETA_USER_IDS = "1"
+CORS_ORIGIN = "http://127.0.0.1:8888,http://localhost:8888"
+CDN_BASE_URL = ""
+SITE_ORIGIN = "http://127.0.0.1:8888"
+GROW_COACH_PROVIDER = "workers-ai"
+GROW_COACH_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+COACH_AUTOPILOT_ENABLED = "1"
+FLEET_UI_ENABLED = "1"
+
+# Local Autopilot loop. Do not copy this trigger into wrangler.deploy.toml.
+[triggers]
+crons = ["*/15 * * * *"]

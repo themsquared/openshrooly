@@ -4,6 +4,8 @@
     - if:
         condition:
           lambda: |-
+            // Nothing to check when the setup network is off.
+            if (!id(device_sec)->in_setup()) return true;
             auto ap_ip = wifi::global_wifi_component->wifi_soft_ap_ip();
             return ap_ip == network::IPAddress(192, 168, 4, 1);
         then:

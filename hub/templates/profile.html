@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ profile.name }} · Hub{% endblock %}
+{% block content %}
+<figure class="profile-hero">
+  <img src="{{ species_photo(profile.species, profile.strain, profile.name) }}" alt="{{ profile.name }}" width="960" height="540">
+</figure>
+<p><span class="chip">{{ profile.pack }}</span> <span class="chip">{{ profile.pricing.kind }}</span></p>
+<h1>{{ profile.name }}</h1>
+<p class="muted">{{ profile.species }}{% if profile.strain %} · {{ profile.strain }}{% endif %}</p>
+<p>{{ profile.summary }}</p>
+<p><a href="/profiles/{{ profile.id }}/edit">Edit in the builder</a> · <a href="/api/profiles/{{ profile.id }}">Download profile</a></p>
+{% if profile.legal_notice %}<p class="notice">{{ profile.legal_notice }}</p>{% endif %}
+<p>{{ profile.notes }}</p>
+<p class="muted">{{ profile.chamber_notes }}</p>
+<h2>Grow timeline</h2>
+<ul class="timeline">
+  {% for stage in profile.stages %}
+  <li>
+    <strong>{{ stage.name }}</strong><br>
+    {{ stage.duration_days }} days<br>
+    {{ stage.humidity_percent }}% RH · {{ stage.temperature_c }} °C
+  </li>
+  {% endfor %}
+</ul>
+{% for stage in profile.stages %}
+<article class="card">
+  <h3>{{ stage.name }} <span class="muted">{{ stage.duration_days }} days</span></h3>
+  <p>{{ stage.humidity_percent }}% RH · {{ stage.temperature_c }} °C · light {{ stage.light.duration_hours }} h @ {{ stage.light.white_led_lux }} lux · fan {{ stage.fan.speed_percent }}% every {{ stage.fan.period_min }} min</p>
+  <p>{{ stage.notes }}</p>
+</article>
+{% endfor %}
+{% if profile.light_recipe %}
+<h2>Light recipe</h2>
+<p>{{ profile.light_recipe.why }}</p>
+<p class="muted">{{ profile.light_recipe.wavelength_note }}</p>
+<table>
+  <thead><tr><th>Phase</th><th>Hours on</th><th>White</th><th>RGB mix</th></tr></thead>
+  <tbody>
+  {% for name, phase in profile.light_recipe.phases.items() %}
+    <tr>
+      <td>{{ name }}</td>
+      <td>{{ phase.photoperiod_hours }} h</td>
+      <td>{{ phase.white_brightness_percent }}%</td>
+      <td>{{ phase.red_percent }} / {{ phase.green_percent }} / {{ phase.blue_percent }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h3>Recipe sources</h3>
+<ul>
+  {% for note in profile.light_recipe.sources %}
+  <li><strong>{{ note.title }}.</strong> {{ note.detail }}{% if note.url and note.url.startswith("https://") %} <a href="{{ note.url }}">{{ note.url }}</a>{% endif %}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+<h2>Source notes</h2>
+<ul>
+  {% for note in profile.source_notes %}
+  <li><strong>{{ note.title }}.</strong> {{ note.detail }}</li>
+  {% endfor %}
+</ul>
+<h2>Firmware commands for this profile</h2>
+<p class="muted">Applied one stage at a time through the existing ESPHome REST API. No firmware change required.</p>
+{% endblock %}

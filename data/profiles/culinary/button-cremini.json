@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "id": "button-cremini",
+  "name": "Button / Cremini",
+  "species": "Agaricus bisporus",
+  "strain": "Brown cremini",
+  "variety_group": "agaricus",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "advanced",
+    "compost"
+  ],
+  "restricted": false,
+  "summary": "Compost + casing species. Low light, cool fruiting, casing required.",
+  "notes": "",
+  "chamber_notes": "The device does not mix compost or apply casing. Use a cased tray in the chamber. Portobello is the same species allowed to mature.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). A. bisporus: spawn run ~24 \u00b0C, then case, then 14 to 18 \u00b0C fruiting at 85 to 90% humidity."
+    },
+    {
+      "title": "Commercial",
+      "detail": "Button rooms use low light and managed CO2; pinset quality depends on the casing microclimate."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Spawn run",
+      "duration_days": 16.0,
+      "humidity_percent": 88.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 24.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Colonize compost in the dark before casing."
+    },
+    {
+      "id": "pinning",
+      "name": "Casing / pinning",
+      "duration_days": 8.0,
+      "humidity_percent": 92.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 17.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 22.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 25,
+        "run_duration_s": 20,
+        "speed_percent": 25
+      },
+      "notes": "Apply a non-nutritive casing, then drop temp."
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 12.0,
+      "humidity_percent": 88.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 12.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 20,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "A. bisporus does not need light to fruit. Penn State rooms usually run without it. Both phases stay at 0 h and 0% on this strip.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Baars et al. 2020",
+        "detail": "Johan J. P. Baars et al., Critical Factors Involved in Primordia Building in Agaricus bisporus: A Review, Molecules 25 (2020). A. bisporus does not require light to fruit. Triggers are temperature, carbon dioxide, casing, and volatiles.",
+        "url": "https://doi.org/10.3390/molecules25132984"
+      },
+      {
+        "title": "Penn State Agaricus",
+        "detail": "Penn State Extension, Basic Procedures for Agaricus Mushroom Growing. Mushrooms are usually grown without light. Darkness is not a requirement, and light is not listed as a fruiting control.",
+        "url": "https://extension.psu.edu/basic-procedures-for-agaricus-mushroom-growing/"
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      }
+    }
+  }
+}
