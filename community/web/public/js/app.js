@@ -17,7 +17,6 @@ import {
   lastSeenLine,
   chamberStatus,
   renderChamberStatus,
-  autopilotSummary,
   luxPreview,
   readingWhenLine,
   renderControls,
@@ -38,6 +37,7 @@ import {
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
+import { NO_DECISIONS, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
 import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
 
@@ -1236,8 +1236,13 @@ async function renderCoach() {
     location.replace("/");
     return;
   }
-  $("#coach-hero")?.classList.remove("hidden");
   const canUse = Boolean(catalog.entitled || catalog.beta);
+  // Active users (paid or on the beta list) get the Coach page itself. `autopilot` is true only for them.
+  if (isSignedIn() && (canUse || catalog.autopilot)) {
+    await renderCoachDashboard(catalog, canUse);
+    return;
+  }
+  $("#coach-hero")?.classList.remove("hidden");
   $("#coach-status").textContent = canUse
     ? catalog.beta
       ? "Private beta. Culinary chambers only."
@@ -1259,15 +1264,121 @@ async function renderCoach() {
     });
     return;
   }
-  if (!canUse) {
-    $("#subscribe-panel").classList.remove("hidden");
-    if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
-    $("#subscribe").addEventListener("click", () =>
-      goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan: pickedPlan() } }), showCoachError)
-    );
-    return;
-  }
+  $("#subscribe-panel").classList.remove("hidden");
+  if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
+  $("#subscribe").addEventListener("click", () =>
+    goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan: pickedPlan() } }), showCoachError)
+  );
+}
+
+/** Recommendations, then the decision feed, then chamber status. Chat and photo checks sit below for accounts with AI turned on. */
+async function renderCoachDashboard(catalog, canUse) {
+  $("#coach-hero")?.classList.add("hidden");
   $("#gated").classList.remove("hidden");
+  $("#coach-head-status").textContent = catalog.entitled
+    ? `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
+    : "Private beta. Culinary chambers only.";
+
+  let chambers = [];
+  const chamberFor = (id) => chambers.find((c) => c.device.id === id);
+  const cardMsg = (el, text) => {
+    const box = el?.closest("article")?.querySelector(".coach-msg");
+    if (box) box.textContent = text;
+    else if (text) showCoachError(new Error(text));
+  };
+
+  async function loadOverview() {
+    const data = await api("/api/coach/overview");
+    chambers = data.chambers || [];
+    $("#recs-list").removeAttribute("aria-busy");
+    $("#recs-list").innerHTML = renderRecommendations(chambers);
+    $("#chamber-list").innerHTML = renderChamberCards(chambers);
+  }
+
+  let before = null;
+  async function loadDecisions({ reset = false } = {}) {
+    if (reset) before = null;
+    const qs = new URLSearchParams({ limit: "10" });
+    if (before) qs.set("before", String(before));
+    const data = await api(`/api/coach/decisions?${qs}`);
+    const html = renderDecisions(data.decisions || []);
+    const list = $("#decision-list");
+    if (reset || !before) list.innerHTML = html || `<li class="muted">${escapeHtml(NO_DECISIONS)}</li>`;
+    else list.insertAdjacentHTML("beforeend", html);
+    before = data.next_before;
+    $("#decisions-more").classList.toggle("hidden", !data.has_more);
+  }
+
+  const refreshAll = () => Promise.all([loadOverview(), loadDecisions({ reset: true })]);
+
+  $("#decisions-more").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    try {
+      await loadDecisions();
+    } catch (err) {
+      showCoachError(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#gated").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-undo], button[data-accept], button[data-mode]");
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    try {
+      if (btn.dataset.undo) {
+        await api("/api/coach/autopilot/undo", { method: "POST", jsonBody: { action_id: Number(btn.dataset.undo) } });
+        await refreshAll();
+        return;
+      }
+      if (btn.dataset.accept) {
+        const chamber = chamberFor(btn.dataset.accept);
+        const s = chamber?.recommendation?.suggestion;
+        if (!s) throw new Error("That suggestion is gone. Refresh the page.");
+        const payload = { request_id: newRequestId(), temperature_c: s.temperature_c, humidity_percent: s.humidity_percent };
+        if (s.fan_speed_percent != null) payload.fan_speed_percent = s.fan_speed_percent;
+        const applied = await api(`/api/fleet/devices/${encodeURIComponent(chamber.device.id)}/apply`, {
+          method: "POST",
+          jsonBody: { action: "setpoints", payload },
+        });
+        const result = applied.results?.[0];
+        if (!result || result.status === "failed") throw new Error(resultMessage(result));
+        cardMsg(btn, resultMessage(result));
+        btn.closest("p")?.remove();
+        return;
+      }
+      if (btn.dataset.mode) {
+        const chamber = chamberFor(btn.dataset.device);
+        if (!chamber) return;
+        const profileId = chamber.recommendation?.profile_id || chamber.device.profile?.id;
+        if (btn.dataset.mode === "autopilot" && !profileId) throw new Error("Pick a culinary profile for this chamber first.");
+        await api("/api/coach/autopilot/mode", {
+          method: "POST",
+          jsonBody: { device_id: chamber.device.id, mode: btn.dataset.mode, profile_id: profileId || undefined },
+        });
+        await loadOverview();
+      }
+    } catch (err) {
+      cardMsg(btn, err.message);
+    } finally {
+      if (btn.isConnected) btn.disabled = false;
+    }
+  });
+
+  if (catalog.autopilot) {
+    await Promise.all([loadOverview().catch(showCoachError), loadDecisions({ reset: true }).catch(showCoachError)]);
+  } else {
+    // Autopilot is switched off on this site, so there is nothing to recommend or log yet.
+    for (const id of ["#coach-recs", "#coach-feed", "#coach-chambers"]) $(id)?.classList.add("hidden");
+  }
+  if (canUse) await renderCoachTools(catalog).catch(showCoachError);
+}
+
+/** Chat, photo checks, and the auto-tune switch. These call the AI, so only accounts with Coach chat get them. */
+async function renderCoachTools(catalog) {
+  $("#coach-tools").classList.remove("hidden");
   const devices = await api("/api/devices").catch(() => ({ devices: [] }));
   const claimed = (devices.devices || []).filter((d) => d.status !== "revoked");
   $("#device").innerHTML =
@@ -1280,8 +1391,6 @@ async function renderCoach() {
   const photosOn = Boolean((await capabilities()).photos);
   $("#photo-panel")?.classList.toggle("hidden", !photosOn);
   $("#auto-tune").checked = Boolean(catalog.auto_tune);
-  const autopilotOn = Boolean(catalog.autopilot);
-  $("#mode-panel")?.classList.toggle("hidden", !autopilotOn);
 
   async function refreshUsage() {
     const usage = await api("/api/coach/usage").catch(() => null);
@@ -1291,193 +1400,23 @@ async function renderCoach() {
       : `${usage.chats}/${usage.caps.chats} chats today`;
   }
 
-  async function refreshModel() {
+  async function loadProfiles() {
+    if ($("#profile").dataset.ready) return;
     const qs = new URLSearchParams();
     if (deviceId()) qs.set("device_id", deviceId());
-    if (profileId()) qs.set("profile_id", profileId());
     const data = await api(`/api/coach/model${qs.toString() ? `?${qs}` : ""}`);
-    if ($("#profile") && !$("#profile").dataset.ready) {
-      const library = data.library || [];
-      $("#profile").innerHTML =
-        `<option value="">Selected from journal</option>` +
-        library.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.id)}</option>`).join("");
-      if (data.profile?.id) $("#profile").value = data.profile.id;
-      $("#profile").dataset.ready = "1";
-      $("#profile").disabled = false;
-    }
-    const m = data.model || {};
-    $("#stats").removeAttribute("aria-busy");
-    // Only show numbers that exist. A grid of "0" and "n/a" reads as broken, so a new chamber gets one plain line.
-    const stats = [
-      ["Readings so far", m.sample_count, 0, ""],
-      ["Humidity vs target, on average", m.humidity_error, 1, "%", true],
-      ["Temperature vs target, on average", m.temperature_offset, 1, " °C", true],
-      ["Grows that went well", m.outcome_success_rate == null ? null : m.outcome_success_rate * 100, 0, "%"],
-    ].filter(([, value]) => value != null && !Number.isNaN(Number(value)));
-    const signed = (value, digits) => `${Number(value) > 0 ? "+" : ""}${fmtNum(value, digits)}`;
-    $("#stats").innerHTML = Number(m.sample_count) > 0
-      ? stats
-          .map(([label, value, digits, unit, sign]) => `<div class="stat"><strong>${sign ? signed(value, digits) : fmtNum(value, digits)}${unit}</strong><span>${label}</span></div>`)
-          .join("")
-      : `<p class="muted stat-empty">No readings from this chamber yet. Numbers show up here after it has reported for a few hours.</p>`;
-    $("#alerts").innerHTML =
-      (data.alerts || [])
-        .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong>. ${escapeHtml(a.message)}</li>`)
-        .join("") || `<li class="info">No alerts right now.</li>`;
-    const s = data.suggestion || {};
-    $("#suggestion").innerHTML = s.humidity_percent
-      ? `<p>Suggested <strong>${s.humidity_percent}% humidity</strong> · <strong>${s.temperature_c} °C</strong> · fan ${s.fan_speed_percent}%. ${
-          (s.reasons || []).join(" ") || "No change needed yet."
-        }</p>`
-      : "<p class='muted'>Need a few more readings from this chamber before I can tune it.</p>";
-    $("#suggestion").dataset.ready = s.within_bounds ? "1" : "0";
+    const library = data.library || [];
+    $("#profile").innerHTML =
+      `<option value="">Selected from journal</option>` +
+      library.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.id)}</option>`).join("");
+    if (data.profile?.id) $("#profile").value = data.profile.id;
+    $("#profile").dataset.ready = "1";
+    $("#profile").disabled = false;
   }
 
-  function setModeButtons(mode) {
-    const auto = mode === "autopilot";
-    $("#mode-advisor")?.setAttribute("aria-pressed", auto ? "false" : "true");
-    $("#mode-autopilot")?.setAttribute("aria-pressed", auto ? "true" : "false");
-  }
-
-  function formatEligible(iso) {
-    if (!iso) return "";
-    const at = Date.parse(iso);
-    if (!Number.isFinite(at)) return "";
-    return new Date(at).toLocaleString([], { hour: "numeric", minute: "2-digit" });
-  }
-
-  let coachMode = "advisor";
-
-  async function refreshAutopilot() {
-    if (!autopilotOn) return;
-    if (!deviceId()) {
-      coachMode = "advisor";
-      setModeButtons("advisor");
-      $("#mode-status").textContent = "Pick a chamber first.";
-      $("#run-autopilot")?.classList.add("hidden");
-      $("#autopilot-actions").innerHTML = "";
-      return;
-    }
-    const data = await api(`/api/coach/autopilot?device_id=${encodeURIComponent(deviceId())}`);
-    coachMode = data.mode || "advisor";
-    setModeButtons(data.mode);
-    if (data.status === "paused") {
-      const until = formatEligible(data.pause_until || data.next_eligible_at);
-      $("#mode-status").textContent = until
-        ? `Coach stopped adjusting. ${data.pause_reason} It can adjust again after ${until}.`
-        : `Coach stopped adjusting. ${data.pause_reason}`;
-    } else if (data.mode === "autopilot") {
-      const next = formatEligible(data.next_eligible_at);
-      $("#mode-status").textContent = next
-        ? `Coach adjusts it for you. Next change after ${next}.`
-        : "Coach adjusts it for you.";
-    } else {
-      $("#mode-status").textContent = "Coach suggests changes. You tap Apply.";
-    }
-    $("#run-autopilot")?.classList.toggle("hidden", data.mode !== "autopilot");
-    $("#autopilot-actions").innerHTML =
-      (data.actions || [])
-        .map((row) => {
-          const next = row.new_value || {};
-          const statusLabel = {
-            queued: "Queued for the chamber",
-            applied: "Applied",
-            failed: "Failed",
-            expired: "Expired",
-            refused: "Refused",
-          }[row.apply_status] || "";
-          const summary = row.action === "apply"
-            ? autopilotSummary(next)
-            : row.action === "undo"
-              ? "Restored the previous setpoints"
-              : row.action === "expired"
-                ? "Command expired"
-                : row.action === "failed" || row.action === "refused"
-                  ? `Command ${row.action}`
-                  : "Stopped adjusting";
-          const detail = [statusLabel, row.reason].filter(Boolean).join(". ");
-          const undo = row.action === "apply" && !row.undone_at && row.apply_status !== "failed" && row.apply_status !== "expired" && row.apply_status !== "refused"
-            ? `<button type="button" class="secondary" data-undo="${row.id}">Undo</button>`
-            : row.undone_at
-              ? `<span class="muted">Undone</span>`
-              : statusLabel && row.action === "apply"
-                ? `<span class="muted">${escapeHtml(statusLabel)}</span>`
-                : "";
-          return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(detail)}</p></div>${undo}</li>`;
-        })
-        .join("") || `<li class="muted">Coach has not changed anything yet.</li>`;
-  }
-
-  $("#device").addEventListener("change", () => {
-    refreshModel().catch(showCoachError);
-    refreshAutopilot().catch(showCoachError);
-  });
-  $("#profile")?.addEventListener("change", async () => {
-    try {
-      await refreshModel();
-      if (autopilotOn && coachMode === "autopilot" && deviceId() && profileId()) {
-        await api("/api/coach/autopilot/mode", {
-          method: "POST",
-          jsonBody: { device_id: deviceId(), mode: "autopilot", profile_id: profileId() },
-        });
-        await refreshAutopilot();
-      }
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  $("#refresh-model").addEventListener("click", () => refreshModel().catch(showCoachError));
   $("#auto-tune").addEventListener("change", async () => {
     try {
       await api("/api/coach/auto-tune", { method: "POST", jsonBody: { enabled: $("#auto-tune").checked } });
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  async function setCoachMode(mode) {
-    if (!deviceId()) {
-      showCoachError(new Error("Pick a chamber first."));
-      return;
-    }
-    if (mode === "autopilot" && !profileId()) {
-      showCoachError(new Error("Pick a published culinary profile first."));
-      return;
-    }
-    await api("/api/coach/autopilot/mode", {
-      method: "POST",
-      jsonBody: { device_id: deviceId(), mode, profile_id: profileId() || undefined },
-    });
-    await refreshAutopilot();
-  }
-  $("#mode-advisor")?.addEventListener("click", () => setCoachMode("advisor").catch(showCoachError));
-  $("#mode-autopilot")?.addEventListener("click", () => setCoachMode("autopilot").catch(showCoachError));
-  $("#run-autopilot")?.addEventListener("click", async () => {
-    try {
-      const data = await api("/api/coach/autopilot/run", { method: "POST", jsonBody: { device_id: deviceId() } });
-      if (!data.applied && data.reason) showCoachError(new Error(data.reason));
-      await refreshModel();
-      await refreshAutopilot();
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  $("#autopilot-actions")?.addEventListener("click", async (ev) => {
-    const id = ev.target?.dataset?.undo;
-    if (!id) return;
-    try {
-      await api("/api/coach/autopilot/undo", { method: "POST", jsonBody: { action_id: Number(id) } });
-      await refreshAutopilot();
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-  $("#approve").addEventListener("click", async () => {
-    try {
-      const data = await api("/api/coach/suggest", {
-        method: "POST",
-        jsonBody: { device_id: deviceId() || undefined, profile_id: profileId() || undefined, apply: true, approve: true },
-      });
-      $("#suggestion").innerHTML += `<p class="muted">Queued for the chamber${data.applied ? "" : " (not applied)"}.</p>`;
     } catch (err) {
       showCoachError(err);
     }
@@ -1526,8 +1465,7 @@ async function renderCoach() {
     }
   });
 
-  await refreshModel().catch(showCoachError);
-  await refreshAutopilot().catch(showCoachError);
+  await loadProfiles().catch(showCoachError);
   await refreshUsage();
 }
 

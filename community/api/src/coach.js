@@ -6,11 +6,15 @@ import {
   coachAutopilotAvailable,
   coachAutopilotFlagOn,
   getAutopilotStatus,
+  listAutopilotActions,
+  previewAutopilotSuggestion,
+  resolveAllowedProfile,
   runAutopilotForDevice,
   setDeviceAutopilotMode,
   undoAutopilotAction,
 } from "./coach-autopilot.js";
 import { requireVerified, userFromRequest } from "./auth.js";
+import { enrichDevice } from "./fleet.js";
 import { ValidationError, isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
 import { startCheckout } from "./payments.js";
@@ -340,6 +344,92 @@ export function slimGrounding(grounding) {
   };
 }
 
+/** Owned chambers that still belong to the account, oldest first. */
+async function ownedChambers(db, user) {
+  const rows = (await db.all("SELECT * FROM cloud_devices WHERE owner_id=?", [user.id])) || [];
+  return rows
+    .filter((row) => row.status !== "revoked")
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")) || String(a.id).localeCompare(String(b.id)));
+}
+
+function setpointsDiffer(suggestion, current, { fan = false } = {}) {
+  const apart = (a, b, tolerance) => a != null && (b == null || Math.abs(Number(a) - Number(b)) >= tolerance);
+  return (
+    apart(suggestion.temperature_c, current.temperature_c, 0.5) ||
+    apart(suggestion.humidity_percent, current.humidity_percent, 1) ||
+    (fan && apart(suggestion.fan_speed_percent, current.fan_speed_percent, 5))
+  );
+}
+
+/** What Coach recommends for one chamber now: things to check, a setpoint suggestion, and any Autopilot change still on its way. */
+async function chamberRecommendation(db, user, row, device, autopilot, actions, now) {
+  const todo = (device.alerts || []).map((a) => ({ kind: a.kind, message: a.message }));
+  const pending = (actions || []).find((a) => a.action === "apply" && a.outcome === "waiting") || null;
+  const profileId = autopilot.mode === "autopilot" ? autopilot.profile_id || device.profile?.id : device.profile?.id || autopilot.profile_id;
+  const base = { profile_id: profileId || null, stage: null, suggestion: null, current: device.setpoints, differs: false, todo, pending };
+  if (!profileId) return { ...base, note: "Pick what you're growing so Coach knows the targets." };
+  const resolved = await resolveAllowedProfile(db, profileId);
+  if (resolved.error || !resolved.profile) return { ...base, note: resolved.error || "Pick a published culinary profile." };
+  const samples = await loadRecentTelemetry(db, row.id, { now });
+  const preview = await previewAutopilotSuggestion(db, { device: row, user, profile: resolved.profile, samples, now });
+  if (!preview) return { ...base, note: "Coach needs a reading from the chamber before it can suggest anything." };
+  for (const alert of preview.alerts || []) todo.push({ kind: alert.kind, message: alert.message });
+  const fan = Boolean(device.controls?.fan?.supported);
+  const s = preview.suggestion;
+  const suggestion = {
+    temperature_c: s.temperature_c,
+    humidity_percent: s.humidity_percent,
+    fan_speed_percent: fan ? s.fan_speed_percent : null,
+    reasons: s.reasons || [],
+    within_bounds: Boolean(s.within_bounds),
+  };
+  return {
+    ...base,
+    stage: { id: preview.stage_id, name: preview.stage_name },
+    suggestion,
+    differs: setpointsDiffer(suggestion, device.setpoints || {}, { fan }),
+  };
+}
+
+/** Everything the Coach page needs per chamber: status, Coach mode, and recommendations. Read only. */
+export async function coachOverview(db, env, user, { now = Date.now() } = {}) {
+  const chambers = [];
+  for (const row of await ownedChambers(db, user)) {
+    const device = await enrichDevice(db, env, user, row, { now, coachAvailable: true });
+    if (device.off_menu) {
+      // Off-menu grows get no Coach: name and check-in status only. No grow details, mode, or suggestions.
+      const { id, name, status, online, last_seen_at, linked_at, created_at } = device;
+      chambers.push({
+        device: { id, name, status, online, last_seen_at, linked_at, created_at, off_menu: true, profile: null, reading: null },
+        autopilot: null,
+        recommendation: null,
+      });
+      continue;
+    }
+    const { actions, ...autopilot } = await getAutopilotStatus(db, env, user, row.id);
+    const recommendation = await chamberRecommendation(db, user, row, device, autopilot, actions, now);
+    chambers.push({ device, autopilot, recommendation });
+  }
+  return { chambers, generated_at: new Date(now).toISOString() };
+}
+
+export const DECISIONS_PAGE = 10;
+
+/** Autopilot decisions across the account's chambers, newest first. Page with `before` (the last id shown). */
+export async function coachDecisions(db, user, { deviceId = null, before = null, limit = DECISIONS_PAGE } = {}) {
+  const size = Math.min(50, Math.max(1, Number(limit) || DECISIONS_PAGE));
+  const chambers = (await ownedChambers(db, user)).filter((row) => !deviceId || row.id === deviceId);
+  const names = new Map(chambers.map((row) => [row.id, row.name]));
+  const merged = [];
+  for (const row of chambers) {
+    merged.push(...(await listAutopilotActions(db, row.id, size + 1, { beforeId: before })));
+  }
+  merged.sort((a, b) => b.id - a.id);
+  const page = merged.slice(0, size).map((entry) => ({ ...entry, device_name: names.get(entry.device_id) || "Chamber" }));
+  const hasMore = merged.length > size;
+  return { decisions: page, has_more: hasMore, next_before: hasMore && page.length ? page[page.length - 1].id : null };
+}
+
 export async function handleCoach(method, path, url, request, env) {
   const { db, storage } = env;
 
@@ -486,6 +576,23 @@ export async function handleCoach(method, path, url, request, env) {
     const result = await getAutopilotStatus(db, env, user, url.searchParams.get("device_id"));
     if (result.error) return json({ error: result.error }, result.status || 404);
     return json(result);
+  }
+
+  if (method === "GET" && path === "/api/coach/overview") {
+    const user = await requireAutopilotUser(request, db, env);
+    return json(await coachOverview(db, env, user));
+  }
+
+  if (method === "GET" && path === "/api/coach/decisions") {
+    const user = await requireAutopilotUser(request, db, env);
+    const before = Number(url.searchParams.get("before"));
+    return json(
+      await coachDecisions(db, user, {
+        deviceId: url.searchParams.get("device_id") || null,
+        before: Number.isFinite(before) && before > 0 ? before : null,
+        limit: url.searchParams.get("limit"),
+      })
+    );
   }
 
   if (method === "POST" && path === "/api/coach/autopilot/mode") {

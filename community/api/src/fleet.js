@@ -371,6 +371,16 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     chamber: knobs,
     chamber_light: lightFromKnobs(knobs),
     light: lightFromStage(stage),
+    // The recipe band for the current stage, so pages can show readings against it.
+    targets: stage.id
+      ? {
+          temperature_min: num(stage.temperature_target_min),
+          temperature_max: num(stage.temperature_target_max),
+          humidity_min: num(stage.humidity_target_min),
+          humidity_max: num(stage.humidity_target_max),
+          fan_speed_percent: num(stage.fan?.speed_percent ?? stage.fan_speed_percent),
+        }
+      : null,
     coach,
     firmware: caps.firmware,
     capabilities: { source: caps.source, firmware: caps.firmware, list: caps.list, ranges: caps.ranges, knob_ranges: caps.knob_ranges },
