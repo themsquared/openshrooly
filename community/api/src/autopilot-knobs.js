@@ -26,7 +26,10 @@ function clip(value, [lo, hi]) {
   return Math.min(hi, Math.max(lo, value));
 }
 
-/** The stage a grow day falls in, by cumulative stage durations (past the end: the last stage). */
+/**
+ * The stage a grow day falls in, by cumulative stage durations (past the end: the last stage).
+ * Grow days count from 1, like the chamber: day 1 is the first day of the first stage.
+ */
 export function stageIndexForDay(profile, day) {
   const stages = profile?.stages || [];
   const d = num(day);
@@ -34,7 +37,7 @@ export function stageIndexForDay(profile, day) {
   let end = 0;
   for (let i = 0; i < stages.length; i += 1) {
     end += Number(stages[i].duration_days) || 0;
-    if (d < end) return i;
+    if (d <= end) return i;
   }
   return stages.length - 1;
 }

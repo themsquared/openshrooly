@@ -416,6 +416,15 @@ h1, .display {
   color: #fff6e8;
   box-shadow: 0 0 16px rgba(201, 164, 92, 0.18);
 }
+.filter-chip.chef.is-on,
+.pack-toggle button.chef[aria-pressed="true"] {
+  background: linear-gradient(180deg, #b0563a, #6b2f1f);
+  color: #fff3ec;
+  box-shadow: 0 0 16px rgba(214, 110, 76, 0.2);
+}
+.chip.chip-chef { background: rgba(214, 110, 76, 0.16); color: #f2b49c; border-color: rgba(214, 110, 76, 0.4); }
+.chef-intro { margin: 0.4rem 0 1rem; max-width: 44rem; color: var(--sl-muted); }
+.chef-intro a { color: inherit; text-decoration: underline; }
 .pack-hint { margin: 0; color: var(--sl-muted); font-size: 13px; max-width: 36rem; }
 .resources {
   margin: 1.6rem 0;

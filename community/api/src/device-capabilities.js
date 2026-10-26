@@ -574,7 +574,7 @@ export function setpointParts(payload = {}) {
     }
   }
   if (payload.grow_phase) parts.push(`phase ${payload.grow_phase}`);
-  if (payload.grow_day != null) parts.push(`day ${payload.grow_day}`);
+  if (payload.grow_day != null) parts.push(`grow day ${payload.grow_day}`);
   return parts;
 }
 

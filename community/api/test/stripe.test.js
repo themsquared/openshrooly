@@ -30,6 +30,8 @@ function fakeStripe({ fail = false } = {}) {
   return { calls, fetch };
 }
 
+const TEST_PRICES = { test: { "king-oyster-thick-stem": { product: "prod_test_king", price: "price_test_king", amount_cents: 299 } }, live: {} };
+
 function liveEnv(extra = {}) {
   const stripe = fakeStripe(extra.stripe || {});
   const ctx = testEnv({
@@ -37,6 +39,7 @@ function liveEnv(extra = {}) {
     STRIPE_SECRET_KEY: "sk_test_fake_not_real",
     STRIPE_PRICE_COACH: "price_coach_test",
     COACH_AUTOPILOT_ENABLED: "1",
+    profilePriceTable: TEST_PRICES,
     fetch: stripe.fetch,
     ...extra.env,
   });
@@ -87,11 +90,40 @@ test("profile checkout opens a real Stripe session with an idempotency key and s
   assert.equal(req.form.get("mode"), "payment");
   assert.equal(req.form.get("metadata[user_id]"), String(user.id));
   assert.equal(req.form.get("metadata[item_id]"), "king-oyster-thick-stem");
-  assert.equal(req.form.get("line_items[0][price_data][currency]"), "usd");
-  assert.ok(Number(req.form.get("line_items[0][price_data][unit_amount]")) > 0);
+  assert.equal(req.form.get("line_items[0][price]"), "price_test_king");
+  assert.equal(req.form.has("line_items[0][price_data][unit_amount]"), false);
   assert.match(req.form.get("success_url"), /checkout=success/);
   const row = await ctx.db.one("SELECT * FROM checkouts WHERE id=?", [res.data.id]);
   assert.equal(row.status, "requires_payment");
+});
+
+test("a paid profile with no synced Stripe price says not available yet and never calls Stripe", async () => {
+  const { ctx, stripe } = liveEnv({ env: { profilePriceTable: { test: {}, live: {} } } });
+  const { token } = await register(ctx, "noprice@example.com");
+  const res = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(res.status, 503);
+  assert.equal(res.data.coming_soon, true);
+  assert.match(res.data.error, /not available yet/);
+  assert.equal(stripe.calls.length, 0);
+});
+
+test("a stale synced price (amount changed) is treated as missing", async () => {
+  const stale = { test: { "king-oyster-thick-stem": { product: "prod_x", price: "price_old", amount_cents: 199 } }, live: {} };
+  const { ctx, stripe } = liveEnv({ env: { profilePriceTable: stale } });
+  const { token } = await register(ctx, "stale@example.com");
+  const res = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(res.status, 503);
+  assert.match(res.data.error, /not available yet/);
+  assert.equal(stripe.calls.length, 0);
+});
+
+test("a live key reads only the live price table", async () => {
+  const { profilePriceFor, stripeMode } = await import("../src/stripe.js");
+  const profile = { id: "king-oyster-thick-stem", pricing: { amount_cents: 299 } };
+  assert.equal(stripeMode({ STRIPE_SECRET_KEY: "sk_test_x" }), "test");
+  assert.equal(stripeMode({ STRIPE_SECRET_KEY: "rk_live_x" }), "live");
+  assert.equal(profilePriceFor({ STRIPE_SECRET_KEY: "sk_live_x", profilePriceTable: TEST_PRICES }, profile), null);
+  assert.equal(profilePriceFor({ STRIPE_SECRET_KEY: "sk_test_x", profilePriceTable: TEST_PRICES }, profile).price, "price_test_king");
 });
 
 test("a Stripe error returns a friendly 502 and stores nothing", async () => {
