@@ -64,8 +64,8 @@ void CloudEngine::load() {
   secure_clear(&s, sizeof(s));
 }
 
-// A reboot while linked restores no timers. Poll the inbox and post a heartbeat
-// together shortly after boot, then fall into the normal 15 minute cadence.
+// A reboot while linked restores no timers, and a fresh link has none yet. Poll the
+// inbox and post a heartbeat together shortly after, then fall into the normal 15 minute cadence.
 void CloudEngine::schedule_boot_contact_() {
   uint32_t at = now_() + BOOT_CONTACT_MIN_MS + (clock_->random() % (BOOT_CONTACT_JITTER_MS + 1));
   if (at == 0)
@@ -890,8 +890,8 @@ bool CloudEngine::handle_csr_() {
     claim_deadline_mono_ = 0;
     backoff_ms_ = BACKOFF_MIN_MS;
     apply_(CloudEvent::CsrOk);
-    next_probe_ms_ = now_() + PROBE_INTERVAL_MS;
-    next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
+    // Just linked: first inbox poll and heartbeat 30 to 60 s from now, then the 15 minute cadence.
+    schedule_boot_contact_();
     return true;
   }
   apply_(event_for_csr(o));

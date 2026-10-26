@@ -2233,6 +2233,70 @@ int main() {
   reboot_sim("reboot telemetry 500 under cap", 200, 500, false, 777);
   reboot_sim("reboot tls fail under cap", 0, 0, true, 99);
 
+  // Fresh link: the first inbox poll and heartbeat come 30 to 60 s after the cert, not 15 min.
+  {
+    HostStore stLink;
+    ScriptTransport trLink;
+    FakeChamber chLink;
+    chLink.t_range = {true, 15.f, 35.f, 0.5f};
+    chLink.h_range = {true, 30.f, 100.f, 0.5f};
+    trLink.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+    trLink.inbox_status = 200;
+    trLink.inbox_body = "{\"commands\":[]}";
+    trLink.telemetry_status = 200;
+    trLink.telemetry_body = "{\"ok\":true}";
+    trLink.nonce_limit = 1000;
+    CloudEngine engLink(&trLink, &clk, &stLink, &crypto);
+    engLink.set_chamber(&chLink);
+    clk.now = 400000;
+    clk.wall = parse_iso8601_ms("2026-10-26T18:00:00Z");
+    const int64_t w0 = clk.wall;
+    engLink.connect();
+    expect(engLink.csr_now(), "fresh link csr ok");
+    expect(engLink.state() == CloudState::Linked, "fresh link linked");
+    const uint32_t t0 = clk.now;
+    expect(engLink.next_probe_ms() - t0 >= BOOT_CONTACT_MIN_MS &&
+               engLink.next_probe_ms() - t0 <= BOOT_CONTACT_MIN_MS + BOOT_CONTACT_JITTER_MS,
+           "fresh link probe due in 30 to 60 s");
+    expect(engLink.next_telemetry_ms() == engLink.next_probe_ms(), "fresh link heartbeat with the probe");
+    std::vector<uint32_t> at, inbox_at, tel_at;
+    trLink.hook = [&](const HttpRequest &req) {
+      if (req.url.find("/inbox") != std::string::npos || req.url.find("/telemetry") != std::string::npos ||
+          req.url.find("/nonce") != std::string::npos)
+        at.push_back(clk.now);
+      if (req.url.find("/inbox") != std::string::npos)
+        inbox_at.push_back(clk.now);
+      if (req.url.find("/telemetry") != std::string::npos)
+        tel_at.push_back(clk.now);
+    };
+    for (uint32_t t = 0; t <= 3u * 3600u * 1000u; t += 1000) {
+      clk.now = t0 + t;
+      clk.wall = w0 + static_cast<int64_t>(t);
+      engLink.loop();
+    }
+    trLink.hook = nullptr;
+    expect(!inbox_at.empty() && inbox_at[0] - t0 <= 75u * 1000u, "fresh link first inbox poll within 75 s");
+    expect(!tel_at.empty() && tel_at[0] - t0 <= 75u * 1000u, "fresh link first telemetry within 75 s");
+    expect(inbox_at.empty() || inbox_at[0] - t0 >= BOOT_CONTACT_MIN_MS, "fresh link waits 30 s");
+    bool cadence = inbox_at.size() >= 11;
+    for (size_t i = 1; i < inbox_at.size(); i++)
+      if (inbox_at[i] - inbox_at[i - 1] < 10u * 60u * 1000u)
+        cadence = false;
+    expect(cadence, "fresh link inbox back to the 15 min cadence");
+    size_t worst = 0;
+    for (size_t i = 0; i < at.size(); i++) {
+      size_t n = 0;
+      for (size_t j = i; j < at.size() && at[j] - at[i] < CONNECT_HOUR_MS; j++)
+        n++;
+      if (n > worst)
+        worst = n;
+    }
+    expect(worst <= CONNECT_HOUR_CAP, "fresh link under connect cap");
+    std::printf("fresh link: first inbox %us, first telemetry %us, inbox polls=%zu, worst rolling hour=%zu\n",
+                inbox_at.empty() ? 0u : (inbox_at[0] - t0) / 1000u, tel_at.empty() ? 0u : (tel_at[0] - t0) / 1000u,
+                inbox_at.size(), worst);
+  }
+
   HostStore storeCadence;
   ScriptTransport trCadence;
   FakeChamber chamberCadence;
