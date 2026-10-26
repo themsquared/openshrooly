@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NAV_ITEMS, POSITIONING, SITE } from "../../web/public/js/chrome.js";
 import { PAGES, isPaid, isPsi, loadProfiles, writeSeoFiles } from "../../web/scripts/generate-seo.js";
+import { GUIDES } from "../../web/scripts/guides/index.js";
 
 const PUBLIC = join(import.meta.dirname, "../../web/public");
 const profiles = loadProfiles();
@@ -14,7 +15,13 @@ function read(file) {
 }
 
 function allPages() {
-  return [...Object.keys(PAGES), ...profiles.map((p) => `profiles/${p.id}.html`)];
+  return [...Object.keys(PAGES), "grow.html", ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
+}
+
+/** Clean public URL path for a page file: no .html anywhere. */
+function cleanPath(file) {
+  if (PAGES[file]) return PAGES[file].path;
+  return `/${file.replace(/\.html$/, "")}`;
 }
 
 function meta(html, attr, key) {
@@ -42,7 +49,7 @@ test("generated pages, sitemap, robots, and llms.txt are up to date", () => {
   try {
     cpSync(PUBLIC, dir, { recursive: true });
     writeSeoFiles(dir);
-    const files = [...allPages(), "sitemap.xml", "robots.txt", "llms.txt", "js/indexed-profiles.js"];
+    const files = [...allPages(), "sitemap.xml", "robots.txt", "llms.txt", "llms-full.txt", "_redirects", "js/indexed-profiles.js"];
     const stale = files.filter((file) => readFileSync(join(dir, file), "utf8") !== read(file));
     assert.deepEqual(stale, [], "run node community/web/scripts/generate-seo.js");
   } finally {
@@ -66,7 +73,7 @@ test("claim page explains pairing and hides the code form until a code or flag",
   assert.doesNotMatch(html, />Claim device</);
   const home = read("index.html");
   // One clear first step on the home page: install, with browsing as the quiet second choice.
-  assert.match(home, /id="get-started"[^>]*href="\/install.html"|href="\/install.html"[^>]*id="get-started"/);
+  assert.match(home, /id="get-started"[^>]*href="\/install"|href="\/install"[^>]*id="get-started"/);
   assert.match(home, />Browse profiles</);
   assert.doesNotMatch(home, /Claim a chamber|Claim device/);
   const app = readFileSync(join(PUBLIC, "js/app.js"), "utf8");
@@ -85,15 +92,19 @@ test("every page has the same header, nav, and footer", () => {
 });
 
 test("every page has one title, description, canonical, Open Graph, and Twitter card", () => {
+  const titles = new Set();
   for (const file of allPages()) {
     const html = read(file);
     const title = [...html.matchAll(/<title>([^<]+)<\/title>/g)].map((m) => m[1]);
     assert.equal(title.length, 1, `${file} title`);
-    assert.match(title[0], /^(.+ · Shroom Labs|Shroom Labs · .+)$/, `${file} title pattern`);
+    assert.ok(title[0].length >= 15 && title[0].length <= 80, `${file} title length ${title[0].length}`);
+    assert.ok(!titles.has(title[0]), `${file} duplicate title`);
+    titles.add(title[0]);
     const [description] = meta(html, "name", "description");
     assert.ok(description && description.length >= 50 && description.length <= 160, `${file} description length ${description?.length}`);
     assert.doesNotMatch(description, /\w…$|\s$/, `${file} description cut mid word`);
-    const path = file === "index.html" ? "/" : `/${file}`;
+    const path = cleanPath(file);
+    assert.doesNotMatch(path, /\.html/, `${file} canonical keeps .html`);
     const canonical = [...html.matchAll(/<link rel="canonical" href="([^"]+)">/g)].map((m) => m[1]);
     assert.deepEqual(canonical, [`${SITE}${path}`], `${file} canonical`);
     assert.deepEqual(meta(html, "property", "og:url"), [`${SITE}${path}`], `${file} og:url`);
@@ -116,6 +127,7 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     FAQPage: ["mainEntity"],
     Article: ["headline", "description", "url", "author", "publisher", "image"],
     HowTo: ["name", "step"],
+    CollectionPage: ["name", "url", "mainEntity"],
     BreadcrumbList: ["itemListElement"],
   };
   const seen = new Set();
@@ -132,6 +144,7 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
           node.itemListElement.forEach((item, i) => {
             assert.equal(item.position, i + 1);
             assert.ok(item.item.startsWith(SITE));
+            assert.doesNotMatch(item.item, /\.html/);
           });
         }
         if (node["@type"] === "WebSite") {
@@ -150,23 +163,49 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
   for (const q of faq.mainEntity) assert.ok(read("faq.html").includes(q.name.replaceAll("'", "&#39;")) || read("faq.html").includes(q.name), q.name);
 });
 
-test("sitemap lists every profile, Off-menu included, and only indexable pages", () => {
+test("sitemap lists every culinary profile with lastmod, leaves Off-menu out, and uses clean URLs", () => {
   const sitemap = read("sitemap.xml");
   const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  assert.equal([...sitemap.matchAll(/<lastmod>\d{4}-\d\d-\d\d<\/lastmod>/g)].length, locs.length, "every url has lastmod");
   assert.ok(profiles.some(isPsi));
-  for (const profile of profiles) assert.ok(locs.includes(`${SITE}/profiles/${profile.id}.html`), profile.id);
+  for (const profile of profiles) {
+    const loc = `${SITE}/profiles/${profile.id}`;
+    if (isPsi(profile)) {
+      assert.ok(!locs.includes(loc), `${profile.id} is Off-menu and must stay out of the sitemap`);
+      assert.match(meta(read(`profiles/${profile.id}.html`), "name", "robots")[0], /noindex/);
+    } else assert.ok(locs.includes(loc), profile.id);
+  }
+  assert.ok(locs.includes(`${SITE}/grow`));
+  const byPath = Object.fromEntries(allPages().map((f) => [`${SITE}${cleanPath(f)}`, f]));
   for (const loc of locs) {
-    const file = loc === `${SITE}/` ? "index.html" : loc.slice(SITE.length + 1);
+    assert.doesNotMatch(loc, /\.html/, `${loc} keeps .html`);
+    const file = byPath[loc];
+    assert.ok(file, `${loc} has no page`);
     assert.deepEqual(meta(read(file), "name", "robots"), ["index,follow"], `${file} in sitemap but not indexable`);
   }
   for (const file of ["login.html", "register.html", "account.html", "publish.html", "moderate.html", "profile.html"]) {
-    assert.ok(!locs.includes(`${SITE}/${file}`), `${file} should not be in the sitemap`);
+    assert.ok(!locs.includes(`${SITE}${PAGES[file].path}`), `${file} should not be in the sitemap`);
     assert.match(meta(read(file), "name", "robots")[0], /noindex/);
   }
   const robots = read("robots.txt");
   assert.match(robots, new RegExp(`Sitemap: ${SITE}/sitemap.xml`));
-  assert.doesNotMatch(robots, /Disallow: \/profiles\//);
+  assert.doesNotMatch(robots, /Disallow: \/profiles/);
+  assert.doesNotMatch(robots, /Disallow: \/profile$/m, "a bare /profile prefix would also block /profiles/");
   assert.doesNotMatch(robots, /Disallow: \/$/m);
+  assert.doesNotMatch(robots, /\.html/, "old .html URLs stay crawlable so search engines see the 301");
+});
+
+test("every old .html URL has a forced 301 to its clean URL", () => {
+  const rules = read("_redirects")
+    .split("\n")
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => line.split(/\s+/));
+  const map = Object.fromEntries(rules.map(([from, to, status]) => [from, { to, status }]));
+  for (const file of allPages()) {
+    const from = `/${file}`;
+    assert.deepEqual(map[from], { to: cleanPath(file), status: "301!" }, from);
+  }
+  for (const [, to] of rules) assert.doesNotMatch(to, /\.html/);
 });
 
 test("Off-menu pages carry the legal note and no prices, affiliate links, or Grow Coach", () => {
@@ -175,8 +214,8 @@ test("Off-menu pages carry the legal note and no prices, affiliate links, or Gro
     const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
     assert.match(main, /legal-prominent/);
     assert.doesNotMatch(main, /\$\d|affiliate|Grow Coach|coach\.html/i);
-    assert.match(html, /<a id="nav-coach" href="\/coach.html" class="hidden" data-coach-link>/);
-    assert.match(html, /<a id="footer-nav-coach" href="\/coach.html" class="hidden" data-coach-link>/);
+    assert.match(html, /<a id="nav-coach" href="\/coach" class="hidden" data-coach-link>/);
+    assert.match(html, /<a id="footer-nav-coach" href="\/coach" class="hidden" data-coach-link>/);
     assert.match(html, /<body [^>]*data-coach-off/);
   }
 });
@@ -186,7 +225,7 @@ test("Grow Coach is hidden by default on every static page", () => {
     const html = read(file);
     // Nav and footer links ship hidden. app.js reveals them only when /api/me says grow_coach.available.
     for (const id of ["nav-coach", "footer-nav-coach"]) {
-      assert.match(html, new RegExp(`<a id="${id}" href="/coach.html" class="hidden" data-coach-link[ >]`), `${file} ${id}`);
+      assert.match(html, new RegExp(`<a id="${id}" href="/coach" class="hidden" data-coach-link[ >]`), `${file} ${id}`);
     }
     assert.doesNotMatch(html, /\$3\.99|3\.99 (a|per) month/, `${file} prices Coach`);
     if (file === "coach.html") continue;
@@ -195,14 +234,14 @@ test("Grow Coach is hidden by default on every static page", () => {
     assert.doesNotMatch(visible, /Grow Coach|coach-promo/, `${file} shows Coach outside a hidden block`);
   }
   assert.match(read("account.html"), /<div id="coach-billing" class="hidden">/);
-  for (const file of ["llms.txt", "sitemap.xml"]) assert.doesNotMatch(read(file), /Grow Coach|coach\.html/, file);
+  for (const file of ["llms.txt", "llms-full.txt", "sitemap.xml"]) assert.doesNotMatch(read(file), /Grow Coach|\/coach\b/, file);
   for (const file of ["faq.html", "docs.html"]) {
     const html = read(file);
     const head = html.slice(0, html.indexOf("</head>"));
     assert.doesNotMatch(head, /Grow Coach/, `${file} head`);
   }
   assert.match(meta(read("coach.html"), "name", "robots")[0], /noindex/);
-  assert.match(read("robots.txt"), /Disallow: \/coach.html/);
+  assert.match(read("robots.txt"), /Disallow: \/coach$/m);
   const app = readFileSync(join(PUBLIC, "js/app.js"), "utf8");
   assert.doesNotMatch(app, /3\.99/);
   assert.match(app, /grow_coach\?\.available/);
@@ -215,8 +254,10 @@ test("paid profile pages keep setpoints locked, like the API", () => {
       if (stage.notes) assert.ok(!html.includes(stage.notes), `${profile.id} leaks stage notes`);
     }
     assert.doesNotMatch(html, /°C|% humidity|% RH|HowTo/);
-    assert.doesNotMatch(read("llms.txt"), new RegExp(`${profile.id}\\.html\\): [^\\n]*°C`));
-    assert.doesNotMatch(read("faq.html"), new RegExp(`${profile.id}\\.html">[^<]*</a>[^<]*°C`));
+    assert.doesNotMatch(read("llms.txt"), new RegExp(`${profile.id}\\): [^\\n]*°C`));
+    assert.doesNotMatch(read("llms-full.txt"), new RegExp(`profiles/${profile.id}\\n`));
+    assert.doesNotMatch(read("faq.html"), new RegExp(`${profile.id}">[^<]*</a>[^<]*°C`));
+    assert.doesNotMatch(read("grow.html"), new RegExp(`${profile.id}">[^<]*</a></th><td>[^<]*°C`));
   }
 });
 
@@ -234,9 +275,11 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
       '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
       '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
       '<script src="/js/config.js"></script>',
-      '<script type="module" src="/js/app.js"></script>',
       '<main id="main"',
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
+    // Guide and profile pages are static reading pages: the small lite.js runs the menu. App pages load app.js.
+    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "faq.html";
+    assert.ok(html.includes(`<script type="module" src="/js/${lite ? "lite" : "app"}.js"></script>`), `${file} script`);
   }
 });
 

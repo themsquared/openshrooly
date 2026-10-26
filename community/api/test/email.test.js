@@ -6,7 +6,7 @@ import { call, testEnv } from "./helpers.js";
 
 // Same rule as the alert emails: no dash of any kind, hyphens included, in words we write.
 const DASHES = /[\u2010-\u2015\u2212-]/;
-const LINK = "https://shroomlabs.io/auth/callback.html?token=abc123&x=<y>";
+const LINK = "https://shroomlabs.io/auth/callback?token=abc123&x=<y>";
 const visible = (html) => html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ").replace(/https?:\/\/\S+/g, "");
 
 test("sign in email: branded HTML with a button, a fallback link, the expiry, the footer and no dashes", () => {
@@ -15,7 +15,7 @@ test("sign in email: branded HTML with a button, a fallback link, the expiry, th
   assert.doesNotMatch(m.subject, DASHES);
   assert.match(m.html, /name="viewport"/);
   assert.match(m.html, />Shroom Labs</);
-  const escaped = "https://shroomlabs.io/auth/callback.html?token=abc123&amp;x=&lt;y&gt;";
+  const escaped = "https://shroomlabs.io/auth/callback?token=abc123&amp;x=&lt;y&gt;";
   assert.equal(m.html.split(`href="${escaped}"`).length - 1, 2, "button and fallback both carry the escaped link");
   assert.ok(!m.html.includes("<y>"), "the link is escaped");
   assert.match(m.html, />Sign in</);
@@ -59,6 +59,6 @@ test("magic link start sends the HTML sign in email through Resend", async (t) =
   assert.equal(sent.length, 1);
   assert.equal(sent[0].to[0], "html@example.com");
   assert.equal(sent[0].subject, "Your Shroom Labs sign in link");
-  assert.match(sent[0].html, /href="https?:\/\/[^"]+\/auth\/callback\.html\?token=[0-9a-f]+"/);
-  assert.match(sent[0].text, /\/auth\/callback\.html\?token=[0-9a-f]+/);
+  assert.match(sent[0].html, /href="https?:\/\/[^"]+\/auth\/callback\?token=[0-9a-f]+"/);
+  assert.match(sent[0].text, /\/auth\/callback\?token=[0-9a-f]+/);
 });

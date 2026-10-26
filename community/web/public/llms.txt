@@ -3,55 +3,42 @@
 > Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.
 
 Site: https://shroomlabs.io
+Full text for every guide and profile: https://shroomlabs.io/llms-full.txt
 
-## Culinary Profiles
+All numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
 
-- [Beech / Buna Shimeji](https://shroomlabs.io/profiles/beech-shimeji.html): Beech / Buna Shimeji fruits at 15 °C and 90% humidity with moderate fresh air and 12 h light. About 40 days from start to fruit. Clustered beech mushroom. Cool, humid, and a little less fresh air than oysters.
-- [Blue Oyster](https://shroomlabs.io/profiles/blue-oyster.html): Blue Oyster fruits at 14 °C and 87% humidity with plenty of fresh air and 12 h light. About 25 days from start to fruit. Cool-preferring oyster. Deep color holds better below 18 °C.
-- [Button / Cremini](https://shroomlabs.io/profiles/button-cremini.html): Button / Cremini fruits at 16 °C and 88% humidity with moderate fresh air and 0 h light. About 36 days from start to fruit. Compost + casing species. Low light, cool fruiting, casing required.
-- [Chestnut Mushroom](https://shroomlabs.io/profiles/chestnut.html): Chestnut Mushroom fruits at 15 °C and 92% humidity with moderate fresh air and 12 h light. About 34 days from start to fruit. Clustered woodlover. Cool fruiting and high humidity keep caps glossy.
-- [Cordyceps militaris](https://shroomlabs.io/profiles/cordyceps-militaris.html): Cordyceps militaris fruits at 18 °C and 84% humidity with moderate fresh air and 12 h light. About 57 days from start to fruit. Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.
-- [Elm Oyster](https://shroomlabs.io/profiles/elm-oyster.html): Elm Oyster fruits at 15 °C and 86% humidity with moderate fresh air and 12 h light. About 31 days from start to fruit. Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.
-- [Enoki](https://shroomlabs.io/profiles/enoki.html): Enoki fruits at 15 °C and 93% humidity with little fresh air and 0 h light. About 43 days from start to fruit. Needs cold fruiting and little fresh air for supermarket-long stems.
-- [Golden Oyster](https://shroomlabs.io/profiles/golden-oyster.html): Golden Oyster fruits at 21 °C and 87% humidity with plenty of fresh air and 12 h light. About 24 days from start to fruit. Warm oyster with dense golden clusters. Needs plenty of fresh air to keep stems short.
-- [King Oyster](https://shroomlabs.io/profiles/king-oyster.html): King Oyster fruits at 15 °C and 82% humidity with moderate fresh air and 12 h light. About 38 days from start to fruit. Thick-stem oyster. Cooler, slightly drier, and less fresh air than cluster oysters.
-- [King Oyster: thick-stem method](https://shroomlabs.io/profiles/king-oyster-thick-stem.html): Paid culinary Profile, $2.99. About 43 days from start to fruit. Cooler, drier fruiting to favor thick stems.
-- [Lion's Mane](https://shroomlabs.io/profiles/lions-mane.html): Lion's Mane fruits at 17 °C and 90% humidity with moderate fresh air and 12 h light. About 33 days from start to fruit. Tooth fungus. Moderate fresh air, since too much air yellows the spines.
-- [Maitake](https://shroomlabs.io/profiles/maitake.html): Maitake fruits at 16 °C and 88% humidity with moderate fresh air and 12 h light. About 54 days from start to fruit. Slow woodlover. Primordia look like brains; do not dry them out.
-- [Nameko](https://shroomlabs.io/profiles/nameko.html): Nameko fruits at 14 °C and 93% humidity with moderate fresh air and 12 h light. About 39 days from start to fruit. Cool, very wet fruiting. The slime coat is normal.
-- [Pearl Oyster](https://shroomlabs.io/profiles/pearl-oyster.html): Pearl Oyster fruits at 16 °C and 88% humidity with moderate fresh air and 12 h light. About 29 days from start to fruit. Forgiving beginner oyster. Fast, lots of fresh air, cool-to-room fruiting.
-- [Pink Oyster](https://shroomlabs.io/profiles/pink-oyster.html): Pink Oyster fruits at 24 °C and 86% humidity with plenty of fresh air and 12 h light. About 20 days from start to fruit. Tropical oyster. Wants warmth; stalls and fades in a cold room.
-- [Pioppino](https://shroomlabs.io/profiles/pioppino.html): Pioppino fruits at 16 °C and 86% humidity with moderate fresh air and 12 h light. About 31 days from start to fruit. Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.
-- [Reishi](https://shroomlabs.io/profiles/reishi.html): Reishi fruits at 23 °C and 85% humidity with moderate fresh air and 12 h light. About 77 days from start to fruit. Antlers under high CO2, then consoles when fresh air increases.
-- [Shiitake](https://shroomlabs.io/profiles/shiitake.html): Shiitake fruits at 16 °C and 85% humidity with moderate fresh air and 12 h light. About 74 days from start to fruit. Needs a full colonize + browning rest, then a cold shock before fruiting.
-- [Turkey Tail](https://shroomlabs.io/profiles/turkey-tail.html): Turkey Tail fruits at 20 °C and 86% humidity with moderate fresh air and 12 h light. About 78 days from start to fruit. Thin polypore. Long fruiting, lots of fresh air, not a thick-fleshed edible.
-- [Wine Cap](https://shroomlabs.io/profiles/wine-cap.html): Wine Cap fruits at 17 °C and 85% humidity with moderate fresh air and 12 h light. About 40 days from start to fruit. Best as an outdoor bed mushroom. Indoor profile is a climate approximation only.
-- [Wood Ear](https://shroomlabs.io/profiles/wood-ear.html): Wood Ear fruits at 24 °C and 92% humidity with moderate fresh air and 12 h light. About 38 days from start to fruit. Warm, wet jelly fungus. High humidity matters more than light intensity.
+## Start here
 
-## Off-menu Profiles
+- [Mushroom growing conditions for every species](https://shroomlabs.io/grow): one table with fruiting temperature, humidity, light, and days for each species.
 
-Reference conditions for research and education only. Not sold.
 
-Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.
+## Grow guides by species
 
-- [B+](https://shroomlabs.io/profiles/b-plus.html): B+ fruits at 21 °C and 89% humidity with moderate fresh air and 12 h light. About 32 days from start to fruit. Forgiving cubensis strain with a slightly wider temperature window.
-- [Golden Teacher](https://shroomlabs.io/profiles/golden-teacher.html): Golden Teacher fruits at 22 °C and 90% humidity with moderate fresh air and 12 h light. About 32 days from start to fruit. Common cubensis strain. Reference conditions for research and education only.
-- [Penis Envy](https://shroomlabs.io/profiles/penis-envy.html): Penis Envy fruits at 22 °C and 90% humidity with moderate fresh air and 12 h light. About 50 days from start to fruit. Slower cubensis. Same climate band as Golden Teacher with longer stage timers.
-- [Psilocybe cyanescens](https://shroomlabs.io/profiles/p-cyanescens.html): Psilocybe cyanescens fruits at 15 °C and 90% humidity with moderate fresh air and 12 h light. About 52 days from start to fruit. Cool-weather woodlover. Indoor chambers are a poor substitute for outdoor beds.
-- [Psilocybe natalensis](https://shroomlabs.io/profiles/p-natalensis.html): Psilocybe natalensis fruits at 23 °C and 90% humidity with moderate fresh air and 12 h light. About 29 days from start to fruit. Cubensis-adjacent climate; often described as a bit more vigorous.
-
-## Microscopy and research resources
-
-These are plain links to other sites. We do not endorse these vendors or publishers, we earn nothing from them, and the links carry no referral codes or tracking.
-
-Spore laws vary by state and country, and some US states ban spores outright. Where they are sold, spores are sold for microscopy only.
-
-- [PNW Spore](https://pnwspore.com/). US vendor of spore prints and syringes, sold for microscopy.
-- [Sporeworks](https://sporeworks.com/). Long-running US spore catalog, sold for microscopy.
-- [National Institute on Drug Abuse (NIH)](https://nida.nih.gov/research-topics/psilocybin-magic-mushrooms). US government overview of psilocybin, its effects, and current research.
-- [Johns Hopkins Center for Psychedelic and Consciousness Research](https://www.hopkinspsychedelic.org/publications). Peer-reviewed psilocybin studies from Johns Hopkins Medicine.
+- [How to grow Beech / Buna Shimeji](https://shroomlabs.io/profiles/beech-shimeji): To grow Beech / Buna Shimeji at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window.
+- [How to grow Blue Oyster](https://shroomlabs.io/profiles/blue-oyster): To grow Blue Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 25 days from the start of colonization to the end of the first harvest window.
+- [How to grow Button / Cremini](https://shroomlabs.io/profiles/button-cremini): To grow Button / Cremini at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and no light. This profile runs about 36 days from the start of colonization to the end of the first harvest window.
+- [How to grow Chestnut Mushroom](https://shroomlabs.io/profiles/chestnut): To grow Chestnut Mushroom at home, colonize at 23 °C (73 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 34 days from the start of colonization to the end of the first harvest window.
+- [How to grow Cordyceps militaris](https://shroomlabs.io/profiles/cordyceps-militaris): To grow Cordyceps militaris at home, colonize at 20 °C (68 °F) in the dark, then fruit at 18 °C (64 °F) and 84% humidity with moderate fresh air and 12 h of light a day. This profile runs about 57 days from the start of colonization to the end of the first harvest window.
+- [How to grow Elm Oyster](https://shroomlabs.io/profiles/elm-oyster): To grow Elm Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window.
+- [How to grow Enoki](https://shroomlabs.io/profiles/enoki): To grow Enoki at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 93% humidity with little fresh air and no light. This profile runs about 43 days from the start of colonization to the end of the first harvest window.
+- [How to grow Golden Oyster](https://shroomlabs.io/profiles/golden-oyster): To grow Golden Oyster at home, colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 24 days from the start of colonization to the end of the first harvest window.
+- [How to grow King Oyster](https://shroomlabs.io/profiles/king-oyster): To grow King Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 82% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window.
+- [How to grow King Oyster: thick-stem method](https://shroomlabs.io/profiles/king-oyster-thick-stem): Paid culinary Profile, $2.99. About 43 days from start to fruit.
+- [How to grow Lion's Mane](https://shroomlabs.io/profiles/lions-mane): To grow Lion's Mane at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 33 days from the start of colonization to the end of the first harvest window.
+- [How to grow Maitake](https://shroomlabs.io/profiles/maitake): To grow Maitake at home, colonize at 22 °C (72 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 54 days from the start of colonization to the end of the first harvest window.
+- [How to grow Nameko](https://shroomlabs.io/profiles/nameko): To grow Nameko at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 93% humidity with moderate fresh air and 12 h of light a day. This profile runs about 39 days from the start of colonization to the end of the first harvest window.
+- [How to grow Pearl Oyster](https://shroomlabs.io/profiles/pearl-oyster): To grow Pearl Oyster at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 29 days from the start of colonization to the end of the first harvest window.
+- [How to grow Pink Oyster](https://shroomlabs.io/profiles/pink-oyster): To grow Pink Oyster at home, colonize at 27 °C (81 °F) in the dark, then fruit at 24 °C (75 °F) and 86% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 20 days from the start of colonization to the end of the first harvest window.
+- [How to grow Pioppino](https://shroomlabs.io/profiles/pioppino): To grow Pioppino at home, colonize at 25 °C (77 °F) in the dark, then fruit at 16 °C (61 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window.
+- [How to grow Reishi](https://shroomlabs.io/profiles/reishi): To grow Reishi at home, colonize at 27 °C (81 °F) in the dark, then fruit at 23 °C (73 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 77 days from the start of colonization to the end of the first harvest window.
+- [How to grow Shiitake](https://shroomlabs.io/profiles/shiitake): To grow Shiitake at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 74 days from the start of colonization to the end of the first harvest window.
+- [How to grow Turkey Tail](https://shroomlabs.io/profiles/turkey-tail): To grow Turkey Tail at home, colonize at 24 °C (75 °F) in the dark, then fruit at 20 °C (68 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 78 days from the start of colonization to the end of the first harvest window.
+- [How to grow Wine Cap](https://shroomlabs.io/profiles/wine-cap): To grow Wine Cap at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window.
+- [How to grow Wood Ear](https://shroomlabs.io/profiles/wood-ear): To grow Wood Ear at home, colonize at 26 °C (79 °F) in the dark, then fruit at 24 °C (75 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window.
 
 ## Product
 
 - Chamber profiles for OpenShrooly.
 - Works with Shrooly devices running OpenShrooly.
+- [FAQ](https://shroomlabs.io/faq)
+- [Docs](https://shroomlabs.io/docs)

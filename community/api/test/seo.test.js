@@ -19,6 +19,8 @@ import {
   renderLightRecipe,
   renderSources,
   renderLlms,
+  renderLlmsFull,
+  renderHubPage,
   renderProfilePage,
   renderSitemap,
   seoTitle,
@@ -111,22 +113,47 @@ test("generated Off-menu HTML carries legal notice, microscopy, and no commerce"
   }
 });
 
-test("sitemap, llms.txt, and FAQ index Off-menu profiles", () => {
+test("Off-menu profiles stay out of the sitemap, llms.txt, llms-full.txt, FAQ, and hub", () => {
   const profiles = loadProfiles();
   const sitemap = renderSitemap(profiles);
   const llms = renderLlms(profiles);
+  const full = renderLlmsFull(profiles);
   const faq = renderFaqPage(profiles);
-  assert.match(sitemap, /\/profiles\/golden-teacher\.html/);
-  assert.match(sitemap, /\/profiles\/pearl-oyster\.html/);
-  assert.match(llms, /## Off-menu/);
-  assert.match(llms, /golden-teacher/);
-  assert.match(llms, /illegal to grow/);
-  assert.match(llms, /pnwspore\.com/);
-  assert.doesNotMatch(llms, /Restricted/i);
-  assert.doesNotMatch(llms, DASH);
-  assert.match(faq, /golden-teacher/);
-  assert.match(faq, /off the printed menu/);
-  assert.doesNotMatch(faq, DASH);
+  const hub = renderHubPage(profiles);
+  assert.match(sitemap, /\/profiles\/pearl-oyster</);
+  for (const p of profiles.filter(isOffMenu)) {
+    for (const [name, text] of Object.entries({ sitemap, llms, full, faq, hub })) assert.ok(!text.includes(`/profiles/${p.id}`), `${p.id} in ${name}`);
+  }
+  for (const text of [llms, full, faq, hub]) {
+    assert.doesNotMatch(text, /Off-menu|psilocyb|Golden Teacher/i);
+    assert.doesNotMatch(text, DASH);
+  }
+  const gt = renderProfilePage(profiles.find((p) => p.id === "golden-teacher"));
+  assert.match(gt, /<meta name="robots" content="noindex,follow">/);
+});
+
+test("free profile pages are full grow guides built only from profile data", () => {
+  const profiles = loadProfiles();
+  const lion = profiles.find((p) => p.id === "lions-mane");
+  const html = renderProfilePage(lion, profiles);
+  assert.match(html, /<title>How to grow Lion&#39;s Mane at home: temps, humidity, light by stage<\/title>|<title>How to grow Lion's Mane at home: temps, humidity, light by stage<\/title>/);
+  assert.match(html, /<h1>How to grow Lion's Mane at home<\/h1>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/shroomlabs\.io\/profiles\/lions-mane">/);
+  for (const stage of lion.stages) {
+    assert.ok(html.includes(`<th scope="row">${stage.name}</th><td>${stage.duration_days}</td><td>${stage.temperature_c} °C`), stage.id);
+  }
+  const fruit = lion.stages.find((s) => s.id === "fruiting");
+  assert.match(html, new RegExp(`fruit at ${fruit.temperature_c} °C \\(\\d+ °F\\) and ${fruit.humidity_percent}% humidity`));
+  const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])["@graph"];
+  const types = ld.map((n) => n["@type"]);
+  assert.deepEqual(types, ["Article", "HowTo", "FAQPage", "BreadcrumbList"]);
+  const faq = ld.find((n) => n["@type"] === "FAQPage");
+  for (const q of faq.mainEntity) assert.ok(html.includes(q.name.replaceAll("'", "'")), q.name);
+  assert.match(html, /<time datetime="\d{4}-\d\d-\d\d">/);
+  assert.match(html, /href="\/grow"/);
+  assert.doesNotMatch(html, /\.html"/, "no .html links on profile pages");
+  assert.doesNotMatch(html, DASH);
+  assert.match(html, /src="\/js\/lite\.js"/);
 });
 
 test("API Off-menu detail is free, labeled, and resource-only", async () => {
@@ -243,6 +270,8 @@ test("profile pages without a static file still resolve through the /profiles/:i
   assert.equal(profileIdFromUrl("https://shroomlabs.io/profiles/a%20b.html"), "a b");
   assert.equal(profileIdFromUrl("https://shroomlabs.io/profiles/%E0%A4%A.html"), "%E0%A4%A");
   assert.equal(profileIdFromUrl("https://shroomlabs.io/profile.html"), "");
+  assert.equal(profileIdFromUrl("https://shroomlabs.io/profiles/lions-mane"), "lions-mane");
+  assert.equal(profileIdFromUrl("https://shroomlabs.io/profile?id=new-oyster"), "new-oyster");
 });
 
 test("deploy regenerates static profile pages so new built-in profiles get one", () => {

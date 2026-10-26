@@ -649,7 +649,7 @@ async function notifyOwner(db, env, request, authorRow, kind, reason) {
       : `A moderator did not approve your profile: ${reason}`;
   const html = layout({
     title: subject,
-    bodyHtml: `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(line)}</p>${button("https://shroomlabs.io/account.html", "Open your account")}`,
+    bodyHtml: `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(line)}</p>${button("https://shroomlabs.io/account", "Open your account")}`,
     footerHtml: "<p style=\"margin:0;\">You got this because you sent a profile to the Shroom Labs library.</p>",
   });
   try {

@@ -28,7 +28,7 @@ function reportPhotoHtml(item, mediaSrc) {
     : "";
   return `<article class="card" style="padding:1.1rem">
               <p><span class="chip">Grow report photo</span></p>
-              <p><a href="/profile.html?id=${escapeHtml(profileId)}">${escapeHtml(profileId)}</a></p>
+              <p><a href="/profile?id=${escapeHtml(profileId)}">${escapeHtml(profileId)}</a></p>
               <p class="muted">${escapeHtml(item.uploader?.username || "unknown")} · ${escapeHtml(item.outcome || "")}</p>
               <p>${escapeHtml(item.notes || "")}</p>
               ${thumb}

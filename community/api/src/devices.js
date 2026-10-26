@@ -519,7 +519,7 @@ export async function handleDevices(method, path, url, request, env) {
         [enrollHash, codeHash, expires, "claimed", existing.id]
       );
       await audit(db, existing.owner_id, "device_relink_enroll", existing.id, request);
-      const claimUrl = `${site}/claim.html?code=${code}`;
+      const claimUrl = `${site}/claim?code=${code}`;
       return json({
         device_id: existing.id,
         claim_code: code,
@@ -549,7 +549,7 @@ export async function handleDevices(method, path, url, request, env) {
       );
     }
     await audit(db, null, "device_enroll", id, request);
-    const claimUrl = `${site}/claim.html?code=${code}`;
+    const claimUrl = `${site}/claim?code=${code}`;
     return json({
       device_id: id,
       claim_code: code,
@@ -752,7 +752,7 @@ export async function handleDevices(method, path, url, request, env) {
       ]
     );
     await audit(db, null, "device_reclaim", device.id, request);
-    const claimUrl = `${site}/claim.html?code=${code}`;
+    const claimUrl = `${site}/claim?code=${code}`;
     return json({
       device_id: device.id,
       claim_code: code,

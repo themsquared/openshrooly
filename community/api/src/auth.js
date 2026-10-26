@@ -230,7 +230,7 @@ export async function handleAuth(method, path, url, request, env) {
       "INSERT INTO magic_links (email, token_hash, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
       [email, await sha256Hex(token), "login", laterIso(MAGIC_MS), nowIso()]
     );
-    const link = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/auth/callback.html?token=${token}`;
+    const link = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/auth/callback?token=${token}`;
     const sent = await sendEmail(
       env,
       { to: email, ...renderSignInEmail(link, MAGIC_MS / 60000), priority: "login" },
@@ -565,7 +565,7 @@ async function startOidc(env, request, url, provider) {
   const challenge = await sha256B64url(verifier);
   await env.db.run(
     "INSERT INTO oauth_states (state, nonce, code_verifier, provider, redirect_to, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [state, nonce, verifier, provider, next || "/account.html", laterIso(OIDC_STATE_MS)]
+    [state, nonce, verifier, provider, next || "/account", laterIso(OIDC_STATE_MS)]
   );
   const auth = new URL(cfg.authorize);
   auth.searchParams.set("client_id", cfg.clientId || "stub-client");
@@ -605,7 +605,7 @@ async function finishOidc(env, request, url, provider) {
   const fail = async (reason, userId) => {
     // Specific reasons go to the audit log only; the browser always gets the same generic outcome.
     await audit(env.db, userId || null, `oidc_${provider}_fail`, reason, request);
-    return redirect(`${siteOrigin(env)}/login.html?error=oidc`, clear);
+    return redirect(`${siteOrigin(env)}/login?error=oidc`, clear);
   };
   const limited = await rateLimit(env.db, `oidc-cb-${provider}:${rateLimitClient(request)}`, 20, 900);
   if (!limited.ok) return fail("rate limited");
@@ -675,8 +675,8 @@ async function finishOidc(env, request, url, provider) {
     "INSERT INTO magic_links (email, token_hash, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
     [user.email, await sha256Hex(handoff), "oidc_handoff", laterIso(OIDC_HANDOFF_MS), nowIso()]
   );
-  const next = safeNextPath(row.redirect_to) || "/account.html";
-  const dest = `${siteOrigin(env)}/auth/callback.html#oidc=${handoff}&next=${encodeURIComponent(next)}`;
+  const next = safeNextPath(row.redirect_to) || "/account";
+  const dest = `${siteOrigin(env)}/auth/callback#oidc=${handoff}&next=${encodeURIComponent(next)}`;
   return redirect(dest, clear);
 }
 

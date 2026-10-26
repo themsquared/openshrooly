@@ -24,7 +24,7 @@ export function reclaimBody({ public_jwk }) {
 }
 
 export function claimUrl(code, site = "https://shroomlabs.io") {
-  return `${String(site).replace(/\/$/, "")}/claim.html?code=${String(code || "").toUpperCase()}`;
+  return `${String(site).replace(/\/$/, "")}/claim?code=${String(code || "").toUpperCase()}`;
 }
 
 export async function firmwareDevice() {

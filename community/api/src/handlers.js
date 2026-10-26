@@ -542,8 +542,8 @@ async function route(method, path, url, request, env) {
       amountCents: profile.pricing.amount_cents,
       details: { note: "Culinary checkout." },
       name: profile.name || "Grow profile",
-      successPath: `/profile.html?id=${encodeURIComponent(checkoutRow.id)}&checkout=success`,
-      cancelPath: `/profile.html?id=${encodeURIComponent(checkoutRow.id)}&checkout=cancel`,
+      successPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=success`,
+      cancelPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=cancel`,
     });
     if (!session.ok) return json({ error: session.error, coming_soon: true }, session.status || 503);
     return json(session);

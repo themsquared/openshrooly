@@ -1,0 +1,743 @@
+# Shroom Labs: full grow guides
+
+> Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.
+
+Every number below comes from the published Shroom Labs grow profiles. Source: https://shroomlabs.io/grow
+
+---
+
+## How to grow Beech / Buna Shimeji at home
+
+URL: https://shroomlabs.io/profiles/beech-shimeji
+Species: Hypsizygus tessulatus
+Updated: 2026-10-25
+
+To grow Beech / Buna Shimeji at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window. Clustered beech mushroom. Cool, humid, and a little less fresh air than oysters.
+
+### Conditions by stage
+
+- Colonization: 21 days, 22 °C (72 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 7 days, 16 °C (61 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 12 days, 15 °C (59 °F), 90% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 20%, blue 80%.
+
+### FAQ
+
+Q: What temperature does Beech / Buna Shimeji grow at?
+A: In this profile Beech / Buna Shimeji colonizes at 22 °C (72 °F) and fruits at 15 °C (59 °F). Colonization: 22 °C (72 °F). Pinning: 16 °C (61 °F). Fruiting: 15 °C (59 °F).
+
+Q: What humidity does Beech / Buna Shimeji need?
+A: 90% while fruiting. Colonization: 88%. Pinning: 94%. Fruiting: 90%.
+
+Q: How long does Beech / Buna Shimeji take to grow?
+A: About 40 days with this profile: 21 days of colonization, 7 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Beech / Buna Shimeji need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Beech / Buna Shimeji need?
+A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Blue Oyster at home
+
+URL: https://shroomlabs.io/profiles/blue-oyster
+Species: Pleurotus ostreatus var. columbinus
+Updated: 2026-10-25
+
+To grow Blue Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 25 days from the start of colonization to the end of the first harvest window. Cool-preferring oyster. Deep color holds better below 18 °C.
+
+### Conditions by stage
+
+- Colonization: 12 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 4 days, 15 °C (59 °F), 94% humidity, moderate fresh air: fan runs 40 s every 12 min, light 12 h a day, white 20%, blue 80%. Cooler pinning keeps blue tones.
+- Fruiting: 9 days, 14 °C (57 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%.
+
+### Notes
+
+If the chamber runs warm, blues fade toward grey and stems elongate.
+
+### FAQ
+
+Q: What temperature does Blue Oyster grow at?
+A: In this profile Blue Oyster colonizes at 22 °C (72 °F) and fruits at 14 °C (57 °F). Colonization: 22 °C (72 °F). Pinning: 15 °C (59 °F). Fruiting: 14 °C (57 °F).
+
+Q: What humidity does Blue Oyster need?
+A: 87% while fruiting. Colonization: 90%. Pinning: 94%. Fruiting: 87%.
+
+Q: How long does Blue Oyster take to grow?
+A: About 25 days with this profile: 12 days of colonization, 4 days of pinning, 9 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Blue Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Blue Oyster need?
+A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Blue Oyster good for beginners?
+A: Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.
+
+---
+
+## How to grow Button / Cremini at home
+
+URL: https://shroomlabs.io/profiles/button-cremini
+Species: Agaricus bisporus
+Updated: 2026-10-25
+
+To grow Button / Cremini at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and no light. This profile runs about 36 days from the start of colonization to the end of the first harvest window. Compost + casing species. Low light, cool fruiting, casing required.
+
+### Conditions by stage
+
+- Spawn run: 16 days, 24 °C (75 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Colonize compost in the dark before casing.
+- Casing / pinning: 8 days, 17 °C (63 °F), 92% humidity, moderate fresh air: fan runs 20 s every 25 min, light dark. Apply a non-nutritive casing, then drop temp.
+- Fruiting: 12 days, 16 °C (61 °F), 88% humidity, moderate fresh air: fan runs 25 s every 20 min, light dark.
+
+### Notes
+
+The device does not mix compost or apply casing. Use a cased tray in the chamber. Portobello is the same species allowed to mature.
+
+### FAQ
+
+Q: What temperature does Button / Cremini grow at?
+A: In this profile Button / Cremini colonizes at 24 °C (75 °F) and fruits at 16 °C (61 °F). Spawn run: 24 °C (75 °F). Casing / pinning: 17 °C (63 °F). Fruiting: 16 °C (61 °F).
+
+Q: What humidity does Button / Cremini need?
+A: 88% while fruiting. Spawn run: 88%. Casing / pinning: 92%. Fruiting: 88%.
+
+Q: How long does Button / Cremini take to grow?
+A: About 36 days with this profile: 16 days of spawn run, 8 days of casing / pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Button / Cremini need?
+A: Spawn run: dark. Casing / pinning: dark. Fruiting: dark.
+
+Q: How much fresh air does Button / Cremini need?
+A: Moderate fresh air: fan runs 25 s every 20 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Button / Cremini good for beginners?
+A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
+
+---
+
+## How to grow Chestnut Mushroom at home
+
+URL: https://shroomlabs.io/profiles/chestnut
+Species: Pholiota adiposa
+Updated: 2026-10-25
+
+To grow Chestnut Mushroom at home, colonize at 23 °C (73 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 34 days from the start of colonization to the end of the first harvest window. Clustered woodlover. Cool fruiting and high humidity keep caps glossy.
+
+### Conditions by stage
+
+- Colonization: 18 days, 23 °C (73 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 6 days, 16 °C (61 °F), 95% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 10 days, 15 °C (59 °F), 92% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%.
+
+### FAQ
+
+Q: What temperature does Chestnut Mushroom grow at?
+A: In this profile Chestnut Mushroom colonizes at 23 °C (73 °F) and fruits at 15 °C (59 °F). Colonization: 23 °C (73 °F). Pinning: 16 °C (61 °F). Fruiting: 15 °C (59 °F).
+
+Q: What humidity does Chestnut Mushroom need?
+A: 92% while fruiting. Colonization: 90%. Pinning: 95%. Fruiting: 92%.
+
+Q: How long does Chestnut Mushroom take to grow?
+A: About 34 days with this profile: 18 days of colonization, 6 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Chestnut Mushroom need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Chestnut Mushroom need?
+A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Cordyceps militaris at home
+
+URL: https://shroomlabs.io/profiles/cordyceps-militaris
+Species: Cordyceps militaris
+Updated: 2026-10-25
+
+To grow Cordyceps militaris at home, colonize at 20 °C (68 °F) in the dark, then fruit at 18 °C (64 °F) and 84% humidity with moderate fresh air and 12 h of light a day. This profile runs about 57 days from the start of colonization to the end of the first harvest window. Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.
+
+### Conditions by stage
+
+- Colonization: 12 days, 20 °C (68 °F), 82% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Dark. Do not start light until the surface is colonized.
+- Orange initials: 10 days, 18 °C (64 °F), 86% humidity, moderate fresh air: fan runs 20 s every 30 min, light 12 h a day, white 51%, blue 80%. Bright, cooler light helps stroma form.
+- Stroma: 35 days, 18 °C (64 °F), 84% humidity, moderate fresh air: fan runs 20 s every 25 min, light 12 h a day, white 51%, blue 80%.
+
+### Notes
+
+This profile only sets climate. Media (brown rice + silkworm-pupa or vegan analog) is on you. Keep jars or trays in the chamber.
+
+### FAQ
+
+Q: What temperature does Cordyceps militaris grow at?
+A: In this profile Cordyceps militaris colonizes at 20 °C (68 °F) and fruits at 18 °C (64 °F). Colonization: 20 °C (68 °F). Orange initials: 18 °C (64 °F). Stroma: 18 °C (64 °F).
+
+Q: What humidity does Cordyceps militaris need?
+A: 84% while fruiting. Colonization: 82%. Orange initials: 86%. Stroma: 84%.
+
+Q: How long does Cordyceps militaris take to grow?
+A: About 57 days with this profile: 12 days of colonization, 10 days of orange initials, 35 days of stroma. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Cordyceps militaris need?
+A: Colonization: dark. Orange initials: 12 h a day, white 51%, blue 80%. Stroma: 12 h a day, white 51%, blue 80%.
+
+Q: How much fresh air does Cordyceps militaris need?
+A: Moderate fresh air: fan runs 20 s every 25 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Cordyceps militaris good for beginners?
+A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
+
+---
+
+## How to grow Elm Oyster at home
+
+URL: https://shroomlabs.io/profiles/elm-oyster
+Species: Hypsizygus ulmarius
+Updated: 2026-10-25
+
+To grow Elm Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window. Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.
+
+### Conditions by stage
+
+- Colonization: 16 days, 22 °C (72 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 5 days, 16 °C (61 °F), 92% humidity, moderate fresh air: fan runs 30 s every 16 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 10 days, 15 °C (59 °F), 86% humidity, moderate fresh air: fan runs 30 s every 14 min, light 12 h a day, white 20%, blue 80%.
+
+### FAQ
+
+Q: What temperature does Elm Oyster grow at?
+A: In this profile Elm Oyster colonizes at 22 °C (72 °F) and fruits at 15 °C (59 °F). Colonization: 22 °C (72 °F). Pinning: 16 °C (61 °F). Fruiting: 15 °C (59 °F).
+
+Q: What humidity does Elm Oyster need?
+A: 86% while fruiting. Colonization: 88%. Pinning: 92%. Fruiting: 86%.
+
+Q: How long does Elm Oyster take to grow?
+A: About 31 days with this profile: 16 days of colonization, 5 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Elm Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Elm Oyster need?
+A: Moderate fresh air: fan runs 30 s every 14 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Elm Oyster good for beginners?
+A: Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.
+
+---
+
+## How to grow Enoki at home
+
+URL: https://shroomlabs.io/profiles/enoki
+Species: Flammulina velutipes
+Updated: 2026-10-25
+
+To grow Enoki at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 93% humidity with little fresh air and no light. This profile runs about 43 days from the start of colonization to the end of the first harvest window. Needs cold fruiting and little fresh air for supermarket-long stems.
+
+### Conditions by stage
+
+- Colonization: 18 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 7 days, 16 °C (61 °F), 95% humidity, little fresh air: fan runs 15 s every 90 min, light dark. Keep still and wet to pile up pins.
+- Fruiting: 18 days, 15 °C (59 °F), 93% humidity, little fresh air: fan runs 15 s every 90 min, light dark. Little fresh air stretches stems. More air makes stocky wild-type caps.
+
+### Notes
+
+A Shrooly cannot reach true 4 to 10 °C enoki rooms. This profile uses the coolest firmware target (15 °C) and very little fresh air as a chamber approximation.
+
+### FAQ
+
+Q: What temperature does Enoki grow at?
+A: In this profile Enoki colonizes at 22 °C (72 °F) and fruits at 15 °C (59 °F). Colonization: 22 °C (72 °F). Pinning: 16 °C (61 °F). Fruiting: 15 °C (59 °F).
+
+Q: What humidity does Enoki need?
+A: 93% while fruiting. Colonization: 90%. Pinning: 95%. Fruiting: 93%.
+
+Q: How long does Enoki take to grow?
+A: About 43 days with this profile: 18 days of colonization, 7 days of pinning, 18 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Enoki need?
+A: Colonization: dark. Pinning: dark. Fruiting: dark.
+
+Q: How much fresh air does Enoki need?
+A: Little fresh air: fan runs 15 s every 90 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Enoki good for beginners?
+A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
+
+---
+
+## How to grow Golden Oyster at home
+
+URL: https://shroomlabs.io/profiles/golden-oyster
+Species: Pleurotus citrinopileatus
+Updated: 2026-10-25
+
+To grow Golden Oyster at home, colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 24 days from the start of colonization to the end of the first harvest window. Warm oyster with dense golden clusters. Needs plenty of fresh air to keep stems short.
+
+### Conditions by stage
+
+- Colonization: 12 days, 25 °C (77 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 4 days, 22 °C (72 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 8 days, 21 °C (70 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. More light helps hold gold color.
+
+### FAQ
+
+Q: What temperature does Golden Oyster grow at?
+A: In this profile Golden Oyster colonizes at 25 °C (77 °F) and fruits at 21 °C (70 °F). Colonization: 25 °C (77 °F). Pinning: 22 °C (72 °F). Fruiting: 21 °C (70 °F).
+
+Q: What humidity does Golden Oyster need?
+A: 87% while fruiting. Colonization: 90%. Pinning: 93%. Fruiting: 87%.
+
+Q: How long does Golden Oyster take to grow?
+A: About 24 days with this profile: 12 days of colonization, 4 days of pinning, 8 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Golden Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Golden Oyster need?
+A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow King Oyster at home
+
+URL: https://shroomlabs.io/profiles/king-oyster
+Species: Pleurotus eryngii
+Updated: 2026-10-25
+
+To grow King Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 82% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window. Thick-stem oyster. Cooler, slightly drier, and less fresh air than cluster oysters.
+
+### Conditions by stage
+
+- Colonization: 18 days, 22 °C (72 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 6 days, 16 °C (61 °F), 90% humidity, moderate fresh air: fan runs 25 s every 25 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 14 days, 15 °C (59 °F), 82% humidity, moderate fresh air: fan runs 25 s every 25 min, light 12 h a day, white 20%, blue 80%. Let stems elongate before caps flare if you want steak-cut kings.
+
+### Notes
+
+High humidity plus lots of fresh air makes skinny kings. Keep humidity a bit lower once pins set.
+
+### FAQ
+
+Q: What temperature does King Oyster grow at?
+A: In this profile King Oyster colonizes at 22 °C (72 °F) and fruits at 15 °C (59 °F). Colonization: 22 °C (72 °F). Pinning: 16 °C (61 °F). Fruiting: 15 °C (59 °F).
+
+Q: What humidity does King Oyster need?
+A: 82% while fruiting. Colonization: 88%. Pinning: 90%. Fruiting: 82%.
+
+Q: How long does King Oyster take to grow?
+A: About 38 days with this profile: 18 days of colonization, 6 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does King Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does King Oyster need?
+A: Moderate fresh air: fan runs 25 s every 25 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Lion's Mane at home
+
+URL: https://shroomlabs.io/profiles/lions-mane
+Species: Hericium erinaceus
+Updated: 2026-10-25
+
+To grow Lion's Mane at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 33 days from the start of colonization to the end of the first harvest window. Tooth fungus. Moderate fresh air, since too much air yellows the spines.
+
+### Conditions by stage
+
+- Colonization: 16 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 5 days, 18 °C (64 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 26%, blue 80%. Look for dense white primordia, not fuzzy overlay.
+- Fruiting: 12 days, 17 °C (63 °F), 90% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 26%, blue 80%. Harvest when spines elongate but before they yellow.
+
+### Notes
+
+If spines brown or yellow, cut fresh air and raise humidity slightly. Original Shrooly lion's mane recipe used a gentle fan ramp.
+
+### FAQ
+
+Q: What temperature does Lion's Mane grow at?
+A: In this profile Lion's Mane colonizes at 22 °C (72 °F) and fruits at 17 °C (63 °F). Colonization: 22 °C (72 °F). Pinning: 18 °C (64 °F). Fruiting: 17 °C (63 °F).
+
+Q: What humidity does Lion's Mane need?
+A: 90% while fruiting. Colonization: 90%. Pinning: 94%. Fruiting: 90%.
+
+Q: How long does Lion's Mane take to grow?
+A: About 33 days with this profile: 16 days of colonization, 5 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Lion's Mane need?
+A: Colonization: dark. Pinning: 12 h a day, white 26%, blue 80%. Fruiting: 12 h a day, white 26%, blue 80%.
+
+Q: How much fresh air does Lion's Mane need?
+A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Lion's Mane good for beginners?
+A: Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.
+
+---
+
+## How to grow Maitake at home
+
+URL: https://shroomlabs.io/profiles/maitake
+Species: Grifola frondosa
+Updated: 2026-10-25
+
+To grow Maitake at home, colonize at 22 °C (72 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 54 days from the start of colonization to the end of the first harvest window. Slow woodlover. Primordia look like brains; do not dry them out.
+
+### Conditions by stage
+
+- Colonization: 28 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Primordia: 10 days, 17 °C (63 °F), 93% humidity, moderate fresh air: fan runs 20 s every 25 min, light 12 h a day, white 37%.
+- Fruiting: 16 days, 16 °C (61 °F), 88% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 37%.
+
+### FAQ
+
+Q: What temperature does Maitake grow at?
+A: In this profile Maitake colonizes at 22 °C (72 °F) and fruits at 16 °C (61 °F). Colonization: 22 °C (72 °F). Primordia: 17 °C (63 °F). Fruiting: 16 °C (61 °F).
+
+Q: What humidity does Maitake need?
+A: 88% while fruiting. Colonization: 90%. Primordia: 93%. Fruiting: 88%.
+
+Q: How long does Maitake take to grow?
+A: About 54 days with this profile: 28 days of colonization, 10 days of primordia, 16 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Maitake need?
+A: Colonization: dark. Primordia: 12 h a day, white 37%. Fruiting: 12 h a day, white 37%.
+
+Q: How much fresh air does Maitake need?
+A: Moderate fresh air: fan runs 25 s every 20 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Maitake good for beginners?
+A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
+
+---
+
+## How to grow Nameko at home
+
+URL: https://shroomlabs.io/profiles/nameko
+Species: Pholiota microspora
+Updated: 2026-10-25
+
+To grow Nameko at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 93% humidity with moderate fresh air and 12 h of light a day. This profile runs about 39 days from the start of colonization to the end of the first harvest window. Cool, very wet fruiting. The slime coat is normal.
+
+### Conditions by stage
+
+- Colonization: 20 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 7 days, 15 °C (59 °F), 95% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 12 days, 14 °C (57 °F), 93% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 20%, blue 80%.
+
+### FAQ
+
+Q: What temperature does Nameko grow at?
+A: In this profile Nameko colonizes at 22 °C (72 °F) and fruits at 14 °C (57 °F). Colonization: 22 °C (72 °F). Pinning: 15 °C (59 °F). Fruiting: 14 °C (57 °F).
+
+Q: What humidity does Nameko need?
+A: 93% while fruiting. Colonization: 90%. Pinning: 95%. Fruiting: 93%.
+
+Q: How long does Nameko take to grow?
+A: About 39 days with this profile: 20 days of colonization, 7 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Nameko need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Nameko need?
+A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Pearl Oyster at home
+
+URL: https://shroomlabs.io/profiles/pearl-oyster
+Species: Pleurotus ostreatus
+Updated: 2026-10-25
+
+To grow Pearl Oyster at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 29 days from the start of colonization to the end of the first harvest window. Forgiving beginner oyster. Fast, lots of fresh air, cool-to-room fruiting.
+
+### Conditions by stage
+
+- Colonization: 14 days, 24 °C (75 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Dark, little fresh air until the block is white.
+- Pinning: 5 days, 18 °C (64 °F), 93% humidity, moderate fresh air: fan runs 35 s every 15 min, light 12 h a day, white 20%, blue 80%. Drop temperature and add fresh air to trigger clusters.
+- Fruiting: 10 days, 16 °C (61 °F), 88% humidity, moderate fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. Harvest when caps flatten and edges just begin to upturn.
+
+### Notes
+
+Shrooly-sized chamber works well. Keep surfaces just barely glistening, not dripping.
+
+### FAQ
+
+Q: What temperature does Pearl Oyster grow at?
+A: In this profile Pearl Oyster colonizes at 24 °C (75 °F) and fruits at 16 °C (61 °F). Colonization: 24 °C (75 °F). Pinning: 18 °C (64 °F). Fruiting: 16 °C (61 °F).
+
+Q: What humidity does Pearl Oyster need?
+A: 88% while fruiting. Colonization: 90%. Pinning: 93%. Fruiting: 88%.
+
+Q: How long does Pearl Oyster take to grow?
+A: About 29 days with this profile: 14 days of colonization, 5 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Pearl Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Pearl Oyster need?
+A: Moderate fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Pearl Oyster good for beginners?
+A: Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.
+
+---
+
+## How to grow Pink Oyster at home
+
+URL: https://shroomlabs.io/profiles/pink-oyster
+Species: Pleurotus djamor
+Updated: 2026-10-25
+
+To grow Pink Oyster at home, colonize at 27 °C (81 °F) in the dark, then fruit at 24 °C (75 °F) and 86% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 20 days from the start of colonization to the end of the first harvest window. Tropical oyster. Wants warmth; stalls and fades in a cold room.
+
+### Conditions by stage
+
+- Colonization: 10 days, 27 °C (81 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 3 days, 24 °C (75 °F), 92% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 7 days, 24 °C (75 °F), 86% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. Color fades as fruits mature; harvest while still vivid.
+
+### Notes
+
+Do not cold-shock. Harvest early; shelf life is short.
+
+### FAQ
+
+Q: What temperature does Pink Oyster grow at?
+A: In this profile Pink Oyster colonizes at 27 °C (81 °F) and fruits at 24 °C (75 °F). Colonization: 27 °C (81 °F). Pinning: 24 °C (75 °F). Fruiting: 24 °C (75 °F).
+
+Q: What humidity does Pink Oyster need?
+A: 86% while fruiting. Colonization: 88%. Pinning: 92%. Fruiting: 86%.
+
+Q: How long does Pink Oyster take to grow?
+A: About 20 days with this profile: 10 days of colonization, 3 days of pinning, 7 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Pink Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Pink Oyster need?
+A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Pink Oyster good for beginners?
+A: Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.
+
+---
+
+## How to grow Pioppino at home
+
+URL: https://shroomlabs.io/profiles/pioppino
+Species: Cyclocybe aegerita
+Updated: 2026-10-25
+
+To grow Pioppino at home, colonize at 25 °C (77 °F) in the dark, then fruit at 16 °C (61 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window. Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.
+
+### Conditions by stage
+
+- Colonization: 16 days, 25 °C (77 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 5 days, 17 °C (63 °F), 92% humidity, moderate fresh air: fan runs 30 s every 18 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 10 days, 16 °C (61 °F), 86% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%. Ease humidity so caps stay dry enough to open cleanly.
+
+### FAQ
+
+Q: What temperature does Pioppino grow at?
+A: In this profile Pioppino colonizes at 25 °C (77 °F) and fruits at 16 °C (61 °F). Colonization: 25 °C (77 °F). Pinning: 17 °C (63 °F). Fruiting: 16 °C (61 °F).
+
+Q: What humidity does Pioppino need?
+A: 86% while fruiting. Colonization: 88%. Pinning: 92%. Fruiting: 86%.
+
+Q: How long does Pioppino take to grow?
+A: About 31 days with this profile: 16 days of colonization, 5 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Pioppino need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Pioppino need?
+A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Reishi at home
+
+URL: https://shroomlabs.io/profiles/reishi
+Species: Ganoderma lucidum
+Updated: 2026-10-25
+
+To grow Reishi at home, colonize at 27 °C (81 °F) in the dark, then fruit at 23 °C (73 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 77 days from the start of colonization to the end of the first harvest window. Antlers under high CO2, then consoles when fresh air increases.
+
+### Conditions by stage
+
+- Colonization: 21 days, 27 °C (81 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Antler / primordia: 21 days, 24 °C (75 °F), 90% humidity, little fresh air: fan runs 20 s every 90 min, light 12 h a day, white 37%, blue 80%. Little fresh air keeps growth as antlers.
+- Console formation: 35 days, 23 °C (73 °F), 85% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 37%, blue 80%. Increase fresh air and light to flatten antlers into consoles.
+
+### Notes
+
+Original Shrooly reishi LUA used a very long quiet fan period. Match that for antlers; raise fresh air for kidney-shaped consoles.
+
+### FAQ
+
+Q: What temperature does Reishi grow at?
+A: In this profile Reishi colonizes at 27 °C (81 °F) and fruits at 23 °C (73 °F). Colonization: 27 °C (81 °F). Antler / primordia: 24 °C (75 °F). Console formation: 23 °C (73 °F).
+
+Q: What humidity does Reishi need?
+A: 85% while fruiting. Colonization: 88%. Antler / primordia: 90%. Console formation: 85%.
+
+Q: How long does Reishi take to grow?
+A: About 77 days with this profile: 21 days of colonization, 21 days of antler / primordia, 35 days of console formation. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Reishi need?
+A: Colonization: dark. Antler / primordia: 12 h a day, white 37%, blue 80%. Console formation: 12 h a day, white 37%, blue 80%.
+
+Q: How much fresh air does Reishi need?
+A: Moderate fresh air: fan runs 30 s every 20 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Reishi good for beginners?
+A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
+
+---
+
+## How to grow Shiitake at home
+
+URL: https://shroomlabs.io/profiles/shiitake
+Species: Lentinula edodes
+Updated: 2026-10-25
+
+To grow Shiitake at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 74 days from the start of colonization to the end of the first harvest window. Needs a full colonize + browning rest, then a cold shock before fruiting.
+
+### Conditions by stage
+
+- Colonization: 42 days, 24 °C (75 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Wait for full white, then browning: do not fruit early.
+- Browning / skin: 21 days, 21 °C (70 °F), 80% humidity, little fresh air: fan runs 20 s every 45 min, light 12 h a day, white 26%, blue 80%. Block forms a protective brown skin. Keep it a bit drier.
+- Cold shock (off-device): 1 days, 16 °C (61 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark. The chamber can't get fridge cold. Shock 12 to 24 h at 5 to 10 °C, then apply fruiting.
+- Fruiting: 10 days, 16 °C (61 °F), 85% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
+
+### Notes
+
+OpenShrooly cannot refrigerate a block. Cold-shock in a fridge, then return the block to the device.
+
+### FAQ
+
+Q: What temperature does Shiitake grow at?
+A: In this profile Shiitake colonizes at 24 °C (75 °F) and fruits at 16 °C (61 °F). Colonization: 24 °C (75 °F). Browning / skin: 21 °C (70 °F). Cold shock (off-device): 16 °C (61 °F). Fruiting: 16 °C (61 °F).
+
+Q: What humidity does Shiitake need?
+A: 85% while fruiting. Colonization: 88%. Browning / skin: 80%. Cold shock (off-device): 90%. Fruiting: 85%.
+
+Q: How long does Shiitake take to grow?
+A: About 74 days with this profile: 42 days of colonization, 21 days of browning / skin, 1 day of cold shock (off-device), 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Shiitake need?
+A: Colonization: dark. Browning / skin: 12 h a day, white 26%, blue 80%. Cold shock (off-device): dark. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Shiitake need?
+A: Moderate fresh air: fan runs 35 s every 12 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Turkey Tail at home
+
+URL: https://shroomlabs.io/profiles/turkey-tail
+Species: Trametes versicolor
+Updated: 2026-10-25
+
+To grow Turkey Tail at home, colonize at 24 °C (75 °F) in the dark, then fruit at 20 °C (68 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 78 days from the start of colonization to the end of the first harvest window. Thin polypore. Long fruiting, lots of fresh air, not a thick-fleshed edible.
+
+### Conditions by stage
+
+- Colonization: 28 days, 24 °C (75 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Primordia: 10 days, 21 °C (70 °F), 90% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%.
+- Brackets: 40 days, 20 °C (68 °F), 86% humidity, moderate fresh air: fan runs 30 s every 12 min, light 12 h a day, white 20%, blue 80%.
+
+### FAQ
+
+Q: What temperature does Turkey Tail grow at?
+A: In this profile Turkey Tail colonizes at 24 °C (75 °F) and fruits at 20 °C (68 °F). Colonization: 24 °C (75 °F). Primordia: 21 °C (70 °F). Brackets: 20 °C (68 °F).
+
+Q: What humidity does Turkey Tail need?
+A: 86% while fruiting. Colonization: 88%. Primordia: 90%. Brackets: 86%.
+
+Q: How long does Turkey Tail take to grow?
+A: About 78 days with this profile: 28 days of colonization, 10 days of primordia, 40 days of brackets. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Turkey Tail need?
+A: Colonization: dark. Primordia: 12 h a day, white 20%, blue 80%. Brackets: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Turkey Tail need?
+A: Moderate fresh air: fan runs 30 s every 12 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Wine Cap at home
+
+URL: https://shroomlabs.io/profiles/wine-cap
+Species: Stropharia rugosoannulata
+Updated: 2026-10-25
+
+To grow Wine Cap at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window. Best as an outdoor bed mushroom. Indoor profile is a climate approximation only.
+
+### Conditions by stage
+
+- Colonization: 21 days, 22 °C (72 °F), 85% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 7 days, 18 °C (64 °F), 90% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 12 days, 17 °C (63 °F), 85% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%.
+
+### Notes
+
+Wine caps want a deep, airy mulch bed. A Shrooly can hold temperature and humidity for a tray experiment but yields are usually better outdoors.
+
+### FAQ
+
+Q: What temperature does Wine Cap grow at?
+A: In this profile Wine Cap colonizes at 22 °C (72 °F) and fruits at 17 °C (63 °F). Colonization: 22 °C (72 °F). Pinning: 18 °C (64 °F). Fruiting: 17 °C (63 °F).
+
+Q: What humidity does Wine Cap need?
+A: 85% while fruiting. Colonization: 85%. Pinning: 90%. Fruiting: 85%.
+
+Q: How long does Wine Cap take to grow?
+A: About 40 days with this profile: 21 days of colonization, 7 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Wine Cap need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Wine Cap need?
+A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Wine Cap good for beginners?
+A: Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.
+
+---
+
+## How to grow Wood Ear at home
+
+URL: https://shroomlabs.io/profiles/wood-ear
+Species: Auricularia auricula-judae
+Updated: 2026-10-25
+
+To grow Wood Ear at home, colonize at 26 °C (79 °F) in the dark, then fruit at 24 °C (75 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window. Warm, wet jelly fungus. High humidity matters more than light intensity.
+
+### Conditions by stage
+
+- Colonization: 18 days, 26 °C (79 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 6 days, 24 °C (75 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 14 days, 24 °C (75 °F), 92% humidity, moderate fresh air: fan runs 25 s every 16 min, light 12 h a day, white 20%, blue 80%.
+
+### FAQ
+
+Q: What temperature does Wood Ear grow at?
+A: In this profile Wood Ear colonizes at 26 °C (79 °F) and fruits at 24 °C (75 °F). Colonization: 26 °C (79 °F). Pinning: 24 °C (75 °F). Fruiting: 24 °C (75 °F).
+
+Q: What humidity does Wood Ear need?
+A: 92% while fruiting. Colonization: 90%. Pinning: 94%. Fruiting: 92%.
+
+Q: How long does Wood Ear take to grow?
+A: About 38 days with this profile: 18 days of colonization, 6 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Wood Ear need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Wood Ear need?
+A: Moderate fresh air: fan runs 25 s every 16 min while fruiting. Colonization runs with little fresh air.

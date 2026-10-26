@@ -69,7 +69,7 @@ test("D1: Apple sign-up creates a verified Hide My Email account without storing
     const first = await signIn(d1, ctx, {
       user: JSON.stringify({ name: { firstName: "Jane", lastName: "Appleseed" }, email: RELAY_EMAIL }),
     });
-    assert.ok(first.loc.startsWith(`${SITE}/auth/callback.html#oidc=`), first.loc);
+    assert.ok(first.loc.startsWith(`${SITE}/auth/callback#oidc=`), first.loc);
     assert.equal(first.done.status, 200, JSON.stringify(first.done.data));
     assert.equal(first.done.data.user.email, RELAY_EMAIL);
     assert.equal(first.done.data.user.email_verified, true);
@@ -100,12 +100,12 @@ test("D1: missing state, replayed callback/nonce, and a foreign Origin are refus
       form: { state: r.state, code: "c" },
       headers: { cookie: r.cookie, origin: "https://appleid.apple.com" },
     });
-    assert.equal(replay.headers.get("location"), `${SITE}/login.html?error=oidc`);
+    assert.equal(replay.headers.get("location"), `${SITE}/login?error=oidc`);
     const missing = await call(ctx, "POST", "/api/auth/oidc/apple/callback", {
       form: { code: "c" },
       headers: { cookie: r.cookie, origin: "https://appleid.apple.com" },
     });
-    assert.equal(missing.headers.get("location"), `${SITE}/login.html?error=oidc`);
+    assert.equal(missing.headers.get("location"), `${SITE}/login?error=oidc`);
     const start = await call(ctx, "GET", "/api/auth/oidc/apple/start");
     const state = new URL(start.headers.get("location")).searchParams.get("state");
     const cookie = start.headers.get("set-cookie").split(";")[0];
@@ -130,7 +130,7 @@ for (const [name, mutate] of Object.entries(D1_BAD)) {
     await withD1(async (d1, ctx) => {
       mutate(apple);
       const r = await signIn(d1, ctx);
-      assert.equal(r.cb.headers.get("location"), `${SITE}/login.html?error=oidc`);
+      assert.equal(r.cb.headers.get("location"), `${SITE}/login?error=oidc`);
       assert.equal((await d1.prepare("SELECT COUNT(*) n FROM users").first()).n, 0);
     });
   });
@@ -146,7 +146,7 @@ test("D1: unverified account with the same email is not taken over", async () =>
       .bind(RELAY_EMAIL, now)
       .run();
     const refused = await signIn(d1, ctx);
-    assert.equal(refused.cb.headers.get("location"), `${SITE}/login.html?error=oidc`);
+    assert.equal(refused.cb.headers.get("location"), `${SITE}/login?error=oidc`);
     assert.equal((await d1.prepare("SELECT COUNT(*) n FROM auth_identities").first()).n, 0);
     assert.equal((await d1.prepare("SELECT email_verified n FROM users WHERE email=?").bind(RELAY_EMAIL).first()).n, 0);
   });

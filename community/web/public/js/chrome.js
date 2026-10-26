@@ -10,9 +10,10 @@ export const DISCLOSURE =
 
 export const NAV_ITEMS = [
   { id: "profiles", href: "/", label: "Profiles" },
-  { id: "faq", href: "/faq.html", label: "FAQ" },
-  { id: "coach", href: "/coach.html", label: "Grow Coach" },
-  { id: "docs", href: "/docs.html", label: "Docs" },
+  { id: "grow", href: "/grow", label: "Grow guides" },
+  { id: "faq", href: "/faq", label: "FAQ" },
+  { id: "coach", href: "/coach", label: "Grow Coach" },
+  { id: "docs", href: "/docs", label: "Docs" },
 ];
 
 export function brandSvg() {

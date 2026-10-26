@@ -33,8 +33,8 @@ export async function linksFor(env, userId, now) {
   const token = await makeUnsubToken(env, userId, now);
   const q = `token=${encodeURIComponent(token)}`;
   return {
-    settings: `${siteOrigin(env)}/account.html#alerts`,
-    unsubscribePage: `${siteOrigin(env)}/alerts-unsub.html?${q}`,
+    settings: `${siteOrigin(env)}/account#alerts`,
+    unsubscribePage: `${siteOrigin(env)}/alerts-unsub?${q}`,
     unsubscribePost: `${apiOrigin(env)}/api/alerts/unsubscribe?${q}`,
   };
 }

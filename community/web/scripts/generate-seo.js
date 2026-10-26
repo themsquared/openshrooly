@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /** Build prerendered profile pages (culinary and Off-menu), sitemap, robots, llms.txt, FAQ, OG cards, and stamp shared head and chrome. */
 
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NAV_ITEMS, POSITIONING, PRODUCT, SITE, TAGLINE, renderFooter, renderHeader } from "../public/js/chrome.js";
@@ -9,6 +10,7 @@ import { speciesArt } from "../public/js/species-art.js";
 import { lightRecipeLine } from "../public/js/light-line.js";
 import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.js";
 import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
+import { GUIDES } from "./guides/index.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
@@ -49,6 +51,7 @@ export function loadProfiles() {
     const dir = join(DATA, pack);
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
       const profile = JSON.parse(readFileSync(join(dir, file), "utf8"));
+      Object.defineProperty(profile, "_file", { value: join(dir, file), enumerable: false });
       if (isIndexableProfile(profile)) out.push(profile);
     }
   }
@@ -156,8 +159,211 @@ export function answerFirst(profile) {
 }
 
 export function seoTitle(profile) {
+  if (isGuideProfile(profile)) return `How to grow ${profile.name} at home: temps, humidity, light by stage`;
   const species = profile.species ? ` (${profile.species})` : "";
   return `${profile.name}${species} grow profile · Shroom Labs`;
+}
+
+/** Free culinary and functional Profiles get the full grow guide page. Paid and Off-menu keep the short page. */
+export function isGuideProfile(profile) {
+  return !isPsi(profile) && !isPaid(profile);
+}
+
+/** Profiles that belong in search, the sitemap, llms.txt, and the hub. Off-menu never does. */
+export function isSearchProfile(profile) {
+  return !isPsi(profile) && isIndexableProfile(profile);
+}
+
+const TODAY = new Date().toISOString().slice(0, 10);
+
+/** Last commit date of a file, so "Updated" and sitemap lastmod only move when the content does. */
+export function lastUpdated(file) {
+  if (!file) return TODAY;
+  try {
+    const out = execFileSync("git", ["log", "-1", "--format=%cs", "--", file], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return out || TODAY;
+  } catch {
+    return TODAY;
+  }
+}
+
+export function cToF(c) {
+  return Math.round((Number(c) * 9) / 5 + 32);
+}
+
+export function tempText(c) {
+  return `${c} °C (${cToF(c)} °F)`;
+}
+
+function plural(n, word) {
+  return `${n} ${word}${Number(n) === 1 ? "" : "s"}`;
+}
+
+/** Fan schedule in plain words. */
+export function fanText(stage) {
+  const fan = stage.fan || {};
+  if (!fan.run_duration_s || !fan.period_min || !fan.speed_percent) return freshAirLabel(stage);
+  return `${freshAirLabel(stage)}: fan runs ${fan.run_duration_s} s every ${fan.period_min} min`;
+}
+
+/** Light for one stage in plain words, from the light recipe when there is one. */
+export function lightHours(profile, stage) {
+  const phase = profile.light_recipe ? recipePhase(profile, stage.id) : null;
+  return phase ? Number(phase.photoperiod_hours ?? 0) : Number(stage.light?.duration_hours ?? 0);
+}
+
+export function lightText(profile, stage) {
+  const phase = profile.light_recipe ? recipePhase(profile, stage.id) : null;
+  const hours = lightHours(profile, stage);
+  if (!hours) return "Dark";
+  if (!phase) return `${hours} h a day`;
+  const mix = [
+    ["white", phase.white_brightness_percent],
+    ["red", phase.red_percent],
+    ["green", phase.green_percent],
+    ["blue", phase.blue_percent],
+  ]
+    .filter(([, v]) => Number(v) > 0)
+    .map(([name, v]) => `${name} ${v}%`)
+    .join(", ");
+  return mix ? `${hours} h a day, ${mix}` : `${hours} h a day`;
+}
+
+function firstStage(profile) {
+  return (profile.stages || [])[0] || {};
+}
+
+/** Meta description for a profile guide page: the key numbers in under 160 characters. */
+export function guideDescription(profile) {
+  const col = firstStage(profile);
+  const fruit = fruiting(profile);
+  const hours = lightHours(profile, fruit);
+  const light = hours ? `${hours} h of light a day` : "no light";
+  const core = `Grow ${profile.name} at home: colonize at ${tempText(col.temperature_c)}, fruit at ${tempText(fruit.temperature_c)} with ${fruit.humidity_percent}% humidity and ${light}.`;
+  for (const tail of [` About ${daysToFruit(profile)} days. Full stage table and FAQ.`, ` About ${daysToFruit(profile)} days.`, ""]) {
+    if ((core + tail).length <= 160) return core + tail;
+  }
+  return fitDescription(core);
+}
+
+/** Direct answer for the top of a profile page: two or three sentences, all from the profile data. */
+export function directAnswer(profile) {
+  const col = firstStage(profile);
+  const fruit = fruiting(profile);
+  const hours = lightHours(profile, fruit);
+  const lightPart = hours ? `${hours} h of light a day` : "no light";
+  const dark = lightHours(profile, col) ? "" : " in the dark";
+  return `To grow ${profile.name} at home, colonize at ${tempText(col.temperature_c)}${dark}, then fruit at ${tempText(fruit.temperature_c)} and ${fruit.humidity_percent}% humidity with ${freshAirLabel(fruit)} and ${lightPart}. This profile runs about ${daysToFruit(profile)} days from the start of colonization to the end of the first harvest window.`;
+}
+
+function stageRows(profile) {
+  let day = 1;
+  return (profile.stages || []).map((s) => {
+    const days = Number(s.duration_days || 0);
+    const row = { stage: s, from: day, to: day + days - 1 };
+    day += days;
+    return row;
+  });
+}
+
+export function conditionsTable(profile) {
+  const rows = (profile.stages || [])
+    .map(
+      (s) =>
+        `<tr><th scope="row">${escapeHtml(s.name)}</th><td>${s.duration_days}</td><td>${escapeHtml(tempText(s.temperature_c))}</td><td>${s.humidity_percent}%</td><td>${escapeHtml(fanText(s))}</td><td>${escapeHtml(lightText(profile, s))}</td></tr>`
+    )
+    .join("");
+  return `<div class="table-wrap"><table class="conditions-table">
+        <caption>${escapeHtml(profile.name)} growing conditions by stage</caption>
+        <thead><tr><th scope="col">Stage</th><th scope="col">Days</th><th scope="col">Temperature</th><th scope="col">Humidity</th><th scope="col">Fresh air</th><th scope="col">Light</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+}
+
+const NO_LEGGY = new Set(["king-oyster", "enoki", "reishi", "cordyceps-militaris", "turkey-tail", "wood-ear", "lions-mane"]);
+const NO_CAPS = new Set(["lions-mane", "cordyceps-militaris", "wood-ear", "turkey-tail", "reishi"]);
+
+/** Common problems: the profile's own notes first, then a few general checks tied to this profile's numbers. */
+export function commonProblems(profile) {
+  const fruit = fruiting(profile);
+  const stages = profile.stages || [];
+  const pin = stages.find((s) => s.id === "pinning") || stages.find((s) => s.id === "cold_shock") || fruit;
+  const items = [];
+  if (profile.chamber_notes) items.push({ q: `What does this profile watch for?`, a: profile.chamber_notes, guide: null });
+  items.push({
+    q: "No pins after colonization",
+    a: `Make sure the block is fully colonized first. Then check that the chamber reaches the ${pin.name.toLowerCase()} conditions: ${tempText(pin.temperature_c)}, ${pin.humidity_percent}% humidity, and ${freshAirLabel(pin)}. Pins need more fresh air than colonization.`,
+    guide: "no-pins",
+  });
+  if (!NO_LEGGY.has(profile.id) && (profile.tags || []).includes("oyster")) {
+    items.push({
+      q: "Long, thin stems and small caps",
+      a: `This usually means too little fresh air. This profile runs ${fanText(fruit).toLowerCase()} while fruiting.`,
+      guide: "leggy-stems",
+    });
+  }
+  if (!NO_CAPS.has(profile.id)) {
+    items.push({
+      q: "Dry, cracked, or curled caps",
+      a: `Usually humidity is too low, or air is blowing straight on the mushrooms. This profile holds ${fruit.humidity_percent}% humidity while fruiting.`,
+      guide: "dry-cracked-caps",
+    });
+  }
+  items.push({
+    q: "Green, black, or slimy patches",
+    a: "Patches that are not white mycelium are usually contamination such as green mold or bacteria. Bag the block, take it out of the chamber, and clean the chamber before the next grow.",
+    guide: "contamination",
+  });
+  return items;
+}
+
+/** FAQ built only from the profile's own data. */
+export function profileFaq(profile) {
+  const col = firstStage(profile);
+  const fruit = fruiting(profile);
+  const stages = profile.stages || [];
+  const tags = profile.tags || [];
+  const faq = [
+    {
+      q: `What temperature does ${profile.name} grow at?`,
+      a: `In this profile ${profile.name} colonizes at ${tempText(col.temperature_c)} and fruits at ${tempText(fruit.temperature_c)}. ${stages
+        .map((s) => `${s.name}: ${tempText(s.temperature_c)}.`)
+        .join(" ")}`,
+    },
+    {
+      q: `What humidity does ${profile.name} need?`,
+      a: `${fruit.humidity_percent}% while fruiting. ${stages.map((s) => `${s.name}: ${s.humidity_percent}%.`).join(" ")}`,
+    },
+    {
+      q: `How long does ${profile.name} take to grow?`,
+      a: `About ${daysToFruit(profile)} days with this profile: ${stages.map((s) => `${plural(s.duration_days, "day")} of ${s.name.toLowerCase()}`).join(", ")}. Real blocks vary, so move on when the block is ready, not only when the days run out.`,
+    },
+    {
+      q: `How much light does ${profile.name} need?`,
+      a: `${stages.map((s) => `${s.name}: ${lightText(profile, s).toLowerCase()}.`).join(" ")}`,
+    },
+    {
+      q: `How much fresh air does ${profile.name} need?`,
+      a: `${fanText(fruit).replace(/^./, (c) => c.toUpperCase())} while fruiting. Colonization runs with ${freshAirLabel(col)}.`,
+    },
+  ];
+  if (tags.includes("beginner")) faq.push({ q: `Is ${profile.name} good for beginners?`, a: `Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.` });
+  if (tags.includes("advanced")) faq.push({ q: `Is ${profile.name} good for beginners?`, a: `It is one of the harder species in this library. Try an oyster first if you have never grown before.` });
+  return faq;
+}
+
+export function relatedProfiles(profile, profiles) {
+  const tags = new Set((profile.tags || []).filter((t) => t !== "culinary"));
+  return profiles
+    .filter((p) => p.id !== profile.id && isSearchProfile(p))
+    .map((p) => ({ p, score: (p.variety_group && p.variety_group === profile.variety_group ? 3 : 0) + (p.tags || []).filter((t) => tags.has(t)).length }))
+    .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
+    .slice(0, 4)
+    .map((r) => r.p);
+}
+
+export function guideHref(slug) {
+  return GUIDES.some((g) => g.slug === slug) ? `/guides/${slug}` : "";
 }
 
 /** Fit to 160 characters on a sentence or word boundary, never mid word. */
@@ -185,7 +391,7 @@ export function ogImage(profile) {
 }
 
 export function profileUrl(profile) {
-  return `${SITE}/profiles/${profile.id}.html`;
+  return `${SITE}/profiles/${profile.id}`;
 }
 
 const ORG_REF = { "@type": "Organization", "@id": `${SITE}/#org`, name: "Shroom Labs", url: `${SITE}/` };
@@ -201,11 +407,13 @@ export function profileJsonLd(profile) {
   const url = profileUrl(profile);
   const photo = photoRecordFor(profile);
   const image = photo ? speciesImageObject(photo, SITE) : ogImage(profile);
+  const guide = isGuideProfile(profile);
   const article = {
     "@type": "Article",
     "@id": `${url}#article`,
-    headline: `${profile.name} grow profile`,
-    description: answerFirst(profile),
+    headline: guide ? `How to grow ${profile.name} at home` : `${profile.name} grow profile`,
+    description: guide ? directAnswer(profile) : answerFirst(profile),
+    dateModified: lastUpdated(profile._file),
     url,
     mainEntityOfPage: url,
     image,
@@ -219,24 +427,43 @@ export function profileJsonLd(profile) {
     const howto = {
       "@type": "HowTo",
       "@id": `${url}#howto`,
-      name: `Grow ${profile.name} in a chamber running OpenShrooly`,
+      name: `How to grow ${profile.name} at home`,
       description: setpointLine(profile),
       totalTime: `P${daysToFruit(profile)}D`,
       step: (profile.stages || []).map((s, i) => ({
         "@type": "HowToStep",
         position: i + 1,
         name: s.name,
-        text: `${s.duration_days} days at ${s.temperature_c} °C and ${s.humidity_percent}% humidity. Light ${lightMixLine(recipePhase(profile, s.id))}.${s.notes ? " " + s.notes : ""}`,
+        text: `${s.duration_days} days at ${tempText(s.temperature_c)} and ${s.humidity_percent}% humidity, ${freshAirLabel(s)}. Light: ${lightText(profile, s).toLowerCase()}.${s.notes ? " " + s.notes : ""}`,
       })),
     };
     if (photo) howto.image = image;
     graph.push(howto);
   }
-  graph.push(breadcrumbs([["Profiles", `${SITE}/`], [profile.name, url]]));
+  if (guide) {
+    graph.push({
+      "@type": "FAQPage",
+      "@id": `${url}#faq`,
+      mainEntity: profileFaq(profile).map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+    });
+  }
+  graph.push(
+    isPsi(profile)
+      ? breadcrumbs([["Home", `${SITE}/`], [profile.name, url]])
+      : breadcrumbs([["Home", `${SITE}/`], ["Grow guides", `${SITE}/grow`], [profile.name, url]])
+  );
   return { "@context": "https://schema.org", "@graph": graph };
 }
 
 export const FAQ = [
+  {
+    q: "What is the easiest mushroom to grow at home?",
+    a: "Oyster mushrooms. Pearl, blue, and pink oyster colonize fast, forgive small mistakes, and fruit in about three to four weeks in these profiles. Lion's Mane is a good second choice.",
+  },
+  {
+    q: "What conditions do mushrooms need to fruit?",
+    a: "Most culinary mushrooms colonize warm and dark, then fruit cooler with high humidity, regular fresh air, and some light. The exact numbers change by species, and each grow guide on this site lists them stage by stage.",
+  },
   {
     q: "How do I apply a Profile to a chamber?",
     a: "Pick a culinary Profile, pull it to your Hub on your home network, then apply a stage. The Hub talks to OpenShrooly. No cloud is required to grow.",
@@ -251,7 +478,7 @@ export const FAQ = [
   },
   {
     q: "Do I need the cloud?",
-    a: "No. Growing runs on your own network. Linking a chamber to the cloud needs a chamber update that is not out yet. Local controls still win if the cloud is down.",
+    a: "No. Growing runs on your chamber and your own network. Linking a chamber to your account is optional and adds remote viewing and email alerts. Local controls keep working if the internet is down.",
   },
   {
     q: "How long does pearl oyster take?",
@@ -264,10 +491,6 @@ export const FAQ = [
   {
     q: "What humidity does shiitake want?",
     a: "Shiitake fruits cooler and a bit drier than oyster. Keep the block moist, not dripping, after the browning rest.",
-  },
-  {
-    q: "Where are Golden Teacher and other Psilocybe climate recipes?",
-    a: `They are Off-menu Profiles. Each has its own page on this site with reference conditions for research and education only, and they stay out of the main catalog unless you choose Off-menu. Psilocybin is illegal in most places, so check the laws where you live first.`,
   },
 ];
 
@@ -316,7 +539,7 @@ export function siteJsonLd() {
 }
 
 /** Shared head tags. Every page gets the same set, in the same order. */
-export function renderHead({ title, description, path, robots = "index,follow", image = ogImage(), type = "website", jsonLd }) {
+export function renderHead({ title, description, path, robots = "index,follow", image = ogImage(), type = "website", modified, jsonLd }) {
   const canonical = `${SITE}${path}`;
   const lines = [
     `<title>${escapeHtml(title)}</title>`,
@@ -337,11 +560,12 @@ export function renderHead({ title, description, path, robots = "index,follow", 
     `<meta name="twitter:description" content="${escapeHtml(description)}">`,
     `<meta name="twitter:image" content="${escapeHtml(image)}">`,
   ];
+  if (modified) lines.push(`<meta property="article:modified_time" content="${escapeHtml(modified)}">`);
   if (jsonLd) lines.push(`<script type="application/ld+json">${JSON.stringify(jsonLd).replaceAll("<", "\\u003c")}</script>`);
   return lines.join("\n  ");
 }
 
-function shell({ head, activeId, hideCoach = false, body }) {
+function shell({ head, activeId, hideCoach = false, body, script = "/js/lite.js" }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -364,13 +588,94 @@ function shell({ head, activeId, hideCoach = false, body }) {
   <!--CHROME_FOOTER-->
   ${renderFooter()}
   <!--/CHROME_FOOTER-->
-  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="${script}"></script>
 </body>
 </html>
 `;
 }
 
-export function renderProfilePage(profile) {
+function faqHtml(items, level = "h3") {
+  return items.map((item) => `<${level}>${escapeHtml(item.q)}</${level}><p>${escapeHtml(item.a)}</p>`).join("");
+}
+
+function crumbsHtml(rows) {
+  return `<nav class="crumbs" aria-label="Breadcrumb"><ol>${rows
+    .map(([name, href], i) => (i === rows.length - 1 ? `<li aria-current="page">${escapeHtml(name)}</li>` : `<li><a href="${href}">${escapeHtml(name)}</a></li>`))
+    .join("")}</ol></nav>`;
+}
+
+function updatedHtml(date) {
+  return `<p class="updated muted">Updated <time datetime="${date}">${date}</time></p>`;
+}
+
+/** Full grow guide for a free culinary or functional Profile. Every number comes from the profile JSON. */
+export function renderGuideProfilePage(profile, profiles = []) {
+  const tools = `/profile?id=${encodeURIComponent(profile.id)}`;
+  const art = speciesArt(profile.species, profile.strain, profile.name, profile.pack, { priority: true, id: profile.id });
+  const updated = lastUpdated(profile._file);
+  const timeline = stageRows(profile)
+    .map(
+      ({ stage, from, to }) =>
+        `<li><strong>Day ${from}${to > from ? ` to ${to}` : ""}: ${escapeHtml(stage.name)}</strong>${stage.notes ? `<p>${escapeHtml(stage.notes)}</p>` : ""}</li>`
+    )
+    .join("");
+  const problems = commonProblems(profile)
+    .map((item) => {
+      const href = item.guide ? guideHref(item.guide) : "";
+      return `<h3>${escapeHtml(item.q)}</h3><p>${escapeHtml(item.a)}${href ? ` <a href="${href}">More on this</a>.` : ""}</p>`;
+    })
+    .join("");
+  const related = relatedProfiles(profile, profiles);
+  const guides = GUIDES.filter((g) => g.profileLink !== false).slice(0, 4);
+  const name = escapeHtml(profile.name);
+  const body = `
+    <article class="profile-page guide-page">
+      ${crumbsHtml([["Home", "/"], ["Grow guides", "/grow"], [profile.name, ""]])}
+      ${art ? `<div class="card profile-page-art">${art}</div>` : ""}
+      <p class="eyebrow">Culinary Profile</p>
+      <h1>How to grow ${name} at home</h1>
+      <p class="muted">${escapeHtml(profile.species || "")}${profile.strain ? `, ${escapeHtml(profile.strain)}` : ""}</p>
+      ${updatedHtml(updated)}
+      <p class="lede answer-first">${escapeHtml(directAnswer(profile))}</p>
+      ${profile.summary ? `<p>${escapeHtml(profile.summary)}</p>` : ""}
+      <p class="actions"><a class="button" href="${tools}">Use this profile on your chamber</a></p>
+      <h2>What conditions does ${name} need at each stage?</h2>
+      ${conditionsTable(profile)}
+      <h2>How long does ${name} take to grow?</h2>
+      <p>About ${daysToFruit(profile)} days from the start of colonization to the end of the first harvest window.</p>
+      <ol class="grow-timeline">${timeline}</ol>
+      ${renderLightRecipe(profile)}
+      <h2>What goes wrong when growing ${name}?</h2>
+      ${problems}
+      <h2>${name} growing FAQ</h2>
+      ${faqHtml(profileFaq(profile))}
+      ${
+        related.length
+          ? `<h2>Related grow guides</h2><ul class="faq-links">${related
+              .map((p) => `<li><a href="/profiles/${escapeHtml(p.id)}">How to grow ${escapeHtml(p.name)}</a></li>`)
+              .join("")}${guides.map((g) => `<li><a href="/guides/${g.slug}">${escapeHtml(g.h1)}</a></li>`).join("")}<li><a href="/grow">All species and conditions</a></li></ul>`
+          : ""
+      }
+      <p class="actions"><a class="button" href="${tools}">Download, rate, or report a grow</a></p>
+      ${renderSources(profile)}
+    </article>`;
+  return shell({
+    head: {
+      title: seoTitle(profile),
+      description: guideDescription(profile),
+      path: `/profiles/${profile.id}`,
+      image: ogImage(profile),
+      type: "article",
+      modified: updated,
+      jsonLd: profileJsonLd(profile),
+    },
+    activeId: "profiles",
+    body,
+  });
+}
+
+export function renderProfilePage(profile, profiles = []) {
+  if (isGuideProfile(profile)) return renderGuideProfilePage(profile, profiles);
   const psi = isPsi(profile);
   const paid = isPaid(profile);
   const stages = (profile.stages || [])
@@ -385,7 +690,7 @@ export function renderProfilePage(profile) {
   const legal = psi
     ? `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside>`
     : "";
-  const tools = `/profile.html?id=${encodeURIComponent(profile.id)}`;
+  const tools = `/profile?id=${encodeURIComponent(profile.id)}`;
   const cta = paid
     ? `<p class="actions"><a class="button" href="${tools}">Buy for ${price(profile)}</a></p>`
     : `<p class="actions"><a class="button" href="${tools}">Download, rate, or report a grow</a></p>`;
@@ -411,7 +716,8 @@ export function renderProfilePage(profile) {
     head: {
       title: seoTitle(profile),
       description: seoDescription(profile),
-      path: `/profiles/${profile.id}.html`,
+      path: `/profiles/${profile.id}`,
+      robots: psi ? PRIVATE : "index,follow",
       image: ogImage(profile),
       type: "article",
       jsonLd: profileJsonLd(profile),
@@ -423,63 +729,270 @@ export function renderProfilePage(profile) {
 }
 
 export function renderFaqPage(profiles = []) {
-  const culinary = profiles.filter((p) => !isPsi(p));
-  const off = profiles.filter(isPsi);
+  const culinary = profiles.filter(isSearchProfile);
   const linkList = (rows) =>
-    `<ul class="faq-links">${rows.map((p) => `<li><a href="/profiles/${escapeHtml(p.id)}.html">${escapeHtml(p.name)}</a>. ${escapeHtml(setpointLine(p))}</li>`).join("")}</ul>`;
+    `<ul class="faq-links">${rows.map((p) => `<li><a href="/profiles/${escapeHtml(p.id)}">${escapeHtml(p.name)}</a>. ${escapeHtml(setpointLine(p))}</li>`).join("")}</ul>`;
   const items = FAQ.map((item) => `<h2>${escapeHtml(item.q)}</h2><p class="answer-first">${escapeHtml(item.a)}</p>`).join("");
   return shell({
     head: PAGES["faq.html"],
     activeId: "faq",
-    body: `<article class="profile-page"><p class="eyebrow">FAQ</p><h1>Answers, then the chamber.</h1>${items}<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside><h2>Culinary Profiles</h2>${linkList(culinary)}<h2>Off-menu Profiles</h2>${linkList(off)}</article>`,
+    body: `<article class="profile-page"><p class="eyebrow">FAQ</p><h1>Answers, then the chamber.</h1>${items}<h2>Culinary Profiles</h2>${linkList(culinary)}<p><a href="/grow">Compare conditions for every species</a></p></article>`,
   });
 }
 
+/** /grow: every species with its fruiting conditions in one table, plus the guides. */
+export function hubFaq(profiles) {
+  const rows = profiles.filter(isGuideProfile);
+  const temps = rows.map((p) => Number(fruiting(p).temperature_c));
+  const hums = rows.map((p) => Number(fruiting(p).humidity_percent));
+  const fast = [...rows].sort((a, b) => daysToFruit(a) - daysToFruit(b)).slice(0, 3);
+  const beginner = rows.filter((p) => (p.tags || []).includes("beginner") && (p.tags || []).includes("oyster"));
+  return [
+    {
+      q: "What temperature do mushrooms grow at?",
+      a: `Fruiting temperatures in this library run from ${tempText(Math.min(...temps))} to ${tempText(Math.max(...temps))}, depending on the species. Colonization usually runs a few degrees warmer than fruiting.`,
+    },
+    {
+      q: "What humidity do mushrooms need to fruit?",
+      a: `Between ${Math.min(...hums)}% and ${Math.max(...hums)}% while fruiting for the species here. Most sit near 90%.`,
+    },
+    {
+      q: "Which mushrooms grow fastest?",
+      a: `${fast.map((p) => `${p.name} (about ${daysToFruit(p)} days)`).join(", ")} are the quickest profiles in this library, from the start of colonization to the end of the first harvest window.`,
+    },
+    {
+      q: "What is the easiest mushroom to grow at home?",
+      a: `Oyster mushrooms. ${beginner.map((p) => p.name).join(", ")} are tagged beginner here because they colonize fast and forgive small mistakes.`,
+    },
+  ];
+}
+
+export function renderHubPage(profiles) {
+  const rows = profiles.filter(isSearchProfile).sort((a, b) => a.name.localeCompare(b.name));
+  const level = (p) => ((p.tags || []).find((t) => ["beginner", "intermediate", "advanced"].includes(t)) || "").replace(/^./, (c) => c.toUpperCase());
+  const table = rows
+    .map((p) => {
+      const f = fruiting(p);
+      const link = `<a href="/profiles/${escapeHtml(p.id)}">${escapeHtml(p.name)}</a>`;
+      if (isPaid(p)) return `<tr><th scope="row">${link}</th><td colspan="3">Paid profile</td><td>${daysToFruit(p)}</td><td>${escapeHtml(level(p))}</td></tr>`;
+      return `<tr><th scope="row">${link}</th><td>${escapeHtml(tempText(f.temperature_c))}</td><td>${f.humidity_percent}%</td><td>${lightHours(p, f)} h</td><td>${daysToFruit(p)}</td><td>${escapeHtml(level(p))}</td></tr>`;
+    })
+    .join("");
+  const faq = hubFaq(profiles);
+  const guides = GUIDES.length
+    ? `<h2>Grow guides</h2><ul class="faq-links">${GUIDES.map((g) => `<li><a href="/guides/${g.slug}">${escapeHtml(g.h1)}</a>. ${escapeHtml(g.description)}</li>`).join("")}</ul>`
+    : "";
+  const body = `
+    <article class="profile-page guide-page">
+      ${crumbsHtml([["Home", "/"], ["Grow guides", ""]])}
+      <p class="eyebrow">Grow guides</p>
+      <h1>Mushroom growing conditions for ${rows.length} species</h1>
+      ${updatedHtml(HUB_UPDATED.value)}
+      <p class="lede answer-first">Most culinary mushrooms colonize warm and dark, then fruit cooler with high humidity, regular fresh air, and some light. The table lists fruiting temperature, humidity, light, and total days for every species in the library, straight from each grow profile. Open a species for the full stage by stage guide.</p>
+      <div class="table-wrap"><table class="conditions-table">
+        <caption>Fruiting conditions by species</caption>
+        <thead><tr><th scope="col">Species</th><th scope="col">Fruiting temp</th><th scope="col">Humidity</th><th scope="col">Light</th><th scope="col">Days</th><th scope="col">Level</th></tr></thead>
+        <tbody>${table}</tbody>
+      </table></div>
+      ${guides}
+      <h2>Common questions</h2>
+      ${faqHtml(faq)}
+    </article>`;
+  return shell({ head: hubHead(profiles), activeId: "grow", body });
+}
+
+const HUB_UPDATED = { value: TODAY };
+
+function hubHead(profiles) {
+  const rows = profiles.filter(isSearchProfile);
+  return {
+    title: `Mushroom growing temperature and humidity chart for ${rows.length} species`,
+    description: fitDescription(
+      `Fruiting temperature, humidity, light, and days to harvest for ${rows.length} culinary and functional mushrooms, from oyster and lion's mane to shiitake and reishi.`
+    ),
+    path: "/grow",
+    modified: HUB_UPDATED.value,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "CollectionPage",
+          "@id": `${SITE}/grow#page`,
+          name: "Mushroom growing conditions",
+          url: `${SITE}/grow`,
+          dateModified: HUB_UPDATED.value,
+          publisher: ORG_REF,
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: rows.map((p, i) => ({ "@type": "ListItem", position: i + 1, url: profileUrl(p), name: `How to grow ${p.name}` })),
+          },
+        },
+        {
+          "@type": "FAQPage",
+          "@id": `${SITE}/grow#faq`,
+          mainEntity: hubFaq(profiles).map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+        },
+        breadcrumbs([["Home", `${SITE}/`], ["Grow guides", `${SITE}/grow`]]),
+      ],
+    },
+  };
+}
+
+/** One long-form guide from scripts/guides. Sections are trusted HTML written in this repo. */
+export function renderGuidePage(guide) {
+  const url = `${SITE}/guides/${guide.slug}`;
+  const sections = guide.sections.map((sec) => `<h2>${escapeHtml(sec.h2)}</h2>${sec.html}`).join("\n      ");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `${url}#article`,
+        headline: guide.h1,
+        description: guide.answer,
+        url,
+        mainEntityOfPage: url,
+        image: ogImage(),
+        inLanguage: "en",
+        dateModified: guide.updated,
+        author: ORG_REF,
+        publisher: ORG_REF,
+      },
+      ...(guide.faq?.length
+        ? [
+            {
+              "@type": "FAQPage",
+              "@id": `${url}#faq`,
+              mainEntity: guide.faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+            },
+          ]
+        : []),
+      breadcrumbs([["Home", `${SITE}/`], ["Grow guides", `${SITE}/grow`], [guide.h1, url]]),
+    ],
+  };
+  const body = `
+    <article class="profile-page guide-page">
+      ${crumbsHtml([["Home", "/"], ["Grow guides", "/grow"], [guide.h1, ""]])}
+      <p class="eyebrow">${escapeHtml(guide.eyebrow || "Grow guide")}</p>
+      <h1>${escapeHtml(guide.h1)}</h1>
+      ${updatedHtml(guide.updated)}
+      <p class="lede answer-first">${escapeHtml(guide.answer)}</p>
+      ${sections}
+      ${guide.faq?.length ? `<h2>FAQ</h2>${faqHtml(guide.faq)}` : ""}
+      ${
+        guide.related?.length
+          ? `<h2>Keep reading</h2><ul class="faq-links">${guide.related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>`
+          : ""
+      }
+    </article>`;
+  return shell({
+    head: { title: guide.title, description: guide.description, path: `/guides/${guide.slug}`, type: "article", modified: guide.updated, jsonLd },
+    activeId: "grow",
+    body,
+  });
+}
+
+export function sitemapEntries(profiles) {
+  const pages = Object.entries(PAGES)
+    .filter(([, p]) => p.sitemap)
+    .map(([file, p]) => ({ path: p.path, lastmod: lastUpdated(join(PUBLIC, file)) }));
+  return [
+    ...pages,
+    { path: "/grow", lastmod: HUB_UPDATED.value },
+    ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
+    ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p._file) })),
+  ];
+}
+
 export function renderSitemap(profiles) {
-  const indexed = profiles.filter((p) => isIndexableProfile(p));
-  const urls = [...Object.values(PAGES).filter((p) => p.sitemap).map((p) => p.path), ...indexed.map((p) => `/profiles/${p.id}.html`)];
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((path) => `  <url><loc>${SITE}${path}</loc><changefreq>weekly</changefreq></url>`).join("\n")}
+${sitemapEntries(profiles)
+  .map(({ path, lastmod }) => `  <url><loc>${SITE}${path}</loc><lastmod>${lastmod}</lastmod></url>`)
+  .join("\n")}
 </urlset>
 `;
 }
 
 export function renderLlms(profiles) {
-  const culinary = profiles.filter((p) => !isPsi(p));
-  const off = profiles.filter(isPsi);
-  const line = (p) => `- [${p.name}](${SITE}/profiles/${p.id}.html): ${answerFirst(p)}`;
+  const culinary = profiles.filter(isSearchProfile);
+  const line = (p) => `- [How to grow ${p.name}](${SITE}/profiles/${p.id}): ${isGuideProfile(p) ? directAnswer(p) : setpointLine(p)}`;
   return `# Shroom Labs
 
 > ${PRODUCT}
 
 Site: ${SITE}
+Full text for every guide and profile: ${SITE}/llms-full.txt
 
-## Culinary Profiles
+All numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
+
+## Start here
+
+- [Mushroom growing conditions for every species](${SITE}/grow): one table with fruiting temperature, humidity, light, and days for each species.
+${GUIDES.map((g) => `- [${g.h1}](${SITE}/guides/${g.slug}): ${g.answer}`).join("\n")}
+
+## Grow guides by species
 
 ${culinary.map(line).join("\n")}
-
-## Off-menu Profiles
-
-Reference conditions for research and education only. Not sold.
-
-${PSI_LEGAL_NOTICE}
-
-${off.map(line).join("\n")}
-
-## Microscopy and research resources
-
-${PSI_RESOURCE_DISCLAIMER}
-
-${PSI_SPORE_LAW}
-
-${PSI_RESOURCES.map((r) => `- [${r.name}](${r.url}). ${r.note}`).join("\n")}
 
 ## Product
 
 - ${TAGLINE}
 - ${POSITIONING}
+- [FAQ](${SITE}/faq)
+- [Docs](${SITE}/docs)
 `;
+}
+
+function stripHtml(html) {
+  return String(html)
+    .replace(/<li>/g, "\n- ")
+    .replace(/<\/(p|h3|ul|ol|table|tr)>/g, "\n")
+    .replace(/<(td|th)[^>]*>/g, " | ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function renderLlmsFull(profiles) {
+  const out = [`# Shroom Labs: full grow guides\n\n> ${PRODUCT}\n\nEvery number below comes from the published Shroom Labs grow profiles. Source: ${SITE}/grow`];
+  for (const g of GUIDES) {
+    out.push(
+      `## ${g.h1}\n\nURL: ${SITE}/guides/${g.slug}\nUpdated: ${g.updated}\n\n${g.answer}\n\n${g.sections.map((sec) => `### ${sec.h2}\n\n${stripHtml(sec.html)}`).join("\n\n")}${
+        g.faq?.length ? `\n\n### FAQ\n\n${g.faq.map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}` : ""
+      }`
+    );
+  }
+  for (const p of profiles.filter(isGuideProfile)) {
+    const stages = (p.stages || [])
+      .map((s) => `- ${s.name}: ${s.duration_days} days, ${tempText(s.temperature_c)}, ${s.humidity_percent}% humidity, ${fanText(s)}, light ${lightText(p, s).toLowerCase()}.${s.notes ? ` ${s.notes}` : ""}`)
+      .join("\n");
+    out.push(
+      `## How to grow ${p.name} at home\n\nURL: ${SITE}/profiles/${p.id}\nSpecies: ${p.species || ""}\nUpdated: ${lastUpdated(p._file)}\n\n${directAnswer(p)}${p.summary ? ` ${p.summary}` : ""}\n\n### Conditions by stage\n\n${stages}${
+        p.chamber_notes ? `\n\n### Notes\n\n${p.chamber_notes}` : ""
+      }\n\n### FAQ\n\n${profileFaq(p).map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}`
+    );
+  }
+  return `${out.join("\n\n---\n\n")}\n`;
+}
+
+/** Netlify _redirects: every old .html URL moves for good to its clean URL. Netlify keeps the query string. */
+export function renderRedirects(profiles) {
+  const lines = ["# Generated by scripts/generate-seo.js. Old .html URLs move to clean URLs. Query strings carry over.", "/index.html / 301!"];
+  for (const [file, page] of Object.entries(PAGES)) {
+    if (file === "index.html") continue;
+    lines.push(`/${file} ${page.path} 301!`);
+  }
+  lines.push("/grow.html /grow 301!");
+  for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
+  for (const p of profiles) lines.push(`/profiles/${p.id}.html /profiles/${p.id} 301!`);
+  lines.push("/profiles /grow 301!", "/profiles/ /grow 301!", "/guides /grow 301!", "/guides/ /grow 301!");
+  return `${lines.join("\n")}\n`;
 }
 
 /** 1200x630 social card. scripts/render-og.mjs turns these into PNG, since most social sites do not read SVG. */
@@ -519,89 +1032,97 @@ export const PAGES = {
     active: "profiles",
     sitemap: true,
     path: "/",
-    title: `Shroom Labs · ${TAGLINE.replace(/\.$/, "")}`,
-    description: PRODUCT,
+    title: "Shroom Labs: free mushroom grow profiles and guides for home growers",
+    description: "Stage by stage temperature, humidity, fresh air, and light for oyster, lion's mane, shiitake, and more. Free profiles for Shrooly chambers on OpenShrooly.",
     jsonLd: siteJsonLd(),
   },
   "faq.html": {
     active: "faq",
     sitemap: true,
-    path: "/faq.html",
-    title: "FAQ · Shroom Labs",
-    description: "Plain answers about Profiles, the Hub, Off-menu Profiles, and running OpenShrooly on a home chamber.",
+    path: "/faq",
+    title: "Mushroom growing FAQ · Shroom Labs",
+    description: "Plain answers about growing mushrooms at home, grow profiles, the Hub, and running OpenShrooly on a Shrooly chamber.",
     jsonLd: {
       "@context": "https://schema.org",
       "@graph": [
         {
           "@type": "FAQPage",
-          "@id": `${SITE}/faq.html#faq`,
+          "@id": `${SITE}/faq#faq`,
           mainEntity: FAQ.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
         },
-        breadcrumbs([["Home", `${SITE}/`], ["FAQ", `${SITE}/faq.html`]]),
+        breadcrumbs([["Home", `${SITE}/`], ["FAQ", `${SITE}/faq`]]),
       ],
     },
   },
   "docs.html": {
     active: "docs",
     sitemap: true,
-    path: "/docs.html",
+    path: "/docs",
     title: "Docs · Shroom Labs",
     description: "What Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.",
-    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Docs", `${SITE}/docs.html`]]) },
+    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Docs", `${SITE}/docs`]]) },
   },
   // Grow Coach is a private beta. Keep it out of search and the sitemap; the page itself sends anyone the API does not allow back home.
   "coach.html": {
     active: "coach",
-    path: "/coach.html",
+    path: "/coach",
     robots: "noindex,nofollow",
     title: "Grow Coach · Shroom Labs",
     description: "Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.",
-    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach.html`]]) },
+    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach`]]) },
   },
   "claim.html": {
     active: "",
     sitemap: true,
-    path: "/claim.html",
+    path: "/claim",
     title: "Link a chamber · Shroom Labs",
     description: "Link your chamber to your account to see it, get grow alerts by email, and change what it grows. Optional. It works fully on your Wi-Fi without it.",
-    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Link a chamber", `${SITE}/claim.html`]]) },
+    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Link a chamber", `${SITE}/claim`]]) },
   },
   "install.html": {
     active: "",
     sitemap: true,
-    path: "/install.html",
+    path: "/install",
     title: "Install over USB · Shroom Labs",
     description: "Put OpenShrooly on a Shrooly from Chrome or Edge with a USB-C cable. Only releases signed by Shroom Labs are offered.",
-    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Install over USB", `${SITE}/install.html`]]) },
+    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Install over USB", `${SITE}/install`]]) },
   },
-  "login.html": { active: "", path: "/login.html", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and link a chamber. No password." },
-  "register.html": { active: "", path: "/register.html", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and link a chamber. No password." },
-  "account.html": { active: "", path: "/account.html", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs profile, devices, billing, security, and shared profiles." },
-  "devices.html": { active: "", path: "/devices.html", robots: PRIVATE, title: "My chambers · Shroom Labs", description: "See the chambers linked to your Shroom Labs account, with species, live readings, and grow status." },
-  "device.html": { active: "", path: "/device.html", robots: PRIVATE, title: "Device · Shroom Labs", description: "Live stats, grow identity, and chamber controls for one of your Shroom Labs devices." },
-  "fleet.html": { active: "", path: "/fleet.html", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "Bulk tools for the chambers linked to your Shroom Labs account." },
-  "alerts-unsub.html": { active: "", path: "/alerts-unsub.html", robots: PRIVATE, title: "Alert emails · Shroom Labs", description: "Turn off Shroom Labs alert emails with one click. Alerts still show in your account." },
-  "publish.html": { active: "", path: "/publish.html", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Build a mushroom grow profile for your chambers, or send it to the Shroom Labs library." },
-  "moderate.html": { active: "", path: "/moderate.html", robots: "noindex,nofollow", title: "Review queue · Shroom Labs", description: "Moderator queue for community mushroom grow profiles." },
-  "profile.html": { active: "profiles", path: "/profile.html", robots: PRIVATE, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
-  "legacy-preview.html": { active: "", path: "/legacy-preview.html", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
-  "auth/callback.html": { active: "", path: "/auth/callback.html", robots: "noindex,nofollow", title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
+  "login.html": { active: "", path: "/login", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and link a chamber. No password." },
+  "register.html": { active: "", path: "/register", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and link a chamber. No password." },
+  "account.html": { active: "", path: "/account", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs profile, devices, billing, security, and shared profiles." },
+  "devices.html": { active: "", path: "/devices", robots: PRIVATE, title: "My chambers · Shroom Labs", description: "See the chambers linked to your Shroom Labs account, with species, live readings, and grow status." },
+  "device.html": { active: "", path: "/device", robots: PRIVATE, title: "Device · Shroom Labs", description: "Live stats, grow identity, and chamber controls for one of your Shroom Labs devices." },
+  "fleet.html": { active: "", path: "/fleet", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "Bulk tools for the chambers linked to your Shroom Labs account." },
+  "alerts-unsub.html": { active: "", path: "/alerts-unsub", robots: PRIVATE, title: "Alert emails · Shroom Labs", description: "Turn off Shroom Labs alert emails with one click. Alerts still show in your account." },
+  "publish.html": { active: "", path: "/publish", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Build a mushroom grow profile for your chambers, or send it to the Shroom Labs library." },
+  "moderate.html": { active: "", path: "/moderate", robots: "noindex,nofollow", title: "Review queue · Shroom Labs", description: "Moderator queue for community mushroom grow profiles." },
+  "profile.html": { active: "profiles", path: "/profile", robots: PRIVATE, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
+  "legacy-preview.html": { active: "", path: "/legacy-preview", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
+  "auth/callback.html": { active: "", path: "/auth/callback", robots: "noindex,nofollow", title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
 };
 
+/** App pages that need sign-in stay out of crawls. Public pages marked noindex stay crawlable so search engines can read the noindex. */
 export function renderRobots() {
-  return `User-agent: *\nAllow: /\nDisallow: /profile.html\nDisallow: /account.html\nDisallow: /publish.html\nDisallow: /moderate.html\nDisallow: /device.html\nDisallow: /devices.html\nDisallow: /fleet.html\nDisallow: /coach.html\nDisallow: /alerts-unsub.html\nDisallow: /auth/\nSitemap: ${SITE}/sitemap.xml\n`;
+  const blocked = ["/profile$", "/profile?", "/account", "/publish", "/moderate", "/device$", "/device?", "/devices", "/fleet", "/coach", "/alerts-unsub", "/auth/"];
+  return `User-agent: *\nAllow: /\n${blocked.map((p) => `Disallow: ${p}`).join("\n")}\nSitemap: ${SITE}/sitemap.xml\n`;
 }
 
 export function writeSeoFiles(dir = PUBLIC) {
   const profiles = loadProfiles();
+  HUB_UPDATED.value = profiles.filter(isSearchProfile).map((p) => lastUpdated(p._file)).sort().pop() || TODAY;
   mkdirSync(join(dir, "profiles"), { recursive: true });
+  mkdirSync(join(dir, "guides"), { recursive: true });
   writeFileSync(join(dir, "sitemap.xml"), renderSitemap(profiles));
   writeFileSync(join(dir, "llms.txt"), renderLlms(profiles));
+  writeFileSync(join(dir, "llms-full.txt"), renderLlmsFull(profiles));
   writeFileSync(join(dir, "robots.txt"), renderRobots());
+  writeFileSync(join(dir, "_redirects"), renderRedirects(profiles));
   writeFileSync(join(dir, "faq.html"), renderFaqPage(profiles));
+  writeFileSync(join(dir, "grow.html"), renderHubPage(profiles));
+  for (const guide of GUIDES) writeFileSync(join(dir, "guides", `${guide.slug}.html`), renderGuidePage(guide));
   writeFileSync(join(dir, "js", "indexed-profiles.js"), `/** Generated by scripts/generate-seo.js. Profiles with a static page under /profiles/. */\nexport const INDEXED_PROFILES = new Set(${JSON.stringify(profiles.map((p) => p.id))});\n`);
   for (const profile of profiles) {
-    writeFileSync(join(dir, "profiles", `${profile.id}.html`), renderProfilePage(profile));
+    writeFileSync(join(dir, "profiles", `${profile.id}.html`), renderProfilePage(profile, profiles));
   }
   for (const [file, page] of Object.entries(PAGES)) {
     if (file === "faq.html") continue;

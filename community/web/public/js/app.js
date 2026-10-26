@@ -122,7 +122,7 @@ function bindLightForm(form, { summary, error, status, send } = {}) {
 }
 
 /** Post sign-in destinations stay on this site: a same-origin path, never a scheme or another host. */
-function safeNext(value, fallback = "/account.html") {
+function safeNext(value, fallback = "/account") {
   const next = String(value || "");
   if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\") || /[\u0000-\u001f]/.test(next)) return fallback;
   return next;
@@ -160,11 +160,11 @@ function renderNav() {
     nav.innerHTML = `<details class="account-menu">
       <summary>Account</summary>
       <div class="account-menu-links">
-        <a href="/account.html">Account</a>
-        <a href="/devices.html">My chambers</a>
-        <a href="/fleet.html" id="nav-fleet" class="hidden">Bulk tools</a>
-        <a href="/publish.html">Build a profile</a>
-        <a href="/moderate.html" id="nav-moderate" class="hidden">Review queue</a>
+        <a href="/account">Account</a>
+        <a href="/devices">My chambers</a>
+        <a href="/fleet" id="nav-fleet" class="hidden">Bulk tools</a>
+        <a href="/publish">Build a profile</a>
+        <a href="/moderate" id="nav-moderate" class="hidden">Review queue</a>
         <button class="link" id="logout" type="button">Log out</button>
       </div>
     </details>`;
@@ -183,7 +183,7 @@ function renderNav() {
       })
       .catch(() => {});
   } else {
-    nav.innerHTML = `<a class="nav-signin button" href="/login.html">Sign in</a>`;
+    nav.innerHTML = `<a class="nav-signin button" href="/login">Sign in</a>`;
   }
 }
 
@@ -273,7 +273,7 @@ function setGetStarted() {
       const linked = (list?.devices || []).filter((d) => d.status !== "revoked");
       if (!linked.length) return;
       cta.textContent = "Open my chambers";
-      cta.href = "/devices.html";
+      cta.href = "/devices";
     })
     .catch(() => {});
 }
@@ -319,7 +319,7 @@ async function renderGrowThis(profile) {
       if (!result || result.status === "failed") throw new Error(resultMessage(result));
       confirmRow.classList.add("hidden");
       const when = result.status === "queued" ? "Your chamber picks it up in about 15 minutes." : "Your chamber has it.";
-      msg.innerHTML = `Sent. ${when} <a href="/device.html?id=${encodeURIComponent(deviceId)}">Open the chamber</a>`;
+      msg.innerHTML = `Sent. ${when} <a href="/device?id=${encodeURIComponent(deviceId)}">Open the chamber</a>`;
     } catch (err) {
       yes.disabled = false;
       yes.textContent = "Start the grow";
@@ -497,7 +497,7 @@ async function renderProfile() {
   });
   $("#fork")?.addEventListener("click", async () => {
     const forked = await api(`/api/profiles/${id}/fork`, { method: "POST", jsonBody: {} });
-    location.href = `/publish.html?id=${encodeURIComponent(forked.id)}`;
+    location.href = `/publish?id=${encodeURIComponent(forked.id)}`;
   });
   if (data.unlocked) {
     $("#flag-box")?.classList.remove("hidden");
@@ -563,7 +563,7 @@ async function renderAuth(mode) {
       $("#error").classList.remove("hidden");
       if (data.debug_token) {
         const next = params().get("next") || "";
-        location.href = `/auth/callback.html?token=${encodeURIComponent(data.debug_token)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
+        location.href = `/auth/callback?token=${encodeURIComponent(data.debug_token)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
       }
     } catch (err) {
       $("#error").textContent = err.message;
@@ -605,7 +605,7 @@ async function renderCallback() {
 
 async function renderAccount() {
   if (!getToken()) {
-    location.href = "/login.html";
+    location.href = "/login";
     return;
   }
   const me = await api("/api/me");
@@ -625,7 +625,7 @@ async function renderAccount() {
   $("#my-profiles").innerHTML =
     (mine.profiles || [])
       .map(
-        (item) => `<li><a href="/publish.html?id=${encodeURIComponent(item.profile.id)}">${escapeHtml(item.profile.name)}</a> · ${escapeHtml(stateLabel[item.review?.status] || "Draft")}${item.review?.reason ? ` · ${escapeHtml(item.review.reason)}` : ""}</li>`
+        (item) => `<li><a href="/publish?id=${encodeURIComponent(item.profile.id)}">${escapeHtml(item.profile.name)}</a> · ${escapeHtml(stateLabel[item.review?.status] || "Draft")}${item.review?.reason ? ` · ${escapeHtml(item.review.reason)}` : ""}</li>`
       )
       .join("") || "<li class='muted'>No profiles yet.</li>";
   // Grow Coach billing shows only when the server says this user can use Coach.
@@ -698,7 +698,7 @@ async function renderAccount() {
   });
 }
 
-/** Account sections are collapsed; a link like /account.html#alerts opens that one. */
+/** Account sections are collapsed; a link like /account#alerts opens that one. */
 function openAccountSectionFromHash() {
   const id = decodeURIComponent(location.hash.slice(1));
   if (!id) return;
@@ -827,7 +827,7 @@ async function renderPublish() {
   const builder = $("#builder");
   if (!builder) return;
   if (!getToken()) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;
   }
   await customElements.whenDefined("profile-builder").catch(() => {});
@@ -873,7 +873,7 @@ async function renderPublish() {
         ? await api(`/api/profiles/${encodeURIComponent(existing)}`, { method: "PUT", jsonBody: built.profile })
         : await api("/api/profiles", { method: "POST", jsonBody: built.profile });
       const nextId = saved.id || built.profile.id;
-      location.href = `/publish.html?id=${encodeURIComponent(nextId)}`;
+      location.href = `/publish?id=${encodeURIComponent(nextId)}`;
     } catch (err) {
       showErr(err);
     }
@@ -908,7 +908,7 @@ async function renderPublish() {
         method: "POST",
         jsonBody: { title: built.publish.title, description: built.publish.description },
       });
-      location.href = `/publish.html?id=${encodeURIComponent(nextId)}`;
+      location.href = `/publish?id=${encodeURIComponent(nextId)}`;
     } catch (err) {
       showErr(err);
     }
@@ -927,7 +927,7 @@ async function renderModerate() {
   bindBlobUrlCleanup();
   revokeTrackedBlobUrls();
   if (!getToken()) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;
   }
   try {
@@ -1003,10 +1003,10 @@ if (page === "home") {
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));
 if (page === "login" || page === "register") renderAuth(page);
 if (page === "callback") renderCallback();
-if (page === "account") renderAccount().catch(() => (location.href = "/login.html"));
+if (page === "account") renderAccount().catch(() => (location.href = "/login"));
 if (page === "devices") renderDevices().catch((err) => {
   if (err.status === 401) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;
   }
   const box = $("#devices-error");
@@ -1019,7 +1019,7 @@ if (page === "publish") renderPublish();
 if (page === "moderate") renderModerate();
 if (page === "device") renderDevice().catch((err) => {
   if (err.status === 401) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;
   }
   const box = $("#device-error");
@@ -1037,7 +1037,7 @@ if (page === "coach") renderCoach().catch((err) => {
 });
 if (page === "fleet") renderFleet().catch((err) => {
   if (err.status === 401) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;
   }
   const box = $("#fleet-error");
@@ -1122,7 +1122,7 @@ async function consumeLocalSignIn() {
   history.replaceState(null, "", location.pathname + location.search);
   const data = await api("/api/auth/local", { method: "POST", jsonBody: { token } });
   if (data.access_token) setToken(data.access_token);
-  location.replace("/coach.html");
+  location.replace("/coach");
   return true;
 }
 
@@ -1166,7 +1166,7 @@ async function renderCoach() {
   if (!isSignedIn()) {
     $("#subscribe-panel").classList.remove("hidden");
     $("#subscribe").addEventListener("click", () => {
-      location.href = `/login.html?next=${encodeURIComponent("/coach.html")}`;
+      location.href = `/login?next=${encodeURIComponent("/coach")}`;
     });
     return;
   }
@@ -1470,7 +1470,7 @@ async function renderClaim() {
     form?.classList.add("hidden");
     if (signin) {
       const next = encodeURIComponent(location.pathname + location.search);
-      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in to link it</a> <a href="/register.html?next=${next}">or make an account</a>`;
+      signin.innerHTML = `<a class="button" href="/login?next=${next}">Sign in to link it</a> <a href="/register?next=${next}">or make an account</a>`;
       signin.classList.remove("hidden");
     }
     return;
@@ -1489,7 +1489,7 @@ async function renderClaim() {
     try {
       const code = $("#code").value.trim().toUpperCase();
       const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code } });
-      location.href = `/device.html?id=${encodeURIComponent(data.device.id)}`;
+      location.href = `/device?id=${encodeURIComponent(data.device.id)}`;
     } catch (err) {
       $("#error").textContent = err.message;
       $("#error").classList.remove("hidden");
@@ -1646,7 +1646,7 @@ function canWriteDevice(device) {
 }
 
 function loginRedirect() {
-  location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+  location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
 }
 
 /**
@@ -1830,7 +1830,7 @@ async function renderDevice() {
   if (!id) {
     $("#device-skeleton")?.classList.add("hidden");
     const box = $("#device-error");
-    box.innerHTML = `Pick a chamber from your <a href="/devices.html">devices</a>.`;
+    box.innerHTML = `Pick a chamber from your <a href="/devices">devices</a>.`;
     box.classList.remove("hidden");
     return;
   }
@@ -1908,7 +1908,7 @@ async function renderDevice() {
       try {
         await api(`/api/fleet/devices/${enc}/unlink`, { method: "POST", jsonBody: { confirm: true } });
         liveCache.clear();
-        location.href = "/devices.html";
+        location.href = "/devices";
       } catch (err) {
         flash($("#device-controls-msg"), err.message);
       }
@@ -1976,7 +1976,7 @@ async function renderDevice() {
     const status = $("#device-status");
     if (alerts) {
       const notice = deliveryNotice(alerts);
-      status.innerHTML = notice ? `${escapeHtml(notice)} <a href="/account.html#alerts">Alert settings</a>` : "";
+      status.innerHTML = notice ? `${escapeHtml(notice)} <a href="/account#alerts">Alert settings</a>` : "";
       status.classList.toggle("hidden", !notice);
       showStates(alerts.states);
       if (!view.rulesFilled && !form.contains(document.activeElement)) {
@@ -1986,7 +1986,7 @@ async function renderDevice() {
       swap("#device-alerts", alertItems(alerts.alerts || []));
       $("#device-body").classList.remove("hidden");
     } else if (!cached) {
-      status.innerHTML = `Verify your email to use alerts for this chamber. <a href="/account.html">Account</a>`;
+      status.innerHTML = `Verify your email to use alerts for this chamber. <a href="/account">Account</a>`;
       status.classList.remove("hidden");
       $("#device-body").classList.add("hidden");
     }
@@ -2193,7 +2193,7 @@ async function renderFleet() {
   // The cached paint runs synchronously; wait until the rest of this module (STATE_LABEL etc.) is initialized.
   await Promise.resolve();
   if (!getToken()) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
     return;
   }
   const showError = (err) => {
@@ -2255,7 +2255,7 @@ async function renderFleet() {
     });
     detailLive.push(await loadDeviceSnapshot(detailId));
     const back = document.querySelector("#fleet-detail .back-link a");
-    if (back) back.insertAdjacentHTML("afterend", ` · <a href="/device.html?id=${encodeURIComponent(detailId)}">Open device page</a>`);
+    if (back) back.insertAdjacentHTML("afterend", ` · <a href="/device?id=${encodeURIComponent(detailId)}">Open device page</a>`);
     fillLightInputs(d.light, {
       sunrise: $("#detail-sunrise"),
       duration: $("#detail-duration"),
@@ -2303,7 +2303,7 @@ async function renderFleet() {
           method: "POST",
           jsonBody: { confirm: true },
         });
-        location.href = "/fleet.html";
+        location.href = "/fleet";
       } catch (err) {
         showError(err);
       }
@@ -2396,7 +2396,7 @@ async function renderFleet() {
         .map(
           (d) => `<tr>
             <td><label class="cell-check"><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></label></td>
-            <td><a href="/fleet.html?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
+            <td><a href="/fleet?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
             <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(lastSeenLine(d))}</span></td>
             <td>${d.reading ? `${safeDisplay(d.reading.temperature, "not reported")} °C · ${safeDisplay(d.reading.humidity, "not reported")}%` : "No reading"}</td>
             <td>${escapeHtml(d.profile?.name || "None")}${d.profile?.species ? `<br><span class="muted">${escapeHtml(d.profile.species)}</span>` : ""}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>

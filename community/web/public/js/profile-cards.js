@@ -13,7 +13,7 @@ function escapeHtml(value) {
 }
 
 export function profileHref(id) {
-  return INDEXED_PROFILES.has(id) ? `/profiles/${encodeURIComponent(id)}.html` : `/profile.html?id=${encodeURIComponent(id)}`;
+  return INDEXED_PROFILES.has(id) ? `/profiles/${encodeURIComponent(id)}` : `/profile?id=${encodeURIComponent(id)}`;
 }
 
 function stageDots(stages = []) {

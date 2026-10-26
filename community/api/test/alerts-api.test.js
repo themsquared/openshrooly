@@ -162,7 +162,7 @@ test("one click unsubscribe: POST only, signed, idempotent, rate limited", async
   const token = await makeUnsubToken(ctx, owner.user.id, T0);
   const get = await call(ctx, "GET", `/api/alerts/unsubscribe?token=${encodeURIComponent(token)}`);
   assert.equal(get.status, 302);
-  assert.match(get.headers.get("location"), /\/alerts-unsub\.html\?token=/);
+  assert.match(get.headers.get("location"), /\/alerts-unsub\?token=/);
   assert.equal((await call(ctx, "GET", "/api/alerts/prefs", { token: owner.token })).data.prefs.email, true, "GET changed nothing");
 
   const bad = await call(ctx, "POST", `/api/alerts/unsubscribe?token=${encodeURIComponent(token.slice(0, -2))}xx`);
