@@ -374,8 +374,8 @@ export async function handleCoach(method, path, url, request, env) {
       mode: "subscription",
       priceId: coachPriceId(env),
       name: "Grow Coach",
-      successPath: "/account.html?checkout=success#billing",
-      cancelPath: "/coach.html?checkout=cancel",
+      successPath: "/account?checkout=success#billing",
+      cancelPath: "/coach?checkout=cancel",
     });
     if (!session.ok) return json({ error: session.error, coming_soon: session.status === 503 }, session.status || 503);
     return json(session);

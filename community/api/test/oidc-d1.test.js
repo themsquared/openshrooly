@@ -70,7 +70,7 @@ afterEach(() => {
 test("D1: Google sign-up creates a verified account, repeat login reuses it", async () => {
   await withD1(async (d1, ctx) => {
     const first = await signIn(d1, ctx);
-    assert.ok(first.loc.startsWith(`${SITE}/auth/callback.html#oidc=`), first.loc);
+    assert.ok(first.loc.startsWith(`${SITE}/auth/callback#oidc=`), first.loc);
     assert.equal(first.done.status, 200, JSON.stringify(first.done.data));
     assert.equal(first.done.data.user.email, "grower@gmail.com");
     assert.equal(first.done.data.user.email_verified, true);
@@ -92,7 +92,7 @@ test("D1: state and handoff are single use; a handoff is not a magic link", asyn
     const r = await signIn(d1, ctx);
     assert.equal(r.done.status, 200);
     const replay = await call(ctx, "GET", `/api/auth/oidc/google/callback?state=${r.state}&code=c`, { headers: { cookie: r.cookie } });
-    assert.equal(replay.headers.get("location"), `${SITE}/login.html?error=oidc`);
+    assert.equal(replay.headers.get("location"), `${SITE}/login?error=oidc`);
     assert.equal((await call(ctx, "POST", "/api/auth/oidc/complete", { body: { token: r.handoff } })).status, 401);
     assert.equal((await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: r.handoff } })).status, 401);
     assert.equal(google.tokenCalls.length, 1);
@@ -137,7 +137,7 @@ test("D1: verified account is linked, unverified account is not taken over", asy
     google.claims = { sub: "999", email: "victim@gmail.com" };
     await d1.prepare("INSERT INTO users (username, password_hash, email, email_verified, display_name, role, created_at) VALUES ('squat', '!no-password', 'victim@gmail.com', 0, 's', 'user', ?)").bind(now).run();
     const refused = await signIn(d1, ctx);
-    assert.equal(refused.cb.headers.get("location"), `${SITE}/login.html?error=oidc`);
+    assert.equal(refused.cb.headers.get("location"), `${SITE}/login?error=oidc`);
     assert.equal((await d1.prepare("SELECT COUNT(*) n FROM auth_identities WHERE subject='999'").first()).n, 0);
   });
 });

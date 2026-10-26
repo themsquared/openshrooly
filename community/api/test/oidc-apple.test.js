@@ -70,7 +70,7 @@ async function signIn(ctx, { query = "", user = FIRST_USER } = {}) {
 
 function refused(res) {
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get("location"), `${SITE}/login.html?error=oidc`);
+  assert.equal(res.headers.get("location"), `${SITE}/login?error=oidc`);
   assert.doesNotMatch(res.headers.get("set-cookie") || "", /sl_session=/);
 }
 
@@ -111,8 +111,8 @@ test("happy path: first Apple sign-in treats Hide My Email as verified, mints an
   const ctx = liveEnv();
   const r = await signIn(ctx);
   assert.equal(r.cb.status, 302);
-  assert.ok(r.loc.startsWith(`${SITE}/auth/callback.html#oidc=`), r.loc);
-  assert.equal(r.frag.get("next"), "/account.html");
+  assert.ok(r.loc.startsWith(`${SITE}/auth/callback#oidc=`), r.loc);
+  assert.equal(r.frag.get("next"), "/account");
   assert.match(r.cb.headers.get("set-cookie"), /__Host-sl_oidc=; .*SameSite=None; .*Max-Age=0/);
   assert.equal(apple.tokenCalls.length, 1);
   const sent = apple.tokenCalls[0];
@@ -283,7 +283,7 @@ test("Apple form_post Origin is allowed only on the Apple callback; other POSTs 
   apple.pendingNonce = row.nonce;
   const cb = await callback(ctx, { state: s.state, cookie: s.cookie, origin: "https://appleid.apple.com" });
   assert.equal(cb.status, 302);
-  assert.ok(cb.headers.get("location").startsWith(`${SITE}/auth/callback.html#oidc=`));
+  assert.ok(cb.headers.get("location").startsWith(`${SITE}/auth/callback#oidc=`));
 });
 
 test("a replayed callback is refused and the nonce cannot be reused", async () => {
@@ -340,8 +340,8 @@ test("redirect after login stays on our site", async () => {
     const s = await start(ctx, `?next=${encodeURIComponent(bad)}`);
     assert.equal(s.res.status, 400, bad);
   }
-  const ok = await signIn(ctx, { query: `?next=${encodeURIComponent("/device.html?id=7")}` });
-  assert.equal(ok.frag.get("next"), "/device.html?id=7");
+  const ok = await signIn(ctx, { query: `?next=${encodeURIComponent("/device?id=7")}` });
+  assert.equal(ok.frag.get("next"), "/device?id=7");
 });
 
 test("Apple shows as configured only when team, key, services, and private key are all set", () => {

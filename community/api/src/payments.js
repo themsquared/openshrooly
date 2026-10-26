@@ -71,7 +71,7 @@ export async function openBillingPortal(db, env, user) {
   const customer = await coachCustomerFor(db, user.id);
   if (!customer) return { ok: false, status: 404, error: "No paid plan on this account." };
   try {
-    const portal = await createPortalSession(env, { customer, returnPath: "/account.html#billing" });
+    const portal = await createPortalSession(env, { customer, returnPath: "/account#billing" });
     return { ok: true, url: portal.url };
   } catch (err) {
     if (err instanceof StripeError) return { ok: false, status: err.status, error: err.message };

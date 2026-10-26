@@ -55,7 +55,7 @@ async function signIn(ctx, query = "") {
 
 function refused(res) {
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get("location"), `${SITE}/login.html?error=oidc`);
+  assert.equal(res.headers.get("location"), `${SITE}/login?error=oidc`);
   assert.doesNotMatch(res.headers.get("set-cookie") || "", /sl_session=/);
 }
 
@@ -93,8 +93,8 @@ test("happy path: verified Google login creates a verified account and a Lax ses
   const ctx = liveEnv();
   const r = await signIn(ctx);
   assert.equal(r.cb.status, 302);
-  assert.ok(r.loc.startsWith(`${SITE}/auth/callback.html#oidc=`), r.loc);
-  assert.equal(r.frag.get("next"), "/account.html");
+  assert.ok(r.loc.startsWith(`${SITE}/auth/callback#oidc=`), r.loc);
+  assert.equal(r.frag.get("next"), "/account");
   assert.match(r.cb.headers.get("set-cookie"), /__Host-sl_oidc=; .*Max-Age=0/);
   assert.equal(google.tokenCalls.length, 1);
   const sent = google.tokenCalls[0];
@@ -311,9 +311,9 @@ test("redirect after login stays on our site: next must be a same-site path", as
     assert.equal(s.res.status, 400, bad);
     assert.equal(s.res.headers.get("set-cookie"), null);
   }
-  const ok = await signIn(ctx, `?next=${encodeURIComponent("/device.html?id=7")}`);
-  assert.ok(ok.loc.startsWith(`${SITE}/auth/callback.html#`));
-  assert.equal(ok.frag.get("next"), "/device.html?id=7");
+  const ok = await signIn(ctx, `?next=${encodeURIComponent("/device?id=7")}`);
+  assert.ok(ok.loc.startsWith(`${SITE}/auth/callback#`));
+  assert.equal(ok.frag.get("next"), "/device?id=7");
   assert.equal(safeNextPath("/a"), "/a");
   assert.equal(safeNextPath("//a"), null);
 });

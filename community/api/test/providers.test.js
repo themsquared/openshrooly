@@ -87,7 +87,7 @@ test("stubs are inert in a prod-like config even when leftover stub flags are se
 
   const oidcCb = await call(ctx, "GET", "/api/auth/oidc/google/callback?state=x&code=stub", { host });
   assert.equal(oidcCb.status, 302);
-  assert.match(oidcCb.headers.get("location"), /\/login\.html\?error=oidc$/);
+  assert.match(oidcCb.headers.get("location"), /\/login\?error=oidc$/);
   assert.doesNotMatch(oidcCb.headers.get("set-cookie") || "", /sl_session=/);
 
   const coach = await call(ctx, "GET", "/api/coach", { host });

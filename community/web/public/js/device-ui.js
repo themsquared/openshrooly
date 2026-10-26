@@ -110,7 +110,7 @@ export function renderDeviceCard(device) {
   const online = device.online ? "Online" : "Offline";
   const coach = coachLine(device);
   const picked = Boolean(device?.profile);
-  const href = `/device.html?id=${encodeURIComponent(device.id)}${picked ? "" : "#grow"}`;
+  const href = `/device?id=${encodeURIComponent(device.id)}${picked ? "" : "#grow"}`;
   const art = identityArt(device);
   return `<article class="card device-card${art ? "" : " is-empty"}" data-device-id="${escapeHtml(device.id)}">
     <a class="device-card-link" href="${href}">
@@ -553,8 +553,8 @@ export function devicesEmptyHtml() {
   return `<section class="card empty-devices">
     <h2>No chambers yet</h2>
     <p class="muted">Link your chamber to see it here and change what it grows from your phone.</p>
-    <a class="button" href="/claim.html">Link your chamber</a>
-    <a class="small-link" href="/install.html">I don't have OpenShrooly on it yet</a>
+    <a class="button" href="/claim">Link your chamber</a>
+    <a class="small-link" href="/install">I don't have OpenShrooly on it yet</a>
   </section>`;
 }
 
@@ -569,11 +569,11 @@ export function growableDevices(devices) {
  */
 export function growThisHtml({ signedIn, devices = [], next = "/" } = {}) {
   if (!signedIn) {
-    return `<div class="grow-this-row"><a class="button" href="/login.html?next=${encodeURIComponent(next)}">Sign in to grow this</a></div>`;
+    return `<div class="grow-this-row"><a class="button" href="/login?next=${encodeURIComponent(next)}">Sign in to grow this</a></div>`;
   }
   const list = growableDevices(devices);
   if (!list.length) {
-    return `<div class="grow-this-row"><a class="button" href="/claim.html">Link a chamber to grow this</a></div>`;
+    return `<div class="grow-this-row"><a class="button" href="/claim">Link a chamber to grow this</a></div>`;
   }
   const label = (d) => escapeHtml(d.name || "My chamber");
   const picker =

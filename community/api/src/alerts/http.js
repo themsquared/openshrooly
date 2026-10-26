@@ -126,7 +126,7 @@ export async function handleAlerts(method, path, url, request, env) {
       const token = url.searchParams.get("token") || "";
       return new Response(null, {
         status: 302,
-        headers: { location: `${siteOrigin(env)}/alerts-unsub.html?token=${encodeURIComponent(token)}`, "cache-control": "no-store" },
+        headers: { location: `${siteOrigin(env)}/alerts-unsub?token=${encodeURIComponent(token)}`, "cache-control": "no-store" },
       });
     }
     if (method === "POST") {

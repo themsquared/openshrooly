@@ -55,13 +55,13 @@ export function isOffMenu(profile) {
 }
 
 export function profilePath(id) {
-  return `/profiles/${encodeURIComponent(id)}.html`;
+  return `/profiles/${encodeURIComponent(id)}`;
 }
 
 /**
  * Profile id for the page at `url`. A profile with no static page yet reaches
- * /profile.html?id=<id>.html through the Netlify /profiles/:id fallback, so the
- * suffix is dropped here and the page still loads from the API.
+ * /profile?id=<id> through the Netlify /profiles/:id fallback. Old links may
+ * still carry a .html suffix, so it is dropped here and the page still loads from the API.
  */
 export function profileIdFromUrl(url) {
   const { pathname, searchParams } = new URL(url, "https://shroomlabs.io");

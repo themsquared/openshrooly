@@ -35,7 +35,7 @@ test("device cards make species and grow identity obvious", () => {
   assert.match(html, /day 7 of 29/);
   assert.match(html, /Shrooly chamber/);
   assert.match(html, /Kitchen chamber/);
-  assert.match(html, /device\.html\?id=demo-kitchen/);
+  assert.match(html, /device\?id=demo-kitchen/);
   assert.match(html, /species-oyster|pearl-oyster|Pleurotus/);
   assert.doesNotMatch(html, DASH);
   assert.doesNotMatch(html, /setpoint/i);
@@ -158,7 +158,7 @@ test("an empty chamber gets a small icon and one next step, on the card and the 
   const card = renderDeviceCard(bare);
   assert.match(card, /mushroom-icon/);
   assert.match(card, new RegExp(PICK_GROW_LABEL.replace("'", "(&#39;|')")));
-  assert.match(card, /device\.html\?id=dev-new#grow/);
+  assert.match(card, /device\?id=dev-new#grow/);
   assert.doesNotMatch(card, /No species selected|No grow selected/);
   const identity = renderIdentity(bare);
   assert.match(identity, /href="#grow"/);
@@ -388,14 +388,14 @@ test("a new grow's phase list defaults to the first stage", async () => {
 test("devices empty state gives one clear next step", async () => {
   const { devicesEmptyHtml } = await import("../public/js/device-ui.js");
   const html = devicesEmptyHtml();
-  assert.match(html, /href="\/claim.html">Link your chamber</);
-  assert.match(html, /href="\/install.html"/);
+  assert.match(html, /href="\/claim">Link your chamber</);
+  assert.match(html, /href="\/install"/);
   assert.doesNotMatch(html, /filter/i);
 });
 
 test("grow this adapts to sign in and chamber count", async () => {
   const { growThisHtml } = await import("../public/js/device-ui.js");
-  assert.match(growThisHtml({ signedIn: false, next: "/profile.html?id=x" }), /Sign in to grow this/);
+  assert.match(growThisHtml({ signedIn: false, next: "/profile?id=x" }), /Sign in to grow this/);
   assert.match(growThisHtml({ signedIn: true, devices: [] }), /Link a chamber to grow this/);
   assert.match(growThisHtml({ signedIn: true, devices: [{ id: "a", status: "revoked" }] }), /Link a chamber/);
   const one = growThisHtml({ signedIn: true, devices: [{ id: "a", name: "Kitchen", status: "active" }] });

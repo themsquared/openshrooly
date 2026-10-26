@@ -85,7 +85,7 @@ test("installer page loads nothing from other sites and has plain copy", () => {
   for (const m of html.matchAll(/<script[^>]*src="([^"]+)"/g)) assert.ok(m[1].startsWith("/"), m[1]);
   assert.doesNotMatch(html, /unpkg|github|[\u2013\u2014]|firmware|\bOTA\b|manifest|Ed25519|ESP Web Tools/i);
   const toml = readFileSync(join(here, "..", "netlify.toml"), "utf8");
-  const csp = toml.split('for = "/install.html"')[1].split("[[headers]]")[0];
+  const csp = toml.split('for = "/install"')[1].split("[[headers]]")[0];
   assert.doesNotMatch(csp, /unpkg|github/);
   assert.match(csp, /script-src 'self';/);
   const vendor = readdirSync(join(pub, "vendor", "esp-web-tools-10.4.0"));
