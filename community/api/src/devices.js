@@ -30,6 +30,13 @@ import {
   verifyCsr,
 } from "./pki.js";
 
+// Short, printable name the device shows as "Linked to <name>". Never an email.
+export function deviceOwnerName(user) {
+  const raw = String(user?.display_name || user?.username || "");
+  const clean = raw.replace(/[^\x20-\x7e]/g, "").replace(/\s+/g, " ").trim().slice(0, 20).trim();
+  return clean.includes("@") ? "" : clean;
+}
+
 export const CERT_DAYS = 7;
 export const ROTATE_AFTER_MS = 3.5 * 24 * 3600 * 1000;
 export const CLAIM_MS = 15 * 60 * 1000;
@@ -656,7 +663,9 @@ export async function handleDevices(method, path, url, request, env) {
     const issued = await replaceCert(env, db, device.id, body.csr, request);
     await db.run("UPDATE cloud_devices SET status=?, cloud_enabled=?, enroll_hash=? WHERE id=?", ["active", 1, null, device.id]);
     await audit(db, device.owner_id, "device_cert_issue", `${device.id}:${issued.serial}`, request);
+    const owner = device.owner_id ? await db.one("SELECT * FROM users WHERE id=?", [device.owner_id]) : null;
     return json({
+      owner_name: deviceOwnerName(owner),
       certificate: issued.pem,
       ca: issued.caPem || env._deviceCa?.certPem || null,
       serial: issued.serial,
