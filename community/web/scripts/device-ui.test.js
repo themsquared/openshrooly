@@ -32,7 +32,7 @@ test("device cards make species and grow identity obvious", () => {
   assert.match(html, /Pleurotus ostreatus/);
   assert.match(html, /Pearl Oyster/);
   assert.match(html, /Fruiting/);
-  assert.match(html, /day 6 of 29/);
+  assert.match(html, /day 7 of 29/);
   assert.match(html, /Shrooly chamber/);
   assert.match(html, /Kitchen chamber/);
   assert.match(html, /device\.html\?id=demo-kitchen/);
@@ -282,4 +282,15 @@ test("live pages wait for app.js to finish loading before the cached paint", () 
     const re = new RegExp(`async function ${fn}\\(\\) \\{\\n(?:\\s*//[^\\n]*\\n)*\\s*await Promise\\.resolve\\(\\);`);
     assert.match(app, re, fn);
   }
+});
+
+test("a new grow's phase list defaults to the first stage", async () => {
+  const { stageOptionsHtml, phaseLine } = await import("../public/js/device-ui.js");
+  const stages = [{ id: "colonization", name: "Colonization" }, { id: "pinning", name: "Pinning" }, { id: "fruiting", name: "Fruiting" }];
+  const fresh = stageOptionsHtml(stages, { selectedId: "fruiting", sameProfile: false });
+  assert.match(fresh, /value="colonization" selected/);
+  assert.match(fresh, /start here/);
+  const same = stageOptionsHtml(stages, { selectedId: "fruiting", sameProfile: true });
+  assert.match(same, /value="fruiting" selected/);
+  assert.equal(phaseLine({ grow: { phase: "Colonization", day: 0, total_days: 29 } }), "Colonization · day 1 of 29");
 });
