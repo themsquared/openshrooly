@@ -43,7 +43,17 @@ Prod Autopilot stays behind `COACH_AUTOPILOT_ENABLED` plus
 `COACH_BETA_USER_IDS` (user 82). Do not turn those on from deploy toml.
 Rollout steps (migration 0009, env vars, cron) are in that local doc.
 
-Daily caps: 40 chats, 8 photos, 80k neurons. Chat cache 10 minutes. Usage in `coach_usage`.
+Caps (Workers AI neurons cost $0.011 per 1,000; a chat is about 10 neurons, a photo check about 25):
+
+| Cap | Default | Env var |
+| --- | --- | --- |
+| Chats per user per day | 40 | `COACH_DAILY_CHATS` |
+| Photo checks per user per day | 8 | `COACH_DAILY_PHOTOS` |
+| Neurons per user per day | 3,000 (about $0.03) | `COACH_DAILY_NEURONS` |
+| Neurons per user per month | 20,000 (about $0.22) | `COACH_MONTHLY_NEURONS` |
+| Neurons for everyone per day | 100,000 (about $1.10) | `COACH_GLOBAL_DAILY_NEURONS` |
+
+Days and months are UTC. Hitting a per-user cap returns 429 with a plain message. Hitting the global budget returns 503 ("Grow Coach is very busy today") and logs `coach.budget` so it shows in Worker logs. Chat cache 10 minutes. Usage in `coach_usage`.
 
 ## Schema
 
@@ -57,4 +67,4 @@ Fresh installs already include the tables in `schema.sql`.
 
 ## Cost
 
-See the **Grow Coach cost vs $3.99** table in [`ROADMAP.md`](ROADMAP.md). Cap-month AI is about **$0.20–0.50** per subscriber; list is $3.99. Workers Paid $5 is shared with the rest of the API.
+See the **Grow Coach cost vs $3.99** table in [`ROADMAP.md`](ROADMAP.md). AI cost is capped at about **$0.22** per subscriber per month (the monthly neuron cap). Final price is Mike's call. Workers Paid $5 is shared with the rest of the API.
