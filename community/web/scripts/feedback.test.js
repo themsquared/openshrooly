@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { deviceOptions, feedbackSubject, linkedDevices, screenshotProblem, deviceFirmware } from "../public/js/feedback.js";
+import { deviceOptions, feedbackSubject, linkedDevices, screenshotProblem, deviceFirmware, fillHidden } from "../public/js/feedback.js";
 
 const html = readFileSync(new URL("../public/account/feedback.html", import.meta.url), "utf8");
 
@@ -43,4 +43,14 @@ test("claim page carries the beta waitlist Netlify form and a feedback link", ()
   assert.match(claim, /<form[^>]+name="beta-waitlist"[^>]+data-netlify="true"/);
   assert.match(claim, /href="\/account\/feedback"/);
   assert.doesNotMatch(claim, /opens soon/);
+});
+
+test("fillHidden takes the user from the /api/me shape", () => {
+  const fields = {};
+  const form = { elements: { namedItem: (n) => (fields[n] ??= { value: "" }) } };
+  fillHidden(form, { me: { user: { id: 7, username: "grower_7" } }, device: { id: "sldev_1" }, href: "https://shroomlabs.io/device?id=sldev_1", userAgent: "UA" });
+  assert.equal(fields.user_id.value, "7");
+  assert.equal(fields.username.value, "grower_7");
+  assert.equal(fields.device_id.value, "sldev_1");
+  assert.equal(fields.page_url.value, "https://shroomlabs.io/device?id=sldev_1");
 });

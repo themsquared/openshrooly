@@ -39,8 +39,10 @@ export function fillHidden(form, { me, device, href, userAgent }) {
   };
   const type = form.elements.namedItem("type")?.value || "";
   set("subject", feedbackSubject(type));
-  set("user_id", me?.id);
-  set("username", me?.username);
+  // /api/me answers { user: { id, username } }.
+  const user = me?.user || me;
+  set("user_id", user?.id);
+  set("username", user?.username);
   set("device_id", device?.id || "");
   set("firmware", deviceFirmware(device));
   set("page_url", href);
