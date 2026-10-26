@@ -600,6 +600,8 @@ function shell({ head, activeId, hideCoach = false, body, script = "/js/lite.js"
   <!--SEO_HEAD-->
   ${renderHead(head)}
   <!--/SEO_HEAD-->
+  <link rel="preload" href="/fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/fraunces-600.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
