@@ -19,7 +19,7 @@
   "legal_notice": "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
   "source_notes": [
     {
-      "title": "Field / grower notes",
+      "title": "Climate",
       "detail": "P. cyanescens fruits in cool, wet weather, often 10 to 18 \u00b0C, on lignin-rich mulch. Indoor success is inconsistent."
     }
   ],
@@ -122,26 +122,12 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "No P. cyanescens photoperiod or lux paper was found. This is the labeled general default plus the P. cubensis blue-light finding, which is not a cyanescens measurement.",
-    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "why": "No light numbers specific to P. cyanescens are known. Colonization is dark. Pinning and fruiting use the chamber default: 12 hours a day at 20% white (92 lux on this chamber) with 80% blue.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation, not a measured spectrum.",
     "sources": [
       {
-        "title": "General default",
-        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
-      },
-      {
-        "title": "Badham 1980",
-        "detail": "Edmond R. Badham, The Effect of Light Upon Basidiocarp Initiation in Psilocybe cubensis, Mycologia 72 (1980). Initials formed only after light. 370, 440, and 460 nm were effective. Wavelengths longer than 510 nm were not. The saturating dose is a flash energy, not a room lux, so intensity here is the general default.",
-        "url": "https://doi.org/10.1080/00275514.1980.12021162"
-      },
-      {
-        "title": "Sakamoto 2018",
-        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
-        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
-      },
-      {
-        "title": "Stamets",
-        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
+        "title": "Chamber default",
+        "detail": "Standard light settings mapped to this chamber's white and RGB LEDs. Not a measured value for this variety."
       }
     ],
     "phases": {

@@ -446,8 +446,10 @@ async function renderProfile() {
         </table>
       </details>`;
   }
-  $("#sources").innerHTML = sourceItems.join("");
-  $("#sources-block")?.classList.toggle("hidden", !sourceItems.length);
+  // Off-menu profiles show no citations or source list.
+  const shownSources = off ? [] : sourceItems;
+  $("#sources").innerHTML = shownSources.join("");
+  $("#sources-block")?.classList.toggle("hidden", !shownSources.length);
   if (!off && data.links?.length) {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +

@@ -30,14 +30,14 @@ test("every licensed photo exists, has alt text, and an allowed license", () => 
   assert.doesNotMatch(credits, DASH);
   for (const photo of LICENSED_PHOTOS) {
     assert.ok(existsSync(publicPath(photo.src)), photo.src);
-    assert.ok(existsSync(publicPath(photo.src640)), photo.src640);
+    if (photo.src640) assert.ok(existsSync(publicPath(photo.src640)), photo.src640);
     assert.ok(existsSync(publicPath(photo.og)), photo.og);
     assert.ok(photo.alt && photo.alt.length > 12, `${photo.id} alt`);
     assert.match(photo.alt, /Psilocybe|fruiting/i);
     assert.ok(ALLOWED_LICENSES.has(licenseFamily(photo.license)), `${photo.id} license ${photo.license}`);
     assert.doesNotMatch(photo.license, /nc|nd/i);
     assert.match(photo.licenseUrl, /^https:\/\/creativecommons\.org\//);
-    assert.match(photo.sourcePage, /^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
+    assert.match(photo.sourcePage, /^https:\/\/(commons\.wikimedia\.org\/wiki\/File:|www\.inaturalist\.org\/photos\/\d+$)/);
     assert.ok(photo.author);
     assert.ok(photo.changes);
     assert.match(credits, new RegExp(photo.author.replace("ä", "ä")));
@@ -58,23 +58,20 @@ function renderLicensedMarkup(photo) {
   return speciesArt("", "", "", "psilocybin", { id: photo.id });
 }
 
-test("Off-menu pages with a photo render credit, ImageObject, and existing og:image path", () => {
+test("every Off-menu page has a licensed photo, credit, no citations, and no structured data", () => {
   const profiles = loadProfiles().filter((p) => p.pack === "psilocybin");
   assert.deepEqual(
     profiles.map((p) => p.id).sort(),
-    ["b-plus", "golden-teacher", "p-cyanescens", "p-natalensis", "penis-envy"]
+    ["acadian-coast", "b-plus", "golden-teacher", "p-cyanescens", "p-natalensis", "penis-envy", "treasure-coast"]
   );
   for (const profile of profiles) {
     const photo = photoRecordFor(profile);
     const html = renderProfilePage(profile);
     const ld = profileJsonLd(profile);
     const article = ld["@graph"].find((n) => n["@type"] === "Article");
-    if (!photo) {
-      assert.equal(speciesPhoto(profile.species, profile.strain, profile.name, profile.pack, profile.id), "");
-      assert.doesNotMatch(html, /species-photo|img\/species\/.*\.(webp|jpg|svg)/);
-      assert.equal(article.image, `https://shroomlabs.io/og/${profile.id}.jpg`);
-      continue;
-    }
+    assert.ok(photo, `${profile.id} needs a licensed photo`);
+    assert.doesNotMatch(html, /application\/ld\+json/, `${profile.id} must not carry structured data`);
+    assert.doesNotMatch(html, /<h2>Sources<\/h2>|class="sources"|Badham|Waldbillig|Sakamoto|Stamets|Shroomery|Roger Rabbit|doi\.org/i);
     assert.match(html, new RegExp(`src="${photo.src}"`));
     assert.match(html, new RegExp(`alt="${photo.alt.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
     assert.match(html, /srcset="/);
@@ -117,7 +114,7 @@ test("culinary harvest shots stay on the generated JPEG path", () => {
   const first = speciesArt("Pleurotus ostreatus", "", "Blue Oyster", "culinary", { priority: true });
   assert.match(first, /species-oyster\.jpg|species-blue-oyster\.jpg/);
   assert.doesNotMatch(first, /species-photo|figcaption/);
-  assert.equal(speciesArt("Psilocybe cubensis", "Penis Envy", "Penis Envy", "psilocybin", { id: "penis-envy" }), "");
+  assert.equal(speciesArt("Psilocybe cubensis", "Some Strain", "Some Strain", "psilocybin", { id: "no-such-strain" }), "");
 });
 
 function nestedAnchor(html) {
@@ -136,7 +133,7 @@ function nestedAnchor(html) {
 test("rendered cards never nest an <a> inside another <a>", () => {
   const profiles = loadProfiles();
   const offMenu = profiles.filter((p) => p.pack === "psilocybin");
-  assert.equal(offMenu.length, 5);
+  assert.equal(offMenu.length, 7);
   const html = renderProfileCards(profiles);
   assert.match(html, /<a class="profile-card"/);
   assert.match(html, /photo-credit/);
@@ -147,9 +144,9 @@ test("rendered cards never nest an <a> inside another <a>", () => {
   assert.match(linked, /<a href="/);
   assert.doesNotMatch(plain, /<a\b/);
   assert.match(plain, /Alan Rockefeller/);
-  for (const id of ["penis-envy", "p-natalensis"]) {
+  for (const id of offMenu.map((p) => p.id)) {
     const card = html.match(new RegExp(`<a class="profile-card" href="/profiles/${id}">[\\s\\S]*?</a>`))[0];
-    assert.doesNotMatch(card, /<img|profile-art|species-photo/);
+    assert.match(card, /<img\b[^>]*alt="[^"]+"/, `${id} card photo`);
   }
 });
 

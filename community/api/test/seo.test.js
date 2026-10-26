@@ -14,6 +14,7 @@ import {
   isIndexableProfile,
   httpsSourceHref,
   loadProfiles,
+  profileJsonLd,
   seoDescription,
   renderFaqPage,
   renderLightRecipe,
@@ -76,8 +77,9 @@ test("Off-menu photos use licensed files, alt text, and ImageObject credits", as
   assert.match(html, new RegExp(`src="${photo.src}"`));
   assert.match(html, /alt="Cluster of Golden Teacher Psilocybe cubensis/);
   assert.match(html, /photo-credit/);
-  const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
-  const article = ld["@graph"].find((n) => n["@type"] === "Article");
+  // Off-menu pages carry no structured data on the page; the ImageObject stays available from profileJsonLd.
+  assert.doesNotMatch(html, /application\/ld\+json/);
+  const article = profileJsonLd(gt)["@graph"].find((n) => n["@type"] === "Article");
   assert.equal(article.image["@type"], "ImageObject");
   assert.equal(article.image.creditText, creditText(photo));
   assert.equal(article.image.license, photo.licenseUrl);
@@ -211,6 +213,11 @@ test("profile pages lead with a one-line light recipe and keep details and sourc
     assert.match(section, /<details class="light-details">[\s\S]*465 to 475 nm/);
     const fruit = profile.light_recipe.phases.fruiting;
     if (fruit) assert.match(html, new RegExp(`${fruit.photoperiod_hours} h on`));
+    // Off-menu pages show no citations at all.
+    if (profile.pack === "psilocybin") {
+      assert.doesNotMatch(html, /sources-block/, profile.id);
+      continue;
+    }
     // Sources sit at the end of the article, collapsed.
     const sources = html.indexOf('<details class="sources-block">');
     assert.ok(sources > html.indexOf('class="actions"'), profile.id);
