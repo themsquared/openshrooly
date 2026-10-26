@@ -64,6 +64,14 @@ COACH_BETA_USER_IDS = "82"
 # Email send caps per UTC day default in code (src/email.js): 300 total, 200 for anything that is not a
 # sign-in link. Override with EMAIL_DAILY_CAP and EMAIL_DAILY_BULK_CAP vars if the Resend plan changes.
 
+# Workers Logs: keep what the code logs (errors carry a request id and are redacted).
+# Invocation logs stay off so request URLs and headers (magic links, tokens) are never stored.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
+
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
 [triggers]
 crons = ["*/5 * * * *"]
