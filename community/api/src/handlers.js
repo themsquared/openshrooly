@@ -18,6 +18,7 @@ import { nowIso, randomToken, sha256Hex } from "./crypto.js";
 import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
 import { handleFleet } from "./fleet.js";
+import { handleAccount } from "./account.js";
 import { coachBetaAccess, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { coachAutopilotAvailable } from "./coach-autopilot.js";
@@ -301,6 +302,8 @@ async function route(method, path, url, request, env) {
   if (coachResponse) return coachResponse;
   const alertsResponse = await handleAlerts(method, path, url, request, env);
   if (alertsResponse) return alertsResponse;
+  const accountResponse = await handleAccount(method, path, url, request, env);
+  if (accountResponse) return accountResponse;
   const reviewResponse = await handleReview(method, path, url, request, env, {
     seeds: SEED_DOCS,
     parseProfileRow: parseProfile,
@@ -358,8 +361,11 @@ async function route(method, path, url, request, env) {
     const user = await userFromAuth(request, db);
     if (!user) return json({ error: "sign in required" }, 401);
     const body = await readJson(request);
-    const token = await mintToken(db, user.id, body.name || "hub");
-    return json({ token, name: body.name || "hub" });
+    // "mobile-access" is the website sign-in token name; a hub token must never pass as one.
+    const requested = String(body.name || "hub").trim().slice(0, 80) || "hub";
+    const name = requested.toLowerCase() === "mobile-access" ? "hub" : requested;
+    const token = await mintToken(db, user.id, name);
+    return json({ token, name });
   }
 
   if (method === "GET" && path === "/api/profiles") {

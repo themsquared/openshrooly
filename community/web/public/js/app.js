@@ -602,12 +602,64 @@ async function renderAccount() {
   const devices = await api("/api/fleet/devices").catch(() => ({ devices: [] }));
   $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No devices linked yet." });
   renderAlertSettings().catch((err) => showAlertsStatus(err.message));
+  wireYourData(me);
   $("#mint").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
     const data = await api("/api/me/tokens", { method: "POST", jsonBody: { name: fd.get("name") } });
     $("#new-token").textContent = data.token;
     $("#new-token-wrap").classList.remove("hidden");
+  });
+}
+
+function wireYourData(me) {
+  const username = me.user?.username || "";
+  const form = $("#delete-account");
+  if ($("#delete-username")) $("#delete-username").textContent = username;
+  $("#export-data")?.addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    $("#export-msg").textContent = "Getting your file ready...";
+    try {
+      const data = await api("/api/me/export");
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `shroomlabs-${username || "account"}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      $("#export-msg").textContent = "Downloaded.";
+    } catch (err) {
+      $("#export-msg").textContent = err.message || "Could not download. Try again.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  if (!form) return;
+  const input = form.elements.confirm;
+  const submit = form.querySelector("button[type=submit]");
+  const matches = () => input.value.trim().toLowerCase() === username.toLowerCase() && username !== "";
+  input.addEventListener("input", () => {
+    submit.disabled = !matches();
+  });
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (!matches()) return;
+    submit.disabled = true;
+    $("#delete-msg").textContent = "Deleting...";
+    try {
+      await api("/api/me/delete", { method: "POST", jsonBody: { confirm: input.value.trim() } });
+      setToken("");
+      form.innerHTML = "<p>Your account is deleted. Taking you home.</p>";
+      setTimeout(() => {
+        location.href = "/";
+      }, 1500);
+    } catch (err) {
+      $("#delete-msg").textContent = err.message || "Could not delete. Try again.";
+      submit.disabled = !matches();
+    }
   });
 }
 
