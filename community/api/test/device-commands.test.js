@@ -159,7 +159,7 @@ test("light-only and fan-only changes are refused with a plain message on sl.2",
     body: { action: "light", payload: { profile_id: pearlOyster.id, stage: "fruiting" } },
   });
   assert.equal(light.data.results[0].status, "failed");
-  assert.match(light.data.results[0].error, /can't take light settings from the cloud/i);
+  assert.match(light.data.results[0].error, /can't take light settings from the site/i);
   const fan = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
     token,
     body: { action: "setpoints", payload: { fan_speed_percent: 40 } },
@@ -236,7 +236,7 @@ test("with Autopilot steering, a profile apply switches its target and sends not
   const res = await applyProfile(ctx, token);
   const r = res.data.results[0];
   assert.equal(r.status, "applied");
-  assert.match(r.message, /Autopilot now steers/i);
+  assert.match(r.message, /Coach now adjusts toward/i);
   assert.equal((await rows(ctx)).length, before);
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-1", { token });
   assert.equal(status.data.mode, "autopilot");
@@ -286,10 +286,10 @@ test("Mike's 12:14 profile commands read as not runnable on sl.2, never applied"
   const queued = commandState(cmd, { device: {}, caps, now: Date.parse("2026-10-25T19:30:00Z") });
   assert.equal(queued.status, "queued");
   assert.equal(queued.runnable, false);
-  assert.match(queued.reason, /can't run profile commands/i);
+  assert.match(queued.reason, /can't take profile changes yet/i);
   const delivered = commandState(cmd, { device: { last_inbox_at: "2026-10-25T19:31:00Z" }, caps, now: Date.parse("2026-10-25T19:32:00Z") });
   assert.equal(delivered.status, "delivered");
   const expired = commandState(cmd, { device: {}, caps, now: Date.parse("2026-10-26T19:15:00Z") });
   assert.equal(expired.status, "expired");
-  assert.match(expired.reason, /firmware/i);
+  assert.match(expired.reason, /expired unused/i);
 });

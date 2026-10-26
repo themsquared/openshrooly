@@ -305,3 +305,11 @@ No new climate, pin, or OTA behavior. If 5b/5c already report `grow_phase`, `gro
 - Restricted-pack-specific copy
 - Emailing Grow Coach chat or photo results
 - Changing humidifier / fan / light managers
+
+## Daily send cap
+
+Every email goes through `sendEmail` in `community/api/src/email.js`, which counts sends per UTC day in `rate_limits`.
+
+- 300 a day in total (`EMAIL_DAILY_CAP`).
+- 200 a day for everything that is not a sign-in link (`EMAIL_DAILY_BULK_CAP`), so grow alerts and review notices can never use up sign-in.
+- Past the cap, alerts are marked failed and sign-in returns 429 "Try again in a few hours". Each refusal logs `email_daily_cap`.

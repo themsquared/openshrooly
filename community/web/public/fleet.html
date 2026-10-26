@@ -83,7 +83,7 @@
         <table class="fleet-table" id="fleet-table">
           <thead>
             <tr>
-              <th><input type="checkbox" id="fleet-all" aria-label="Select all"></th>
+              <th><label class="cell-check"><input type="checkbox" id="fleet-all" aria-label="Select all"></label></th>
               <th>Name</th>
               <th>Status</th>
               <th>Readings</th>
@@ -132,8 +132,8 @@
           </label>
           <label class="hidden" data-coach-only>Coach mode
             <select id="bulk-coach">
-              <option value="advisor">Advisor</option>
-              <option value="autopilot">Autopilot</option>
+              <option value="advisor">I approve changes</option>
+              <option value="autopilot">Coach adjusts it for me</option>
             </select>
           </label>
         </div>

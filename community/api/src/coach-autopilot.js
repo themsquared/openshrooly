@@ -443,7 +443,7 @@ function publicStatus(state, now = Date.now()) {
     return {
       mode: "advisor",
       status: stillPaused ? "paused" : "advisor",
-      pause_reason: stillPaused ? state.pause_reason || "Autopilot is paused." : null,
+      pause_reason: stillPaused ? state.pause_reason || "Coach stopped adjusting for now." : null,
       pause_until: stillPaused ? state.pause_until : null,
       next_eligible_at: stillPaused && Number.isFinite(pauseUntil) ? new Date(pauseUntil).toISOString() : null,
     };
@@ -452,7 +452,7 @@ function publicStatus(state, now = Date.now()) {
     return {
       mode: "autopilot",
       status: "paused",
-      pause_reason: state.pause_reason || "Autopilot is paused.",
+      pause_reason: state.pause_reason || "Coach stopped adjusting for now.",
       pause_until: state.pause_until,
       next_eligible_at: Number.isFinite(pauseUntil) ? new Date(pauseUntil).toISOString() : null,
     };
@@ -491,7 +491,7 @@ export async function getAutopilotStatus(db, env, user, deviceId) {
 export async function resolveAllowedProfile(db, profileId) {
   if (!profileId) return { error: "Pick a published culinary profile first.", status: 400 };
   if (refuseRestrictedPack({ pack: profileId, tags: [] })) {
-    return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
+    return { error: "Coach can't adjust off-menu varieties.", status: 400 };
   }
   const row = await db.one("SELECT * FROM profiles WHERE id=?", [profileId]);
   if (!row || !Number(row.published)) {
@@ -508,7 +508,7 @@ export async function resolveAllowedProfile(db, profileId) {
   if (!doc) return { error: "Pick a published culinary profile first.", status: 400 };
   const profile = normalizeStoredProfileLight({ ...doc, id: doc.id || row.id });
   if (isPsilocybin(profile) || refuseRestrictedPack(profile)) {
-    return { error: "Autopilot is not available for off-menu varieties.", status: 400 };
+    return { error: "Coach can't adjust off-menu varieties.", status: 400 };
   }
   return { profile };
 }
@@ -534,7 +534,7 @@ export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, pr
   if (nextMode === "autopilot") {
     const until = state.pause_until ? Date.parse(state.pause_until) : NaN;
     if (Number(state.paused) && Number.isFinite(until) && until > Date.now()) {
-      return { error: state.pause_reason || "Autopilot is paused.", status: 409 };
+      return { error: state.pause_reason || "Coach stopped adjusting for now.", status: 409 };
     }
     state.paused = 0;
     state.pause_reason = null;
@@ -551,7 +551,7 @@ export async function pauseForManualOverride(db, deviceId, userId, now = Date.no
   if (state.mode !== "autopilot") return state;
   state.mode = "advisor";
   state.paused = 1;
-  state.pause_reason = "You changed a setpoint. Autopilot is paused for 12 hours.";
+  state.pause_reason = "You changed a target yourself, so Coach stopped adjusting for 12 hours.";
   state.pause_until = new Date(now + AUTOPILOT_LIMITS.manualPauseMs).toISOString().replace(/\.\d+Z$/, "Z");
   state.last_manual_at = new Date(now).toISOString().replace(/\.\d+Z$/, "Z");
   await writeDeviceMode(db, state);

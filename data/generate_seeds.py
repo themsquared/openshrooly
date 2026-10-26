@@ -455,7 +455,7 @@ def build_profiles() -> list[MushroomProfile]:
                     1,
                     90,
                     16,
-                    notes="Firmware cannot reach fridge temps. Shock 12 to 24 h at 5 to 10 °C, then apply fruiting.",
+                    notes="The chamber can't get fridge cold. Shock 12 to 24 h at 5 to 10 °C, then apply fruiting.",
                     warn_min=13,
                     warn_max=20,
                 ),

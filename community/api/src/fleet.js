@@ -590,7 +590,7 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
   if (!plan.ok) return { ...base, status: "failed", error: plan.error, preview: null };
   if (plan.kind === "coach_mode") {
     if (!coachAutopilotFlagOn(env)) {
-      return { ...base, status: "failed", error: "Coach Autopilot is off.", preview: plan.preview };
+      return { ...base, status: "failed", error: "Coach is not set to adjust this chamber.", preview: plan.preview };
     }
     const result = await setDeviceAutopilotMode(db, env, user, {
       deviceId: device.id,
@@ -616,7 +616,7 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
         status: "applied",
         preview: plan.preview,
         commands: [],
-        message: `Autopilot now steers toward ${profileLabel(profile, stage)} a step at a time. No direct change was sent.`,
+        message: `Coach now adjusts toward ${profileLabel(profile, stage)} a step at a time. No direct change was sent.`,
       };
     }
   }

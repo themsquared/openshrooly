@@ -55,7 +55,7 @@ test("device page identity and controls use chamber names, not product Shrooly",
   assert.match(controls, /Target humidity/);
   assert.match(controls, /Fan speed/);
   assert.match(controls, /Light/);
-  assert.match(controls, /Advisor/);
+  assert.match(controls, /I approve changes/);
   assert.doesNotMatch(controls, /setpoint/i);
   assert.doesNotMatch(identity + controls, DASH);
   const offMenu = renderControls({ ...pearl, off_menu: true, coach: null }, { canWrite: true, showCoach: true });
@@ -133,7 +133,7 @@ test("controls the firmware can't take are disabled with a plain note", () => {
   assert.match(html, /can't change fan speed from the cloud/);
   assert.match(html, /can't take light settings from the cloud/);
   assert.match(html, /can't load a whole profile/);
-  assert.match(html, /Firmware version not reported/);
+  assert.match(html, /Chamber software version not reported/);
   assert.doesNotMatch(html, DASH);
 });
 
@@ -143,7 +143,7 @@ test("a chamber that reports light support keeps the light controls on", () => {
     { canWrite: true }
   );
   assert.doesNotMatch(tagFor(html, "white_led_lux"), /disabled/);
-  assert.match(html, /Firmware 2\.0\.0/);
+  assert.match(html, /Chamber software 2\.0\.0/);
 });
 
 test("command states read plainly and queued is never called applied", () => {

@@ -21,6 +21,25 @@
   font-style: normal;
   font-display: swap;
 }
+/* U12: Atkinson's slashed zero made "90%" read like "98%" at tile sizes. These digits-only files are
+   Atkinson Hyperlegible (OFL 1.1, renamed as the license asks) with one oval counter in the zero (built by scripts/make-digit-fonts.py). Claim codes keep
+   the slashed zero, since they mix letters and numbers. */
+@font-face {
+  font-family: "Shroom Labs Digits";
+  src: url("/fonts/sl-digits-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+}
+@font-face {
+  font-family: "Shroom Labs Digits";
+  src: url("/fonts/sl-digits-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+}
 @font-face {
   font-family: "Atkinson";
   src: url("/fonts/atkinson-700.woff2") format("woff2");
@@ -31,7 +50,7 @@
 
 :root {
   --display: "Fraunces", "Iowan Old Style", Palatino, serif;
-  --sans: "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --sans: "Shroom Labs Digits", "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -806,7 +825,7 @@ button.nav-toggle {
 .claim-how summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--sl-spore); font-weight: 600; }
 .claim-steps-plain { padding-left: 1.3rem; margin: 0.6rem 0 0.8rem; }
 .claim-steps-plain li { margin: 0 0 0.6rem; }
-.claim-code-card input#code { font-size: 1.4rem; letter-spacing: 0.18em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.claim-code-card input#code { font-family: "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif; font-size: 1.4rem; letter-spacing: 0.18em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .claim-code-card button[type="submit"] { width: 100%; min-height: 48px; }
 .empty-devices { padding: 1.6rem 1.4rem; text-align: center; }
 .empty-devices h2 { margin: 0 0 0.4rem; }
@@ -1019,3 +1038,35 @@ button.nav-toggle {
 .live-badge[data-state="live"]::before { content: ""; display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.35rem; border-radius: 50%; background: #2f9e44; vertical-align: middle; }
 .gauge-missing { font-size: 1rem; font-weight: 600; opacity: 0.7; }
 .device-reading-when { margin-top: 0.4rem; font-size: 0.85rem; }
+
+/* S7: every tap target is at least 44px tall on every page. Links in running lists keep their
+   line height: padding grows the hit area and the matching negative margin keeps the layout. */
+input, select, button, .button { min-height: 44px; }
+input[type="checkbox"], input[type="radio"] { min-height: 0; }
+.site-nav a, .site-nav button.link, .footer-nav a, nav a, nav button.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+}
+.brand { min-height: 44px; }
+.skip { min-height: 44px; display: inline-flex; align-items: center; }
+main li a:not(.button), .back-link a, .small-link, .empty-devices .small-link, main dd a:not(.button) {
+  display: inline-block;
+  padding: 12px;
+  margin: -12px;
+}
+/* Links inside running text stay inline (so they wrap); vertical padding on an inline box widens
+   the hit area without moving any line. */
+main p a:not(.button), main .muted a:not(.button) { padding-block: 12px; }
+.empty-devices .small-link { margin-top: calc(0.9rem - 12px); margin-bottom: -12px; }
+.back-link { margin-bottom: 0.6rem; }
+td a:not(.button) { display: inline-flex; align-items: center; min-height: 44px; }
+.toggle, .alert-form .toggle, .coach-toolbar .toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.toggle input[type="checkbox"] { width: 20px; height: 20px; padding: 0; flex: none; margin: 0; accent-color: var(--sl-spore-deep); }
+.cell-check { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; margin: 0; cursor: pointer; }
+.cell-check input { width: 20px; height: 20px; padding: 0; margin: 0; accent-color: var(--sl-spore-deep); }
+#group-form { align-items: flex-end; }
+#group-form label { margin-bottom: 0; }
+#group-form button { flex: 0 0 auto; min-width: 120px; }
