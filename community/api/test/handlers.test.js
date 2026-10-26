@@ -191,8 +191,11 @@ test("refresh rotation and logout-everywhere", async () => {
   const replay = await call(ctx, "POST", "/api/auth/refresh", { body: { refresh_token: session.refresh_token } });
   assert.equal(replay.status, 401);
   await call(ctx, "POST", "/api/auth/logout-all", { token: rotated.data.access_token, body: {} });
-  const me = await call(ctx, "GET", "/api/me", { token: session.token });
-  assert.equal(me.status, 200);
+  // Sign out everywhere ends every sign-in access token, the old one and the rotated one.
+  for (const token of [session.token, rotated.data.access_token]) {
+    const me = await call(ctx, "GET", "/api/me", { token });
+    assert.equal(me.status, 401);
+  }
 });
 
 test("unverified email cannot publish (blocked when email_verified=0)", async () => {

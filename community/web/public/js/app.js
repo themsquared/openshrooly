@@ -242,6 +242,8 @@ async function renderHome() {
   $("#pack-chef")?.setAttribute("aria-pressed", chef ? "true" : "false");
   $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
   $("#chef-intro")?.classList.toggle("hidden", !chef);
+  // The off-menu hint is about the off-menu pack. It reads oddly above paid culinary recipes.
+  $("#pack-hint")?.classList.toggle("hidden", chef);
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", off);
   setCoachOffMenu(off);
@@ -400,12 +402,20 @@ async function renderProfile() {
     if (result === "cancel" && notice) notice.textContent = "Checkout canceled. Nothing was charged.";
     $("#buy")?.addEventListener("click", () =>
       goToCheckout($("#buy"), () => api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} }), (err) => {
+        if (err.status === 409) {
+          // Bought in another tab or device. Show the recipe instead of a second charge.
+          $("#buy")?.classList.add("hidden");
+          if (notice) notice.textContent = "You own this. Loading your recipe...";
+          location.reload();
+          return;
+        }
         if (notice) notice.textContent = err.message;
       })
     );
     return;
   }
   $("#full").classList.remove("hidden");
+  if (p.pricing?.kind === "paid") $("#owned")?.classList.remove("hidden");
   renderGrowThis(p).catch(() => $("#grow-this")?.classList.add("hidden"));
   $("#notes").textContent = p.notes || "";
   $("#chamber").textContent = p.chamber_notes || "";
