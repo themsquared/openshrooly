@@ -312,6 +312,22 @@ export function luxPreview(percent) {
   return `About ${lux} lux${lux >= 4000 ? " (the most the chamber can do)" : ""}`;
 }
 
+/** One line for an Autopilot change: temperature and RH, then any fan, light or phase it moved. */
+export function autopilotSummary(next = {}) {
+  const parts = [`${next.temperature_c ?? "?"} °C`, `${next.humidity_percent ?? "?"}% RH`];
+  const fan = next.air_exchange_speed ?? next.fan_speed_percent;
+  if (fan != null) parts.push(`fan ${fan}%`);
+  if (next.air_exchange_period_min != null && next.air_exchange_run_sec != null) {
+    parts.push(`fresh air ${next.air_exchange_run_sec} s every ${next.air_exchange_period_min} min`);
+  }
+  if (next.light_hours != null) {
+    parts.push(Number(next.light_hours) > 0 ? `light ${next.light_hours} h at ${next.white_intensity ?? 0} lux` : "light off");
+  }
+  if (next.grow_phase) parts.push(`phase ${next.grow_phase}`);
+  const last = parts.pop();
+  return `Set ${parts.length ? `${parts.join(", ")} and ${last}` : last}`;
+}
+
 /** Chamber grow phases (the chamber's own select). */
 export const GROW_PHASES = ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"];
 

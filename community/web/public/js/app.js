@@ -15,6 +15,7 @@ import {
   growLine,
   growingLabels,
   lastSeenLine,
+  autopilotSummary,
   luxPreview,
   readingWhenLine,
   renderControls,
@@ -1297,7 +1298,7 @@ async function renderCoach() {
             refused: "Refused",
           }[row.apply_status] || "";
           const summary = row.action === "apply"
-            ? `Set ${next.temperature_c ?? "?"} °C and ${next.humidity_percent ?? "?"}% RH`
+            ? autopilotSummary(next)
             : row.action === "undo"
               ? "Restored the previous setpoints"
               : row.action === "expired"

@@ -406,3 +406,21 @@ test("grow this adapts to sign in and chamber count", async () => {
   assert.match(two, /&lt;b&gt;Shed/);
   assert.match(two, /Start from day 1/);
 });
+
+test("Autopilot log line names every knob it moved", async () => {
+  const { autopilotSummary } = await import("../public/js/device-ui.js");
+  assert.equal(autopilotSummary({ temperature_c: 23, humidity_percent: 93 }), "Set 23 °C and 93% RH");
+  assert.equal(
+    autopilotSummary({
+      temperature_c: 23,
+      humidity_percent: 93,
+      air_exchange_speed: 30,
+      air_exchange_period_min: 15,
+      air_exchange_run_sec: 35,
+      light_hours: 12,
+      white_intensity: 90,
+      grow_phase: "Pinning",
+    }),
+    "Set 23 °C, 93% RH, fan 30%, fresh air 35 s every 15 min, light 12 h at 90 lux and phase Pinning"
+  );
+});
