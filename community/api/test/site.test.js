@@ -214,8 +214,7 @@ test("Off-menu pages carry the legal note and no prices, affiliate links, or Gro
     const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
     assert.match(main, /legal-prominent/);
     assert.doesNotMatch(main, /\$\d|affiliate|Grow Coach|coach\.html/i);
-    assert.match(html, /<a id="nav-coach" href="\/coach" class="hidden" data-coach-link>/);
-    assert.match(html, /<a id="footer-nav-coach" href="\/coach" class="hidden" data-coach-link>/);
+    assert.doesNotMatch(html, /nav-coach|data-coach-link|href="\/coach"/);
     assert.match(html, /<body [^>]*data-coach-off/);
   }
 });
@@ -223,10 +222,9 @@ test("Off-menu pages carry the legal note and no prices, affiliate links, or Gro
 test("Grow Coach is hidden by default on every static page", () => {
   for (const file of allPages()) {
     const html = read(file);
-    // Nav and footer links ship hidden. app.js reveals them only when /api/me says grow_coach.available.
-    for (const id of ["nav-coach", "footer-nav-coach"]) {
-      assert.match(html, new RegExp(`<a id="${id}" href="/coach" class="hidden" data-coach-link[ >]`), `${file} ${id}`);
-    }
+    // No Coach link in static chrome. app.js inserts it only when /api/me says grow_coach.available.
+    const navs = (html.match(/<nav[\s\S]*?<\/nav>/g) || []).join("");
+    assert.doesNotMatch(navs, /nav-coach|data-coach-link|Grow Coach|href="\/coach"/, `${file} has a static Coach link`);
     assert.doesNotMatch(html, /\$3\.99|3\.99 (a|per) month/, `${file} prices Coach`);
     if (file === "coach.html") continue;
     const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
@@ -293,4 +291,15 @@ test("checkout buttons send people only to Stripe or this site, and say so when 
   assert.match(read("account.html"), /id="billing-portal" class="secondary hidden"/);
   assert.match(read("profile.html"), /id="buy">Buy</);
   assert.match(readFileSync(join(PUBLIC, "js/app.js"), "utf8"), /\$\("#buy"\)\.textContent = `Buy for \$\{price\}`/);
+});
+
+test("the Coach nav link is inserted at runtime only when the API says it is available", () => {
+  const js = (f) => readFileSync(new URL(`../../web/public/js/${f}`, import.meta.url), "utf8");
+  const sync = js("app.js").slice(js("app.js").indexOf("async function syncCoachLinks"), js("app.js").indexOf("function setCoachOffMenu"));
+  assert.match(sync, /const show = !offMenu && \(await coachAvailable\(\)\)/);
+  assert.match(sync, /setCoachNav\(show\)/);
+  assert.match(js("app.js"), /me\?\.grow_coach\?\.available/);
+  assert.match(js("lite.js"), /isSignedIn\(\) && !document\.body\.hasAttribute\("data-coach-off"\)/);
+  assert.match(js("lite.js"), /setCoachNav\(Boolean\(me\?\.grow_coach\?\.available\)\)/);
+  assert.match(js("chrome.js"), /if \(!show\) \{\s*existing\?\.remove\(\);/);
 });

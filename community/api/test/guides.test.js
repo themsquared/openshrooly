@@ -88,3 +88,20 @@ test("guides are in the sitemap, llms.txt, llms-full.txt, the hub, and redirect 
     assert.ok(redirects.includes(`/guides/${g.slug}.html /guides/${g.slug} 301!`), g.slug);
   }
 });
+
+test("only culinary partners are called partners or affiliates", () => {
+  for (const g of GUIDES) {
+    const html = main(page(g.slug));
+    for (const sentence of text(html).split(/(?<=\.)\s+/)) {
+      if (/PNW Spore/.test(sentence)) assert.doesNotMatch(sentence, /partner|affiliate|commission|we work with/i, `${g.slug}: ${sentence}`);
+    }
+  }
+});
+
+test("llms files never call PNW Spore a partner", () => {
+  for (const f of ["llms.txt", "llms-full.txt"]) {
+    for (const line of readFileSync(join(PUBLIC, f), "utf8").split("\n")) {
+      if (/PNW Spore/.test(line)) assert.doesNotMatch(line, /partner|affiliate|we work with/i, `${f}: ${line}`);
+    }
+  }
+});

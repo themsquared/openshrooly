@@ -4,7 +4,7 @@ import { days, fruit, link, profile, stage, temp } from "./data.js";
 const UPDATED = "2026-10-26";
 
 const PARTNERS =
-  '<p class="muted">Shroom Labs partners with <a href="https://northspore.com/" rel="noopener">North Spore</a> and <a href="https://pnwspore.com/" rel="noopener">PNW Spore</a>. Some supplier links on this site may be affiliate links. We may earn a commission if you buy through them, at no extra cost to you.</p>';
+  '<p class="muted">Shroom Labs partners with <a href="https://northspore.com/" rel="noopener">North Spore</a>. Some supplier links on this site may be affiliate links. We may earn a commission if you buy through them, at no extra cost to you.</p>';
 
 function speciesRow(id) {
   const p = profile(id);
@@ -88,7 +88,7 @@ ${speciesTable(["pearl-oyster", "blue-oyster", "lions-mane", "pink-oyster"], "Go
     },
     {
       h2: "Where can you buy mushroom kits and spawn?",
-      html: `<p>Buy from a supplier that sells clean, labeled cultures and stands behind them. Two we work with are North Spore for kits, spawn, and supplies, and PNW Spore for culinary liquid cultures.</p>${PARTNERS}`,
+      html: `<p>Buy from a supplier that sells clean, labeled cultures and stands behind them. North Spore sells kits, spawn, and supplies. <a href="https://pnwspore.com/" rel="noopener">PNW Spore</a> is another source of culinary liquid cultures.</p>${PARTNERS}`,
     },
   ],
   faq: [
