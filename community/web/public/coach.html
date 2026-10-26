@@ -4,22 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!--SEO_HEAD-->
-  <title>Grow Coach · Shroom Labs</title>
-  <meta name="description" content="Grow Coach and Autopilot for culinary chambers on Shroom Labs. Free during the beta for linked chambers.">
-  <meta name="robots" content="noindex,nofollow">
+  <title>Grow Coach: automatic grow control for your Shrooly · Shroom Labs</title>
+  <meta name="description" content="Grow Coach reads your Shrooly chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.">
+  <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://shroomlabs.io/coach">
   <meta property="og:site_name" content="Shroom Labs">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Grow Coach · Shroom Labs">
-  <meta property="og:description" content="Grow Coach and Autopilot for culinary chambers on Shroom Labs. Free during the beta for linked chambers.">
+  <meta property="og:title" content="Grow Coach: automatic grow control for your Shrooly · Shroom Labs">
+  <meta property="og:description" content="Grow Coach reads your Shrooly chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.">
   <meta property="og:url" content="https://shroomlabs.io/coach">
   <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Grow Coach · Shroom Labs">
+  <meta property="og:image:alt" content="Grow Coach: automatic grow control for your Shrooly · Shroom Labs">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Grow Coach · Shroom Labs">
-  <meta name="twitter:description" content="Grow Coach and Autopilot for culinary chambers on Shroom Labs. Free during the beta for linked chambers.">
+  <meta name="twitter:title" content="Grow Coach: automatic grow control for your Shrooly · Shroom Labs">
+  <meta name="twitter:description" content="Grow Coach reads your Shrooly chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.">
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Grow Coach","item":"https://shroomlabs.io/coach"}]}</script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-RKQ4CBEZWY"></script>
@@ -43,12 +43,12 @@
   <!--/CHROME_HEADER-->
   <main id="main">
     <p id="coach-error" class="notice hidden" role="alert"></p>
-    <div id="coach-skeleton" class="device-skeleton" aria-hidden="true"><div class="sk sk-identity"></div><div class="sk-row"><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div><div class="sk sk-card"></div></div>
-    <section id="coach-hero" class="hero coach-hero hidden" aria-label="Grow Coach">
+    <div id="coach-skeleton" class="device-skeleton hidden" aria-hidden="true"><div class="sk sk-identity"></div><div class="sk-row"><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div><div class="sk sk-card"></div></div>
+    <section id="coach-hero" class="hero coach-hero" aria-label="Grow Coach">
       <div class="hero-copy">
         <p id="coach-eyebrow" class="eyebrow">Culinary chambers only</p>
-        <h1>Advice tuned to your chamber.</h1>
-        <p class="lede">Grow Coach uses your device's readings and your past grows to tailor humidity and temperature advice for culinary Profiles. Photo checks come later.</p>
+        <h1>Automatic grow control for your Shrooly.</h1>
+        <p class="lede">Grow Coach reads your chamber's live readings and recommends humidity and temperature changes for the culinary Profile you're growing. Turn on Autopilot and it makes those changes for you, inside the Profile's safe range.</p>
         <p class="muted">Sold for general home cultivation only.</p>
         <p id="coach-status" class="muted"></p>
         <div id="coach-link" class="coach-sales hidden">
@@ -63,9 +63,9 @@
             <div id="coach-plan-list" class="coach-plan-list"></div>
           </fieldset>
           <ul class="coach-bullets">
-            <li>Advice for your chamber, based on its live readings and your past grows.</li>
-            <li>Suggested humidity and temperature changes you approve with one tap.</li>
-            <li>Works with culinary Profiles on a linked Shrooly.</li>
+            <li>Recommendations for your chamber, based on its live readings and your past grows.</li>
+            <li>Approve each change with one tap, or let Autopilot make it.</li>
+            <li>Works with culinary Profiles on a Shrooly running OpenShrooly.</li>
           </ul>
           <button type="button" id="subscribe">Start Grow Coach</button>
           <p class="muted coach-cancel">Cancel anytime.</p>
@@ -73,11 +73,27 @@
       </div>
     </section>
 
+    <section id="coach-pitch" class="coach-pitch" aria-labelledby="pitch-title">
+      <h2 id="pitch-title">How Grow Coach works</h2>
+      <ol class="coach-steps">
+        <li><strong>Install OpenShrooly on your Shrooly.</strong> It runs on your Wi-Fi and keeps working without an account. <a href="/install">Install guide</a></li>
+        <li><strong>Link the chamber to Shroom Labs.</strong> Coach needs the chamber's readings to know what is happening inside it. <a href="/claim">Link a chamber</a></li>
+        <li><strong>Pick a culinary Profile.</strong> Coach compares the readings with the Profile's stage targets and recommends changes when humidity or temperature drift.</li>
+        <li><strong>Choose how much control to hand over.</strong> In Advisor mode you approve each change. With Autopilot, Coach adjusts the targets itself and logs every decision with the reason.</li>
+      </ol>
+      <p class="muted">Every change stays inside the Profile's safe range and you can undo it. Grow Coach is $4.99 a month or $49 a year. Cancel anytime.</p>
+    </section>
+
     <div id="gated" class="hidden coach-page">
       <header class="coach-head">
         <h1>Grow Coach</h1>
         <p id="coach-head-status" class="muted"></p>
       </header>
+
+      <section id="coach-chambers" class="coach-section" aria-labelledby="chambers-title">
+        <h2 id="chambers-title">Chambers</h2>
+        <div id="chamber-list" class="coach-stack"></div>
+      </section>
 
       <section id="coach-recs" class="coach-section" aria-labelledby="recs-title">
         <h2 id="recs-title">Recommendations</h2>
@@ -89,11 +105,6 @@
         <p class="muted">What Coach changed, who decided, and why. Newest first.</p>
         <ul id="decision-list" class="action-list coach-feed-list" aria-live="polite"></ul>
         <p class="row"><button type="button" class="secondary hidden" id="decisions-more">Load more</button></p>
-      </section>
-
-      <section id="coach-chambers" class="coach-section" aria-labelledby="chambers-title">
-        <h2 id="chambers-title">Chambers</h2>
-        <div id="chamber-list" class="coach-stack"></div>
       </section>
 
       <div id="coach-tools" class="hidden">

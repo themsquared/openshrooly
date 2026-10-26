@@ -10,7 +10,6 @@ Disallow: /device$
 Disallow: /device?
 Disallow: /devices
 Disallow: /fleet
-Disallow: /coach
 Disallow: /alerts-unsub
 Disallow: /auth/
 Sitemap: https://shroomlabs.io/sitemap.xml
