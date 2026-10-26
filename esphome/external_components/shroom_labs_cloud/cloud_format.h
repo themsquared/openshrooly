@@ -130,6 +130,15 @@ struct InboxCommand {
 
 size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max);
 
+/** What is growing, from the inbox reply. Shown on the chamber's own page. */
+struct InboxGrow {
+  std::string name;
+  std::string url;    // https:// only, else empty
+  std::string image;  // https:// only, else empty
+};
+/** False when the reply has no grow_name (older server): keep what the chamber shows. */
+bool parse_inbox_grow(const char *json, InboxGrow *out);
+
 enum class SetpointDecision : uint8_t { Skip = 0, Apply, Refuse, Fail };
 
 struct SetpointPlan {
