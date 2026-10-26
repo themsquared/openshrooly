@@ -20,10 +20,10 @@ Releases are static files on the Netlify site, not in this repo and not in R2.
    openshrooly-release-v1
    product=openshrooly        (openshrooly-usb for the factory image)
    channel=stable
-   version=1.0.3-sl.1
+   version=1.0.4-sl.4
    size=<bytes>
    sha256=<hex>
-   url=https://shroomlabs.io/firmware/stable/openshrooly-1.0.3-sl.1.ota.bin
+   url=https://shroomlabs.io/firmware/stable/openshrooly-1.0.4-sl.4.ota.bin
    ```
 
    The Wi-Fi and USB images use different product names, so one signature can never be
@@ -96,7 +96,7 @@ B=.esphome/build/openshrooly/build
 
 # 2. Sign into the site's firmware folder (never commit these files)
 node ../scripts/sign_release.mjs --key /workspace/secrets/firmware-signing.key.pem \
-  --version 1.0.3-sl.2 --ota $B/firmware.ota.bin --factory $B/firmware.factory.bin \
+  --version 1.0.4-sl.4 --ota $B/firmware.ota.bin --factory $B/firmware.factory.bin \
   --out ../community/web/public/firmware/stable
 
 # The signer also writes openshrooly-<version>.signed.bin for Install from a file.

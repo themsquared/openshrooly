@@ -1517,6 +1517,31 @@ int main() {
   expect(tel_body.find("\"temperature_target_min\":15.00") != std::string::npos, "telemetry reports temp min");
   expect(tel_body.find("\"target_humidity_min\":30.00") != std::string::npos, "telemetry reports rh min");
   expect(engApply.last_applied_command_id() == 9, "remembers applied command");
+
+  // S4: an ack recorded while a telemetry POST is in flight must survive that POST's success.
+  HostStore storeRace;
+  ScriptTransport trRace;
+  FakeChamber chamberRace;
+  chamberRace.t_range = {true, 15.f, 35.f, 0.5f};
+  chamberRace.h_range = {true, 30.f, 100.f, 0.5f};
+  trRace.steps = {{"/enroll", ok_body(200, enroll_ok)},
+                  {"/csr", ok_body(200, cert_ok)},
+                  {"/inbox", ok_body(200, inbox_apply)},
+                  {"/telemetry", ok_body(200, "{\"ok\":true}")}};
+  CloudEngine engRace(&trRace, &clk, &storeRace, &crypto);
+  engRace.set_chamber(&chamberRace);
+  engRace.connect();
+  engRace.csr_now();
+  bool raced = false;
+  trRace.hook = [&](const HttpRequest &req) {
+    if (!raced && req.url.find("/telemetry") != std::string::npos) {
+      raced = true;
+      engRace.complete_apply(10, true, nullptr, nullptr, ChamberReading{});
+    }
+  };
+  expect(engRace.probe_now(), "probe race");
+  expect(raced, "race hook ran");
+  expect(engRace.ack_waiting(), "newer ack survives the older ack's POST");
   bool saw_query = false;
   for (const auto &u : trApply.urls)
     saw_query = saw_query || u.find("/inbox?") != std::string::npos;
