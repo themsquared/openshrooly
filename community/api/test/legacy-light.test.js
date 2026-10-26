@@ -95,7 +95,7 @@ test("a legacy profile still starts a grow, forks, rates, and exports with sensi
   // A chamber that says it takes light schedules, so the light preview is about the profile's values.
   await ctx.db.run("INSERT INTO device_telemetry (device_id, document, created_at) VALUES (?, ?, ?)", [
     "dev-legacy",
-    JSON.stringify({ firmware_version: "2.0.0", capabilities: ["setpoints.temperature", "setpoints.humidity", "light.schedule"] }),
+    JSON.stringify({ firmware_version: "1.0.5-sl.1", capabilities: ["setpoints.temperature", "setpoints.humidity", "setpoints.multi", "light.schedule", "light.color"] }),
     nowIso(),
   ]);
 

@@ -182,8 +182,49 @@ test("a chamber that reports light support keeps the light controls on", () => {
     { ...sl2, firmware: "2.0.0", capabilities: { source: "reported" }, controls: { ...SL2_CONTROLS, light: { supported: true, note: null } } },
     { canWrite: true }
   );
-  assert.doesNotMatch(tagFor(html, "white_led_lux"), /disabled/);
+  assert.doesNotMatch(tagFor(html, "white_percent"), /disabled/);
   assert.match(html, /Chamber software 2\.0\.0/);
+});
+
+const SL5_CONTROLS = {
+  ...SL2_CONTROLS,
+  fan: { supported: true, note: null },
+  air: { supported: true, note: null },
+  light: { supported: true, schedule: true, color: true, note: null },
+  stage: { supported: true, phase: true, day: true, note: null },
+  profile: { supported: true, mode: "full", note: null },
+};
+
+test("a 1.0.5 chamber gets fan, fresh air, light in % with a lux preview, and its phase", async () => {
+  const { luxPreview } = await import("../public/js/device-ui.js");
+  const device = {
+    ...sl2,
+    firmware: "1.0.5-sl.1",
+    controls: SL5_CONTROLS,
+    chamber: { air_exchange_period_min: 20, air_exchange_run_sec: 60, grow_phase: "Pinning", grow_day: 9 },
+    chamber_light: { sunrise_hour: 7, duration_hours: 12, white_led_lux: 1165, white_percent: 50, red_percent: 0, green_percent: 0, blue_percent: 80 },
+  };
+  const html = renderControls(device, { canWrite: true });
+  assert.match(tagFor(html, "air_exchange_period_min"), /value="20"/);
+  assert.match(tagFor(html, "air_exchange_run_sec"), /value="60"/);
+  assert.match(tagFor(html, "white_percent"), /value="50"/);
+  assert.match(html, /About 1164 lux/);
+  assert.match(html, /<option value="Pinning" selected>/);
+  assert.match(tagFor(html, "grow_day"), /value="9"/);
+  for (const action of ["air", "light", "stage"]) assert.match(html, new RegExp(`data-action="${action}"`));
+  assert.doesNotMatch(html, /Fan period and run time stay on the chamber/);
+  assert.doesNotMatch(html, /on the chamber itself for now/);
+  assert.equal(luxPreview(20), "About 92 lux");
+  assert.match(luxPreview(100), /4000 lux \(the most/);
+  assert.doesNotMatch(html, DASH);
+});
+
+test("air and phase controls stay hidden until the chamber reports them", () => {
+  const html = renderControls(sl2, { canWrite: true });
+  assert.doesNotMatch(html, /name="air_exchange_period_min"/);
+  assert.doesNotMatch(html, /name="grow_phase"/);
+  const offline = renderControls({ ...sl2, controls: SL5_CONTROLS, chamber: {} }, { canWrite: false });
+  assert.match(tagFor(offline, "air_exchange_run_sec"), /disabled/);
 });
 
 test("command states read plainly and queued is never called applied", () => {

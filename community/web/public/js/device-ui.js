@@ -2,6 +2,7 @@
 
 import { speciesArt } from "./species-art.js";
 import { escapeHtml, safeDisplay } from "./safe-markdown.js";
+import { whiteLuxToPercent, whitePercentToLux } from "./profile-schema.js";
 
 export const DEFAULT_DEVICE_TYPE = "shrooly_chamber";
 
@@ -294,21 +295,39 @@ function controlMsg(action) {
 export function chamberOnlyLine(controls = {}) {
   const off = [];
   if (controls.fan?.supported === false) off.push("fan speed");
+  if (controls.air?.supported === false) off.push("the air exchange schedule");
   if (controls.light?.supported === false) off.push("the light schedule");
   if (!off.length) return "";
-  return `This chamber takes ${off.join(" and ")} on the chamber itself for now, not from here.`;
+  const list = off.length > 2 ? `${off.slice(0, -1).join(", ")} and ${off.at(-1)}` : off.join(" and ");
+  return `This chamber takes ${list} on the chamber itself for now, not from here.`;
 }
 
 /**
  * Chamber controls, top to bottom: what is growing, the climate, then light and name.
  * Controls this chamber can't take from the cloud are left out, with one plain line saying so.
  */
+/** White brightness preview: the chamber's white channel is set in lux, the site shows %. */
+export function luxPreview(percent) {
+  const lux = whitePercentToLux(percent);
+  return `About ${lux} lux${lux >= 4000 ? " (the most the chamber can do)" : ""}`;
+}
+
+/** Chamber grow phases (the chamber's own select). */
+export const GROW_PHASES = ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"];
+
 export function renderControls(device, { profiles = [], canWrite = false, showCoach = false } = {}) {
   const disabled = canWrite ? "" : " disabled";
   const controls = device.controls || {};
   const supported = (key) => controls[key]?.supported !== false;
+  // Newer knobs show only when the chamber says it can take them.
+  const reported = (key) => controls[key]?.supported === true;
+  const chamber = device.chamber || {};
   const profileOff = canWrite && supported("profile") ? "" : " disabled";
-  const light = device.light || {};
+  // What the chamber runs now wins over the stage recipe, so Save never surprises.
+  const light = device.chamber_light || device.light || {};
+  const whitePct = light.white_percent ?? (light.white_led_lux != null ? Math.round(whiteLuxToPercent(light.white_led_lux)) : null);
+  const colorOff = controls.light?.color === false ? " disabled" : "";
+  const scheduleOff = controls.light?.schedule === false ? " disabled" : "";
   const profileOptions =
     `<option value="">Choose what you're growing</option>` +
     profiles
@@ -344,9 +363,49 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       : "";
   const fan = supported("fan")
     ? `<label>Fan speed (%)
-          <input name="fan_speed_percent" type="number" step="1" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${disabled}>
+          <input name="fan_speed_percent" type="number" step="5" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${disabled}>
         </label>
-        <p class="muted">Fan period and run time stay on the chamber.</p>`
+        ${reported("air") ? "" : `<p class="muted">Fan period and run time stay on the chamber.</p>`}`
+    : "";
+  const airBlock = reported("air")
+    ? `<fieldset>
+      <legend>Fresh air</legend>
+      <div class="row">
+        <label>Run every (minutes)
+          <input name="air_exchange_period_min" type="number" step="1" min="1" max="240" value="${numOrBlank(chamber.air_exchange_period_min)}"${disabled}>
+        </label>
+        <label>For (seconds)
+          <input name="air_exchange_run_sec" type="number" step="5" min="5" max="900" value="${numOrBlank(chamber.air_exchange_run_sec)}"${disabled}>
+        </label>
+      </div>
+      <button type="submit" class="secondary" data-action="air"${disabled}>Save fresh air</button>
+      ${controlMsg("air")}
+    </fieldset>`
+    : "";
+  const phaseNow = chamber.grow_phase || "";
+  const stageBlock = reported("stage")
+    ? `<fieldset>
+      <legend>Chamber phase</legend>
+      <div class="row">
+        ${
+          controls.stage?.phase === false
+            ? ""
+            : `<label>Phase on the chamber
+          <select name="grow_phase"${disabled}>${GROW_PHASES.map((p) => `<option value="${p}"${p === phaseNow ? " selected" : ""}>${p}</option>`).join("")}</select>
+        </label>`
+        }
+        ${
+          controls.stage?.day === false
+            ? ""
+            : `<label>Grow day
+          <input name="grow_day" type="number" step="1" min="0" max="90" value="${numOrBlank(chamber.grow_day)}"${disabled}>
+        </label>`
+        }
+      </div>
+      <p class="muted">Only changes what the chamber shows and counts. Start this grow above sets the whole phase.</p>
+      <button type="submit" class="secondary" data-action="stage"${disabled}>Save phase</button>
+      ${controlMsg("stage")}
+    </fieldset>`
     : "";
   const lightBlock = supported("light")
     ? `<fieldset>
@@ -354,21 +413,22 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       ${controlNote(controls.light)}
       <div class="row">
         <label>Lights on at (hour)
-          <input name="sunrise_hour" type="number" step="0.25" min="0" max="23.75" value="${numOrBlank(light.sunrise_hour)}"${disabled}>
+          <input name="sunrise_hour" type="number" step="1" min="0" max="23" value="${numOrBlank(light.sunrise_hour)}"${disabled}${scheduleOff}>
         </label>
         <label>Hours on
-          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${disabled}>
+          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${disabled}${scheduleOff}>
         </label>
       </div>
-      <label>White brightness (lux)
-        <input name="white_led_lux" type="number" min="0" max="4000" value="${numOrBlank(light.white_led_lux)}"${disabled}>
+      <label>White brightness (%)
+        <input name="white_percent" type="number" step="1" min="0" max="100" value="${numOrBlank(whitePct)}"${disabled}${colorOff}>
       </label>
+      <p class="muted lux-preview" data-lux-preview aria-live="polite">${escapeHtml(luxPreview(whitePct ?? 0))}</p>
       <div class="row">
-        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${disabled}></label>
-        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${disabled}></label>
-        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${disabled}></label>
+        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${disabled}${colorOff}></label>
+        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${disabled}${colorOff}></label>
+        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${disabled}${colorOff}></label>
       </div>
-      <p class="muted">Set hours on to 0 only for a dark stage, with brightness and colors at 0 too.</p>
+      <p class="muted">Hours on 0 means dark, with brightness and colors at 0 too. A light that is on with 0 hours runs 12 hours.</p>
       <button type="submit" class="secondary" data-action="light"${disabled}>Save light</button>
       ${controlMsg("light")}
     </fieldset>`
@@ -399,7 +459,9 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       <button type="submit" class="secondary" data-action="climate"${disabled}>Save climate</button>
       ${controlMsg("climate")}
     </fieldset>
+    ${airBlock}
     ${lightBlock}
+    ${stageBlock}
     ${onlyHere ? `<p class="muted chamber-only-line">${escapeHtml(onlyHere)}</p>` : ""}
     <fieldset>
       <legend>Chamber name</legend>
