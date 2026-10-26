@@ -228,7 +228,7 @@ test("fleet setpoint apply pauses Autopilot immediately", async () => {
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-pause", { token });
   assert.equal(status.data.mode, "advisor");
   assert.equal(status.data.status, "paused");
-  assert.match(status.data.pause_reason, /you changed a setpoint/i);
+  assert.match(status.data.pause_reason, /you changed a target yourself/i);
 });
 
 test("fleet profile action requires a published or owned profile and does not leak names", async () => {

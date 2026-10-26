@@ -239,7 +239,7 @@ export const FAQ = [
   },
   {
     q: "Do I need the cloud?",
-    a: "No. Growing runs on your own network. Linking a chamber to the cloud needs a firmware update that is not out yet. Local controls still win if the cloud is down.",
+    a: "No. Growing runs on your own network. Linking a chamber to the cloud needs a chamber update that is not out yet. Local controls still win if the cloud is down.",
   },
   {
     q: "How long does pearl oyster take?",

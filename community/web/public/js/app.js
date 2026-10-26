@@ -1173,7 +1173,7 @@ async function renderCoach() {
     if (!deviceId()) {
       coachMode = "advisor";
       setModeButtons("advisor");
-      $("#mode-status").textContent = "Pick a chamber to use Autopilot.";
+      $("#mode-status").textContent = "Pick a chamber first.";
       $("#run-autopilot")?.classList.add("hidden");
       $("#autopilot-actions").innerHTML = "";
       return;
@@ -1184,15 +1184,15 @@ async function renderCoach() {
     if (data.status === "paused") {
       const until = formatEligible(data.pause_until || data.next_eligible_at);
       $("#mode-status").textContent = until
-        ? `Autopilot paused: ${data.pause_reason} Next eligible after ${until}.`
-        : `Autopilot paused: ${data.pause_reason}`;
+        ? `Coach stopped adjusting. ${data.pause_reason} It can adjust again after ${until}.`
+        : `Coach stopped adjusting. ${data.pause_reason}`;
     } else if (data.mode === "autopilot") {
       const next = formatEligible(data.next_eligible_at);
       $("#mode-status").textContent = next
-        ? `Autopilot is on. Next change after ${next}.`
-        : "Autopilot is on.";
+        ? `Coach adjusts it for you. Next change after ${next}.`
+        : "Coach adjusts it for you.";
     } else {
-      $("#mode-status").textContent = "Advisor. Coach suggests changes. You tap Apply.";
+      $("#mode-status").textContent = "Coach suggests changes. You tap Apply.";
     }
     $("#run-autopilot")?.classList.toggle("hidden", data.mode !== "autopilot");
     $("#autopilot-actions").innerHTML =
@@ -1214,7 +1214,7 @@ async function renderCoach() {
                 ? "Command expired"
                 : row.action === "failed" || row.action === "refused"
                   ? `Command ${row.action}`
-                  : "Paused Autopilot";
+                  : "Stopped adjusting";
           const detail = [statusLabel, row.reason].filter(Boolean).join(". ");
           const undo = row.action === "apply" && !row.undone_at && row.apply_status !== "failed" && row.apply_status !== "expired" && row.apply_status !== "refused"
             ? `<button type="button" class="secondary" data-undo="${row.id}">Undo</button>`
@@ -1225,7 +1225,7 @@ async function renderCoach() {
                 : "";
           return `<li><div><strong>${escapeHtml(summary)}</strong><p class="muted">${escapeHtml(detail)}</p></div>${undo}</li>`;
         })
-        .join("") || `<li class="muted">No Autopilot actions yet.</li>`;
+        .join("") || `<li class="muted">Coach has not changed anything yet.</li>`;
   }
 
   $("#device").addEventListener("change", () => {
@@ -2011,8 +2011,8 @@ function coachLabel(device) {
   // The API only sends `coach` to users who can use Coach. No coach, no label.
   if (!device.coach) return "";
   if (device.coach.status === "paused") return `Paused: ${device.coach.pause_reason || "paused"}`;
-  if (device.coach.mode === "autopilot") return "Autopilot";
-  return "Advisor";
+  if (device.coach.mode === "autopilot") return "Coach adjusts";
+  return "Coach suggests";
 }
 
 async function renderFleet() {

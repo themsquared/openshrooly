@@ -56,8 +56,8 @@ export function coachLine(device) {
   if (device?.off_menu) return "";
   if (!device?.coach) return "";
   if (device.coach.status === "paused") return `Coach paused: ${device.coach.pause_reason || "paused"}`;
-  if (device.coach.mode === "autopilot") return "Coach Autopilot";
-  return "Coach Advisor";
+  if (device.coach.mode === "autopilot") return "Coach adjusts it";
+  return "Coach suggests";
 }
 
 export function lastSeenLine(device) {
@@ -236,7 +236,7 @@ export function newRequestId() {
 }
 
 export function renderCapabilities(device) {
-  const firmware = device.firmware ? `Firmware ${device.firmware}` : "Firmware version not reported";
+  const firmware = device.firmware ? `Chamber software ${device.firmware}` : "Chamber software version not reported";
   const source = device.capabilities?.source;
   const how =
     source === "reported"
@@ -297,8 +297,8 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
           <legend>Grow Coach</legend>
           <label>Mode
             <select name="coach_mode"${disabled}>
-              <option value="advisor"${device.coach?.mode !== "autopilot" ? " selected" : ""}>Advisor</option>
-              <option value="autopilot"${device.coach?.mode === "autopilot" ? " selected" : ""}>Autopilot</option>
+              <option value="advisor"${device.coach?.mode !== "autopilot" ? " selected" : ""}>I approve changes</option>
+              <option value="autopilot"${device.coach?.mode === "autopilot" ? " selected" : ""}>Coach adjusts it for me</option>
             </select>
           </label>
           <button type="submit" data-action="coach_mode"${disabled}>Save Coach mode</button>

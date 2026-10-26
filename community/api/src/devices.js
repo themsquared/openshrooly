@@ -787,7 +787,7 @@ export async function handleDevices(method, path, url, request, env) {
       const latest = samples.at(-1);
       const caps = deviceCapabilities(latest ? JSON.parse(latest.document || "{}") : {});
       if (!caps.firmware_notice) {
-        return json({ ok: false, status: "failed", error: "This chamber's firmware can't show update notices from the cloud." }, 409);
+        return json({ ok: false, status: "failed", error: "This chamber can't show update notices from the site yet." }, 409);
       }
       await db.run(
         "INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)",
