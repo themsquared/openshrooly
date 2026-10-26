@@ -488,6 +488,7 @@ int main() {
 
   expect(cloud_owns_url("/cloud"), "cloud owns /cloud");
   expect(!cloud_owns_url("/cloud/connect"), "cloud does not own two-segment");
+  expect(cloud_grow_url("/grow") && !cloud_grow_url("/grow/x") && std::strcmp(first_local_handler("/grow"), "cloud") == 0, "grow read is ours");
   expect(!dashboard_catchall_claims("/cloud"), "catchall skips /cloud");
   expect(!dashboard_catchall_claims("/security"), "catchall skips /security");
   expect(!dashboard_catchall_claims("/update"), "catchall skips /update");
@@ -502,7 +503,7 @@ int main() {
              cloud_action_ok("remote_apply_on") && cloud_action_ok("remote_apply_off"),
          "cloud actions");
   expect(!cloud_action_ok("wipe") && !cloud_action_ok(""), "cloud action reject");
-  const char *our_routes[] = {"/cloud", "/security", "/update", "/wifisave"};
+  const char *our_routes[] = {"/cloud", "/grow", "/security", "/update", "/wifisave"};
   bool stolen = false;
   for (const char *p : our_routes)
     stolen = stolen || dashboard_catchall_claims(p);
@@ -769,6 +770,43 @@ int main() {
   expect(eng.cert_pem().find("BEGIN CERTIFICATE") != std::string::npos, "engine cert pem");
   expect(eng.owner_name() == "Mike M", "engine keeps owner name from csr");
   expect(!eng.wiping(), "engine not wiping when linked");
+
+  // What is growing rides on the inbox and shows on the chamber's own page while linked.
+  expect(eng.grow_json() == "{\"linked\":true,\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\"}", "no grow before inbox");
+  expect(eng.status_json().find("grow_name") == std::string::npos, "grow not in the login-only status");
+  tr.steps = {{"/inbox", ok_body(200,
+      "{\"commands\":[],\"cloud_enabled\":true,\"offline_ok\":true,\"grow_name\":\"Lion's Mane\","
+      "\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\","
+      "\"grow_image\":\"https://shroomlabs.io/img/species/species-lions-mane-640.webp\"}")}};
+  tr.i = 0;
+  eng.probe_now();
+  {
+    const std::string js = eng.grow_json();
+    expect(js.find("\"grow_name\":\"Lion's Mane\"") != std::string::npos, "grow name in status");
+    expect(js.find("\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\"") != std::string::npos, "grow url in status");
+    expect(js.find("species-lions-mane-640.webp\"") != std::string::npos, "grow image in status");
+  }
+  // An older server sends no grow keys: keep what the page shows.
+  tr.steps = {{"/inbox", ok_body(200, "{\"commands\":[]}")}};
+  tr.i = 0;
+  eng.probe_now();
+  expect(eng.grow_json().find("Lion's Mane") != std::string::npos, "grow kept when server sends none");
+  // Empty name clears it.
+  tr.steps = {{"/inbox", ok_body(200, "{\"commands\":[],\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\"}")}};
+  tr.i = 0;
+  eng.probe_now();
+  expect(eng.grow_json().find("\"grow_name\":\"\"") != std::string::npos, "grow cleared");
+  {
+    InboxGrow g;
+    expect(!parse_inbox_grow("{\"commands\":[]}", &g), "grow absent on old server");
+    expect(!parse_inbox_grow("{\"commands\":[{\"payload\":{\"grow_name\":\"x\"}}]}", &g), "grow only at top level");
+    expect(parse_inbox_grow("{\"grow_name\":\"A\\\"<b>\",\"grow_url\":\"http://evil\",\"grow_image\":\"javascript:x\"}", &g),
+           "grow parsed");
+    expect(g.name == "Ab", "grow name stripped of quotes and tags");
+    expect(g.url.empty() && g.image.empty(), "grow links https only");
+    expect(parse_inbox_grow("{\"grow_name\":\"\",\"grow_url\":\"https://shroomlabs.io/x\"}", &g) && g.url.empty(),
+           "no link without a name");
+  }
 
   tr.steps = {{"/rotate", ok_body(429, "{}", true, 120)}};
   tr.i = 0;
@@ -2232,6 +2270,70 @@ int main() {
   reboot_sim("reboot inbox 503 under cap", 503, 200, false, 12345);
   reboot_sim("reboot telemetry 500 under cap", 200, 500, false, 777);
   reboot_sim("reboot tls fail under cap", 0, 0, true, 99);
+
+  // Fresh link: the first inbox poll and heartbeat come 30 to 60 s after the cert, not 15 min.
+  {
+    HostStore stLink;
+    ScriptTransport trLink;
+    FakeChamber chLink;
+    chLink.t_range = {true, 15.f, 35.f, 0.5f};
+    chLink.h_range = {true, 30.f, 100.f, 0.5f};
+    trLink.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+    trLink.inbox_status = 200;
+    trLink.inbox_body = "{\"commands\":[]}";
+    trLink.telemetry_status = 200;
+    trLink.telemetry_body = "{\"ok\":true}";
+    trLink.nonce_limit = 1000;
+    CloudEngine engLink(&trLink, &clk, &stLink, &crypto);
+    engLink.set_chamber(&chLink);
+    clk.now = 400000;
+    clk.wall = parse_iso8601_ms("2026-10-26T18:00:00Z");
+    const int64_t w0 = clk.wall;
+    engLink.connect();
+    expect(engLink.csr_now(), "fresh link csr ok");
+    expect(engLink.state() == CloudState::Linked, "fresh link linked");
+    const uint32_t t0 = clk.now;
+    expect(engLink.next_probe_ms() - t0 >= BOOT_CONTACT_MIN_MS &&
+               engLink.next_probe_ms() - t0 <= BOOT_CONTACT_MIN_MS + BOOT_CONTACT_JITTER_MS,
+           "fresh link probe due in 30 to 60 s");
+    expect(engLink.next_telemetry_ms() == engLink.next_probe_ms(), "fresh link heartbeat with the probe");
+    std::vector<uint32_t> at, inbox_at, tel_at;
+    trLink.hook = [&](const HttpRequest &req) {
+      if (req.url.find("/inbox") != std::string::npos || req.url.find("/telemetry") != std::string::npos ||
+          req.url.find("/nonce") != std::string::npos)
+        at.push_back(clk.now);
+      if (req.url.find("/inbox") != std::string::npos)
+        inbox_at.push_back(clk.now);
+      if (req.url.find("/telemetry") != std::string::npos)
+        tel_at.push_back(clk.now);
+    };
+    for (uint32_t t = 0; t <= 3u * 3600u * 1000u; t += 1000) {
+      clk.now = t0 + t;
+      clk.wall = w0 + static_cast<int64_t>(t);
+      engLink.loop();
+    }
+    trLink.hook = nullptr;
+    expect(!inbox_at.empty() && inbox_at[0] - t0 <= 75u * 1000u, "fresh link first inbox poll within 75 s");
+    expect(!tel_at.empty() && tel_at[0] - t0 <= 75u * 1000u, "fresh link first telemetry within 75 s");
+    expect(inbox_at.empty() || inbox_at[0] - t0 >= BOOT_CONTACT_MIN_MS, "fresh link waits 30 s");
+    bool cadence = inbox_at.size() >= 11;
+    for (size_t i = 1; i < inbox_at.size(); i++)
+      if (inbox_at[i] - inbox_at[i - 1] < 10u * 60u * 1000u)
+        cadence = false;
+    expect(cadence, "fresh link inbox back to the 15 min cadence");
+    size_t worst = 0;
+    for (size_t i = 0; i < at.size(); i++) {
+      size_t n = 0;
+      for (size_t j = i; j < at.size() && at[j] - at[i] < CONNECT_HOUR_MS; j++)
+        n++;
+      if (n > worst)
+        worst = n;
+    }
+    expect(worst <= CONNECT_HOUR_CAP, "fresh link under connect cap");
+    std::printf("fresh link: first inbox %us, first telemetry %us, inbox polls=%zu, worst rolling hour=%zu\n",
+                inbox_at.empty() ? 0u : (inbox_at[0] - t0) / 1000u, tel_at.empty() ? 0u : (tel_at[0] - t0) / 1000u,
+                inbox_at.size(), worst);
+  }
 
   HostStore storeCadence;
   ScriptTransport trCadence;

@@ -570,6 +570,35 @@ const char *const KNOB_KEYS[KNOB_COUNT] = {
     "white_intensity",    "color_r",                 "color_g",              "color_b",      "grow_day",
 };
 
+// Printable ASCII only, and nothing that needs escaping in JSON or HTML.
+static std::string grow_text(const std::string &in, size_t max) {
+  std::string out;
+  for (char ch : in) {
+    if (out.size() >= max)
+      break;
+    if (ch >= 0x20 && ch < 0x7f && ch != '"' && ch != '\\' && ch != '<' && ch != '>')
+      out.push_back(ch);
+  }
+  return out;
+}
+
+static std::string grow_link(const std::string &in) {
+  std::string s = grow_text(in, 160);
+  return s.compare(0, 8, "https://") == 0 && s.find(' ') == std::string::npos ? s : std::string();
+}
+
+bool parse_inbox_grow(const char *json, InboxGrow *out) {
+  std::string name, url, image;
+  if (out == nullptr || !json_get_string_top(json, "grow_name", &name))
+    return false;
+  json_get_string_top(json, "grow_url", &url);
+  json_get_string_top(json, "grow_image", &image);
+  out->name = grow_text(name, 48);
+  out->url = out->name.empty() ? std::string() : grow_link(url);
+  out->image = out->name.empty() ? std::string() : grow_link(image);
+  return true;
+}
+
 size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max) {
   if (json == nullptr || out == nullptr || max == 0)
     return 0;

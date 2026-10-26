@@ -118,7 +118,7 @@ Cold shock (shiitake) **cannot** be done inside the chamber; the profile documen
 | --- | --- | --- |
 | Free profiles | Working | Entire culinary starter pack except one demo |
 | Paid profiles $1–$5 (up to $20 capped) | Stub checkout | `PaymentRouter` + Stripe stub; entitlement row |
-| **Grow Coach** subscription | Stub checkout · **$3.99 / mo** | Culinary only. Entitlement + `coach_subs`. See Phase 0d |
+| **Grow Coach** subscription | Stripe checkout · **$4.99 / mo or $49 / yr** | Culinary only. Entitlement + `coach_subs`. See Phase 0d |
 | Creator revenue share | Field only | `creator_share_percent` default 70%; no payouts |
 | Grow guides | One stub row | Same checkout interface |
 | Affiliate links | Working (example URLs) | Click tracking + FTC-style disclosure |
@@ -198,7 +198,9 @@ Affiliate example links are placeholders (`example.com`). Real networks (3–8%)
 
 This is not a forecast. The firmware stays free and MIT-licensed regardless.
 
-### Grow Coach cost vs $3.99 list (Phase 0d)
+### Grow Coach cost vs $4.99 list (Phase 0d)
+
+Plans (Mike, Oct 26 2026): **$4.99 a month** or **$49 a year**. Twelve months at $4.99 is $59.88, so yearly is 18.2% less ("save about 18%"). After Stripe's 2.9% plus 30 cents: monthly nets about $4.54, yearly about $47.28 (about $3.94 a month). The yearly plan pays one 30 cent fee instead of twelve.
 
 Learning (droop, sensor offset, rise rate, alerts) is **plain JavaScript** — no model call. Chat and photo-check go through a swappable provider (`GROW_COACH_PROVIDER`). Production default: **Cloudflare Workers AI**.
 
@@ -222,11 +224,11 @@ Workers Paid is **$5 / month** for the whole API (shared with catalog, auth, mTL
 
 | Subscribers | Shared Worker | AI at cap (worst) | Cost / sub | List | Rough gross after Stripe-ish 3%+$0.30 |
 | --- | --- | --- | --- | --- | --- |
-| 10 | $5 | $5 | ~$1.00 | $3.99 | ~$2.50 net / sub before support |
-| 50 | $5 | $25 | ~$0.60 | $3.99 | ~$3.20 net / sub |
-| Real usage (not everyone at cap) | $5 | much less | **well under $1** | $3.99 | Comfortable margin |
+| 10 | $5 | $5 | ~$1.00 | $4.99 | ~$3.55 net / sub before support |
+| 50 | $5 | $25 | ~$0.60 | $4.99 | ~$3.95 net / sub |
+| Real usage (not everyone at cap) | $5 | much less | **well under $1** | $4.99 | Comfortable margin |
 
-**Do not** point Grow Coach at a frontier API by default — one verbose vision call there can erase a month of $3.99. Swap the provider (`GROW_COACH_PROVIDER`) only after measuring `coach_usage.neurons`.
+**Do not** point Grow Coach at a frontier API by default. One verbose vision call there can erase a month of $4.99. Swap the provider (`GROW_COACH_PROVIDER`) only after measuring `coach_usage.neurons`.
 
 Marketing and checkout copy stay on **general culinary cultivation**. Subscribe with `pack=psilocybin` is rejected; chat / photo / auto-tune refuse the restricted pack.
 
@@ -236,7 +238,7 @@ Details: [`docs/COACH.md`](COACH.md).
 
 ### Phase 0d — Grow Coach (this follow-up)
 
-Paid culinary AI after device mTLS. $3.99/month, entitlement-gated.
+Paid culinary AI after device mTLS. $4.99 a month or $49 a year, entitlement-gated.
 
 - [x] Per-device model from telemetry + culinary grow outcomes
 - [x] Suggest setpoints (user approve) or opt-in auto-tune inside safe bounds (RH 70–96, 16–28 °C, Δ 6% / 2 °C)

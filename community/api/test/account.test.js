@@ -136,7 +136,7 @@ test("delete waits for a paid Grow Coach plan to be cancelled", async () => {
   await ctx.db.run("INSERT INTO coach_subs (user_id, status, period_end, auto_tune, created_at) VALUES (?, ?, ?, ?, ?)", [user.id, "active", later, 0, now]);
   await ctx.db.run(
     "INSERT INTO checkouts (id, user_id, item_id, provider, status, amount_cents, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    ["cs_1", user.id, "grow-coach", "stripe", "paid", 399, "{}", now]
+    ["cs_1", user.id, "grow-coach", "stripe", "paid", 499, "{}", now]
   );
   const res = await call(ctx, "POST", "/api/me/delete", { cookie, body: { confirm: user.username } });
   assert.equal(res.status, 409, JSON.stringify(res.data));

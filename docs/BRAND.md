@@ -22,7 +22,7 @@ Use that line on every public surface. Never brand the product as Shrooly. Never
 | --- | --- |
 | Profiles | Chamber recipes (humidity, temperature, fresh air, light, days) |
 | Hub | Local app that stores Profiles and talks to a chamber |
-| Grow Coach | $3.99/month culinary coaching (coming soon; photo checks later) |
+| Grow Coach | $4.99/month or $49/year culinary coaching (coming soon; photo checks later) |
 | Community | The public site and the people who rate, fork, and report |
 
 Do not invent extra product names. Culinary is the default library browse.

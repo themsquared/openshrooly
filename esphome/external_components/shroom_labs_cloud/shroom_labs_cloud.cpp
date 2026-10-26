@@ -66,10 +66,18 @@ class CloudPage : public AsyncWebHandler {
   explicit CloudPage(ShroomLabsCloud *c) : cloud_(c) {}
   bool canHandle(AsyncWebServerRequest *request) const override {
     char buf[AsyncWebServerRequest::URL_BUF_SIZE];
-    return cloud_owns_url(std::string(request->url_to(buf)).c_str());
+    const std::string url(request->url_to(buf));
+    return cloud_owns_url(url.c_str()) || (request->method() == HTTP_GET && cloud_grow_url(url.c_str()));
   }
   void handleRequest(AsyncWebServerRequest *request) override {
     const auto method = request->method();
+    char buf[AsyncWebServerRequest::URL_BUF_SIZE];
+    if (cloud_grow_url(std::string(request->url_to(buf)).c_str())) {
+      auto *res = request->beginResponse(200, "application/json", this->cloud_->grow_json());
+      res->addHeader("Cache-Control", "no-store");
+      request->send(res);
+      return;
+    }
     if (method == HTTP_GET) {
       auto *res = request->beginResponse(200, "application/json", this->cloud_->status_json());
       res->addHeader("Cache-Control", "no-store");
