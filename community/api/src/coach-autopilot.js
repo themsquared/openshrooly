@@ -44,9 +44,7 @@ export async function coachAutopilotAvailable(env, db, user) {
   if (!user) return false;
   if (isCoachBetaUser(env, user)) return true;
   const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
-  if (sub && sub.status === "active" && sub.period_end >= nowIso()) return true;
-  const row = await db.one("SELECT * FROM entitlements WHERE user_id=? AND item_id=?", [user.id, COACH_ITEM]);
-  return Boolean(row);
+  return Boolean(sub && sub.status === "active" && sub.period_end >= nowIso());
 }
 
 export const AUTOPILOT_SOURCES = new Set(["grow-coach-autopilot", "grow-coach-autopilot-undo"]);

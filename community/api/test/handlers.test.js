@@ -302,3 +302,20 @@ test("POST /api/auth/local is impossible on prod hosts and without ENVIRONMENT=l
   const still = await call(local, "POST", "/api/auth/local", { body: { token: unused }, host: "127.0.0.1" });
   assert.equal(still.status, 200, JSON.stringify(still.data));
 });
+
+test("placeholder affiliate links are never shown or followed", async () => {
+  const { affiliateLinksFor } = await import("../src/profile.js");
+  const profile = {
+    pack: "culinary",
+    affiliates_allowed: true,
+    affiliate_links: [
+      { id: "fake", merchant: "example-supplier", label: "Fake", url: "https://example.com/affiliate/x" },
+      { id: "real", merchant: "north-spore", label: "Real", url: "https://northspore.com/products/x" },
+    ],
+  };
+  assert.deepEqual(affiliateLinksFor(profile).map((l) => l.id), ["real"]);
+  assert.deepEqual(affiliateLinksFor({ ...profile, pack: "psilocybin" }), []);
+  const ctx = testEnv();
+  const supplies = await call(ctx, "GET", "/api/supplies");
+  assert.deepEqual(supplies.data.items, []);
+});
