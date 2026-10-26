@@ -23,7 +23,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io wss://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 ws://127.0.0.1:8787 ws://localhost:8787 https://cdn.shroomlabs.io https://challenges.cloudflare.com; img-src 'self' data: blob: https://cdn.shroomlabs.io; style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; font-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.shroomlabs.io http://127.0.0.1:8787"
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://api.shroomlabs.io wss://api.shroomlabs.io http://127.0.0.1:8787 http://localhost:8787 ws://127.0.0.1:8787 ws://localhost:8787 https://cdn.shroomlabs.io https://challenges.cloudflare.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; img-src 'self' data: blob: https://cdn.shroomlabs.io https://*.google-analytics.com https://*.googletagmanager.com; style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com https://www.googletagmanager.com; font-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.shroomlabs.io http://127.0.0.1:8787"
 
 [[headers]]
   for = "/install"

@@ -597,7 +597,15 @@ export function siteJsonLd() {
 }
 
 /** Shared head tags. Every page gets the same set, in the same order. */
-export function renderHead({ title, description, path, robots = "index,follow", image = ogImage(), type = "website", modified, jsonLd }) {
+/** Google Analytics 4 measurement id. public/js/ga.js holds the config, since the CSP allows no inline script. */
+export const GA_ID = "G-RKQ4CBEZWY";
+
+/** GA tags for the shared head. Pages with analytics: false (sign-in callback, token links, Off-menu) never load it. */
+export function renderAnalytics() {
+  return [`<script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>`, `<script src="/js/ga.js" defer></script>`];
+}
+
+export function renderHead({ title, description, path, robots = "index,follow", image = ogImage(), type = "website", modified, jsonLd, analytics = true }) {
   const canonical = `${SITE}${path}`;
   const lines = [
     `<title>${escapeHtml(title)}</title>`,
@@ -620,6 +628,7 @@ export function renderHead({ title, description, path, robots = "index,follow", 
   ];
   if (modified) lines.push(`<meta property="article:modified_time" content="${escapeHtml(modified)}">`);
   if (jsonLd) lines.push(`<script type="application/ld+json">${JSON.stringify(jsonLd).replaceAll("<", "\\u003c")}</script>`);
+  if (analytics) lines.push(...renderAnalytics());
   return lines.join("\n  ");
 }
 
@@ -780,8 +789,9 @@ export function renderProfilePage(profile, profiles = []) {
       robots: psi ? PRIVATE : "index,follow",
       image: ogImage(profile),
       type: "article",
-      // Off-menu pages stay out of structured data.
+      // Off-menu pages stay out of structured data and analytics.
       jsonLd: psi ? undefined : profileJsonLd(profile),
+      analytics: !psi,
     },
     activeId: "profiles",
     hideCoach: psi,
@@ -1349,6 +1359,8 @@ export const PAGES = {
   },
   "install.html": {
     active: "install",
+    // The installer loads nothing from other sites (see install-verify.test.js), so no analytics.
+    analytics: false,
     sitemap: true,
     path: "/install",
     title: "Install on your Shrooly: free OpenShrooly software over USB",
@@ -1361,17 +1373,17 @@ export const PAGES = {
   "devices.html": { active: "", path: "/devices", robots: PRIVATE, title: "My chambers · Shroom Labs", description: "See the chambers linked to your Shroom Labs account, with species, live readings, and grow status." },
   "device.html": { active: "", path: "/device", robots: PRIVATE, title: "Device · Shroom Labs", description: "Live stats, grow identity, and chamber controls for one of your Shroom Labs devices." },
   "fleet.html": { active: "", path: "/fleet", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "Bulk tools for the chambers linked to your Shroom Labs account." },
-  "alerts-unsub.html": { active: "", path: "/alerts-unsub", robots: PRIVATE, title: "Alert emails · Shroom Labs", description: "Turn off Shroom Labs alert emails with one click. Alerts still show in your account." },
+  "alerts-unsub.html": { active: "", path: "/alerts-unsub", robots: PRIVATE, analytics: false, title: "Alert emails · Shroom Labs", description: "Turn off Shroom Labs alert emails with one click. Alerts still show in your account." },
   "publish.html": { active: "", path: "/publish", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Build a mushroom grow profile for your chambers, or send it to the Shroom Labs library." },
   "moderate.html": { active: "", path: "/moderate", robots: "noindex,nofollow", title: "Review queue · Shroom Labs", description: "Moderator queue for community mushroom grow profiles." },
-  "profile.html": { active: "profiles", path: "/profile", robots: PRIVATE, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
+  "profile.html": { active: "profiles", path: "/profile", robots: PRIVATE, analytics: false, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
   "legacy-preview.html": { active: "", path: "/legacy-preview", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
   "account/feedback.html": { active: "", path: "/account/feedback", robots: "noindex,nofollow", title: "Beta feedback · Shroom Labs", description: "Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one." },
   // Legal pages: public, no sign-in, linked from every footer. Not in the sitemap.
   "privacy.html": { active: "", path: "/privacy", title: "Privacy policy · Shroom Labs", description: "What Shroom Labs collects, how it's used, who else sees it, how it's kept safe, and how to download or delete it." },
   "tos.html": { active: "", path: "/tos", title: "Terms of Service · Shroom Labs", description: "The rules for using Shroom Labs and Grow Coach: billing, renewals, refunds, the beta, and installing on your Shrooly at your own risk." },
   "contact.html": { active: "", path: "/contact", title: "Contact · Shroom Labs", description: "Send Shroom Labs a message about your account, billing, a refund, a chamber, or your data." },
-  "auth/callback.html": { active: "", path: "/auth/callback", robots: "noindex,nofollow", title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
+  "auth/callback.html": { active: "", path: "/auth/callback", robots: "noindex,nofollow", analytics: false, title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
 };
 
 /** App pages that need sign-in stay out of crawls. Public pages marked noindex stay crawlable so search engines can read the noindex. */
