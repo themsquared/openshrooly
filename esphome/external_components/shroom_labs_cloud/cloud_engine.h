@@ -46,6 +46,8 @@ class CloudEngine {
   CloudState state() const;
   bool cloud_enabled() const;
   bool linked() const;
+  bool wiping() const;
+  std::string owner_name() const;
   std::string claim_code() const;
   std::string claim_url() const;
   std::string status_json() const;
@@ -171,6 +173,7 @@ class CloudEngine {
   std::string cert_pem_;
   std::string serial_;
   std::string fingerprint_;
+  std::string owner_name_;
   std::string not_after_;
   int64_t rotate_after_ms_{ROTATE_AFTER_MS};
   int64_t issued_ms_{0};

@@ -435,6 +435,14 @@ bool CloudEngine::linked() const {
   std::lock_guard<std::mutex> g(lock_);
   return state_ == CloudState::Linked && has_cert_;
 }
+bool CloudEngine::wiping() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return pending_wipe_ || job_ == CloudJob::REVOKE;
+}
+std::string CloudEngine::owner_name() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return owner_name_;
+}
 bool CloudEngine::has_key() const {
   std::lock_guard<std::mutex> g(lock_);
   return has_key_;
@@ -742,6 +750,9 @@ bool CloudEngine::store_cert_(const std::string &body) {
   json_get_string(body.c_str(), "serial", &serial_);
   json_get_string(body.c_str(), "fingerprint", &fingerprint_);
   json_get_string(body.c_str(), "not_after", &not_after_);
+  std::string owner;
+  if (json_get_string(body.c_str(), "owner_name", &owner))
+    owner_name_ = owner;
   int64_t rot = 0;
   if (json_get_int64(body.c_str(), "rotate_after_ms", &rot) && rot > 0)
     rotate_after_ms_ = rot;

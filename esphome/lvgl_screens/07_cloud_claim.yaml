@@ -1,11 +1,21 @@
 # ========================================================================
-# CLOUD CLAIM - Large 6-character code + QR, glanceable like the grow screen
-# Canvas is 296x128. Hero type for the code. QR on the right.
+# LINK THIS DEVICE - big claim code + QR, glanceable like the grow screen
+# Canvas is 296x128. Hero type for the code, QR on the right. The QR canvas
+# comes before the labels so wide messages draw over the blank canvas.
+# The last four children must stay the button bar (apply_display_layout).
 # ========================================================================
 
 - id: icloudclaim
   bg_color: paper_white
   widgets:
+    - canvas:
+        id: claim_qr
+        width: 105
+        height: 105
+        align: TOP_RIGHT
+        x: -4
+        y: 2
+
     - image:
         id: claim_header_mark
         src: mark_16
@@ -17,7 +27,7 @@
 
     - label:
         id: claim_title
-        text: "Claim"
+        text: "Link"
         align: TOP_LEFT
         x: 25
         y: 0
@@ -28,31 +38,17 @@
         text: ""
         align: TOP_LEFT
         x: 6
-        y: 28
+        y: 26
         text_font: font_hero
-
-    - canvas:
-        id: claim_qr
-        width: 105
-        height: 105
-        align: TOP_RIGHT
-        x: -4
-        y: 2
 
     - label:
         id: claim_hint
-        text: "Turn on from the web page"
-        align: TOP_LEFT
-        x: 6
-        y: 80
-        text_font: font1
-
-    - label:
-        id: claim_expiry
         text: ""
         align: TOP_LEFT
         x: 6
-        y: 94
+        y: 78
+        width: 182
+        long_mode: WRAP
         text_font: font1
 
     - obj:
@@ -65,6 +61,7 @@
         bg_color: paper_black
         widgets:
           - label:
+              id: claim_back_label
               text: "Back"
               align: CENTER
               text_color: paper_white
@@ -79,7 +76,7 @@
         bg_color: paper_black
         widgets:
           - label:
-              text: "-"
+              text: ""
               align: CENTER
               text_color: paper_white
               text_font: font1
@@ -93,7 +90,7 @@
         bg_color: paper_black
         widgets:
           - label:
-              text: "+"
+              text: ""
               align: CENTER
               text_color: paper_white
               text_font: font1
@@ -108,7 +105,7 @@
         widgets:
           - label:
               id: claim_next_label
-              text: "Refresh"
+              text: ""
               align: CENTER
               text_color: paper_white
               text_font: font1

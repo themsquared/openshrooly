@@ -1,5 +1,5 @@
 substitutions:
-  device_version: "1.0.5-sl.1"
+  device_version: "1.0.6-sl.1"
 
 esphome:
   name: openshrooly

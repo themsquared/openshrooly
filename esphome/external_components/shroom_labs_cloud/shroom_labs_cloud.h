@@ -2,6 +2,7 @@
 
 #include "cloud_engine.h"
 #include "cloud_qr.h"
+#include "link_flow.h"
 #include "esphome/core/component.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/select/select.h"
@@ -95,6 +96,20 @@ class ShroomLabsCloud : public Component {
   std::string display_title() const { return engine_.display_title(); }
   bool take_show_claim() { return engine_.take_show_claim(); }
   bool fill_qr(QrCode *out) const;
+
+  // "Link this device" menu. Cloud actions run here; each call returns the
+  // page move the UI should make (WifiSetup, GoGrow, GoMenu) or None.
+  LinkAction link_open(bool wifi) { return this->link_run_(this->link_.open(this->link_inputs_(wifi)), wifi); }
+  LinkAction link_tick(bool wifi) { return this->link_run_(this->link_.tick(this->link_inputs_(wifi)), wifi); }
+  LinkAction link_button(int b, bool wifi) {
+    return this->link_run_(this->link_.button(b, this->link_inputs_(wifi)), wifi);
+  }
+  const LinkScreen &link_screen() const { return this->link_screen_; }
+  bool link_take_dirty() {
+    const bool d = this->link_dirty_;
+    this->link_dirty_ = false;
+    return d;
+  }
   bool nvs_encrypted() const { return nvs_encrypted_; }
   bool flash_encrypted() const { return flash_encrypted_; }
 
@@ -133,6 +148,12 @@ class ShroomLabsCloud : public Component {
   bool flash_encrypted_{false};
   uint32_t last_local_change_ms_{0};
   bool applying_remote_{false};
+  LinkInputs link_inputs_(bool wifi) const;
+  LinkAction link_run_(LinkAction a, bool wifi);
+  LinkFlow link_;
+  LinkScreen link_screen_;
+  std::string link_sig_;
+  bool link_dirty_{true};
   number::Number *knobs_[KNOB_COUNT]{};
   select::Select *grow_phase_{nullptr};
   bool watchers_on_{false};
