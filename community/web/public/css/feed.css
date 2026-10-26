@@ -1,0 +1,21 @@
+/* Grow feed: progress photos. Mobile first. */
+.feed-list { display: grid; gap: 1rem; margin-top: 1rem; }
+.feed-post { padding: 0; overflow: hidden; }
+.feed-photo { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: cover; background: rgba(127,127,127,0.12); }
+.feed-body { padding: 0.9rem 1rem 1rem; display: grid; gap: 0.4rem; }
+.feed-profile { font-weight: 600; }
+.feed-note { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.feed-meta { margin: 0; font-size: 0.9rem; }
+.feed-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.feed-actions button { min-height: 40px; }
+.feed-actions .danger { color: #f2b49c; }
+.feed-status { margin-left: 0.5rem; }
+.feed-form { display: grid; gap: 0.75rem; padding: 1.2rem; }
+.feed-form h2 { margin: 0; font-size: 1.15rem; }
+.feed-form label { display: grid; gap: 0.3rem; }
+.feed-form select, .feed-form input, .feed-form textarea, .feed-form button { width: 100%; min-height: 44px; }
+.grow-posts { margin: 1.6rem 0; }
+@media (min-width: 720px) {
+  .feed-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .feed-form button { width: auto; }
+}
