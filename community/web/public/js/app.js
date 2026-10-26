@@ -227,7 +227,8 @@ async function renderHome() {
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
   const off = pack === "psilocybin";
-  $("#pack-label").textContent = off ? "Off-menu" : "Culinary Profiles";
+  const packLabel = $("#pack-label");
+  if (packLabel) packLabel.textContent = off ? "Off-menu" : "Culinary Profiles";
   $("#legal")?.classList.toggle("hidden", !off);
   $("#q").value = q;
   $("#pack").value = pack;

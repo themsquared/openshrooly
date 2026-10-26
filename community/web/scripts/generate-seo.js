@@ -11,6 +11,7 @@ import { lightRecipeLine } from "../public/js/light-line.js";
 import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.js";
 import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
 import { GUIDES } from "./guides/index.js";
+import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
@@ -924,12 +925,87 @@ export function renderGuidePage(guide) {
   });
 }
 
+/** The one call to action every Shrooly owner page ends with. */
+export function installCta(secondary = ["What happened to Shrooly?", "/what-happened-to-shrooly"]) {
+  return `<div class="owner-cta"><a class="button hero-cta" href="/install">Install on your Shrooly</a>${
+    secondary ? `<a class="text-link" href="${secondary[1]}">${escapeHtml(secondary[0])}</a>` : ""
+  }</div>`;
+}
+
+/** Question sections that answer a search. Their visible first sentence is the FAQPage answer, word for word. */
+export function ownerFaq(page) {
+  return page.sections.filter((sec) => sec.faq !== false && sec.h2.endsWith("?")).map((sec) => ({ q: sec.h2, a: sec.answer }));
+}
+
+/** Top level page for Shrooly owners: answer first, question sections, sources, then the install button. */
+export function renderOwnerPage(page) {
+  const path = `/${page.slug}`;
+  const url = `${SITE}${path}`;
+  const faq = ownerFaq(page);
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `${url}#article`,
+        headline: page.h1,
+        description: page.answer,
+        url,
+        mainEntityOfPage: url,
+        image: ogImage(),
+        inLanguage: "en",
+        dateModified: page.updated,
+        author: ORG_REF,
+        publisher: ORG_REF,
+        citation: page.sources.map((key) => OWNER_SOURCES[key].url),
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${url}#faq`,
+        mainEntity: faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+      },
+      breadcrumbs([["Home", `${SITE}/`], [page.h1, url]]),
+    ],
+  };
+  const sections = page.sections
+    .map((sec) => `<section class="owner-section"><h2>${escapeHtml(sec.h2)}</h2><p class="answer-first">${escapeHtml(sec.answer)}</p>${sec.html || ""}</section>`)
+    .join("\n      ");
+  const others = OWNER_PAGES.filter((p) => p.slug !== page.slug);
+  const secondary = page.slug === "what-happened-to-shrooly" ? ["Shrooly FAQ", "/shrooly-faq"] : ["What happened to Shrooly?", "/what-happened-to-shrooly"];
+  const body = `
+    <article class="profile-page guide-page owner-page">
+      ${crumbsHtml([["Home", "/"], [page.h1, ""]])}
+      <p class="eyebrow">${escapeHtml(page.eyebrow)}</p>
+      <h1>${escapeHtml(page.h1)}</h1>
+      ${updatedHtml(page.updated)}
+      <p class="lede answer-first">${escapeHtml(page.answer)}</p>
+      ${installCta(null)}
+      ${sections}
+      <h2>Sources</h2>
+      <p class="muted">Every page below was checked on ${OWNER_CHECKED}.</p>
+      <ol class="sources">${page.sources.map((key) => `<li><a href="${OWNER_SOURCES[key].url}" rel="noopener">${escapeHtml(OWNER_SOURCES[key].label)}</a></li>`).join("")}</ol>
+      <h2>Keep reading</h2>
+      <ul class="faq-links">${[...page.related, ...others.filter((o) => !page.related.some(([, h]) => h === `/${o.slug}`)).map((o) => [o.h1, `/${o.slug}`])]
+        .map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`)
+        .join("")}</ul>
+      <h2>Ready to bring your Shrooly back?</h2>
+      <p>It is free and takes about 5 minutes from Chrome or Edge.</p>
+      ${installCta(secondary)}
+    </article>`;
+  return shell({
+    head: { title: page.title, description: page.description, path, type: "article", modified: page.updated, jsonLd },
+    activeId: "",
+    body,
+  });
+}
+
 export function sitemapEntries(profiles) {
   const pages = Object.entries(PAGES)
     .filter(([, p]) => p.sitemap)
     .map(([, p]) => ({ path: p.path, lastmod: p.updated || PAGES_UPDATED }));
   return [
     ...pages,
+    ...OWNER_PAGES.map((p) => ({ path: `/${p.slug}`, lastmod: p.updated })),
     { path: "/grow", lastmod: HUB_UPDATED.value },
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
     ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
@@ -957,6 +1033,11 @@ Site: ${SITE}
 Full text for every guide and profile: ${SITE}/llms-full.txt
 
 All numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
+
+## For Shrooly owners
+
+${OWNER_PAGES.map((p) => `- [${p.h1}](${SITE}/${p.slug}): ${p.answer}`).join("\n")}
+- [Install on your Shrooly](${SITE}/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C cable.
 
 ## Start here
 
@@ -993,6 +1074,13 @@ function stripHtml(html) {
 
 export function renderLlmsFull(profiles) {
   const out = [`# Shroom Labs: full grow guides\n\n> ${PRODUCT}\n\nEvery number below comes from the published Shroom Labs grow profiles. Source: ${SITE}/grow`];
+  for (const p of OWNER_PAGES) {
+    out.push(
+      `## ${p.h1}\n\nURL: ${SITE}/${p.slug}\nUpdated: ${p.updated}\n\n${p.answer}\n\n${p.sections
+        .map((sec) => `### ${sec.h2}\n\n${sec.answer}${sec.html ? `\n\n${stripHtml(sec.html)}` : ""}`)
+        .join("\n\n")}\n\n### Sources\n\n${p.sources.map((key) => `- ${OWNER_SOURCES[key].label}: ${OWNER_SOURCES[key].url}`).join("\n")}`
+    );
+  }
   for (const g of GUIDES) {
     out.push(
       `## ${g.h1}\n\nURL: ${SITE}/guides/${g.slug}\nUpdated: ${g.updated}\n\n${g.answer}\n\n${g.sections.map((sec) => `### ${sec.h2}\n\n${stripHtml(sec.html)}`).join("\n\n")}${
@@ -1021,6 +1109,7 @@ export function renderRedirects(profiles) {
     lines.push(`/${file} ${page.path} 301!`);
   }
   lines.push("/grow.html /grow 301!");
+  for (const p of OWNER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
   for (const p of profiles) lines.push(`/profiles/${p.id}.html /profiles/${p.id} 301!`);
   lines.push("/profiles /grow 301!", "/profiles/ /grow 301!", "/guides /grow 301!", "/guides/ /grow 301!");
@@ -1064,8 +1153,8 @@ export const PAGES = {
     active: "profiles",
     sitemap: true,
     path: "/",
-    title: "Shroom Labs: free mushroom grow profiles and guides for home growers",
-    description: "Stage by stage temperature, humidity, fresh air, and light for oyster, lion's mane, shiitake, and more. Free profiles for Shrooly chambers on OpenShrooly.",
+    title: "Got a Shrooly? Bring it back with free firmware and grow profiles",
+    description: "Shrooly app not working? Install free OpenShrooly firmware from your browser, then grow oyster, lion's mane, and more with stage by stage profiles.",
     jsonLd: siteJsonLd(),
   },
   "faq.html": {
@@ -1112,11 +1201,11 @@ export const PAGES = {
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Link a chamber", `${SITE}/claim`]]) },
   },
   "install.html": {
-    active: "",
+    active: "install",
     sitemap: true,
     path: "/install",
-    title: "Install over USB · Shroom Labs",
-    description: "Put OpenShrooly on a Shrooly from Chrome or Edge with a USB-C cable. Only releases signed by Shroom Labs are offered.",
+    title: "Install on your Shrooly: free OpenShrooly software over USB",
+    description: "Shrooly app not working? Put free OpenShrooly software on your Shrooly from Chrome or Edge with a USB-C cable in about 5 minutes. Signed releases only.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Install over USB", `${SITE}/install`]]) },
   },
   "login.html": { active: "", path: "/login", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and link a chamber. No password." },
@@ -1153,6 +1242,7 @@ export function writeSeoFiles(dir = PUBLIC) {
   writeFileSync(join(dir, "faq.html"), renderFaqPage(profiles));
   writeFileSync(join(dir, "grow.html"), renderHubPage(profiles));
   for (const guide of GUIDES) writeFileSync(join(dir, "guides", `${guide.slug}.html`), renderGuidePage(guide));
+  for (const page of OWNER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderOwnerPage(page));
   writeFileSync(join(dir, "js", "indexed-profiles.js"), `/** Generated by scripts/generate-seo.js. Profiles with a static page under /profiles/. */\nexport const INDEXED_PROFILES = new Set(${JSON.stringify(profiles.map((p) => p.id))});\n`);
   for (const profile of profiles) {
     writeFileSync(join(dir, "profiles", `${profile.id}.html`), renderProfilePage(profile, profiles));

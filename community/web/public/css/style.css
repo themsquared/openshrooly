@@ -1217,3 +1217,45 @@ h1 .beta-badge, h2 .beta-badge { font-size: 0.45em; margin-left: 0.4em; }
 .install-help summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .glossary dt { font-weight: 600; margin-top: 0.9rem; }
 .glossary dd { margin: 0.2rem 0 0; }
+
+/* Shrooly owners: the install entry in the nav, the home strip, and the owner pages. */
+.site-nav a.nav-install { color: var(--sl-spore); font-weight: 700; }
+.footer-nav a.nav-install { color: var(--sl-spore); }
+.footer-owners { margin-top: 0.4rem; }
+.hero-more { margin: 0.9rem 0 0; }
+.hero-more .text-link { color: var(--sl-ink); text-decoration: underline; text-underline-offset: 3px; display: inline-flex; min-height: 44px; align-items: center; }
+.owners-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 12px;
+  margin: 1.2rem 0 1.6rem;
+}
+.owner-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.1rem;
+  min-height: 44px;
+  border: 1px solid var(--sl-line);
+  border-radius: 18px;
+  background: rgba(10, 22, 16, 0.6);
+  color: var(--sl-ink);
+  text-decoration: none;
+}
+.owner-card:hover, .owner-card:focus-visible { border-color: var(--sl-spore); }
+.owner-card strong { font-size: 1.05rem; }
+.owner-card span { color: var(--sl-ink-dim); font-size: 0.95rem; }
+.owner-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: 1.2rem 0 1.6rem;
+}
+.owner-cta .text-link { color: var(--sl-ink); text-decoration: underline; text-underline-offset: 3px; display: inline-flex; min-height: 44px; align-items: center; }
+.owner-page .sources { font-size: 0.95rem; overflow-wrap: anywhere; }
+.owner-page .sources li { margin: 0.35rem 0; }
+@media (max-width: 767px) {
+  .site-nav a.nav-install { order: -1; }
+  .owner-cta .button { width: 100%; justify-content: center; text-align: center; }
+}

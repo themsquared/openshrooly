@@ -7,6 +7,13 @@ Full text for every guide and profile: https://shroomlabs.io/llms-full.txt
 
 All numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
 
+## For Shrooly owners
+
+- [What happened to Shrooly?](https://shroomlabs.io/what-happened-to-shrooly): We could not find a public shutdown notice from the company that made Shrooly. Its last customer update was July 31, 2025. Since August 2025 many owners report the app will not sign in, support does not answer, and orders did not arrive. Your chamber can still run on free community software.
+- [Reuse your Shrooly](https://shroomlabs.io/reuse-your-shrooly): Yes, you can reuse your Shrooly. Free, open source software called OpenShrooly replaces the stock software, so the chamber runs on your own Wi-Fi with no Shrooly app. You install it from Chrome or Edge with a USB-C cable in about 5 minutes. Shroom Labs adds grow profiles and an optional phone dashboard.
+- [Shrooly FAQ](https://shroomlabs.io/shrooly-faq): Short version: many Shrooly owners lost the app in 2025, and the company has not said why. The chamber itself still works. Free OpenShrooly firmware runs it on your own Wi-Fi with no Shrooly app, and you can install it from Chrome or Edge in about 5 minutes. Answers to the questions owners ask most are below.
+- [Install on your Shrooly](https://shroomlabs.io/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C cable.
+
 ## Start here
 
 - [Mushroom growing conditions for every species](https://shroomlabs.io/grow): one table with fruiting temperature, humidity, light, and days for each species.
