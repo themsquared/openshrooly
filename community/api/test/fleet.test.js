@@ -509,3 +509,22 @@ test("applying a new profile starts at day 1 of the first stage, not fruiting", 
   assert.equal(d.stage.id, first.id);
   assert.equal(d.grow.day, 0, "day 0 elapsed, shown as day 1");
 });
+
+test("a linked chamber that never checked in is waiting, not offline, and carries linked_at", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "fresh-link@example.com");
+  await addDevice(ctx, user.id, "dev-fresh", { lastSeen: null });
+  const linkedAt = nowIso();
+  await ctx.db.run(
+    "INSERT INTO device_certs (device_id, serial, fingerprint, pem, issuer, status, cf_id, not_before, not_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["dev-fresh", "s-fresh", "fp", "pem", "worker-ca", "active", null, linkedAt, linkedAt, linkedAt]
+  );
+  const res = await call(ctx, "GET", "/api/fleet/devices/dev-fresh", { token });
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  const d = res.data.device || res.data;
+  assert.equal(d.online, false);
+  assert.equal(d.linked_at, linkedAt);
+  const kinds = (d.alerts || []).map((a) => a.kind);
+  assert.ok(kinds.includes("waiting"));
+  assert.ok(!kinds.includes("offline"));
+});

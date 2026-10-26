@@ -62,10 +62,62 @@ export function coachLine(device) {
 }
 
 export function lastSeenLine(device) {
-  if (!device?.last_seen_at) return "Never seen";
+  if (!device?.last_seen_at) return "Not checked in yet";
   const date = new Date(device.last_seen_at);
   if (Number.isNaN(date.getTime())) return "Last seen unknown";
   return `Last seen ${date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
+}
+
+/** A new chamber checks in within about this long of linking. */
+export const FIRST_CHECKIN_MS = 15 * 60 * 1000;
+/** After this long with no first check-in, ask the person to look at the chamber. */
+export const FIRST_CHECKIN_LATE_MS = 30 * 60 * 1000;
+
+function clockText(ms) {
+  return new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * The chamber's own status, the one signal that says whether it is reporting.
+ * kind: "online", "waiting" (linked, never checked in) or "offline".
+ */
+export function chamberStatus(device, now = Date.now()) {
+  if (device?.online) {
+    const seen = Date.parse(device.last_seen_at || "");
+    const detail = Number.isFinite(seen) ? `Checked in at ${clockText(seen)}. It checks in about every 15 minutes.` : "";
+    return { kind: "online", label: "Online", detail };
+  }
+  if (!device?.last_seen_at) {
+    const since = Date.parse(device?.linked_at || device?.created_at || "");
+    const help = "If nothing shows up, check that the chamber is plugged in and connected to Wi-Fi.";
+    if (!Number.isFinite(since)) {
+      return { kind: "waiting", label: "Waiting for first check-in", detail: `This can take up to about 15 minutes after linking. ${help}` };
+    }
+    if (now - since < FIRST_CHECKIN_LATE_MS) {
+      return {
+        kind: "waiting",
+        label: "Waiting for first check-in",
+        detail: `Linked at ${clockText(since)}. A new chamber checks in within about 15 minutes, so look for it by ${clockText(since + FIRST_CHECKIN_MS + 60000)}. ${help}`,
+      };
+    }
+    return {
+      kind: "waiting",
+      label: "Waiting for first check-in",
+      detail: `Linked at ${clockText(since)} and it has not checked in yet. Check that the chamber is plugged in and its Wi-Fi is set up (Menu, then System, then Wi-Fi). Then unplug its power for 10 seconds and plug it back in.`,
+    };
+  }
+  return {
+    kind: "offline",
+    label: "Offline",
+    detail: `${lastSeenLine(device)}. Check that the chamber is plugged in and connected to Wi-Fi.`,
+  };
+}
+
+/** The big status pill at the top of the device page. */
+export function renderChamberStatus(device, now = Date.now()) {
+  const st = chamberStatus(device, now);
+  return `<p class="chamber-status is-${st.kind}"><span class="chamber-status-dot" aria-hidden="true"></span><strong>${escapeHtml(st.label)}</strong></p>
+  ${st.detail ? `<p class="chamber-status-detail muted">${escapeHtml(st.detail)}</p>` : ""}`;
 }
 
 export function readingLine(device) {
@@ -80,6 +132,7 @@ export function readingLine(device) {
 /** When the numbers on screen were measured. */
 export function readingWhenLine(device, now = Date.now()) {
   const at = device?.reading?.reading_at;
+  if (!at && !device?.reading && device && !device.last_seen_at) return "Readings show up here after the first check-in.";
   if (!at) return device?.reading ? "" : "No reading in the last while. Readings arrive about every 15 minutes.";
   const date = new Date(at);
   if (Number.isNaN(date.getTime())) return "";
@@ -107,7 +160,8 @@ export const PICK_GROW_LABEL = "Pick what you're growing";
 
 export function renderDeviceCard(device) {
   const grow = growingLabels(device);
-  const online = device.online ? "Online" : "Offline";
+  const status = chamberStatus(device);
+  const online = status.label;
   const coach = coachLine(device);
   const picked = Boolean(device?.profile);
   const href = `/device?id=${encodeURIComponent(device.id)}${picked ? "" : "#grow"}`;
@@ -116,7 +170,7 @@ export function renderDeviceCard(device) {
     <a class="device-card-link" href="${href}">
       <div class="device-card-art">${art || `<div class="device-card-fallback">${MUSHROOM_ICON}</div>`}</div>
       <div class="device-card-body">
-        <p class="device-card-kicker">${escapeHtml(deviceTypeLabel(device.device_type))} · <span class="${device.online ? "is-on" : "is-off"}">${online}</span></p>
+        <p class="device-card-kicker">${escapeHtml(deviceTypeLabel(device.device_type))} · <span class="is-${status.kind === "online" ? "on" : status.kind === "waiting" ? "wait" : "off"}">${escapeHtml(online)}</span></p>
         <h3>${escapeHtml(device.name || "Unnamed device")}</h3>
         ${
           picked
@@ -189,9 +243,9 @@ export function renderGauges(device, { now = Date.now() } = {}) {
   <p class="muted device-reading-when" id="reading-when">${escapeHtml(`${when}${waterNote}`.trim())}</p>`;
 }
 
-/** Plain header line: hardware, status, last seen and Coach. What is growing lives in the identity card. */
+/** Plain header line: hardware and Coach. Status has its own pill (renderChamberStatus); what is growing lives in the identity card. */
 export function deviceMetaLine(device, { showCoach = false } = {}) {
-  return [device.device_type_label || deviceTypeLabel(device.device_type), device.online ? "Online" : "Offline", lastSeenLine(device), showCoach ? coachLine(device) : ""]
+  return [device.device_type_label || deviceTypeLabel(device.device_type), showCoach ? coachLine(device) : ""]
     .filter(Boolean)
     .join(" · ");
 }
@@ -361,7 +415,9 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
     ? ""
     : device.online
       ? "This chamber is not linked, so changes from here are off."
-      : "This chamber looks offline. Changes from here come back when it reports again.";
+      : !device.last_seen_at
+        ? "Changes from here turn on after the chamber's first check-in."
+        : "This chamber is offline. Changes from here come back when it checks in again.";
   const onlyHere = chamberOnlyLine(controls);
   const coach =
     showCoach && !device.off_menu

@@ -239,7 +239,9 @@ async function groupIdsForDevice(db, ownerId, deviceId) {
 
 function fleetAlerts({ device, reading, stage, now }) {
   const alerts = [];
-  if (!deviceIsOnline(device, now)) {
+  if (!device?.last_seen_at) {
+    alerts.push({ kind: "waiting", message: "Waiting for first check-in." });
+  } else if (!deviceIsOnline(device, now)) {
     alerts.push({ kind: "offline", message: "Chamber looks offline." });
   }
   if (!reading || (reading.temperature == null && reading.humidity == null)) {
@@ -375,6 +377,9 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     controls,
     commands,
     cert_expires_at: activeCert?.not_after || null,
+    // When the chamber picked up its link (its first certificate). Until its first check-in the page counts from here.
+    linked_at: (certs || []).map((c) => c.created_at).filter(Boolean).sort()[0] || device.created_at || null,
+    created_at: device.created_at || null,
     alerts: fleetAlerts({ device, reading: current, stage, now }),
     group_ids: groupIds,
     off_menu: offMenu,
