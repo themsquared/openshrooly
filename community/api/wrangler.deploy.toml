@@ -18,6 +18,12 @@ database_id = "36c95b84-7f13-47a1-b90c-4237f875eb4b"
 binding = "PHOTOS"
 bucket_name = "shroomlabs-photos"
 
+# Nightly D1 backups (src/backup.js): d1/YYYY-MM-DD.json.gz, newest 30 kept.
+# Private bucket. Never map it on a public hostname or turn on r2.dev.
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "shroomlabs-backups"
+
 # Live device cache (src/live.js). One SQLite-backed object per device keeps
 # the device page snapshot and pushes changes over hibernatable WebSockets;
 # one per user fans changes out to the Devices and Fleet pages. D1 stays the

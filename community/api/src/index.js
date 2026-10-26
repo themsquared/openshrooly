@@ -2,6 +2,7 @@ import { handleRequest, withCors } from "./handlers.js";
 import { envContext } from "./env.js";
 import { runAlerts } from "./alerts/cron.js";
 import { runAutopilotPass } from "./coach-autopilot.js";
+import { runBackup } from "./backup.js";
 import { reclassifyUnconfirmedLegacyBatch } from "./review.js";
 import { isLiveSocket, liveNotifyAfter, notifyCron } from "./live.js";
 
@@ -42,6 +43,12 @@ export default {
         }
       } catch (err) {
         console.log(JSON.stringify({ level: "error", event: "coach_autopilot_failed", message: String(err?.message || err).slice(0, 200) }));
+      }
+      try {
+        const backup = await runBackup(ctx.db, env.BACKUPS, { now: Number(event?.scheduledTime) || Date.now() });
+        if (!backup.skipped) console.log(JSON.stringify({ level: "info", event: "d1_backup", ...backup }));
+      } catch (err) {
+        console.error(JSON.stringify({ level: "error", event: "d1_backup_failed", message: String(err?.message || err).slice(0, 200) }));
       }
       try {
         // Alerts and Autopilot may have changed device state; refresh the live cache.
