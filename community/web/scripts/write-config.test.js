@@ -72,6 +72,8 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
     }
     const text = `${html.replace(/<[^>]+>/g, " ")} ${extras.join(" ")}`.replace(allow, " ");
     for (const rule of banned) {
+      // A privacy policy has to name who processes data and what cookies it sets.
+      if (name === "privacy.html" && (rule.name === "Cloudflare" || rule.name === "cookie")) continue;
       const found = text.match(rule.re);
       if (found) hits.push(`${name}: ${rule.name} (${found[0]})`);
     }
