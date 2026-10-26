@@ -138,7 +138,9 @@ jobs:
           yaml-file: esphome/openshrooly.yaml
           complete-manifest: true
           release-summary: "Dev build from ${{ github.ref }} @ ${{ github.sha }}"
-          version: "${{ env.VERSION }}"
+          # ESPHome image tag, not the firmware version. VERSION can be
+          # preview-<sha>, which is not an ESPHome image.
+          version: latest
 
       # ----- Dev "latest" moving tag -----
       - name: Tag dev-latest
