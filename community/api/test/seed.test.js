@@ -12,7 +12,7 @@ test("seed SQL is insert-if-missing for every profile and the guide stub", () =>
   assert.match(sql, /INSERT OR IGNORE INTO profiles/);
   assert.match(sql, /INSERT OR IGNORE INTO guides/);
   assert.match(sql, /block-prep-101/);
-  assert.equal(seeds.length, 26);
+  assert.equal(seeds.length, 28);
   for (const profile of seeds) {
     assert.match(sql, new RegExp(sqlQuote(profile.id)));
   }
@@ -75,7 +75,7 @@ test("seedMissing fills a partial catalog and does not overwrite existing rows",
 
   await seedMissing(db, seeds);
   const after = await db.all("SELECT document FROM profiles WHERE published=1");
-  assert.equal(after.length, 26);
+  assert.equal(after.length, 28);
   const kept = after.find((row) => JSON.parse(row.document).id === first.id);
   assert.equal(JSON.parse(kept.document).name, "keep-me");
   const guide = await db.one("SELECT * FROM guides WHERE id=?", [GUIDE_SEED.id]);
@@ -83,7 +83,7 @@ test("seedMissing fills a partial catalog and does not overwrite existing rows",
 
   await seedMissing(db, seeds);
   const again = await db.all("SELECT document FROM profiles WHERE published=1");
-  assert.equal(again.length, 26);
+  assert.equal(again.length, 28);
 });
 
 test("first request still exposes the full culinary catalog from memory", async () => {
