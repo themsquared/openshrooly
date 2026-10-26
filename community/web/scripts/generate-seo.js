@@ -319,26 +319,26 @@ export function commonProblems(profile) {
   items.push({
     q: "No pins after colonization",
     a: `Make sure the block is fully colonized first. Then check that the chamber reaches the ${pin.name.toLowerCase()} conditions: ${tempText(pin.temperature_c)}, ${pin.humidity_percent}% humidity, and ${freshAirLabel(pin)}. Pins need more fresh air than colonization.`,
-    guide: "no-pins",
+    guide: "mushrooms-not-pinning",
   });
   if (!NO_LEGGY.has(profile.id) && (profile.tags || []).includes("oyster")) {
     items.push({
       q: "Long, thin stems and small caps",
       a: `This usually means too little fresh air. This profile runs ${fanText(fruit).toLowerCase()} while fruiting.`,
-      guide: "leggy-stems",
+      guide: "leggy-mushroom-stems",
     });
   }
   if (!NO_CAPS.has(profile.id)) {
     items.push({
       q: "Dry, cracked, or curled caps",
       a: `Usually humidity is too low, or air is blowing straight on the mushrooms. This profile holds ${fruit.humidity_percent}% humidity while fruiting.`,
-      guide: "dry-cracked-caps",
+      guide: "dry-cracked-mushroom-caps",
     });
   }
   items.push({
     q: "Green, black, or slimy patches",
     a: "Patches that are not white mycelium are usually contamination such as green mold or bacteria. Bag the block, take it out of the chamber, and clean the chamber before the next grow.",
-    guide: "contamination",
+    guide: "mushroom-contamination",
   });
   return items;
 }
