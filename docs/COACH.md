@@ -1,6 +1,6 @@
 # Grow Coach
 
-Paid culinary coaching on Shroom Labs. **$3.99 / month.** Not sold or marketed with off-menu varieties.
+Paid culinary coaching on Shroom Labs. **$4.99 a month or $49 a year** (the yearly plan saves about 18%: 12 x $4.99 is $59.88). Not sold or marketed with off-menu varieties.
 
 Cloud control is still opt-in. Autopilot queues setpoints on the existing
 device inbox; the chamber applies them if cloud is enabled and local
@@ -67,4 +67,4 @@ Fresh installs already include the tables in `schema.sql`.
 
 ## Cost
 
-See the **Grow Coach cost vs $3.99** table in [`ROADMAP.md`](ROADMAP.md). AI cost is capped at about **$0.22** per subscriber per month (the monthly neuron cap). Final price is Mike's call. Workers Paid $5 is shared with the rest of the API.
+See the **Grow Coach cost vs $4.99** table in [`ROADMAP.md`](ROADMAP.md). AI cost is capped at about **$0.22** per subscriber per month (the monthly neuron cap). Final price is Mike's call. Workers Paid $5 is shared with the rest of the API.

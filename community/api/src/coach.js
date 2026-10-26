@@ -30,7 +30,10 @@ import { insertMedia, pendingPhotoKey } from "./media-acl.js";
 import {
   COACH_ITEM,
   COACH_PERIOD_DAYS,
+  COACH_PLANS,
   COACH_PRICE_CENTS,
+  COACH_YEARLY_SAVINGS_PERCENT,
+  coachPlanId,
   buildDeviceModel,
   compareReadingToStage,
   detectAlerts,
@@ -76,7 +79,25 @@ function json(body, status = 200) {
   });
 }
 
-export function coachCatalog() {
+/** Can checkout run for this plan right now: Stripe keys plus that plan's price id, or local dev stubs. */
+export function coachPlanOnSale(env = {}, request, plan = "monthly") {
+  if (devStubsEnabled(env, request)) return true;
+  return paymentsConfigured(env) && Boolean(coachPriceId(env, plan));
+}
+
+/** Plans for the picker. `available` is false until that plan's Stripe price id is set. */
+export function coachPlans(env = {}, request) {
+  return Object.values(COACH_PLANS).map((plan) => ({
+    id: plan.id,
+    amount_cents: plan.amount_cents,
+    currency: "USD",
+    period: plan.period,
+    savings_percent: plan.id === "yearly" ? COACH_YEARLY_SAVINGS_PERCENT : 0,
+    available: coachPlanOnSale(env, request, plan.id),
+  }));
+}
+
+export function coachCatalog(env = {}, request) {
   return {
     id: COACH_ITEM,
     name: "Grow Coach",
@@ -84,6 +105,7 @@ export function coachCatalog() {
     amount_cents: COACH_PRICE_CENTS,
     currency: "USD",
     period: "month",
+    plans: coachPlans(env, request),
     pack: "culinary",
     summary:
       "Coaching for culinary grows that uses your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later. Not sold or marketed with off-menu varieties.",
@@ -114,8 +136,7 @@ export async function hasGrowCoach(db, user, env = {}) {
  */
 export function coachForSale(env = {}, request) {
   if (!coachPublicEnabled(env) || !coachAutopilotFlagOn(env)) return false;
-  if (devStubsEnabled(env, request)) return true;
-  return paymentsConfigured(env) && Boolean(coachPriceId(env));
+  return coachPlanOnSale(env, request, "monthly") || coachPlanOnSale(env, request, "yearly");
 }
 
 /** Coach shows up for this visitor: beta or paying users, or anyone while it is on sale. */
@@ -333,7 +354,7 @@ export async function handleCoach(method, path, url, request, env) {
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
     return json({
       available: true,
-      product: coachCatalog(),
+      product: coachCatalog(env, request),
       entitled,
       beta,
       signed_in: Boolean(user),
@@ -360,8 +381,11 @@ export async function handleCoach(method, path, url, request, env) {
       if (!(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
       return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }
-    if (paymentsConfigured(env) && !coachPriceId(env) && !devStubsEnabled(env, request)) {
-      return json({ error: "Grow Coach checkout opens soon.", coming_soon: true }, 503);
+    const plan = coachPlanId(body.plan);
+    if (!plan) return json({ error: "Pick the monthly or yearly plan." }, 400);
+    if (!coachPlanOnSale(env, request, plan)) {
+      const error = plan === "yearly" ? "The yearly plan is not available yet. The monthly plan opens first." : "The monthly plan is not available yet. Check back soon.";
+      return json({ error, coming_soon: true, plan }, 503);
     }
     if (await hasPaidCoach(db, user)) {
       return json({ error: "You already have Grow Coach. Manage it from your account page.", already_active: true }, 409);
@@ -369,10 +393,11 @@ export async function handleCoach(method, path, url, request, env) {
     const session = await startCheckout(db, env, request, {
       user,
       itemId: COACH_ITEM,
-      amountCents: COACH_PRICE_CENTS,
-      details: { item_type: "subscription", note: "Culinary Grow Coach only." },
+      amountCents: COACH_PLANS[plan].amount_cents,
+      details: { item_type: "subscription", plan, note: "Culinary Grow Coach only." },
       mode: "subscription",
-      priceId: coachPriceId(env),
+      plan,
+      priceId: coachPriceId(env, plan),
       name: "Grow Coach",
       successPath: "/account?checkout=success#billing",
       cancelPath: "/coach?checkout=cancel",
@@ -579,12 +604,12 @@ export async function handleCoach(method, path, url, request, env) {
  * Turn Grow Coach on until periodEnd (default: one period from now). replaySafe keeps an
  * active plan as is, so a repeated checkout event never moves the end date.
  */
-export async function activateCoachSub(db, userId, { replaySafe = false, periodEnd: explicitEnd = "" } = {}) {
+export async function activateCoachSub(db, userId, { replaySafe = false, periodEnd: explicitEnd = "", periodDays = COACH_PERIOD_DAYS } = {}) {
   const existing = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [userId]);
   if (replaySafe && existing && existing.status === "active" && existing.period_end >= nowIso()) {
     return existing.period_end;
   }
-  const periodEnd = explicitEnd || laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
+  const periodEnd = explicitEnd || laterIso(periodDays * 24 * 3600 * 1000);
   if (existing) {
     await db.run("UPDATE coach_subs SET status=?, period_end=? WHERE user_id=?", ["active", periodEnd, userId]);
   } else {

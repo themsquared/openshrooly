@@ -6,8 +6,14 @@ export function stripeSecret(env = {}) {
   return String(env.STRIPE_SECRET_KEY || "").trim();
 }
 
-export function coachPriceId(env = {}) {
-  return String(env.STRIPE_PRICE_COACH || "").trim();
+/**
+ * Stripe price id for a Grow Coach plan. Monthly reads STRIPE_PRICE_MONTHLY and falls back to the
+ * older single STRIPE_PRICE_COACH. Yearly reads STRIPE_PRICE_YEARLY. Empty means that plan is not on sale yet.
+ */
+export function coachPriceId(env = {}, plan = "monthly") {
+  if (plan === "yearly") return String(env.STRIPE_PRICE_YEARLY || "").trim();
+  if (plan !== "monthly") return "";
+  return String(env.STRIPE_PRICE_MONTHLY || env.STRIPE_PRICE_COACH || "").trim();
 }
 
 export function siteOrigin(env = {}) {
@@ -57,9 +63,9 @@ async function stripePost(env, path, params, idempotencyKey) {
  * Create a Checkout Session. `ref` is our own id for this attempt and doubles as the idempotency key,
  * so a double click or a retried request never makes two sessions.
  */
-export function createCheckoutSession(env, { ref, mode, userId, email, itemId, priceId, amountCents, name, successPath, cancelPath }) {
+export function createCheckoutSession(env, { ref, mode, userId, email, itemId, priceId, amountCents, name, successPath, cancelPath, plan }) {
   const site = siteOrigin(env);
-  const metadata = { user_id: String(userId), item_id: itemId, ref };
+  const metadata = { user_id: String(userId), item_id: itemId, ref, plan: plan || undefined };
   const params = {
     mode,
     client_reference_id: String(userId),
