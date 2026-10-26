@@ -5,6 +5,7 @@ import { runAutopilotPass } from "./coach-autopilot.js";
 import { runBackup } from "./backup.js";
 import { reclassifyUnconfirmedLegacyBatch } from "./review.js";
 import { isLiveSocket, liveNotifyAfter, notifyCron } from "./live.js";
+import { indexNowAfter } from "./indexnow.js";
 
 export { DeviceLive, UserLive } from "./live.js";
 
@@ -17,6 +18,9 @@ export default {
     // Tell the live cache what changed. Never blocks or fails the request.
     const notify = liveNotifyAfter(ctx, request, response);
     if (notify) executionCtx?.waitUntil?.(notify);
+    // Pages a handler marked as newly public get an IndexNow ping after the response.
+    const ping = indexNowAfter(ctx, request);
+    if (ping) executionCtx?.waitUntil?.(ping);
     return withCors(response, ctx, request);
   },
 

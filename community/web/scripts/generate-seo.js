@@ -11,6 +11,7 @@ import { profileItem, renderProfileCards } from "../public/js/profile-cards.js";
 import { lightRecipeLine } from "../public/js/light-line.js";
 import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.js";
 import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
+import { INDEXNOW_KEY } from "../../api/src/indexnow.js";
 import { GUIDES } from "./guides/index.js";
 import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
 
@@ -1405,6 +1406,8 @@ export function writeSeoFiles(dir = PUBLIC) {
   writeFileSync(join(dir, "llms.txt"), renderLlms(profiles));
   writeFileSync(join(dir, "llms-full.txt"), renderLlmsFull(profiles));
   writeFileSync(join(dir, "robots.txt"), renderRobots());
+  // IndexNow key file at the site root. The key is public by design and lives in api/src/indexnow.js.
+  writeFileSync(join(dir, `${INDEXNOW_KEY}.txt`), `${INDEXNOW_KEY}\n`);
   writeFileSync(join(dir, "_redirects"), renderRedirects(profiles));
   writeFileSync(join(dir, "faq.html"), renderFaqPage(profiles));
   writeFileSync(join(dir, "grow.html"), renderHubPage(profiles));
