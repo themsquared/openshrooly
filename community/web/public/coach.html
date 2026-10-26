@@ -40,6 +40,7 @@
   </header>
   <!--/CHROME_HEADER-->
   <main id="main">
+    <div id="coach-skeleton" class="device-skeleton" aria-hidden="true"><div class="sk sk-identity"></div><div class="sk-row"><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div><div class="sk sk-card"></div></div>
     <section id="coach-hero" class="hero coach-hero hidden" aria-label="Grow Coach">
       <div class="hero-copy">
         <p id="coach-eyebrow" class="eyebrow">Private beta · Culinary chambers only</p>
@@ -57,14 +58,14 @@
     <div id="gated" class="hidden">
       <div class="coach-toolbar card">
         <label>Chamber
-          <select id="device"></select>
+          <select id="device" disabled><option>Loading chambers…</option></select>
         </label>
         <label>Profile
-          <select id="profile"></select>
+          <select id="profile" disabled><option>Loading profiles…</option></select>
         </label>
         <label class="toggle">
           <input type="checkbox" id="auto-tune">
-          Auto-tune inside safe bounds
+          Let Coach adjust targets for me (only inside the profile's safe range, undo anytime)
         </label>
         <p id="usage" class="muted"></p>
       </div>
@@ -85,11 +86,11 @@
       <div class="coach-grid">
         <section class="card coach-panel" aria-labelledby="model-title">
           <h2 id="model-title">This chamber</h2>
-          <div id="stats" class="stat-grid"></div>
+          <div id="stats" class="stat-grid" aria-busy="true"><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div>
           <ul id="alerts" class="alert-list"></ul>
           <div id="suggestion"></div>
           <p class="row">
-            <button type="button" class="secondary" id="refresh-model">Refresh model</button>
+            <button type="button" class="secondary" id="refresh-model">Refresh</button>
             <button type="button" id="approve">Approve and send to chamber</button>
           </p>
         </section>
