@@ -46,6 +46,7 @@
   {% endfor %}
   </tbody>
 </table>
+{% if not profile.is_psilocybin %}
 <h3>Recipe sources</h3>
 <ul>
   {% for note in profile.light_recipe.sources %}
@@ -53,12 +54,15 @@
   {% endfor %}
 </ul>
 {% endif %}
+{% endif %}
+{% if not profile.is_psilocybin %}
 <h2>Source notes</h2>
 <ul>
   {% for note in profile.source_notes %}
   <li><strong>{{ note.title }}.</strong> {{ note.detail }}</li>
   {% endfor %}
 </ul>
+{% endif %}
 <h2>Firmware commands for this profile</h2>
 <p class="muted">Applied one stage at a time through the existing ESPHome REST API. No firmware change required.</p>
 {% endblock %}

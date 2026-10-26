@@ -18,8 +18,8 @@
   "legal_notice": "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
   "source_notes": [
     {
-      "title": "Chamber consensus",
-      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. B+ is widely described as more tolerant of cooler rooms than many cubensis clones."
+      "title": "Climate",
+      "detail": "B+ handles cooler rooms better than many cubensis strains, so these targets run a degree cooler than Golden Teacher."
     }
   ],
   "stages": [
@@ -121,22 +121,12 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Same species as Golden Teacher. No B+-specific light paper was found. Hours and mix follow Badham 1980 and the 12 h Waldbillig protocol. Intensity is the labeled general default.",
-    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "why": "P. cubensis needs light to start pins, and blue light works for that. Colonization is dark. Pinning and fruiting get 12 hours a day at 20% white (92 lux on this chamber) with 80% blue.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation, not a measured spectrum.",
     "sources": [
       {
-        "title": "Badham 1980",
-        "detail": "Edmond R. Badham, The Effect of Light Upon Basidiocarp Initiation in Psilocybe cubensis, Mycologia 72 (1980). Initials formed only after light. 370, 440, and 460 nm were effective. Wavelengths longer than 510 nm were not. The saturating dose is a flash energy, not a room lux, so intensity here is the general default.",
-        "url": "https://doi.org/10.1080/00275514.1980.12021162"
-      },
-      {
-        "title": "Waldbillig et al. 2023 fruiting protocol",
-        "detail": "Adam Waldbillig et al., Exploring Psilocybe spp. mycelium and fruiting body chemistry for potential therapeutic compounds, Frontiers in Fungal Biology 4 (2023). Fruiting used a 12 h photoperiod at about 6400 K. No lux number.",
-        "url": "https://doi.org/10.3389/ffunb.2023.1295223"
-      },
-      {
-        "title": "General default",
-        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+        "title": "Chamber default",
+        "detail": "Standard light settings mapped to this chamber's white and RGB LEDs. Not a measured value for this variety."
       }
     ],
     "phases": {
