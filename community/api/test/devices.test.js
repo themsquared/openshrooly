@@ -1278,3 +1278,30 @@ test("beta link cap defaults to 50 and ignores junk values", async () => {
   assert.equal(betaLinkCap({ BETA_LINK_CAP: "0" }), 0);
   assert.equal(betaLinkCap({ BETA_LINK_CAP: "75" }), 75);
 });
+
+test("inbox tells the chamber what is growing so its own page can show it", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token);
+  const inboxPath = `/api/devices/${d.deviceId}/inbox`;
+  const auth = { deviceId: d.deviceId, key: d.pair.keys.privateKey, cert: d.issued.data };
+  const before = await deviceCall(ctx, "GET", inboxPath, auth);
+  assert.equal(before.status, 200, JSON.stringify(before.data));
+  // Nothing picked: empty strings, so the chamber clears its card. Old keys are unchanged.
+  assert.deepEqual(
+    { name: before.data.grow_name, url: before.data.grow_url, image: before.data.grow_image },
+    { name: "", url: "", image: "" }
+  );
+  assert.ok(Array.isArray(before.data.commands));
+  assert.equal(before.data.offline_ok, true);
+
+  const push = await call(ctx, "POST", `/api/devices/${d.deviceId}/commands`, {
+    token,
+    body: { kind: "apply_profile", payload: { profile_id: "lions-mane", stage: "fruiting" } },
+  });
+  assert.equal(push.status, 200, JSON.stringify(push.data));
+  const after = await deviceCall(ctx, "GET", inboxPath, auth);
+  assert.equal(after.data.grow_name, "Lion's Mane");
+  assert.equal(after.data.grow_url, `${ctx.SITE_ORIGIN}/profiles/lions-mane`);
+  assert.equal(after.data.grow_image, `${ctx.SITE_ORIGIN}/img/species/species-lions-mane-640.webp`);
+});

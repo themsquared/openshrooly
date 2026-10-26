@@ -108,6 +108,8 @@ export function renderLightRecipe(profile) {
 /** Citations live in one collapsed "Sources" block at the end of the page. */
 export function renderSources(profile) {
   const psi = isPsi(profile);
+  // Off-menu pages show no citations or source list.
+  if (psi) return "";
   const items = (profile.light_recipe?.sources || [])
     .map((note) => {
       const title = escapeHtml(note.title);
@@ -753,7 +755,8 @@ export function renderProfilePage(profile, profiles = []) {
       robots: psi ? PRIVATE : "index,follow",
       image: ogImage(profile),
       type: "article",
-      jsonLd: profileJsonLd(profile),
+      // Off-menu pages stay out of structured data.
+      jsonLd: psi ? undefined : profileJsonLd(profile),
     },
     activeId: "profiles",
     hideCoach: psi,
