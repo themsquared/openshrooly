@@ -535,6 +535,7 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.includes("FROM users JOIN api_tokens")) {
     const token = tables.api_tokens.find((t) => t.token_hash === params[0]);
     if (!token) return [];
+    if (params.length > 1 && token.name === params[1] && !(token.created_at > params[2])) return [];
     return tables.users.filter((u) => u.id === token.user_id);
   }
   if (q.startsWith("SELECT id, name, created_at FROM api_tokens")) {

@@ -108,9 +108,10 @@ export async function userFromRequest(request, db) {
   const header = request.headers.get("authorization") || "";
   if (header.toLowerCase().startsWith("bearer ")) {
     const tokenHash = await sha256Hex(header.slice(7).trim());
+    // A sign-in token lives no longer than the refresh token issued with it. Personal tokens never age out.
     const viaToken = await db.one(
-      "SELECT users.* FROM users JOIN api_tokens ON api_tokens.user_id = users.id WHERE api_tokens.token_hash=?",
-      [tokenHash]
+      "SELECT users.* FROM users JOIN api_tokens ON api_tokens.user_id = users.id WHERE api_tokens.token_hash=? AND (api_tokens.name<>? OR api_tokens.created_at>?)",
+      [tokenHash, SIGN_IN_TOKEN, laterIso(-REFRESH_MS)]
     );
     if (viaToken) return { user: viaToken, via: "bearer" };
     const viaRefresh = await db.one(
