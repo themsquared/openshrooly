@@ -420,3 +420,47 @@ export function demoDevices() {
     },
   ];
 }
+
+/** First screen for someone with no chambers yet: one line, one button, one small link. */
+export function devicesEmptyHtml() {
+  return `<section class="card empty-devices">
+    <h2>No chambers yet</h2>
+    <p class="muted">Link your chamber to see it here and change what it grows from your phone.</p>
+    <a class="button" href="/claim.html">Link your chamber</a>
+    <a class="small-link" href="/install.html">I don't have OpenShrooly on it yet</a>
+  </section>`;
+}
+
+/** Chambers a person can send a profile to. */
+export function growableDevices(devices) {
+  return (Array.isArray(devices) ? devices : []).filter((d) => d && d.status !== "revoked" && d.id);
+}
+
+/**
+ * The "Grow this" box on a profile page.
+ * Signed out: a sign in link. No chambers: link one. One chamber: one button. Several: pick, then the button.
+ */
+export function growThisHtml({ signedIn, devices = [], next = "/" } = {}) {
+  if (!signedIn) {
+    return `<div class="grow-this-row"><a class="button" href="/login.html?next=${encodeURIComponent(next)}">Sign in to grow this</a></div>`;
+  }
+  const list = growableDevices(devices);
+  if (!list.length) {
+    return `<div class="grow-this-row"><a class="button" href="/claim.html">Link a chamber to grow this</a></div>`;
+  }
+  const label = (d) => escapeHtml(d.name || "My chamber");
+  const picker =
+    list.length > 1
+      ? `<label class="grow-this-pick">Chamber
+          <select id="grow-this-device">${list.map((d) => `<option value="${escapeHtml(d.id)}">${label(d)}</option>`).join("")}</select>
+        </label>`
+      : `<input type="hidden" id="grow-this-device" value="${escapeHtml(list[0].id)}">`;
+  const button = list.length > 1 ? "Grow this" : `Grow this in ${label(list[0])}`;
+  return `<div class="grow-this-row">${picker}<button type="button" id="grow-this-go">${button}</button></div>
+    <div id="grow-this-confirm" class="grow-this-row hidden">
+      <p class="grow-this-ask">Start from day 1? This replaces what the chamber is growing now.</p>
+      <button type="button" id="grow-this-yes">Start the grow</button>
+      <button type="button" id="grow-this-no" class="secondary">Cancel</button>
+    </div>
+    <p id="grow-this-msg" class="grow-this-msg muted" role="status"></p>`;
+}
