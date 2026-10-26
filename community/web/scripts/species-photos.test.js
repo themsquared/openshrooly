@@ -145,7 +145,7 @@ test("rendered cards never nest an <a> inside another <a>", () => {
   assert.doesNotMatch(plain, /<a\b/);
   assert.match(plain, /Alan Rockefeller/);
   for (const id of offMenu.map((p) => p.id)) {
-    const card = html.match(new RegExp(`<a class="profile-card" href="/profiles/${id}">[\\s\\S]*?</a>`))[0];
+    const card = html.match(new RegExp(`<a class="profile-card" href="/profiles/${id}"[^>]*>[\\s\\S]*?</a>`))[0];
     assert.match(card, /<img\b[^>]*alt="[^"]+"/, `${id} card photo`);
   }
 });

@@ -93,6 +93,8 @@ test("profile checkout opens a real Stripe session with an idempotency key and s
   assert.equal(req.form.get("line_items[0][price]"), "price_test_king");
   assert.equal(req.form.has("line_items[0][price_data][unit_amount]"), false);
   assert.match(req.form.get("success_url"), /checkout=success/);
+  // Stripe swaps in the session id; the site uses it as the analytics transaction id.
+  assert.match(req.form.get("success_url"), /&session_id=\{CHECKOUT_SESSION_ID\}$/);
   const row = await ctx.db.one("SELECT * FROM checkouts WHERE id=?", [res.data.id]);
   assert.equal(row.status, "requires_payment");
 });
@@ -177,7 +179,7 @@ test("a missing yearly price id says not available yet and never calls Stripe; m
   assert.equal(bad.status, 400);
   const monthly = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { plan: "monthly" } });
   assert.equal(monthly.status, 200, JSON.stringify(monthly.data));
-  assert.equal(stripe.calls[0].form.get("line_items[0][price]"), "price_m");
+  assert.equal(stripe.calls[0].form.get("line_items[0][price]"), "price_m");  assert.match(stripe.calls[0].form.get("success_url"), /\/account\?checkout=success&session_id=\{CHECKOUT_SESSION_ID\}#billing$/);
 });
 
 test("yearly checkout uses the yearly price, and its webhooks give a year of access", async () => {
