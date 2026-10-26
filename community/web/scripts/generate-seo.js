@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NAV_ITEMS, POSITIONING, PRODUCT, SITE, TAGLINE, renderFooter, renderHeader } from "../public/js/chrome.js";
 import { speciesArt } from "../public/js/species-art.js";
+import { lightRecipeLine } from "../public/js/light-line.js";
 import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.js";
 import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
 
@@ -76,7 +77,7 @@ export function renderLightRecipe(profile) {
   const recipe = profile.light_recipe;
   if (!recipe) return "";
   if (isPaid(profile)) {
-    return `<section class="light-recipe" aria-labelledby="light-recipe-heading"><h2 id="light-recipe-heading">Light recipe</h2><p class="muted">Hours, brightness, and the RGB mix unlock after purchase.</p><p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p></section>`;
+    return `<section class="light-recipe" aria-labelledby="light-recipe-heading"><h2 id="light-recipe-heading">Light recipe</h2><p class="muted">Hours and colors unlock after purchase.</p></section>`;
   }
   const rows = Object.entries(recipe.phases || {})
     .map(
@@ -84,8 +85,26 @@ export function renderLightRecipe(profile) {
         `<tr><th scope="row">${escapeHtml(id)}</th><td>${phase.photoperiod_hours} h on</td><td>white ${phase.white_brightness_percent}%</td><td>RGB ${phase.red_percent} / ${phase.green_percent} / ${phase.blue_percent}</td></tr>`
     )
     .join("");
+  return `<section class="light-recipe" aria-labelledby="light-recipe-heading">
+      <h2 id="light-recipe-heading">Light recipe</h2>
+      <p>${escapeHtml(lightRecipeLine(recipe))}</p>
+      <details class="light-details">
+        <summary>Light details</summary>
+        <p>${escapeHtml(recipe.why)}</p>
+        <p class="muted">${escapeHtml(recipe.wavelength_note)}</p>
+        <table class="light-recipe-table">
+          <caption>Photoperiod and mix for this chamber</caption>
+          <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </details>
+    </section>`;
+}
+
+/** Citations live in one collapsed "Sources" block at the end of the page. */
+export function renderSources(profile) {
   const psi = isPsi(profile);
-    const sources = (recipe.sources || [])
+  const items = (profile.light_recipe?.sources || [])
     .map((note) => {
       const title = escapeHtml(note.title);
       const detail = escapeHtml(note.detail);
@@ -97,18 +116,11 @@ export function renderLightRecipe(profile) {
       return `<li><strong>${title}.</strong> ${detail}</li>`;
     })
     .join("");
-  return `<section class="light-recipe" aria-labelledby="light-recipe-heading">
-      <h2 id="light-recipe-heading">Light recipe</h2>
-      <p>${escapeHtml(recipe.why)}</p>
-      <p class="muted">${escapeHtml(recipe.wavelength_note)}</p>
-      <table class="light-recipe-table">
-        <caption>Photoperiod and mix for this chamber</caption>
-        <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <h3>Recipe sources</h3>
-      <ul>${sources}</ul>
-    </section>`;
+  if (!items) return "";
+  return `<details class="sources-block">
+      <summary>Sources</summary>
+      <ul>${items}</ul>
+    </details>`;
 }
 
 function daysToFruit(profile) {
@@ -375,7 +387,7 @@ export function renderProfilePage(profile) {
     : "";
   const tools = `/profile.html?id=${encodeURIComponent(profile.id)}`;
   const cta = paid
-    ? `<p class="actions"><a class="button" href="${tools}">Unlock for ${price(profile)}</a></p>`
+    ? `<p class="actions"><a class="button" href="${tools}">Buy for ${price(profile)}</a></p>`
     : `<p class="actions"><a class="button" href="${tools}">Download, rate, or report a grow</a></p>`;
   const art = speciesArt(profile.species, profile.strain, profile.name, profile.pack, { priority: true, id: profile.id });
   const body = `
@@ -393,6 +405,7 @@ export function renderProfilePage(profile) {
       ${renderLightRecipe(profile)}
       ${cta}
       ${psi ? microscopySection() : ""}
+      ${isPaid(profile) ? "" : renderSources(profile)}
     </article>`;
   return shell({
     head: {

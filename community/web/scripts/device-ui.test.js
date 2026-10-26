@@ -73,20 +73,24 @@ test("grow line falls back when no profile is set", () => {
   assert.equal(growLine({}), "No grow selected");
 });
 
-test("account page keeps the old hooks inside named sections", () => {
+test("account page is a short menu of collapsed sections that keeps the old hooks", () => {
   const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/account.html"), "utf8");
-  for (const id of ["profile", "devices", "billing", "security", "community", "who", "verified", "device-cards", "alert-prefs", "sessions", "signout-all", "mint", "my-profiles", "ents", "coach-account"]) {
+  for (const id of ["devices", "alerts", "billing", "security", "community", "your-data", "first-chamber", "who", "verified", "device-cards", "alert-prefs", "sessions", "signout", "signout-all", "mint", "my-profiles", "ents", "coach-account"]) {
     assert.match(html, new RegExp(`id="${id}"`), id);
   }
-  assert.match(html, /Account sections/);
-  assert.match(html, /Subscriptions and billing/);
+  // Menu order: Chambers, Email alerts, Billing first, then the rest, each collapsed.
+  const titles = [...html.matchAll(/<details class="account-section card" id="([^"]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(titles.slice(0, 3), ["devices", "alerts", "billing"]);
+  assert.doesNotMatch(html, /<details class="account-section card"[^>]* open/);
+  assert.match(html, /Link your first chamber/);
+  assert.match(html, />Sign out</);
   assert.doesNotMatch(html.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " "), DASH);
 });
 
 test("account page lets people download their data and delete their account", () => {
   const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/account.html"), "utf8");
   for (const id of ["your-data", "export-data", "delete-account", "delete-username"]) assert.match(html, new RegExp(`id="${id}"`), id);
-  assert.match(html, /href="#your-data"/);
+  assert.match(html, /<details class="account-section card" id="your-data">/);
   // The delete button stays off until the username is typed.
   assert.match(html, /<button type="submit" class="danger" disabled>Delete my account<\/button>/);
   assert.match(html, /can't be undone/);

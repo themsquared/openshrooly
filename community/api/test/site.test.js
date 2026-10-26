@@ -65,7 +65,9 @@ test("claim page explains pairing and hides the code form until a code or flag",
   assert.doesNotMatch(main, /Cloud is opt-in/);
   assert.doesNotMatch(html, />Claim device</);
   const home = read("index.html");
-  assert.match(home, /href="\/claim.html">How linking works</);
+  // One clear first step on the home page: install, with browsing as the quiet second choice.
+  assert.match(home, /id="get-started"[^>]*href="\/install.html"|href="\/install.html"[^>]*id="get-started"/);
+  assert.match(home, />Browse profiles</);
   assert.doesNotMatch(home, /Claim a chamber|Claim device/);
   const app = readFileSync(join(PUBLIC, "js/app.js"), "utf8");
   assert.match(app, /Email verified\. You can publish and buy\./);
@@ -246,5 +248,6 @@ test("checkout buttons send people only to Stripe or this site, and say so when 
   assert.match(app, /parsed\.hostname === "checkout\.stripe\.com" \|\| parsed\.hostname === "billing\.stripe\.com"/);
   assert.match(app, /Checkout canceled\. Nothing was charged\./);
   assert.match(read("account.html"), /id="billing-portal" class="secondary hidden"/);
-  assert.match(read("profile.html"), /id="buy">Buy recipe</);
+  assert.match(read("profile.html"), /id="buy">Buy</);
+  assert.match(readFileSync(join(PUBLIC, "js/app.js"), "utf8"), /\$\("#buy"\)\.textContent = `Buy for \$\{price\}`/);
 });
