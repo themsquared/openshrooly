@@ -26,6 +26,7 @@ export async function envContext(env) {
       COMMUNITY_SECRET: env.COMMUNITY_SECRET,
       AUTH_DEBUG: env.AUTH_DEBUG,
       DEV_STUBS: env.DEV_STUBS,
+      INDEXNOW_DISABLED: env.INDEXNOW_DISABLED,
       HIBP_DISABLED: env.HIBP_DISABLED,
       SITE_ORIGIN: env.SITE_ORIGIN || "https://shroomlabs.io",
       API_ORIGIN: env.API_ORIGIN || "https://api.shroomlabs.io",
