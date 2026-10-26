@@ -53,6 +53,11 @@ import {
 const DISCLOSURE =
   "Some links are affiliate links. We may earn a commission if you buy through them, at no extra cost to you.";
 
+/** The affiliate note shows only next to links that are actually affiliate links. */
+export function disclosureFor(links) {
+  return Array.isArray(links) && links.length ? DISCLOSURE : "";
+}
+
 export const DEFAULT_CORS_ORIGINS = "https://shroomlabs.io,https://www.shroomlabs.io";
 
 export function allowedOrigins(env, request) {
@@ -355,7 +360,6 @@ async function route(method, path, url, request, env) {
         : { available: false },
       // Show "Manage billing" only to people Stripe knows about.
       billing_portal: paymentsConfigured(env) && Boolean(await coachCustomerFor(db, user.id)),
-      disclosure: DISCLOSURE,
     });
   }
 
@@ -690,7 +694,8 @@ async function route(method, path, url, request, env) {
 
   if (method === "GET" && path === "/api/supplies") {
     // No partner links yet. The page hides the supplies block when this list is empty.
-    return json({ disclosure: DISCLOSURE, items: [] });
+    const items = [];
+    return json({ disclosure: disclosureFor(items), items });
   }
 
   return json({ error: "not found" }, 404);
@@ -834,6 +839,7 @@ async function showProfile(request, db, env, profileId) {
       };
   const offMenu = isOffMenu(profile) || isPsilocybin(profile, extra);
   const photos = await db.all("SELECT * FROM profile_photos WHERE profile_id=? AND withdrawn=0", [profileId]);
+  const links = offMenu ? [] : unlocked ? affiliateLinksFor(profile, extra) : [];
   return json({
     profile: {
       ...lockedDoc,
@@ -845,8 +851,8 @@ async function showProfile(request, db, env, profileId) {
     ratings,
     avg: avgRow?.a ?? null,
     reports,
-    links: offMenu ? [] : unlocked ? affiliateLinksFor(profile, extra) : [],
-    disclosure: offMenu ? "" : DISCLOSURE,
+    links,
+    disclosure: disclosureFor(links),
     resources: offMenu
       ? { disclaimer: PSI_RESOURCE_DISCLAIMER, spore_law: PSI_SPORE_LAW, links: PSI_RESOURCES }
       : null,

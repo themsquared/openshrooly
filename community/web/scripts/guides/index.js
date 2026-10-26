@@ -2,6 +2,7 @@
 import { PROBLEM_GUIDES } from "./problems.js";
 import { REFERENCE_GUIDES } from "./reference.js";
 import { START_GUIDES } from "./start.js";
+import { withAffiliateNote } from "./suppliers.js";
 
 const ALL = [...START_GUIDES, ...PROBLEM_GUIDES, ...REFERENCE_GUIDES];
 const SLUGS = new Set(ALL.map((g) => g.slug));
@@ -18,6 +19,6 @@ function unlinkMissing(html) {
 
 export const GUIDES = ALL.map((g) => ({
   ...g,
-  sections: g.sections.map((s) => ({ ...s, html: unlinkMissing(s.html) })),
+  sections: g.sections.map((s) => ({ ...s, html: withAffiliateNote(unlinkMissing(s.html)) })),
   related: (g.related || []).filter(([, href]) => !href.startsWith("/guides/") || SLUGS.has(href.slice(8))),
 }));

@@ -228,10 +228,11 @@ test("Grow Coach is hidden by default on every static page", () => {
     assert.doesNotMatch(html, /\$3\.99|3\.99 (a|per) month/, `${file} prices Coach`);
     if (file === "coach.html") continue;
     const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
-    const visible = main.replace(/<div id="coach-billing" class="hidden">[\s\S]*?<\/div>/, "");
-    assert.doesNotMatch(visible, /Grow Coach|coach-promo/, `${file} shows Coach outside a hidden block`);
+    assert.doesNotMatch(main, /Grow Coach|coach-promo|href="\/coach"/, `${file} has Coach in static HTML`);
   }
-  assert.match(read("account.html"), /<div id="coach-billing" class="hidden">/);
+  // account.html keeps an empty slot; app.js fills it only for users the API says can use Coach.
+  assert.match(read("account.html"), /<div id="coach-billing" hidden><\/div>/);
+  assert.match(readFileSync(join(PUBLIC, "js/app.js"), "utf8"), /const show = Boolean\(me\.grow_coach\?\.available\);\s*coachBilling\.hidden = !show;/);
   for (const file of ["llms.txt", "llms-full.txt", "sitemap.xml"]) assert.doesNotMatch(read(file), /Grow Coach|\/coach\b/, file);
   for (const file of ["faq.html", "docs.html"]) {
     const html = read(file);

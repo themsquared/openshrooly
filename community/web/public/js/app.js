@@ -626,9 +626,15 @@ async function renderAccount() {
         (item) => `<li><a href="/publish?id=${encodeURIComponent(item.profile.id)}">${escapeHtml(item.profile.name)}</a> · ${escapeHtml(stateLabel[item.review?.status] || "Draft")}${item.review?.reason ? ` · ${escapeHtml(item.review.reason)}` : ""}</li>`
       )
       .join("") || "<li class='muted'>No profiles yet.</li>";
-  // Grow Coach billing shows only when the server says this user can use Coach.
+  // Grow Coach billing is not in static HTML. It is built here only when the server says this user can use Coach.
   const coachBilling = $("#coach-billing");
-  if (coachBilling) coachBilling.classList.toggle("hidden", !me.grow_coach?.available);
+  if (coachBilling) {
+    const show = Boolean(me.grow_coach?.available);
+    coachBilling.hidden = !show;
+    coachBilling.innerHTML = show
+      ? '<h3>Grow Coach</h3><p id="coach-account" class="muted"></p><p class="account-actions"><a class="button" href="/coach">Open Grow Coach</a></p>'
+      : "";
+  }
   if ($("#coach-account") && me.grow_coach?.available) {
     $("#coach-account").textContent =
       me.grow_coach.entitled && !me.grow_coach.beta && me.grow_coach.period_end
