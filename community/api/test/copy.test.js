@@ -59,7 +59,7 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
 });
 
 test("public pages share one nav label set", () => {
-  const required = ["Profiles", "FAQ", "Grow Coach", "Docs"];
+  const required = ["Profiles", "Grow guides", "FAQ", "Docs"];
   const missing = [];
   for (const page of pages()) {
     if (page.name === "legacy-preview.html") continue;
