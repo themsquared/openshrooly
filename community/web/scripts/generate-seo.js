@@ -507,6 +507,10 @@ export const FAQ = [
     a: "No. Growing runs on your chamber and your own network. Linking a chamber to your account is optional and adds remote viewing and email alerts. Local controls keep working if the internet is down.",
   },
   {
+    q: "How do I link my chamber to my account?",
+    a: "On OpenShrooly 1.0.6-sl.1 or later, press button 4 on the chamber to open the menu, choose Link this device, and scan the QR code with your phone while signed in to shroomlabs.io. You can also type the 6-character code on the link page. The same menu item shows who the chamber is linked to and can unlink it. Linking is optional and in open beta.",
+  },
+  {
     q: "How long does pearl oyster take?",
     a: "Pearl Oyster is about 29 days from start to fruit in cool, humid conditions with plenty of fresh air once pins form.",
   },
