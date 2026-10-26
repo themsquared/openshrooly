@@ -188,9 +188,11 @@ function renderNav() {
   }
 }
 
-function selectPack(pack) {
+function selectPack(pack, line = "") {
   const url = new URL(location.href);
   url.searchParams.set("pack", pack);
+  if (line) url.searchParams.set("line", line);
+  else url.searchParams.delete("line");
   url.hash = "library";
   history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
   document.getElementById("library")?.scrollIntoView();
@@ -227,22 +229,29 @@ async function renderHome() {
   const pack = params().get("pack") || "culinary";
   const q = params().get("q") || "";
   const off = pack === "psilocybin";
+  const chef = !off && params().get("line") === "chef";
   const packLabel = $("#pack-label");
   if (packLabel) packLabel.textContent = off ? "Off-menu" : "Culinary Profiles";
   $("#legal")?.classList.toggle("hidden", !off);
   $("#q").value = q;
   $("#pack").value = pack;
-  $("#pack-culinary")?.classList.toggle("is-on", !off);
+  $("#pack-culinary")?.classList.toggle("is-on", !off && !chef);
+  $("#pack-chef")?.classList.toggle("is-on", chef);
   $("#pack-offmenu")?.classList.toggle("is-on", off);
-  $("#pack-culinary")?.setAttribute("aria-pressed", !off ? "true" : "false");
+  $("#pack-culinary")?.setAttribute("aria-pressed", !off && !chef ? "true" : "false");
+  $("#pack-chef")?.setAttribute("aria-pressed", chef ? "true" : "false");
   $("#pack-offmenu")?.setAttribute("aria-pressed", off ? "true" : "false");
+  $("#chef-intro")?.classList.toggle("hidden", !chef);
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", off);
   setCoachOffMenu(off);
   setGetStarted();
-  const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
-  // First visit: show a handful of cards and one button for the rest. A search shows everything.
-  const preview = !q && profiles.length > HOME_PREVIEW_COUNT;
+  const all = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
+  // Chef's line is its own filter. In the plain culinary view, free profiles come first.
+  const isChef = (p) => (p.tags || []).includes("chef");
+  const profiles = chef ? all.filter(isChef) : [...all.filter((p) => !isChef(p)), ...all.filter(isChef)];
+  // First visit: show a handful of cards and one button for the rest. A search or the Chef's line shows everything.
+  const preview = !q && !chef && profiles.length > HOME_PREVIEW_COUNT;
   $("#cards").innerHTML = profiles.length
     ? renderProfileCards(preview ? profiles.slice(0, HOME_PREVIEW_COUNT) : profiles)
     : `<div class="empty-library">
@@ -618,9 +627,19 @@ async function renderAccount() {
     ? "Email verified. You can publish and buy."
     : "Verify your email before publishing or buying.";
   $("#tokens").innerHTML = me.tokens.map((t) => `<li>${escapeHtml(t.name)} · ${escapeHtml(t.created_at)}</li>`).join("");
+  // Purchases never expire. Show each owned profile by name with a link back to its recipe.
+  const owned = me.entitlements || [];
+  const names = owned.some((e) => e.item_type === "profile")
+    ? new Map(((await api("/api/profiles?pack=culinary").catch(() => [])) || []).map((p) => [p.id, p.name]))
+    : new Map();
   $("#ents").innerHTML =
-    me.entitlements.map((e) => `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`).join("") ||
-    "<li class='muted'>No paid items yet.</li>";
+    owned
+      .map((e) => {
+        if (e.item_type !== "profile") return `<li>${escapeHtml(e.item_type)} · ${escapeHtml(e.item_id)}</li>`;
+        const since = e.granted_at ? ` <span class="muted">· yours since ${escapeHtml(String(e.granted_at).slice(0, 10))}</span>` : "";
+        return `<li><a href="/profile?id=${encodeURIComponent(e.item_id)}">${escapeHtml(names.get(e.item_id) || e.item_id)}</a>${since}</li>`;
+      })
+      .join("") || "<li class='muted'>No paid items yet.</li>";
   if (me.user.role === "moderator" || me.user.role === "admin") {
     $("#nav-moderate")?.classList.remove("hidden");
   }
@@ -1009,6 +1028,7 @@ if (page === "home") {
   $("#pack-culinary")?.addEventListener("click", () => selectPack("culinary"));
   $("#pack-restricted")?.addEventListener("click", () => selectPack("psilocybin"));
   $("#pack-offmenu")?.addEventListener("click", () => selectPack("psilocybin"));
+  $("#pack-chef")?.addEventListener("click", () => selectPack("culinary", "chef"));
   window.addEventListener("popstate", () => renderHome().catch(() => {}));
 }
 if (page === "profile") renderProfile().catch((err) => ($("#summary").textContent = err.message));

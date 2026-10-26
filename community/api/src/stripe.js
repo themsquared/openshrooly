@@ -1,5 +1,7 @@
 /** Minimal Stripe REST client. No SDK: form-encoded fetch with an idempotency key. Secrets never leave this file. */
 
+import { STRIPE_PROFILE_PRICES } from "./stripe-prices.js";
+
 const STRIPE_API = "https://api.stripe.com/v1";
 
 export function stripeSecret(env = {}) {
@@ -14,6 +16,24 @@ export function coachPriceId(env = {}, plan = "monthly") {
   if (plan === "yearly") return String(env.STRIPE_PRICE_YEARLY || "").trim();
   if (plan !== "monthly") return "";
   return String(env.STRIPE_PRICE_MONTHLY || env.STRIPE_PRICE_COACH || "").trim();
+}
+
+/** "live" only for a live key. Anything else (test key, no key) reads the test price table. */
+export function stripeMode(env = {}) {
+  return /^(sk|rk)_live_/.test(stripeSecret(env)) ? "live" : "test";
+}
+
+/**
+ * The synced Stripe Price for a paid profile in the key's mode, or null when the profile is not
+ * on sale yet. A stale entry (amount changed since the last sync) is treated as missing, so the
+ * buyer is never charged a price that differs from the one on the page.
+ */
+export function profilePriceFor(env = {}, profile = {}) {
+  const table = env.profilePriceTable || STRIPE_PROFILE_PRICES;
+  const entry = table?.[stripeMode(env)]?.[profile?.id];
+  if (!entry || typeof entry.price !== "string" || !entry.price.startsWith("price_")) return null;
+  if (Number(entry.amount_cents) !== Number(profile?.pricing?.amount_cents)) return null;
+  return entry;
 }
 
 export function siteOrigin(env = {}) {

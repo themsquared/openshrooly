@@ -23,6 +23,7 @@ import { coachBetaAccess, coachPlans, coachVisible, handleCoach, hasGrowCoach } 
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, coachCustomerFor, openBillingPortal, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities, paymentsConfigured } from "./providers.js";
+import { profilePriceFor } from "./stripe.js";
 import { corsAllowlist, originAllowed, rateLimit, rateLimitClient, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
@@ -544,6 +545,9 @@ async function route(method, path, url, request, env) {
       user,
       itemId: profile.id,
       amountCents: profile.pricing.amount_cents,
+      // Built-in paid profiles sell through their own synced Stripe Price. No price, no sale.
+      priceId: profilePriceFor(env, profile)?.price || "",
+      requirePrice: true,
       details: { note: "Culinary checkout." },
       name: profile.name || "Grow profile",
       successPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=success`,

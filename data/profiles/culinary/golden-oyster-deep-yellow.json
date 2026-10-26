@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "id": "golden-oyster-deep-yellow",
+  "name": "Golden Oyster: deep yellow",
+  "species": "Pleurotus citrinopileatus",
+  "strain": "Golden",
+  "variety_group": "oyster",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "chef",
+    "intermediate",
+    "oyster",
+    "warm"
+  ],
+  "restricted": false,
+  "summary": "Blue-only light and held-back fresh air for fuller yellow color, thicker stems, and more savory flavor than the free card.",
+  "notes": "Do not raise the fan to fix long stems here; the blue light does that job. Harvest before the caps turn up at the edge.",
+  "chamber_notes": " Chamber limits: there is no heater or cooler, so temperature targets only hold if the room sits near them. There is no CO2 sensor, so the fan schedule stands in for fresh air. The humidifier can only add moisture, so a low humidity target depends on dry room air.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Chen et al. 2025, golden oyster light quality",
+      "detail": "Chen X. et al., Frontiers in Nutrition 12 (2025). Under pure blue light (450 nm, 12 h) stipes were 12.5% shorter than under white, stipe and cap diameter rose 35.5% and 18.3%, fruit weight rose 23.7%, color was fuller, and umami and sweet amino acids rose. Red and far-red light gave pale, soft fruits.",
+      "url": "https://doi.org/10.3389/fnut.2025.1554575"
+    },
+    {
+      "title": "IJMM 2013, golden oyster light and atmosphere",
+      "detail": "International Journal of Medicinal Mushrooms 15(1), 2013. The yellow value of P. citrinopileatus was highest at 0.1% CO2, and 0.05 to 0.1% CO2 improved yield. That is why this profile uses moderate rather than maximum fresh air. Its light advice (720 nm) differs from the 2025 study; this profile follows the 2025 blue light result because far-red gave pale fruits there.",
+      "url": "https://doi.org/10.1615/IntJMedMushr.v15.i1.110"
+    },
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. citrinopileatus fruits in a wide warm band, often 18 to 30 \u00b0C."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 12.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 25.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 20.0,
+      "temperature_warning_max_c": 30.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0.0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 4.0,
+      "humidity_percent": 93.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 12,
+        "run_duration_s": 35,
+        "speed_percent": 40
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Blue fruiting",
+      "duration_days": 8.0,
+      "humidity_percent": 87.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 21.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 16.0,
+      "temperature_warning_max_c": 26.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 100
+      },
+      "fan": {
+        "period_min": 15,
+        "run_duration_s": 35,
+        "speed_percent": 40
+      },
+      "notes": "More light helps hold gold color."
+    }
+  ],
+  "pricing": {
+    "kind": "paid",
+    "amount_cents": 299,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [
+    "stripe"
+  ],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Fruiting runs on blue only because pure blue gave fuller color, shorter stems, and more umami than white in Chen 2025.",
+    "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
+    "sources": [
+      {
+        "title": "Chen et al. 2025, golden oyster light quality",
+        "detail": "Chen X. et al., Frontiers in Nutrition 12 (2025). Under pure blue light (450 nm, 12 h) stipes were 12.5% shorter than under white, stipe and cap diameter rose 35.5% and 18.3%, fruit weight rose 23.7%, color was fuller, and umami and sweet amino acids rose. Red and far-red light gave pale, soft fruits.",
+        "url": "https://doi.org/10.3389/fnut.2025.1554575"
+      },
+      {
+        "title": "IJMM 2013, golden oyster light and atmosphere",
+        "detail": "International Journal of Medicinal Mushrooms 15(1), 2013. The yellow value of P. citrinopileatus was highest at 0.1% CO2, and 0.05 to 0.1% CO2 improved yield. That is why this profile uses moderate rather than maximum fresh air. Its light advice (720 nm) differs from the 2025 study; this profile follows the 2025 blue light result because far-red gave pale fruits there.",
+        "url": "https://doi.org/10.1615/IntJMedMushr.v15.i1.110"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0.0,
+        "white_brightness_percent": 0.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 20.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fruiting": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 0.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 100
+      }
+    }
+  }
+}
