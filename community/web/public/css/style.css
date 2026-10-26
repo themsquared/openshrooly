@@ -1073,3 +1073,30 @@ td a:not(.button) { display: inline-flex; align-items: center; min-height: 44px;
 
 /* U14: a new chamber shows one plain line instead of a grid of zeros. */
 .stat-grid .stat-empty { grid-column: 1 / -1; margin: 0; }
+
+/* U13 and U5: an empty chamber gets a small mark and one clear next step, not a big grey box. */
+.mushroom-icon { color: var(--sl-spore); display: block; }
+.device-card.is-empty .device-card-fallback {
+  height: auto;
+  padding: 1rem 1rem 0;
+  background: none;
+}
+.device-card-cta { margin: 0.35rem 0 0.15rem; }
+.device-card-cta .button { pointer-events: none; }
+.button.small { padding: 0.45rem 0.8rem; font-size: 14px; }
+.device-identity.is-empty { grid-template-columns: auto 1fr; }
+.device-identity.is-empty h2 { font-size: clamp(1.3rem, 3.5vw, 1.7rem); }
+.device-identity.is-empty p { margin: 0.5rem 0 0; }
+.control-msg:empty { display: none; }
+.control-msg { margin: 0.5rem 0 0; color: var(--sl-ok, #7dffb3); }
+.chamber-only-line { margin: 0.2rem 0 1rem; }
+#reading-chart-wait { margin: 0 0 1rem; }
+details.device-local-only { padding: 0.8rem 1.1rem; }
+details.device-local-only summary { cursor: pointer; color: var(--sl-muted); }
+details.device-local-only .link-like { text-decoration: underline; color: inherit; }
+details.device-local-only[open] summary { margin-bottom: 0.4rem; }
+#grow { scroll-margin-top: 80px; }
+@media (max-width: 767px) {
+  .device-card.is-empty .device-card-fallback { height: auto; }
+  .device-identity.is-empty { grid-template-columns: auto 1fr; }
+}

@@ -10,6 +10,7 @@ import { escapeHtml, renderSafeMarkdown, safeDisplay } from "./safe-markdown.js"
 import {
   coachLine,
   deviceMetaLine,
+  chartReady,
   drawHistoryChart,
   growLine,
   growingLabels,
@@ -157,7 +158,7 @@ function renderNav() {
       <summary>Account</summary>
       <div class="account-menu-links">
         <a href="/account.html">Account</a>
-        <a href="/devices.html">Devices</a>
+        <a href="/devices.html">My chambers</a>
         <a href="/fleet.html" id="nav-fleet" class="hidden">Bulk tools</a>
         <a href="/publish.html">Build a profile</a>
         <a href="/moderate.html" id="nav-moderate" class="hidden">Review queue</a>
@@ -1754,10 +1755,11 @@ async function renderDevice() {
     dash.innerHTML = `
       <div id="dev-identity"></div>
       <div id="dev-gauges"></div>
-      <figure class="fleet-chart card">
+      <figure class="fleet-chart card hidden" id="reading-chart-box">
         <figcaption>Readings, last 24 hours</figcaption>
         <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>
       </figure>
+      <p class="muted hidden" id="reading-chart-wait">A chart of the last 24 hours shows up here after a couple of readings.</p>
       <div id="dev-controls"></div>
       <div id="dev-commands"></div>
       <div id="dev-notes"></div>
@@ -1820,9 +1822,18 @@ async function renderDevice() {
     swap("#dev-gauges", renderGauges(device));
     if ($("#reading-chart")._history !== JSON.stringify(snap.history || [])) {
       $("#reading-chart")._history = JSON.stringify(snap.history || []);
-      drawHistoryChart($("#reading-chart"), snap.history || []);
+      const ready = chartReady(snap.history);
+      $("#reading-chart-box").classList.toggle("hidden", !ready);
+      $("#reading-chart-wait").classList.toggle("hidden", ready);
+      if (ready) drawHistoryChart($("#reading-chart"), snap.history || []);
     }
     paintControls();
+    // A card or link with #grow lands on the profile picker once it exists.
+    if (!view.jumped && location.hash === "#grow" && $("#grow")) {
+      view.jumped = true;
+      $("#grow").scrollIntoView({ block: "start" });
+      $("#device-controls")?.profile_id?.focus({ preventScroll: true });
+    }
     swap("#dev-commands", renderCommandList(device.commands || []));
     swap("#dev-notes", renderReadonlyNotes(device));
     const alerts = snap.alerts;
@@ -1938,7 +1949,7 @@ async function inFlight(form, run) {
  */
 function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) {
   const form = $("#device-controls");
-  const msg = $("#device-controls-msg");
+  const generalMsg = $("#device-controls-msg");
   // Picking a different profile resets the phase to its first stage (a new grow starts at day 1).
   form?.addEventListener("change", (ev) => {
     if (ev.target?.name !== "profile_id" || !form.stage) return;
@@ -1960,6 +1971,8 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
     if (!canWrite) return;
     const action = ev.submitter?.dataset?.action;
     const device = currentDevice() || {};
+    // Say what happened right under the button that was tapped.
+    const msg = form.querySelector(`.control-msg[data-msg-for="${action}"]`) || generalMsg;
     inFlight(form, async () => {
       try {
         if (action === "name") {
@@ -1976,7 +1989,7 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           payload.temperature_c = numberOrUndefined(form.temperature_c.value);
           payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
           // A disabled fan box means this firmware can't take it; don't ask.
-          if (!form.fan_speed_percent.disabled) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
+          if (form.fan_speed_percent && !form.fan_speed_percent.disabled) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
         }
         if (action === "profile") {
           payload.profile_id = form.profile_id.value;
@@ -2005,7 +2018,9 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         });
         const result = applied.results?.[0];
         if (!result || result.status === "failed") throw new Error(resultMessage(result));
-        flash(msg, resultMessage(result));
+        // Keep this one up: the grower needs to know it is on its way, not just that a click happened.
+        clearTimeout(msg._t);
+        msg.textContent = resultMessage(result);
         onSent();
       } catch (err) {
         flash(msg, err.message);
@@ -2166,6 +2181,39 @@ async function renderFleet() {
   const showCoachColumn = await coachAvailable();
   for (const el of document.querySelectorAll("[data-coach-only]")) el.classList.toggle("hidden", !showCoachColumn);
   if (!showCoachColumn) $('#bulk-action option[value="coach_mode"]')?.remove();
+  // Only the boxes the chosen change needs. Profile and phase are picked from a list, never typed.
+  const showBulkFields = () => {
+    const action = $("#bulk-action")?.value || "";
+    for (const el of document.querySelectorAll("[data-bulk-for]")) {
+      const wanted = el.dataset.bulkFor.split(" ").includes(action);
+      el.classList.toggle("hidden", !wanted || (el.hasAttribute("data-coach-only") && !showCoachColumn));
+    }
+  };
+  $("#bulk-action")?.addEventListener("change", showBulkFields);
+  showBulkFields();
+  loadDeviceCatalog()
+    .then((catalog) => {
+      const picker = $("#bulk-profile");
+      if (!picker) return;
+      picker.innerHTML =
+        `<option value="">Choose what you're growing</option>` +
+        (catalog.profiles || [])
+          .map((p) => {
+            const stages = JSON.stringify((p.stage_list || []).map((st) => ({ id: st.id, name: st.name || st.id })));
+            return `<option value="${escapeHtml(p.id)}" data-stages="${escapeHtml(stages)}">${escapeHtml(p.name)}${p.species ? ` (${escapeHtml(p.species)})` : ""}</option>`;
+          })
+          .join("");
+    })
+    .catch(() => {});
+  $("#bulk-profile")?.addEventListener("change", (ev) => {
+    let stages = [];
+    try {
+      stages = JSON.parse(ev.target.selectedOptions?.[0]?.dataset?.stages || "[]");
+    } catch {
+      stages = [];
+    }
+    $("#bulk-stage").innerHTML = stageOptionsHtml(stages);
+  });
   $("#fleet-group-filter").innerHTML =
     `<option value="">All chambers</option>` +
     groupRows.map((g) => `<option value="${safeDisplay(g.id)}">${escapeHtml(g.name)}</option>`).join("");
@@ -2228,8 +2276,8 @@ async function renderFleet() {
       if ($("#bulk-rh").value) payload.humidity_percent = Number($("#bulk-rh").value);
     }
     if (action === "profile" || action === "light" || action === "coach_mode") {
-      if ($("#bulk-profile").value) payload.profile_id = $("#bulk-profile").value.trim();
-      if ($("#bulk-stage").value) payload.stage = $("#bulk-stage").value.trim();
+      if ($("#bulk-profile").value) payload.profile_id = $("#bulk-profile").value;
+      if ($("#bulk-stage").value) payload.stage = $("#bulk-stage").value;
     }
     if (action === "light") {
       const light = {};
