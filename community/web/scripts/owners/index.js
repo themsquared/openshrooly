@@ -238,7 +238,7 @@ const faq = {
     {
       h2: "Is there custom Shrooly firmware?",
       answer: "Yes. OpenShrooly is free, open source replacement firmware for the Shrooly, created by Graham Stewart.",
-      html: `<p>See ${OPEN}. The Shroom Labs release, 1.0.6-sl.1, adds grow profiles and the Link this device menu.</p>`,
+      html: `<p>See ${OPEN}. The current Shroom Labs release, 1.0.6-sl.2, adds grow profiles, the Link this device menu, and the name and photo of what is growing on the chamber's own page.</p>`,
     },
     {
       h2: "How do I flash my Shrooly?",
