@@ -109,6 +109,95 @@ test("a Stripe error returns a friendly 502 and stores nothing", async () => {
   assert.equal(rows.length, 0);
 });
 
+test("yearly is 18% under twelve monthly payments", async () => {
+  const { COACH_PLANS, COACH_YEARLY_SAVINGS_PERCENT, coachPlanId } = await import("../src/coach-learn.js");
+  assert.equal(COACH_PLANS.monthly.amount_cents, 499);
+  assert.equal(COACH_PLANS.yearly.amount_cents, 4900);
+  assert.equal(12 * 499, 5988);
+  assert.ok(Math.abs((1 - 4900 / 5988) * 100 - 18.2) < 0.05);
+  assert.equal(COACH_YEARLY_SAVINGS_PERCENT, 18);
+  assert.equal(coachPlanId(undefined), "monthly");
+  assert.equal(coachPlanId("Yearly"), "yearly");
+  assert.equal(coachPlanId("weekly"), "");
+});
+
+test("price ids: STRIPE_PRICE_MONTHLY wins, STRIPE_PRICE_COACH still works for monthly, yearly has its own", async () => {
+  const { coachPriceId } = await import("../src/stripe.js");
+  assert.equal(coachPriceId({ STRIPE_PRICE_COACH: "price_old" }, "monthly"), "price_old");
+  assert.equal(coachPriceId({ STRIPE_PRICE_COACH: "price_old", STRIPE_PRICE_MONTHLY: "price_m" }, "monthly"), "price_m");
+  assert.equal(coachPriceId({ STRIPE_PRICE_COACH: "price_old" }, "yearly"), "");
+  assert.equal(coachPriceId({ STRIPE_PRICE_YEARLY: "price_y" }, "yearly"), "price_y");
+  assert.equal(coachPriceId({ STRIPE_PRICE_YEARLY: "price_y" }), "");
+  assert.equal(coachPriceId({ STRIPE_PRICE_MONTHLY: "price_m" }, "weekly"), "");
+});
+
+test("a missing yearly price id says not available yet and never calls Stripe; monthly still works", async () => {
+  const { ctx, stripe } = liveEnv({ env: { STRIPE_PRICE_COACH: "", STRIPE_PRICE_MONTHLY: "price_m" } });
+  const { token } = await register(ctx, "yearlymissing@example.com");
+  const catalog = await call(ctx, "GET", "/api/coach", { token });
+  assert.deepEqual(catalog.data.product.plans.map((p) => [p.id, p.available]), [["monthly", true], ["yearly", false]]);
+  const yearly = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { plan: "yearly" } });
+  assert.equal(yearly.status, 503);
+  assert.equal(yearly.data.coming_soon, true);
+  assert.match(yearly.data.error, /not available yet/);
+  assert.equal(stripe.calls.length, 0);
+  const bad = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { plan: "weekly" } });
+  assert.equal(bad.status, 400);
+  const monthly = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { plan: "monthly" } });
+  assert.equal(monthly.status, 200, JSON.stringify(monthly.data));
+  assert.equal(stripe.calls[0].form.get("line_items[0][price]"), "price_m");
+});
+
+test("yearly checkout uses the yearly price, and its webhooks give a year of access", async () => {
+  const { ctx, stripe } = liveEnv({ env: { STRIPE_PRICE_MONTHLY: "price_m", STRIPE_PRICE_YEARLY: "price_y" } });
+  const { token, user } = await register(ctx, "yearly@example.com");
+  const session = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { plan: "yearly" } });
+  assert.equal(session.status, 200, JSON.stringify(session.data));
+  assert.equal(session.data.amount_cents, 4900);
+  const req = stripe.calls[0];
+  assert.equal(req.form.get("mode"), "subscription");
+  assert.equal(req.form.get("line_items[0][price]"), "price_y");
+  assert.equal(req.form.get("subscription_data[metadata][plan]"), "yearly");
+  const row = await ctx.db.one("SELECT * FROM checkouts WHERE id=?", [session.data.id]);
+  assert.equal(row.amount_cents, 4900);
+  assert.equal(JSON.parse(row.details).plan, "yearly");
+
+  const metadata = { user_id: String(user.id), item_id: "grow-coach", plan: "yearly" };
+  const done = await signedWebhook(
+    ctx,
+    event("evt_y_done", "checkout.session.completed", {
+      id: session.data.id,
+      mode: "subscription",
+      payment_status: "paid",
+      customer: "cus_y",
+      subscription: "sub_y",
+      metadata,
+    })
+  );
+  assert.equal(done.status, 200, JSON.stringify(done.data));
+  const day = 24 * 3600 * 1000;
+  let sub = await ctx.db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
+  assert.ok(new Date(sub.period_end).getTime() > Date.now() + 360 * day, "yearly checkout opens a year, not a month");
+
+  const end = Date.now() + 366 * day;
+  const paid = await signedWebhook(
+    ctx,
+    event("evt_y_inv", "invoice.paid", {
+      id: "in_y",
+      parent: { subscription_details: { metadata, subscription: "sub_y" } },
+      lines: { data: [{ period: { start: unix(Date.now()), end: unix(end) }, metadata }] },
+    })
+  );
+  assert.equal(paid.status, 200, JSON.stringify(paid.data));
+  sub = await ctx.db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
+  assert.ok(new Date(sub.period_end).getTime() > end, "yearly renewal sets the end from Stripe plus grace");
+  assert.equal(await hasCoach(ctx, token), true);
+
+  const gone = await signedWebhook(ctx, event("evt_y_del", "customer.subscription.deleted", { id: "sub_y", status: "canceled", metadata }));
+  assert.equal(gone.status, 200);
+  assert.equal(await hasCoach(ctx, token), false);
+});
+
 test("Coach needs a price id before checkout opens", async () => {
   const { ctx, stripe } = liveEnv({ env: { STRIPE_PRICE_COACH: "" } });
   const { token } = await register(ctx, "noprice@example.com");
@@ -124,6 +213,24 @@ test("Coach subscribe stays hidden without COACH_PUBLIC even with keys", async (
   const res = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
   assert.equal(res.status, 404);
   assert.equal(stripe.calls.length, 0);
+});
+
+test("with COACH_PUBLIC off, only a beta user can open a real Coach checkout once Stripe is set", async () => {
+  const { ctx, stripe } = liveEnv({ env: { COACH_PUBLIC: "", STRIPE_PRICE_COACH: "", STRIPE_PRICE_MONTHLY: "price_m", STRIPE_PRICE_YEARLY: "price_y" } });
+  const stranger = await register(ctx, "stranger@example.com");
+  const beta = await register(ctx, "beta-buyer@example.com");
+  ctx.COACH_BETA_USER_IDS = String(beta.user.id);
+  const hidden = await call(ctx, "POST", "/api/coach/subscribe", { token: stranger.token, body: { plan: "monthly" } });
+  assert.equal(hidden.status, 404);
+  assert.equal(stripe.calls.length, 0);
+  const publicView = await call(ctx, "GET", "/api/coach");
+  assert.equal(publicView.data.available, false);
+  for (const [plan, price] of [["monthly", "price_m"], ["yearly", "price_y"]]) {
+    const res = await call(ctx, "POST", "/api/coach/subscribe", { token: beta.token, body: { plan } });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.equal(stripe.calls.at(-1).form.get("line_items[0][price]"), price);
+    assert.equal(stripe.calls.at(-1).form.get("metadata[plan]"), plan);
+  }
 });
 
 test("Coach lifecycle: pay, renew, cancel at period end keeps access, deletion removes it", async () => {

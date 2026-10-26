@@ -6,6 +6,22 @@ import { isCoachBetaUser } from "./providers.js";
 import { chamberKnobs, deviceCapabilities, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
 import { knobTargets, knobsMismatch, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
 import {
+  applyJevDecision,
+  askJev,
+  buildJevState,
+  deciderMode,
+  jevCapBlock,
+  jevConfigured,
+  jevPolicy,
+  lightRangeFor,
+  recordJevCall,
+} from "./jev.js";
+import { emailReady, linksFor } from "./alerts/cron.js";
+import { CHANNELS } from "./alerts/channels.js";
+import { renderEmail } from "./alerts/templates.js";
+import { readPrefs } from "./alerts/rules.js";
+import { SQL as ALERT_SQL } from "./alerts/store.js";
+import {
   COACH_ITEM,
   READINGS_STALE_MINUTES,
   READINGS_STALE_MS,
@@ -120,14 +136,14 @@ function commandFrom(payload = {}) {
   };
 }
 
-function latestDoc(samples = []) {
+export function latestDoc(samples = []) {
   if (!samples.length) return {};
   const last = samples.slice().sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || ""))).at(-1);
   return parseJson(last.document, {}) || {};
 }
 
 /** A reading plus the chamber's knob values, so knob commands can be confirmed from telemetry. */
-function withKnobs(reading, doc) {
+export function withKnobs(reading, doc) {
   if (!reading) return reading;
   const out = { ...reading };
   for (const [key, value] of Object.entries(chamberKnobs(doc))) if (value != null) out[key] = value;
@@ -594,7 +610,7 @@ export async function noteManualSetpointCommand(db, device, payload) {
   await pauseForManualOverride(db, device.id, device.owner_id);
 }
 
-function expandStage(stage = {}) {
+export function expandStage(stage = {}) {
   const rh = num(stage.humidity_percent);
   const rhHyst = num(stage.humidity_hysteresis);
   const temp = num(stage.temperature_c);
@@ -883,6 +899,107 @@ async function pauseAutopilot(db, state, user, reason, readings = null, { until 
   });
 }
 
+/**
+ * Ask Jev about this pass. Returns { audit, suggestion?, light?, pause? }. Any failure, missing key,
+ * spent cap, or a pass that could not change anything anyway falls back to the rules suggestion.
+ */
+export async function runJevDecider(db, env, ctx) {
+  const { device, state, now, samples, stage, pick, profile, knobs, current, suggestion, currentSetpoints, fanRange, recipe, caps } = ctx;
+  const policy = jevPolicy(env);
+  const audit = { decider: "rules", wanted: "jev", fallback: null };
+  if (!jevConfigured(env)) return { audit: { ...audit, fallback: "no_key" } };
+  // Only spend a call when a change could actually go out this pass.
+  if (now < nextEligibleAt(state, now) || dailyChangeCount(state, now) >= AUTOPILOT_LIMITS.dailyCap) {
+    return { audit: { ...audit, fallback: "not_eligible" } };
+  }
+  const blocked = await jevCapBlock(db, env, device.id, now);
+  if (blocked) return { audit: { ...audit, fallback: blocked } };
+  const log = await db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", [device.id, 5]);
+  const recentCommands = (log || []).map((row) => ({
+    action: row.action,
+    min_ago: Math.round((now - Date.parse(row.created_at)) / 60000),
+    from: parseJson(row.old_value),
+    to: parseJson(row.new_value),
+    status: row.apply_status || null,
+    undone: Boolean(row.undone_at),
+  }));
+  const lightRange = lightRangeFor(recipe?.white_intensity, caps?.knob_ranges?.white_intensity || [0, 4000]);
+  const state0 = buildJevState({
+    rows: samples,
+    now,
+    stageId: pick.stageId,
+    phase: pick.phase || null,
+    growDay: pick.grow_day ?? current.grow_day ?? null,
+    profileName: profile.name || profile.id,
+    targets: {
+      temperature_c: [stage.temperature_target_min ?? null, stage.temperature_target_max ?? null],
+      humidity_percent: [stage.humidity_target_min ?? null, stage.humidity_target_max ?? null],
+      fan_speed_percent: stage.fan?.speed_percent ?? stage.fan_speed_percent ?? null,
+      ...(recipe || {}),
+    },
+    guardrails: {
+      temperature_c: autopilotTempRange(stage),
+      humidity_percent: autopilotHumidityRange(stage),
+      fan_speed_percent: fanRange || AUTOPILOT_LIMITS.fanClamp,
+      white_intensity: lightRange,
+      max_changes_per_day: AUTOPILOT_LIMITS.dailyCap,
+    },
+    current,
+    setpoints: currentSetpoints,
+    knobs,
+    rules: {
+      temperature_c: suggestion.temperature_c ?? null,
+      humidity_percent: suggestion.humidity_percent ?? null,
+      fan_speed_percent: suggestion.fan_speed_percent ?? null,
+    },
+    recentCommands,
+    timeZone: env.CHAMBER_TIMEZONE || "America/Los_Angeles",
+  });
+  const res = await askJev(env, state0);
+  if (!res.ok) {
+    console.log(JSON.stringify({ level: "warn", event: "jev_fallback", device_id: device.id, error: res.error }));
+    return { audit: { ...audit, fallback: res.error } };
+  }
+  await recordJevCall(db, device.id, res.usage, now);
+  const decision = applyJevDecision({
+    answers: res.answers,
+    rules: suggestion,
+    setpoints: currentSetpoints,
+    knobs,
+    lightRange,
+    policy,
+  });
+  return {
+    audit: {
+      decider: "jev",
+      model: res.model,
+      min_confidence: policy.minConfidence,
+      knobs: decision.audit.knobs,
+      abnormal: decision.audit.abnormal,
+      usage: res.usage,
+      ms: res.ms,
+    },
+    suggestion: decision.suggestion,
+    light: decision.light,
+    pause: decision.pause,
+  };
+}
+
+/** Email the grower when Jev pauses Autopilot over abnormal readings. Never throws. */
+async function alertAbnormal(db, env, user, device, reason, now) {
+  try {
+    if (!emailReady(user)) return "unverified";
+    const prefs = readPrefs((await db.one(ALERT_SQL.prefsGet, [user.id]))?.document);
+    if (!prefs.email) return "muted";
+    const links = await linksFor(env, user.id, now);
+    const message = renderEmail([{ title: `Autopilot paused on ${device.name || "your chamber"}`, detail: reason }], links);
+    return await CHANNELS.email.deliver(env, { to: user.email, message, alertIds: [], rule: "autopilot", kind: "jev_abnormal" });
+  } catch {
+    console.log(JSON.stringify({ level: "warn", event: "jev_alert_failed", device_id: device.id }));
+    return "failed";
+  }
+}
+
 export async function runAutopilotForDevice(db, env, { device, user, now = Date.now() } = {}) {
   if (!coachAutopilotFlagOn(env)) return { skipped: "kill_switch" };
   if (!(await coachAutopilotAvailable(env, db, user))) return { skipped: "not_entitled" };
@@ -964,12 +1081,50 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     suggestion.fan_speed_percent = fanSteer.fan;
     if (fanSteer.reason) suggestion.reasons = [...(suggestion.reasons || []), fanSteer.reason];
   }
-  const extras = caps.multi ? recipeChanges(recipeKnobs(stage, pick.stageId, caps), knobs) : {};
+  const recipe = caps.multi ? recipeKnobs(stage, pick.stageId, caps) : {};
+  const extras = caps.multi ? recipeChanges(recipe, knobs) : {};
   const currentSetpoints = {
     temperature_c: current.temperature_setpoint ?? last.temperature_c,
     humidity_percent: current.humidity_setpoint ?? last.humidity_percent,
     fan_speed_percent: (fanKnob ? knobs.air_exchange_speed : null) ?? last.fan_speed_percent ?? suggestion.fan_speed_percent,
   };
+  // AUTOPILOT_DECIDER=jev: Jev nudges each knob; code keeps the steps, clamps, and limits below.
+  let decider = { decider: "rules" };
+  if (deciderMode(env) === "jev") {
+    const jev = await runJevDecider(db, env, {
+      device,
+      state,
+      now,
+      samples,
+      stage,
+      pick,
+      profile,
+      caps,
+      knobs,
+      current,
+      suggestion,
+      currentSetpoints,
+      fanRange: fanSteer?.range,
+      recipe,
+    });
+    decider = jev.audit;
+    if (jev.pause) {
+      const reason = "Jev flagged the readings as abnormal or a sensor looks off. Check the chamber, then turn Autopilot back on.";
+      await pauseAutopilot(db, state, user, reason, { ...current, decider });
+      await alertAbnormal(db, env, user, device, reason, now);
+      return { paused: true, reason, flipped_to: "advisor", decider };
+    }
+    if (jev.suggestion) {
+      for (const key of ["temperature_c", "humidity_percent", "fan_speed_percent"]) {
+        if (jev.suggestion[key] != null) suggestion[key] = jev.suggestion[key];
+      }
+      suggestion.reasons = jev.suggestion.reasons;
+    }
+    if (jev.light != null && caps.multi && knobSupported(caps, "white_intensity")) {
+      if (Number(knobs.white_intensity) === jev.light) delete extras.white_intensity;
+      else extras.white_intensity = jev.light;
+    }
+  }
   // What the chamber ran before, for the audit log and Undo.
   const from = { ...currentSetpoints };
   if (caps.multi) {
@@ -987,6 +1142,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   });
   if (!plan.ok) {
     return {
+      decider,
       skipped: "no_change",
       reason: plan.reason,
       waitUntil: plan.waitUntil || null,
@@ -1037,11 +1193,12 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     old_value: from,
     new_value: commandTargets(queued.payload),
     reason,
-    readings: current,
+    readings: decider.decider === "rules" ? current : { ...current, decider },
     command_id: queued.id,
     apply_status: "queued",
   });
   return {
+    decider,
     applied: true,
     queued: true,
     next: commandTargets(queued.payload),

@@ -1150,8 +1150,18 @@ dialog.sheet h2 { margin: 0 0 0.5rem; font-family: var(--display); font-size: 1.
   dialog.sheet { margin: auto auto 0; border-radius: 20px 20px 0 0; width: 100%; max-width: none; }
 }
 .coach-sales { margin-top: 1rem; max-width: 30rem; }
-.coach-price { font-size: 1.15rem; margin: 0 0 0.6rem; }
-.coach-price strong { font-size: 1.6rem; }
+.coach-plans { border: 0; margin: 0 0 1rem; padding: 0; }
+.coach-plans legend { font-weight: 600; margin-bottom: 0.5rem; padding: 0; }
+.coach-plan-list { display: grid; gap: 0.6rem; }
+.coach-plan { display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "dot name price" "dot note note"; align-items: center; column-gap: 0.75rem; row-gap: 0.15rem; min-height: 64px; padding: 0.75rem 1rem; border: 1.5px solid var(--sl-line-strong); border-radius: var(--sl-radius-sm); cursor: pointer; background: var(--sl-bg-elev); }
+.coach-plan input { grid-area: dot; width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--sl-spore); }
+.coach-plan-name { grid-area: name; font-weight: 600; }
+.coach-plan-price { grid-area: price; font-size: 1.15rem; text-align: right; }
+.coach-plan-note { grid-area: note; font-size: 0.9rem; color: var(--sl-muted); }
+.coach-plan-save { color: var(--sl-spore); font-weight: 600; }
+.coach-plan:has(input:checked) { border-color: var(--sl-spore); box-shadow: 0 0 0 1px var(--sl-spore) inset; }
+.coach-plan:has(input:focus-visible) { outline: 2px solid var(--sl-spore); outline-offset: 2px; }
+.coach-plan.is-off { opacity: 0.55; cursor: not-allowed; }
 .coach-bullets { margin: 0 0 1rem; padding-left: 1.2rem; }
 .coach-bullets li { margin: 0.35rem 0; }
 .coach-sales #subscribe { min-height: 48px; }
@@ -1259,3 +1269,9 @@ h1 .beta-badge, h2 .beta-badge { font-size: 0.45em; margin-left: 0.4em; }
   .site-nav a.nav-install { order: -1; }
   .owner-cta .button { width: 100%; justify-content: center; text-align: center; }
 }
+
+/* Legal links in the footer: small and quiet. The contact page thanks note shows only after a send. */
+.footer-legal { justify-content: center; gap: 0.9rem; font-size: 0.8rem; margin: 0.2rem 0; }
+.footer-legal a { color: var(--sl-muted, inherit); opacity: 0.8; text-decoration: underline; text-underline-offset: 2px; }
+.contact-sent { display: none; }
+.contact-sent:target { display: block; }

@@ -1,7 +1,7 @@
 /** Stripe checkout and webhook. Fail-closed when keys are unset; every webhook event is applied at most once. */
 
 import { nowIso, randomToken } from "./crypto.js";
-import { COACH_ITEM } from "./coach-learn.js";
+import { COACH_ITEM, COACH_PLANS } from "./coach-learn.js";
 import { activateCoachSub } from "./coach.js";
 import { comingSoonBody, devStubsEnabled, paymentsConfigured } from "./providers.js";
 import { ValidationError } from "./profile.js";
@@ -35,7 +35,7 @@ function parseDetails(row) {
  * Start a checkout. With keys set this creates a real Stripe Checkout Session and stores its id.
  * Local dev stubs keep the old fake session so tests never call Stripe.
  */
-export async function startCheckout(db, env, request, { user, itemId, amountCents, details, mode = "payment", priceId, name, successPath, cancelPath }) {
+export async function startCheckout(db, env, request, { user, itemId, amountCents, details, mode = "payment", priceId, name, successPath, cancelPath, plan }) {
   const stubs = devStubsEnabled(env, request);
   if (!paymentsConfigured(env) && !stubs) return { ok: false, status: 503, ...comingSoonBody("Payments") };
   if (stubs) {
@@ -46,7 +46,7 @@ export async function startCheckout(db, env, request, { user, itemId, amountCent
   const ref = `chk_${randomToken().slice(0, 20)}`;
   let session;
   try {
-    session = await createCheckoutSession(env, { ref, mode, userId: user.id, email: user.email, itemId, priceId, amountCents, name, successPath, cancelPath });
+    session = await createCheckoutSession(env, { ref, mode, userId: user.id, email: user.email, itemId, priceId, amountCents, name, successPath, cancelPath, plan });
   } catch (err) {
     if (err instanceof StripeError) return { ok: false, status: err.status, error: err.message };
     throw err;
@@ -153,7 +153,9 @@ async function completeCheckout(db, event) {
   }
   await db.run(SQL.setCheckoutStatus, ["paid", checkout.id]);
   if (checkout.item_id === COACH_ITEM) {
-    const periodEnd = await activateCoachSub(db, Number(checkout.user_id), { replaySafe: true });
+    // The first paid period follows the plan on the checkout. invoice.paid then sets the exact end from Stripe.
+    const plan = COACH_PLANS[parseDetails(checkout).plan] || COACH_PLANS.monthly;
+    const periodEnd = await activateCoachSub(db, Number(checkout.user_id), { replaySafe: true, periodDays: plan.period_days });
     return { ok: true, ...base, item_type: "subscription", period_end: periodEnd };
   }
   await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
