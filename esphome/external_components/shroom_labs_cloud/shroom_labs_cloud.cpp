@@ -488,6 +488,44 @@ std::string ShroomLabsCloud::status_json() const {
   return body;
 }
 
+LinkInputs ShroomLabsCloud::link_inputs_(bool wifi) const {
+  LinkInputs in;
+  in.wifi = wifi;
+  in.enabled = this->engine_.cloud_enabled();
+  in.linked = this->engine_.linked();
+  in.wiping = this->engine_.wiping();
+  in.state = this->engine_.state();
+  in.code = this->engine_.display_code();
+  in.secs_left = this->engine_.claim_seconds_left();
+  in.owner = this->engine_.owner_name();
+  in.now_ms = millis();
+  return in;
+}
+
+LinkAction ShroomLabsCloud::link_run_(LinkAction a, bool wifi) {
+  if (a == LinkAction::Connect)
+    this->engine_.connect();
+  else if (a == LinkAction::Refresh)
+    this->engine_.refresh();
+  else if (a == LinkAction::Disconnect)
+    this->engine_.disconnect();
+  // Our own connect/refresh must not bounce the page through the auto-show path.
+  if (a == LinkAction::Connect || a == LinkAction::Refresh)
+    this->engine_.take_show_claim();
+  const LinkInputs in = this->link_inputs_(wifi);
+  LinkScreen next = this->link_.screen(in);
+  std::string sig = next.title + '\x1f' + next.big + '\x1f' + next.line + '\x1f' + next.back + '\x1f' + next.select +
+                    (next.qr ? "Q" : "-") + (next.qr ? this->engine_.claim_url() : std::string());
+  if (sig != this->link_sig_) {
+    this->link_sig_ = std::move(sig);
+    this->link_screen_ = std::move(next);
+    this->link_dirty_ = true;
+  }
+  if (a == LinkAction::WifiSetup || a == LinkAction::GoGrow || a == LinkAction::GoMenu)
+    return a;
+  return LinkAction::None;
+}
+
 bool ShroomLabsCloud::fill_qr(QrCode *out) const {
   const std::string url = this->engine_.claim_url();
   const std::string code = this->engine_.display_code();

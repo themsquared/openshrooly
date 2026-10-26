@@ -4,7 +4,7 @@ import { X509Certificate, createPublicKey, generateKeyPairSync } from "node:cryp
 import { createMemoryDb } from "../src/db.js";
 import { handleRequest } from "../src/handlers.js";
 import { createMemoryStorage } from "../src/storage.js";
-import { buildCsr, generateP256, jwkOf, localWins, signDeviceProof, CF_CERT_SOFT_CAP } from "../src/devices.js";
+import { buildCsr, generateP256, jwkOf, localWins, signDeviceProof, CF_CERT_SOFT_CAP, deviceOwnerName } from "../src/devices.js";
 import { derToPem, issueCertificate, pemToDer } from "../src/pki.js";
 import { OPENSSL_P256_CSR, P256_SHA384_CSR, P384_CSR, RSA_CSR } from "./fixtures/csr.js";
 
@@ -124,6 +124,20 @@ async function enrollClaimIssue(ctx, token, hardware) {
   assert.equal(issued.status, 200, JSON.stringify(issued.data));
   return { ...d, issued };
 }
+
+test("cert issue tells the device a short owner name, never an email", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx);
+  const { issued } = await enrollClaimIssue(ctx, token);
+  assert.equal(typeof issued.data.owner_name, "string");
+  assert.equal(issued.data.owner_name, deviceOwnerName(user));
+  assert.doesNotMatch(issued.text, /mike@example\.com/);
+  assert.equal(deviceOwnerName({ display_name: "Mike  Moore\u00e9\n" }), "Mike Moore");
+  assert.equal(deviceOwnerName({ display_name: "", username: "spore_fan" }), "spore_fan");
+  assert.equal(deviceOwnerName({ display_name: "a@b.co" }), "");
+  assert.equal(deviceOwnerName({ display_name: "x".repeat(40) }).length, 20);
+  assert.equal(deviceOwnerName(null), "");
+});
 
 test("local settings win when cloud is off or older than a local change", () => {
   const command = { issued_at: "2026-10-23T12:00:00Z" };

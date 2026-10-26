@@ -1,25 +1,29 @@
-# Paint the claim page: large code, QR, expiry. Display only.
+# Paint the Link this device page from the link flow's current screen.
 - id: update_cloud_screen
   mode: restart
   then:
+    - lambda: 'id(shl_cloud)->link_take_dirty();'
     - lvgl.label.update:
         id: claim_title
-        text: !lambda 'return id(shl_cloud)->display_title();'
+        text: !lambda 'return id(shl_cloud)->link_screen().title;'
     - lvgl.label.update:
         id: claim_code_label
-        text: !lambda 'return id(shl_cloud)->display_code();'
+        text: !lambda 'return id(shl_cloud)->link_screen().big;'
     - lvgl.label.update:
         id: claim_hint
-        text: !lambda 'return id(shl_cloud)->display_hint();'
+        text: !lambda 'return id(shl_cloud)->link_screen().line;'
     - lvgl.label.update:
-        id: claim_expiry
-        text: !lambda 'return id(shl_cloud)->display_expiry();'
+        id: claim_back_label
+        text: !lambda 'return std::string(id(shl_cloud)->link_screen().back);'
+    - lvgl.label.update:
+        id: claim_next_label
+        text: !lambda 'return std::string(id(shl_cloud)->link_screen().select);'
     - lambda: |-
         if (!id(display_ready)) {
           return;
         }
         shroom_labs::QrCode qr{};
-        const bool have = id(shl_cloud)->fill_qr(&qr);
+        const bool have = id(shl_cloud)->link_screen().qr && id(shl_cloud)->fill_qr(&qr);
         lv_obj_t *canvas = id(claim_qr);
         if (canvas == nullptr) {
           return;

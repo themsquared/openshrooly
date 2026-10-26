@@ -58,6 +58,7 @@ def compile_host(cxx, exe, idf):
             str(COMP / "cloud_http.cpp"),
             str(COMP / "cloud_engine.cpp"),
             str(COMP / "cloud_qr.cpp"),
+            str(COMP / "link_flow.cpp"),
             "-lcrypto",
         ]
     )
