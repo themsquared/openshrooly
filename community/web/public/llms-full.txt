@@ -93,8 +93,8 @@ Most culinary mushrooms fruit between 85 and 95% humidity. Fresh air matters jus
 
 ### Where can you buy mushroom kits and spawn?
 
-Buy from a supplier that sells clean, labeled cultures and stands behind them. Two we work with are North Spore for kits, spawn, and supplies, and PNW Spore for culinary liquid cultures.
-Shroom Labs partners with North Spore and PNW Spore. Some supplier links on this site may be affiliate links. We may earn a commission if you buy through them, at no extra cost to you.
+Buy from a supplier that sells clean, labeled cultures and stands behind them. North Spore sells kits, spawn, and supplies. PNW Spore is another source of culinary liquid cultures.
+Shroom Labs partners with North Spore. Some supplier links on this site may be affiliate links. We may earn a commission if you buy through them, at no extra cost to you.
 
 ### FAQ
 
@@ -658,6 +658,129 @@ A: It can. Spores from an open moldy block drift to nearby blocks and surfaces. 
 
 Q: What is the white fuzz on my mushroom stems?
 A: Usually mycelium reaching for fresh air, not mold. It goes away when you add more air changes.
+
+---
+
+## Mushroom growing terms, explained plainly
+
+URL: https://shroomlabs.io/guides/mushroom-growing-glossary
+Updated: 2026-10-26
+
+Mushroom growing has its own words, but the ideas are simple. Mycelium is the living network that eats the food you give it. Spawn is mycelium grown on grain, used to seed a bigger batch of substrate, which is the food. Colonization is the mycelium filling that food. Pinning is when tiny mushrooms appear. A flush is one wave of mushrooms. Below are the terms you will meet most, grouped by when you meet them.
+
+### What are the basic parts of a mushroom?
+
+MyceliumThe white, thread-like network that grows through food and digests it. It is the main body of the fungus. Mushrooms are its fruit.HyphaeThe single threads that make up mycelium.Fruiting bodyThe mushroom itself: cap, gills or spines, and stem. It exists to spread spores.SporesTiny cells a mushroom releases, a bit like seeds. Home growers of culinary mushrooms rarely start from spores, because a culture is faster and more reliable.Spore printThe pattern left when a cap drops spores on paper or foil. Used to help identify mushrooms.StrainA line of one species with its own traits, such as speed, color, or temperature range.
+
+### What do spawn, substrate, and culture mean?
+
+CultureLiving mycelium kept for starting new grows. It can be on agar or in liquid.Liquid cultureMycelium growing in sterile sugar water, used to inoculate grain.AgarA jelly in a dish used to grow and clean up cultures.InoculationAdding a culture or spawn to sterile grain or substrate to start it growing.SpawnMycelium grown on a carrier, usually grain, then mixed into a larger batch of substrate. Grain spawn is the most common kind.Spawn rateHow much spawn you mix in, compared with substrate. More spawn colonizes faster and leaves less room for mold.SubstrateThe food the mycelium eats and fruits from: hardwood sawdust, straw, compost, or a mix.Supplemented sawdustHardwood sawdust with added bran or soy hulls for more food. It gives bigger yields but needs sterilizing.PasteurizationHeating substrate enough to kill most competitors but not all. Common for straw.SterilizationHeating under pressure to kill everything. Needed for grain and rich substrates.Field capacitySubstrate as wet as it can be without water dripping out when squeezed.
+
+### What are the stages of a grow called?
+
+ColonizationThe mycelium spreading through the substrate until it is white throughout. Usually warm and dark.Fully colonizedWhite all the way through, with little substrate showing. The point to start fruiting.PinningWhen tiny mushrooms, called pins, first form. It needs a change: cooler air, more fresh air, high humidity, and light.PrimordiaAnother word for pins: the first knots of a mushroom.FruitingPins growing into full mushrooms.FlushOne wave of mushrooms. Most blocks give two or three, each smaller than the last.BrowningA shiitake stage where the block surface turns brown and tough before it fruits.Cold shockA short spell of cold, or a cold soak, that tells some species to fruit.SoakingPutting a block in cold water for some hours between flushes to put back moisture.In Shiitake's profile, browning lasts 21 days and the cold shock runs at 16 °C (61 °F). Every species page lists each stage.
+
+### What do growing setup terms mean?
+
+Fruiting blockA bag or block of colonized substrate ready to fruit. Most kits are fruiting blocks.All-in-one bagA grow bag with grain and substrate in one, colonized in the same bag.Filter patchThe small square on a grow bag that lets air in and keeps mold spores out.MonotubA plastic tub with holes, used as a simple fruiting chamber for bulk substrate.Martha tentA small greenhouse shelf with a plastic cover, used to hold humidity around several blocks.Casing layerA layer of damp peat or similar on top of substrate. Button mushrooms need it to pin.Side fruitingMushrooms growing from the sides of a bag or tub, often where light or air gets in.Smart chamberAn enclosed grower that controls humidity, light, and fresh air on its own. Some also manage temperature.
+
+### What do air and humidity terms mean?
+
+HumidityHow much water the air holds, as a percent of the most it could hold at that temperature. Fruiting mushrooms usually want 80 to 95%.Fresh airAir changes that clear carbon dioxide. Short for fresh air exchange.Carbon dioxideThe gas mushrooms breathe out. High levels give long stems and small caps.HygrometerA meter that reads humidity. Cheap ones are often off by a few percent.MistingSpraying fine water on chamber walls to raise humidity.For example, Pearl Oyster fruits at 88% humidity in its profile. Read humidity and fresh air for mushrooms for more.
+
+### What do problem terms mean?
+
+ContaminationAnything growing in your substrate that is not your mushroom: mold or bacteria. See mushroom contamination.TrichodermaA common green mold that takes over substrate.Cobweb moldA gray, wispy mold that spreads very fast.Bacterial blotchYellow or brown sticky spots on caps, often from standing water.MetabolitesYellow or amber drops the mycelium makes. Normal, not mold.LeggyLong, thin stems with small caps, usually from too little fresh air. See leggy mushroom stems.AbortsPins that stop growing and dry out, often from low humidity.
+
+### FAQ
+
+Q: What is the difference between spawn and substrate?
+A: Spawn is mycelium already growing on grain, used like a starter. Substrate is the bigger batch of food, such as sawdust or straw, that the spawn colonizes and fruits from.
+
+Q: What does fully colonized mean?
+A: The substrate is white with mycelium all the way through and feels firm. That is the point to start fruiting conditions.
+
+Q: What is a flush of mushrooms?
+A: One wave of mushrooms from a block. After a harvest the block rests, then can give another, usually smaller, flush.
+
+Q: What are pins in mushroom growing?
+A: Pins are the first tiny mushrooms that form on a colonized block. They grow into full mushrooms over the next few days.
+
+---
+
+## Shrooly app not working? What you can do
+
+URL: https://shroomlabs.io/guides/shrooly-app-not-working
+Updated: 2026-10-26
+
+Since about August 2025, many owners report that the Shrooly app will not log in or start a grow, often with a no internet connection error, and that support does not reply. If that is what you see, the problem is likely on the app's servers, not your phone. You can still use the chamber: free, open source OpenShrooly firmware runs it over your own Wi-Fi from a web page, with no app or cloud account.
+
+### What is happening with the Shrooly app?
+
+The original Shrooly chamber talks to a phone app over Bluetooth, and owners report the app needs a working connection to the company's servers to start a grow program. From August 2025, posts from owners describe the same things: the app will not log in, it says there is no internet connection when there is, pods cannot be ordered, and support emails go unanswered. The OpenShrooly project site says the company appears to have gone out of business.
+
+Shroom Labs is not part of the company that made Shrooly devices and has no inside information. We only know what owners report and what we see in public.
+
+### What should you check first?
+
+- Update the app and your phone, then restart both the phone and the chamber.
+
+- Check that Bluetooth is on and the app is allowed to use it. On Android, the app may also need location permission to find Bluetooth devices.
+
+- Try on Wi-Fi and on mobile data.
+
+- Stand close to the chamber while connecting.
+
+If other apps work but the Shrooly app still says there is no internet connection or will not log in, more phone fixes are unlikely to help.
+
+### Can you use a Shrooly chamber without the app?
+
+Yes. OpenShrooly is free, open source replacement firmware for the Shrooly chamber, started by Graham Stewart. It turns the chamber into a Wi-Fi device you control from a web page on your phone or computer. It can also connect to Home Assistant. Nothing depends on the company's servers.
+
+It is an experimental hobby project. Many owners have installed it, but it is used at your own risk.
+
+### How do you install OpenShrooly?
+
+- Write down your current humidity, light, and fan settings, and finish or remove any grow in progress.
+
+- If you may want to go back, back up the original firmware first. The OpenShrooly documentation covers it.
+
+- Use a computer with Chrome or Edge and a USB-C data cable, not a charge-only cable.
+
+- Run the installer, from the OpenShrooly site or from the Shroom Labs install page, which offers releases signed by Shroom Labs when one is published.
+
+- Join the chamber to your Wi-Fi and open its page in a browser.
+
+Read the Shroom Labs docs for how profiles, the Hub, and the chamber fit together.
+
+### What settings should you use once it runs?
+
+The app used to pick settings for you. Now you choose them, stage by stage. Every Shroom Labs profile lists temperature, humidity, light, and fresh air for each stage of one species. For example, Lion's Mane fruits at 17 °C (63 °F) and 90% humidity, and Pearl Oyster at 88% humidity.
+
+See conditions for every species, or start with the easiest mushrooms to grow.
+
+### What can you grow without the original pods?
+
+Owners report the original pods are no longer for sale. You do not need them. Any fruiting block or all-in-one grow bag that fits in the chamber works. Some owners split a large colonized bag in half and fruit one half after the other. Buy blocks from a supplier that sells clean, labeled cultures, and pick a forgiving species first, like an oyster or lion's mane.
+
+Read how to grow mushrooms at home for the full process.
+
+### FAQ
+
+Q: Has the company behind the Shrooly app shut down?
+A: We do not know of a public statement from the company. Since August 2025 many owners report the app and support stopped working, and the OpenShrooly project site says the company appears to have gone out of business.
+
+Q: Why does the Shrooly app say there is no internet connection?
+A: Owners see this error even when their phone is online. It usually means the app cannot reach the company's servers, not that your phone has a problem.
+
+Q: Is my Shrooly device useless without the app?
+A: No. With OpenShrooly firmware it runs over your own Wi-Fi from a web page, and you set temperature, humidity, light, and fresh air for each stage.
+
+Q: Does OpenShrooly need the cloud?
+A: No. It runs on the chamber and your home network. Linking to an online account is optional.
+
+Q: Is installing OpenShrooly safe?
+A: Many owners have installed it, but it is experimental and could leave the chamber unusable if something goes wrong. Back up the original firmware first if you may want to go back.
 
 ---
 

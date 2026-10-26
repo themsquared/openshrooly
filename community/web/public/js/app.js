@@ -2,7 +2,7 @@ import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken }
 import { speciesArt } from "./species-art.js";
 import { renderProfileCards } from "./profile-cards.js";
 import { startHero } from "./hero.js";
-import { bindMobileNav } from "./chrome.js";
+import { bindMobileNav, setCoachNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl, revokeTrackedBlobUrls } from "./photo-upload.js";
 import { queueItemHtml } from "./moderate-queue.js";
@@ -143,9 +143,7 @@ function coachAvailable() {
 async function syncCoachLinks() {
   const offMenu = coachOffMenuPage || document.body?.hasAttribute("data-coach-off");
   const show = !offMenu && (await coachAvailable());
-  for (const el of document.querySelectorAll("[data-coach-link], #nav-coach, #footer-nav-coach")) {
-    el.classList.toggle("hidden", !show);
-  }
+  setCoachNav(show);
 }
 
 function setCoachOffMenu(off) {
