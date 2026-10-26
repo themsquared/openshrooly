@@ -2,7 +2,7 @@
 
 import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
-import { isCoachBetaUser } from "./providers.js";
+import { coachAccess } from "./coach-access.js";
 import { chamberKnobs, deviceCapabilities, KNOBS, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
 import { knobTargets, knobsMismatch, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
 import {
@@ -59,12 +59,11 @@ export function coachAutopilotFlagOn(env = {}) {
   return String(env.COACH_AUTOPILOT_ENABLED || "") === "1";
 }
 
+/** Can this user use Coach and Autopilot right now: kill switch on, plus paid, beta or comp access (src/coach-access.js). */
 export async function coachAutopilotAvailable(env, db, user) {
   if (!coachAutopilotFlagOn(env)) return false;
   if (!user) return false;
-  if (isCoachBetaUser(env, user)) return true;
-  const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
-  return Boolean(sub && sub.status === "active" && sub.period_end >= nowIso());
+  return (await coachAccess(env, db, user)).entitled;
 }
 
 export const AUTOPILOT_SOURCES = new Set(["grow-coach-autopilot", "grow-coach-autopilot-undo"]);

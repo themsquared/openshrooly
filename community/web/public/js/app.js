@@ -37,7 +37,7 @@ import {
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
-import { NO_DECISIONS, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
+import { accessText, coachView, NO_DECISIONS, priceText, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
 import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
 
@@ -671,10 +671,12 @@ async function renderAccount() {
       : "";
   }
   if ($("#coach-account") && me.grow_coach?.available) {
-    $("#coach-account").textContent =
-      me.grow_coach.entitled && !me.grow_coach.beta && me.grow_coach.period_end
-        ? `Active culinary subscription through ${fmtDate(me.grow_coach.period_end)}.`
-        : "Private beta access. Culinary chambers only.";
+    const gc = me.grow_coach;
+    $("#coach-account").textContent = !gc.entitled
+      ? `Not on yet. ${priceText(gc.product)} Free during the beta for linked chambers.`
+      : gc.access === "paid" && gc.period_end
+        ? `Active culinary subscription through ${fmtDate(gc.period_end)}.`
+        : accessText(gc, gc.period_end ? fmtDate(gc.period_end) : "");
   }
   const portalButton = $("#billing-portal");
   if (portalButton && me.billing_portal) {
@@ -1246,35 +1248,51 @@ async function renderCoach() {
     location.replace("/");
     return;
   }
-  const canUse = Boolean(catalog.entitled || catalog.beta);
-  // Active users (paid or on the beta list) get the Coach page itself. `autopilot` is true only for them.
-  if (isSignedIn() && (canUse || catalog.autopilot)) {
-    await renderCoachDashboard(catalog, canUse);
+  const view = coachView(catalog, isSignedIn());
+  // People with access (paid, beta chamber, or comp) get the Coach page itself.
+  if (view === "dashboard") {
+    await renderCoachDashboard(catalog);
     return;
   }
   $("#coach-hero")?.classList.remove("hidden");
-  $("#coach-status").textContent = canUse
-    ? catalog.beta
-      ? "Private beta. Culinary chambers only."
-      : `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
-    : catalog.marketing;
-  if ((canUse || !catalog.waitlist) && $("#coach-eyebrow")) $("#coach-eyebrow").textContent = canUse ? "Private beta · Culinary chambers only" : "Culinary subscription";
-  if (!canUse && catalog.waitlist) {
+  $("#gated")?.classList.add("hidden");
+  $("#coach-status").textContent = view === "waitlist" ? catalog.marketing : "";
+  // Only say "free" to people who might get it: signed out, or no chamber linked yet.
+  const mayBeBeta = catalog.beta_active && view !== "checkout";
+  if ($("#coach-eyebrow")) $("#coach-eyebrow").textContent = mayBeBeta ? "Free during the beta · Culinary chambers only" : "Culinary chambers only";
+  const betaLine = catalog.beta_active
+    ? `Free during the beta for chambers linked in the beta. After the beta, ${priceText(catalog.product)}`
+    : "";
+  if (view === "link") {
+    // Signed in with no chamber: say what Coach needs and how to link one. No checkout yet.
+    $("#coach-link")?.classList.remove("hidden");
+    if (betaLine && $("#coach-link-beta")) {
+      $("#coach-link-beta").textContent = betaLine;
+      $("#coach-link-beta").classList.remove("hidden");
+    }
+    return;
+  }
+  if (view === "waitlist") {
     $("#subscribe-panel")?.classList.add("hidden");
-    $("#gated")?.classList.add("hidden");
     return;
   }
   // Sales view: monthly or yearly, one button, three bullets, cancel anytime.
   const pickedPlan = renderCoachPlans(catalog.product);
-  $("#coach-status").textContent = "";
-  if (!isSignedIn()) {
-    $("#subscribe-panel").classList.remove("hidden");
+  $("#subscribe-panel").classList.remove("hidden");
+  if (view === "signin") {
+    if (betaLine && $("#coach-beta-note")) {
+      $("#coach-beta-note").textContent = `${betaLine} Sign in to check.`;
+      $("#coach-beta-note").classList.remove("hidden");
+    }
     $("#subscribe").addEventListener("click", () => {
       location.href = `/login?next=${encodeURIComponent("/coach")}`;
     });
     return;
   }
-  $("#subscribe-panel").classList.remove("hidden");
+  if (catalog.beta_active && $("#coach-beta-note")) {
+    $("#coach-beta-note").textContent = "The free beta covers the first chambers linked to Shroom Labs, and it is full. Grow Coach needs a plan for this account.";
+    $("#coach-beta-note").classList.remove("hidden");
+  }
   if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
   $("#subscribe").addEventListener("click", () =>
     goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan: pickedPlan() } }), showCoachError)
@@ -1282,12 +1300,11 @@ async function renderCoach() {
 }
 
 /** Recommendations, then the decision feed, then chamber status. Chat and photo checks sit below for accounts with AI turned on. */
-async function renderCoachDashboard(catalog, canUse) {
+async function renderCoachDashboard(catalog) {
   $("#coach-hero")?.classList.add("hidden");
   $("#gated").classList.remove("hidden");
-  $("#coach-head-status").textContent = catalog.entitled
-    ? `Active through ${fmtDate(catalog.period_end)}. Culinary chambers only.`
-    : "Private beta. Culinary chambers only.";
+  // Where the paywall would be: "Free during the beta" plus the price after it, or the paid-through date.
+  $("#coach-head-status").textContent = accessText(catalog, catalog.period_end ? fmtDate(catalog.period_end) : "");
 
   let chambers = [];
   const chamberFor = (id) => chambers.find((c) => c.device.id === id);
@@ -1383,7 +1400,8 @@ async function renderCoachDashboard(catalog, canUse) {
     // Autopilot is switched off on this site, so there is nothing to recommend or log yet.
     for (const id of ["#coach-recs", "#coach-feed", "#coach-chambers"]) $(id)?.classList.add("hidden");
   }
-  if (canUse) await renderCoachTools(catalog).catch(showCoachError);
+  // Chat and photo checks need an AI provider on the server (capabilities.coach_chat). Without one they stay hidden.
+  if (catalog.entitled && (await capabilities().catch(() => ({}))).coach_chat) await renderCoachTools(catalog).catch(showCoachError);
 }
 
 /** Chat, photo checks, and the auto-tune switch. These call the AI, so only accounts with Coach chat get them. */

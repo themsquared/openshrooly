@@ -304,3 +304,38 @@ export function renderChamberCards(chambers = [], opts = {}) {
   if (!chambers.length) return `<p class="muted">No chambers linked yet. <a href="/devices">Your devices</a></p>`;
   return chambers.map((c) => renderChamberCard(c, opts)).join("");
 }
+
+/* ---------- access and pricing copy ---------- */
+
+function dollars(cents) {
+  const n = Number(cents) / 100;
+  return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+}
+
+/** "Grow Coach is $4.99 a month or $49 a year." from the catalog plans, with the launch prices as a fallback. */
+export function priceText(product = {}) {
+  const plans = Array.isArray(product.plans) ? product.plans : [];
+  const monthly = plans.find((p) => p.period === "month")?.amount_cents ?? product.amount_cents ?? 499;
+  const yearly = plans.find((p) => p.period === "year")?.amount_cents ?? 4900;
+  return `Grow Coach is ${dollars(monthly)} a month or ${dollars(yearly)} a year.`;
+}
+
+export const BETA_FREE = "Free during the beta";
+
+/** The line where the paywall would be, for someone who already has Coach. `until` is a formatted date. */
+export function accessText(catalog = {}, until = "") {
+  if (catalog.access === "beta") return `${BETA_FREE}. After the beta, ${priceText(catalog.product)}`;
+  if (catalog.access === "comp") return "Free on this account. Culinary chambers only.";
+  return until ? `Active through ${until}. Culinary chambers only.` : "Active. Culinary chambers only.";
+}
+
+/**
+ * Which pre-dashboard view a visitor gets: "dashboard" (has access), "waitlist" (checkout not
+ * open), "signin", "link" (signed in, no chamber linked yet) or "checkout".
+ */
+export function coachView(catalog = {}, signedIn = false) {
+  if (signedIn && (catalog.entitled || catalog.autopilot)) return "dashboard";
+  if (!signedIn) return catalog.waitlist ? "waitlist" : "signin";
+  if (!Number(catalog.chambers)) return "link";
+  return catalog.waitlist ? "waitlist" : "checkout";
+}

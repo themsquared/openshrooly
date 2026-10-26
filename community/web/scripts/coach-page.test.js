@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  accessText,
   canAccept,
+  coachView,
+  priceText,
   changeText,
   decisionTitle,
   deciderText,
@@ -128,4 +131,23 @@ test("a never-seen chamber waits for its first check-in, and off-menu chambers g
   assert.match(card, /culinary grows only/);
   assert.doesNotMatch(card, /data-mode/);
   assert.equal(renderRecommendations([off]).includes("Thing 2"), false);
+});
+
+test("beta users see Free during the beta and the price after it; paid users see their date", () => {
+  const product = { plans: [{ id: "monthly", period: "month", amount_cents: 499 }, { id: "yearly", period: "year", amount_cents: 4900 }] };
+  assert.equal(priceText(product), "Grow Coach is $4.99 a month or $49 a year.");
+  assert.equal(priceText({}), "Grow Coach is $4.99 a month or $49 a year.");
+  assert.equal(accessText({ access: "beta", product }), "Free during the beta. After the beta, Grow Coach is $4.99 a month or $49 a year.");
+  assert.equal(accessText({ access: "paid" }, "Nov 3, 2026"), "Active through Nov 3, 2026. Culinary chambers only.");
+  assert.match(accessText({ access: "comp" }), /Free on this account/);
+  for (const access of ["beta", "paid", "comp"]) assert.doesNotMatch(accessText({ access, product }, "x"), DASHES);
+});
+
+test("coach view: access gets the dashboard, no chamber gets the link panel, others get checkout", () => {
+  assert.equal(coachView({ entitled: true, autopilot: true, chambers: 1 }, true), "dashboard");
+  assert.equal(coachView({ entitled: false, chambers: 1 }, true), "checkout");
+  assert.equal(coachView({ entitled: false, chambers: 0 }, true), "link");
+  assert.equal(coachView({ entitled: false, chambers: 1, waitlist: true }, true), "waitlist");
+  assert.equal(coachView({ entitled: false }, false), "signin");
+  assert.equal(coachView({ entitled: false, waitlist: true }, false), "waitlist");
 });
