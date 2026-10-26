@@ -565,6 +565,11 @@ static bool extract_balanced(const char *start, char open, char close, std::stri
   return false;
 }
 
+const char *const KNOB_KEYS[KNOB_COUNT] = {
+    "air_exchange_speed", "air_exchange_period_min", "air_exchange_run_sec", "sunrise_hour", "light_hours",
+    "white_intensity",    "color_r",                 "color_g",              "color_b",      "grow_day",
+};
+
 size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max) {
   if (json == nullptr || out == nullptr || max == 0)
     return 0;
@@ -612,6 +617,14 @@ size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max) {
       cmd.has_rh = true;
       cmd.humidity_percent = h;
     }
+    for (uint8_t k = 0; k < KNOB_COUNT; k++) {
+      double v = 0;
+      if (json_get_double_top(src, KNOB_KEYS[k], &v)) {
+        cmd.knob_mask |= static_cast<uint16_t>(1u << k);
+        cmd.knob[k] = static_cast<float>(v);
+      }
+    }
+    json_get_string_top(src, "grow_phase", &cmd.grow_phase);
     out[n++] = cmd;
     arr += obj.size();
   }
@@ -663,13 +676,18 @@ float snap_entity_value(float v, const EntityRange &range) {
 SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uint32_t last_local_ms, uint32_t now_ms,
                                    bool remote_apply) {
   SetpointPlan plan{};
-  if (cmd.kind != "setpoints")
-    return plan;
   if (!remote_apply)
     return plan;
   const int64_t exp = parse_iso8601_ms(cmd.expires_at.c_str());
   if (exp > 0 && wall_ms >= exp)
     return plan;
+  if (cmd.kind != "setpoints") {
+    // Answer every command so nothing sits unanswered until it expires.
+    plan.decision = SetpointDecision::Refuse;
+    plan.ack_status = "refused";
+    plan.reason = "Unknown command.";
+    return plan;
+  }
   if (cmd.has_apply && !cmd.apply) {
     plan.decision = SetpointDecision::Refuse;
     plan.ack_status = "refused";
@@ -691,7 +709,7 @@ SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uin
       }
     }
   }
-  if (!cmd.has_temp && !cmd.has_rh) {
+  if (!cmd.has_temp && !cmd.has_rh && cmd.knob_mask == 0 && cmd.grow_phase.empty()) {
     plan.decision = SetpointDecision::Fail;
     plan.ack_status = "failed";
     plan.reason = "No setpoints.";
@@ -707,6 +725,16 @@ SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uin
     plan.write_rh = true;
     plan.humidity_percent = static_cast<float>(cmd.humidity_percent);
   }
+  plan.knob_mask = cmd.knob_mask;
+  for (uint8_t k = 0; k < KNOB_COUNT; k++)
+    plan.knob[k] = cmd.knob[k];
+  if (cmd.grow_phase.size() <= MAX_PHASE_LEN)
+    plan.grow_phase = cmd.grow_phase;
+  else {
+    plan.decision = SetpointDecision::Fail;
+    plan.ack_status = "failed";
+    plan.reason = "grow_phase is not an option.";
+  }
   return plan;
 }
 
@@ -717,7 +745,8 @@ static void append_num(std::string *out, float v) {
 }
 
 std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
-                                const char *ack_reason, const EntityRange *temp_range, const EntityRange *rh_range) {
+                                const char *ack_reason, const EntityRange *temp_range, const EntityRange *rh_range,
+                                const TelemetryExtras *extras) {
   std::string out = "{";
   bool first = true;
   auto comma = [&]() {
@@ -779,6 +808,60 @@ std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, c
     append_num(&out, rh_range->min);
     out += ",\"target_humidity_max\":";
     append_num(&out, rh_range->max);
+  }
+  for (uint8_t k = 0; k < KNOB_COUNT; k++) {
+    if (!(reading.knob_mask & (1u << k)))
+      continue;
+    comma();
+    out += "\"";
+    out += KNOB_KEYS[k];
+    out += "\":";
+    append_num(&out, reading.knob[k]);
+  }
+  if (!reading.grow_phase.empty()) {
+    comma();
+    out += "\"grow_phase\":\"";
+    out += json_escape(reading.grow_phase.c_str());
+    out += "\"";
+  }
+  if (extras != nullptr) {
+    if (extras->firmware_version != nullptr && extras->firmware_version[0]) {
+      comma();
+      out += "\"firmware_version\":\"";
+      out += json_escape(extras->firmware_version);
+      out += "\"";
+    }
+    if (extras->capabilities != nullptr && extras->capabilities[0]) {
+      comma();
+      out += "\"capabilities\":";
+      out += extras->capabilities;
+    }
+    if (extras->ranges != nullptr) {
+      bool any = false;
+      for (uint8_t k = 0; k < KNOB_COUNT; k++) {
+        const EntityRange &r = extras->ranges[k];
+        if (!r.has)
+          continue;
+        if (!any) {
+          comma();
+          out += "\"ranges\":{";
+          any = true;
+        } else {
+          out += ",";
+        }
+        out += "\"";
+        out += KNOB_KEYS[k];
+        out += "\":[";
+        append_num(&out, r.min);
+        out += ",";
+        append_num(&out, r.max);
+        out += ",";
+        append_num(&out, r.step);
+        out += "]";
+      }
+      if (any)
+        out += "}";
+    }
   }
   out += "}";
   return out;

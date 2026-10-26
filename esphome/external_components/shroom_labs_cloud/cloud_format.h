@@ -94,6 +94,24 @@ static constexpr float SETPOINT_TEMP_MAX = 32.0f;
 static constexpr float SETPOINT_RH_MIN = 60.0f;
 static constexpr float SETPOINT_RH_MAX = 98.0f;
 
+// Cloud-writable chamber numbers beyond the temperature and humidity targets. The payload and
+// telemetry key for each is KNOB_KEYS[k], the same as the ESPHome entity id.
+enum : uint8_t {
+  KNOB_FAN = 0,     // air_exchange_speed, %
+  KNOB_AIR_PERIOD,  // air_exchange_period_min
+  KNOB_AIR_RUN,     // air_exchange_run_sec
+  KNOB_SUNRISE,     // sunrise_hour
+  KNOB_LIGHT_HOURS, // light_hours
+  KNOB_WHITE,       // white_intensity, lux
+  KNOB_RED,         // color_r, %
+  KNOB_GREEN,       // color_g, %
+  KNOB_BLUE,        // color_b, %
+  KNOB_GROW_DAY,    // grow_day (display)
+  KNOB_COUNT,
+};
+extern const char *const KNOB_KEYS[KNOB_COUNT];
+static constexpr size_t MAX_PHASE_LEN = 15;
+
 struct InboxCommand {
   int64_t id{0};
   std::string kind;
@@ -105,6 +123,9 @@ struct InboxCommand {
   bool has_rh{false};
   double temperature_c{0};
   double humidity_percent{0};
+  uint16_t knob_mask{0};
+  float knob[KNOB_COUNT]{};
+  std::string grow_phase;
 };
 
 size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max);
@@ -119,6 +140,9 @@ struct SetpointPlan {
   bool write_rh{false};
   float temperature_c{0};
   float humidity_percent{0};
+  uint16_t knob_mask{0};
+  float knob[KNOB_COUNT]{};
+  std::string grow_phase;
 };
 
 struct ChamberReading {
@@ -130,6 +154,9 @@ struct ChamberReading {
   float humidity{0};
   float temperature_target{0};
   float target_humidity{0};
+  uint16_t knob_mask{0};
+  float knob[KNOB_COUNT]{};
+  std::string grow_phase;
 };
 
 struct EntityRange {
@@ -148,6 +175,17 @@ class CloudChamber {
   virtual bool write_temperature(float) { return false; }
   virtual bool write_humidity(float) { return false; }
   virtual uint32_t last_local_change_ms() { return 0; }
+  virtual EntityRange knob_range(uint8_t) { return {}; }
+  virtual bool write_knob(uint8_t, float) { return false; }
+  // Writes the grow_phase select. False for an option the select does not have.
+  virtual bool write_grow_phase(const std::string &) { return false; }
+};
+
+// Firmware version, capability list (a JSON array) and knob ranges for telemetry.
+struct TelemetryExtras {
+  const char *firmware_version{nullptr};
+  const char *capabilities{nullptr};
+  const EntityRange *ranges{nullptr};  // KNOB_COUNT entries
 };
 
 bool value_in_entity_range(float v, const EntityRange &range);
@@ -157,7 +195,7 @@ SetpointPlan plan_setpoint_command(const InboxCommand &cmd, int64_t wall_ms, uin
                                    bool remote_apply);
 std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, const char *ack_status,
                                 const char *ack_reason = nullptr, const EntityRange *temp_range = nullptr,
-                                const EntityRange *rh_range = nullptr);
+                                const EntityRange *rh_range = nullptr, const TelemetryExtras *extras = nullptr);
 float clamp_setpoint_temp(float c);
 float clamp_setpoint_rh(float rh);
 bool setpoint_object_id(const char *object_id);

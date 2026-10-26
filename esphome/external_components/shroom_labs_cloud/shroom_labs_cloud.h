@@ -3,6 +3,8 @@
 #include "cloud_engine.h"
 #include "cloud_qr.h"
 #include "esphome/core/component.h"
+#include "esphome/components/number/number.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/web_server_base/web_server_base.h"
 
 #include <atomic>
@@ -51,6 +53,9 @@ class EspChamber : public CloudChamber {
   bool write_temperature(float c) override;
   bool write_humidity(float rh) override;
   uint32_t last_local_change_ms() override;
+  EntityRange knob_range(uint8_t k) override;
+  bool write_knob(uint8_t k, float v) override;
+  bool write_grow_phase(const std::string &phase) override;
 
  protected:
   ShroomLabsCloud *cloud_;
@@ -63,6 +68,11 @@ class ShroomLabsCloud : public Component {
   void set_api_host(const std::string &host) { engine_.set_api_host(host); }
   void set_site_origin(const std::string &site) { engine_.set_site_origin(site); }
   void set_remote_apply(bool on);
+  void set_knob(uint8_t k, number::Number *n) {
+    if (k < KNOB_COUNT)
+      knobs_[k] = n;
+  }
+  void set_grow_phase_select(select::Select *s) { grow_phase_ = s; }
 
   void setup() override;
   void loop() override;
@@ -103,6 +113,9 @@ class ShroomLabsCloud : public Component {
   EntityRange humidity_target_range();
   bool write_temperature_target(float c);
   bool write_humidity_target(float rh);
+  EntityRange knob_range(uint8_t k);
+  bool write_knob(uint8_t k, float v);
+  bool write_grow_phase(const std::string &phase);
 
   static bool start_job(void *ctx, CloudJob job);
 
@@ -120,6 +133,8 @@ class ShroomLabsCloud : public Component {
   bool flash_encrypted_{false};
   uint32_t last_local_change_ms_{0};
   bool applying_remote_{false};
+  number::Number *knobs_[KNOB_COUNT]{};
+  select::Select *grow_phase_{nullptr};
   bool watchers_on_{false};
   CloudJob pending_job_{CloudJob::NONE};
   std::atomic<bool> busy_{false};

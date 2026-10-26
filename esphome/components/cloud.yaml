@@ -4,6 +4,19 @@ shroom_labs_cloud:
   id: shl_cloud
   api_host: api.shroomlabs.io
   site_origin: https://shroomlabs.io
+  # Numbers the site may set in one atomic command (validated against each entity's range).
+  knobs:
+    air_exchange_speed: air_exchange_speed
+    air_exchange_period_min: air_exchange_period_min
+    air_exchange_run_sec: air_exchange_run_sec
+    sunrise_hour: sunrise_hour
+    light_hours: light_hours
+    white_intensity: white_intensity
+    color_r: color_r
+    color_g: color_g
+    color_b: color_b
+    grow_day: grow_day
+  grow_phase: grow_phase
 
 interval:
   - interval: 1s

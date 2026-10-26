@@ -185,13 +185,30 @@ The API returns `firmware`, `capabilities` and per-control `controls` on each de
 - **Fan-only, light, and update-notice changes** are refused with a plain message on firmware that can't take them.
 - **Repeat submits**: the same `request_id`, or the same change to the same chamber within 60 seconds, returns the existing command (`deduped: true`) instead of queueing another. The buttons are disabled while a send is in flight.
 
-### Firmware follow-ups (not changed yet)
+### Firmware 1.0.5-sl.1 multi-field setpoints
 
-1.0.4-sl.2's cloud apply (`plan_setpoint_command`) only handles `setpoints` with temperature and humidity. To let the site do more, the firmware needs to:
+From 1.0.5-sl.1 one `setpoints` command can carry any of these, and the chamber writes them all or none:
 
-1. Report `firmware_version` and a `capabilities` list in telemetry.
-2. Accept cloud writes to the existing number entities: `air_exchange_speed` (fan), `air_exchange_period_min`, `air_exchange_run_sec`, `sunrise_hour`, `light_hours`, `white_intensity`, `color_r`, `color_g`, `color_b`, plus the `grow_phase` select, and report `setpoints.fan` / `light.schedule` / `light.color` when it does.
-3. Optionally handle `apply_profile` natively (and report `apply_profile`), and ack every command kind it ignores with `ack_status: refused` so nothing sits unanswered.
+| Payload key | Entity | Range (step) |
+|---|---|---|
+| `temperature_c` | Temperature: Target | firmware clamp 10 to 32 °C |
+| `humidity_percent` | Humidity: Target | firmware clamp 60 to 98 % |
+| `air_exchange_speed` | Air Exchange: Fan Speed | 15 to 100 % (5) |
+| `air_exchange_period_min` | Air Exchange: Period | 1 to 240 min (1) |
+| `air_exchange_run_sec` | Air Exchange: Run Time | 5 to 900 s (5) |
+| `sunrise_hour` | Lights: Sunrise Hour | 0 to 23 (1) |
+| `light_hours` | Lights: Hours On | 0 to 24 (0.25) |
+| `white_intensity` | Lights: White | 0 to 4000 lux (5) |
+| `color_r`, `color_g`, `color_b` | Lights: Red, Green, Blue | 0 to 100 % (1) |
+| `grow_day` | Grow day | 0 to 90 (1) |
+| `grow_phase` | Grow phase select | Idle, Colonizing, Pinning, Fruiting, Harvest |
+
+- Each value is checked against the entity's own min and max (the chamber reports them in `ranges` as `[min, max, step]`) and snapped to its step. An out-of-range or missing entity fails the whole command with a reason such as `air_exchange_speed outside entity range`.
+- A command that leaves the light on (white or any color above 0) with `light_hours` at 0 is refused: `light_hours must be above 0 while the light is on`. The chamber's own 12 hour fallback still covers a light that is on with 0 or NaN hours from other paths (write-back capped at 3).
+- The phase is written first, then temperature, RH, fan and air schedule, then light. When the light goes off, the color is cleared before the schedule changes. Every value is read back. Any write that fails or does not stick rolls all earlier writes back and acks `failed` with the reason.
+- Any other command kind is acked `refused` with "Unknown command." so nothing waits for 24 hours.
+- Telemetry adds `firmware_version`, every knob value, `grow_phase`, `ranges`, and `capabilities`: always `setpoints.temperature`, `setpoints.humidity`, `setpoints.multi`, `ack.refused`; plus `setpoints.fan`, `air.schedule`, `light.schedule`, `light.color`, `grow.day`, `grow.phase` for each bound entity.
+- Also carries the ack race fix from #90: an ack is cleared only when the POST that carried it succeeds and it is still the ack that was posted.
 
 ## UX
 
