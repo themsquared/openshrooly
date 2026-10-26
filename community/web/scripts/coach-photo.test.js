@@ -29,7 +29,7 @@ test("result card shows summary, issues, steps and escapes model text", () => {
   assert.match(out, /Dry caps/);
   assert.match(out, /Watch/);
   assert.match(out, /<li>Raise humidity to 90%<\/li>/);
-  assert.match(out, /Based on chamber Shelf\. Confidence 70%/);
+  assert.match(out, /Based on Shelf readings\. Confidence 70%/);
   assert.doesNotMatch(out, DASHES);
 });
 

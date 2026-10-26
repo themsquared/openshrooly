@@ -41,7 +41,7 @@ export function renderPhotoResult(data = {}) {
     )
     .join("");
   const steps = (rec.next_steps || []).map((s) => `<li>${escapeHtml(s)}</li>`).join("");
-  const based = data.context?.label ? `Based on ${data.context.source === "chamber" ? "chamber" : "profile"} ${data.context.label}.` : "";
+  const based = data.context?.label ? `Based on ${data.context.label}${data.context.source === "chamber" ? " readings" : ""}.` : "";
   return `<div class="photo-rec">
     ${rec.stage ? `<p class="eyebrow">Looks like ${escapeHtml(rec.stage)}</p>` : ""}
     <p class="photo-summary">${escapeHtml(rec.summary || "")}</p>
@@ -89,6 +89,7 @@ export async function mountPhotoCheck({ root, api, encodePhoto, onError = () => 
     preview.dataset.url = url;
     preview.src = url;
     preview.classList.remove("hidden");
+    root.querySelector(".photo-pick span").textContent = "Change photo";
   });
 
   $("#cp-form").addEventListener("submit", async (ev) => {
