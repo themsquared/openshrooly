@@ -21,6 +21,25 @@
   font-style: normal;
   font-display: swap;
 }
+/* U12: Atkinson's slashed zero made "90%" read like "98%" at tile sizes. These digits-only files are
+   Atkinson with one oval counter in the zero (built by scripts/make-digit-fonts.py). Claim codes keep
+   the slashed zero, since they mix letters and numbers. */
+@font-face {
+  font-family: "Atkinson Digits";
+  src: url("/fonts/atkinson-digits-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+}
+@font-face {
+  font-family: "Atkinson Digits";
+  src: url("/fonts/atkinson-digits-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+}
 @font-face {
   font-family: "Atkinson";
   src: url("/fonts/atkinson-700.woff2") format("woff2");
@@ -31,7 +50,7 @@
 
 :root {
   --display: "Fraunces", "Iowan Old Style", Palatino, serif;
-  --sans: "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --sans: "Atkinson Digits", "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -806,7 +825,7 @@ button.nav-toggle {
 .claim-how summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--sl-spore); font-weight: 600; }
 .claim-steps-plain { padding-left: 1.3rem; margin: 0.6rem 0 0.8rem; }
 .claim-steps-plain li { margin: 0 0 0.6rem; }
-.claim-code-card input#code { font-size: 1.4rem; letter-spacing: 0.18em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.claim-code-card input#code { font-family: "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif; font-size: 1.4rem; letter-spacing: 0.18em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .claim-code-card button[type="submit"] { width: 100%; min-height: 48px; }
 .empty-devices { padding: 1.6rem 1.4rem; text-align: center; }
 .empty-devices h2 { margin: 0 0 0.4rem; }
