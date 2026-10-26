@@ -105,3 +105,11 @@ test("llms files never call PNW Spore a partner", () => {
     }
   }
 });
+
+test("guide pages preload the body and heading fonts so text does not shift", () => {
+  for (const g of GUIDES) {
+    const html = page(g.slug);
+    assert.match(html, /<link rel="preload" href="\/fonts\/atkinson-400\.woff2" as="font" type="font\/woff2" crossorigin>/, g.slug);
+    assert.match(html, /<link rel="preload" href="\/fonts\/fraunces-600\.woff2" as="font" type="font\/woff2" crossorigin>/, g.slug);
+  }
+});
