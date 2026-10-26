@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from openshrooly_lib.affiliates import AffiliatePolicyError, affiliate_links_for, record_click_allowed
 from openshrooly_lib.catalog import load_profile_by_id
 from openshrooly_lib.mapping import stage_to_commands
+from openshrooly_lib.models import AffiliateLink
 from openshrooly_lib.payments import PaymentRouter
 from openshrooly_lib.schema import ValidationError
 
@@ -34,8 +36,12 @@ def test_stripe_stub_and_psi_block():
 
 
 def test_affiliate_policy():
-    culinary = load_profile_by_id("pearl-oyster", ROOT / "data")
-    assert affiliate_links_for(culinary)
+    seeded = load_profile_by_id("pearl-oyster", ROOT / "data")
+    # Seeds ship with no placeholder partner links.
+    assert affiliate_links_for(seeded) == []
+    real = AffiliateLink(id="real-spawn", label="Culinary spawn", merchant="partner", url="https://partner.invalid/spawn")
+    culinary = replace(seeded, affiliate_links=[real])
+    assert affiliate_links_for(culinary) == [real]
     record_click_allowed(culinary, culinary.affiliate_links[0])
     psi = load_profile_by_id("b-plus", ROOT / "data", include_psilocybin=True)
     assert affiliate_links_for(psi) == []

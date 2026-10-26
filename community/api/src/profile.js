@@ -27,9 +27,22 @@ export {
 
 import { isPsilocybin, ValidationError } from "./profile-schema.js";
 
+/** Placeholder links from early seeds. Never show or redirect to them. */
+export function isPlaceholderAffiliate(link) {
+  if (!link || typeof link.url !== "string") return true;
+  if (link.merchant === "example-supplier") return true;
+  try {
+    const host = new URL(link.url).hostname.toLowerCase();
+    return /(^|\.)example\.(com|org|net)$/.test(host) || host.endsWith(".test") || host.endsWith(".invalid");
+  } catch {
+    return true;
+  }
+}
+
 export function affiliateLinksFor(profile, extra = {}) {
   if (isPsilocybin(profile, extra) || profile.affiliates_allowed === false) return [];
-  return profile.affiliate_links || [];
+  if (profile.pack === "off-menu" || profile.pack === "psilocybin") return [];
+  return (profile.affiliate_links || []).filter((link) => !isPlaceholderAffiliate(link));
 }
 
 export function assertAffiliateAllowed(profile, link, extra = {}) {
