@@ -21,15 +21,13 @@ import { startCheckout } from "./payments.js";
 import { coachPriceId } from "./stripe.js";
 import {
   comingSoonBody,
-  capabilities,
   coachPublicEnabled,
   devStubsEnabled,
   paymentsConfigured,
 } from "./providers.js";
 import { betaActive, coachAccess, hasPaidCoach, linkedChamberCount } from "./coach-access.js";
-import { bytesToBase64, decodePhotoBase64, sanitizeGrowPhoto } from "./photos.js";
+import { addVisionUsage, askVision, photoCheckOptions, preparePhotoCheck, visionNeurons } from "./coach-photo.js";
 import { readJsonLimited } from "./http-body.js";
-import { insertMedia, pendingPhotoKey } from "./media-acl.js";
 import {
   COACH_ITEM,
   COACH_PERIOD_DAYS,
@@ -52,7 +50,7 @@ export const CHAT_CAP = 40;
 export const PHOTO_CAP = 8;
 /**
  * Cost caps in Workers AI neurons ($0.011 per 1,000). A chat is about 10 neurons and a photo check
- * about 25, so these never bite normal use. They stop a runaway client from costing real money.
+ * about 35 (Llama 4 Scout, measured), so these never bite normal use. They stop a runaway client from costing real money.
  * Per user: 3,000 a day and 20,000 a month (about $0.22 a month, well under the plan price).
  * Everyone together: 100,000 a day (about $1.10). All four are overridable with env vars.
  */
@@ -111,7 +109,7 @@ export function coachCatalog(env = {}, request) {
     plans: coachPlans(env, request),
     pack: "culinary",
     summary:
-      "Coaching for culinary grows that uses your device's readings and your past grows to tailor humidity and temperature advice. Photo checks come later. Not sold or marketed with off-menu varieties.",
+      "Coaching for culinary grows that uses your device's readings and your past grows to tailor humidity and temperature advice. Snap a photo of your grow for a quick check. Not sold or marketed with off-menu varieties.",
   };
 }
 
@@ -421,7 +419,7 @@ export async function coachDecisions(db, user, { deviceId = null, before = null,
 }
 
 export async function handleCoach(method, path, url, request, env) {
-  const { db, storage } = env;
+  const { db } = env;
 
   if (method === "GET" && path === "/api/coach") {
     const { user } = await userFromRequest(request, db);
@@ -663,37 +661,44 @@ export async function handleCoach(method, path, url, request, env) {
     });
   }
 
+  if (method === "GET" && path === "/api/coach/photo") {
+    const user = await requireCoach(request, db, env);
+    const options = await photoCheckOptions(db, env, user);
+    const row = await usageRow(db, user.id);
+    return json({
+      available: createModelProvider(env, request).name !== "disabled",
+      ...options,
+      usage: { photos: Number(row.photos || 0), cap: coachCaps(env).photos },
+    });
+  }
+
   if (method === "POST" && path === "/api/coach/photo") {
     const user = await requireCoach(request, db, env);
-    const body = await readJsonLimited(request);
-    if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
-      throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
-    }
-    await assertCap(db, env, user.id, "photos");
-    if (!body.photo_base64) throw new ValidationError("photo_base64 required");
-    const photo = sanitizeGrowPhoto(decodePhotoBase64(body.photo_base64));
-    const caps = capabilities(env, request);
-    if (!caps.photos) return json({ error: "Photo checks are coming later.", coming_soon: true }, 503);
-    const key = pendingPhotoKey("coach", String(user.id), photo.ext);
-    await storage.put(key, photo.bytes, photo.contentType);
-    await insertMedia(db, { photo_key: key, owner_id: user.id, status: "pending", kind: "coach" });
     const provider = createModelProvider(env, request);
-    const result = await provider.vision({ imageBase64: bytesToBase64(photo.bytes), hint: body.hint || body.notes || "" });
+    if (provider.name === "disabled") return json({ error: "Photo checks are not turned on yet.", coming_soon: true }, 503);
+    const body = await readJsonLimited(request);
+    // Validates the photo, strips EXIF and location, refuses off-menu grows, and builds context.
+    const prepared = await preparePhotoCheck(db, env, user, body);
+    await assertCap(db, env, user.id, "photos");
+    let result;
+    try {
+      result = await askVision(provider, prepared);
+    } catch (err) {
+      console.error(JSON.stringify({ event: "coach_photo_error", user_id: user.id, message: String(err?.message || err).slice(0, 200) }));
+      return json({ error: "The photo check did not finish. Try again in a minute." }, 502);
+    }
     if (result.unavailable) return json(comingSoonBody("Grow Coach"), 503);
-    const neurons = estimateNeurons({
-      inputTokens: result.input_tokens,
-      outputTokens: result.output_tokens,
-      vision: true,
-    });
+    const neurons = visionNeurons(result.model, result.usage);
     await bumpUsage(db, user.id, "photos", neurons);
+    await addVisionUsage(db, user.id, neurons);
+    const row = await usageRow(db, user.id);
+    // The photo is not stored anywhere. Only the recommendation goes back.
     return json({
-      photo_key: key,
-      stage: result.stage,
-      flags: result.flags,
-      confidence: result.confidence,
-      next_steps: result.next_steps,
+      recommendation: result.recommendation,
+      context: { source: prepared.context.source, label: prepared.context.label },
       provider: provider.name,
       neurons,
+      usage: { photos: Number(row.photos || 0), cap: coachCaps(env).photos },
     });
   }
 

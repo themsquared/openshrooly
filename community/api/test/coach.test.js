@@ -205,22 +205,18 @@ test("approved suggestion can queue setpoints; body auto flag cannot skip approv
   assert.equal(autoApply.data.suggestion.auto_eligible, true);
 });
 
-test("photo check returns stage flags and next steps", async () => {
+test("photo check returns a recommendation and chat caches", async () => {
   const ctx = env();
   const { token } = await register(ctx, "photo@example.com");
   await subscribe(ctx, token);
   const photo = await call(ctx, "POST", "/api/coach/photo", {
     token,
-    body: { photo_base64: toBase64(buildJpeg()), hint: "green mold on the block" },
+    body: { photo_base64: toBase64(buildJpeg()), note: "green mold on the block" },
   });
   assert.equal(photo.status, 200, JSON.stringify(photo.data));
-  assert.ok(photo.data.flags.some((f) => f.kind === "contamination"));
-  assert.match(photo.data.next_steps, /Isolate/i);
-  assert.match(photo.data.photo_key, /^pending\/coach\/[0-9a-f]+\.(jpe?g|png|webp)$/);
-  const anon = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`);
-  assert.equal(anon.status, 404);
-  const owner = await callRaw(ctx, "GET", `/api/media/${encodeURIComponent(photo.data.photo_key)}`, { token });
-  assert.equal(owner.status, 200);
+  assert.ok(photo.data.recommendation.issues.some((i) => i.severity === "high"));
+  assert.ok(photo.data.recommendation.next_steps.some((s) => /Isolate/i.test(s)));
+  assert.equal(photo.data.photo_key, undefined);
 
   const first = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
   assert.equal(first.status, 200);

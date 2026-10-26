@@ -172,6 +172,7 @@ function renderSpend(s) {
   stats($("#spend-stats"), [
     ["Est. cost", money(t.cost[w])],
     ["Jev calls", t.jev_calls[w]],
+    ["Photo checks", `${t.photo_checks?.[w] ?? 0} (${money(t.photo_ai_cost?.[w] ?? 0)})`],
     ["Emails (tracked)", t.emails[w]],
     ["Revenue live", cents(t.revenue_cents[w])],
     ["Revenue test", cents(t.revenue_test_cents[w])],
@@ -184,6 +185,8 @@ function renderSpend(s) {
     { key: "jev_calls", label: "Jev calls", num: true, value: (r) => r.jev_calls[w], html: (r) => String(r.jev_calls[w]) },
     { key: "jev_cost", label: "Jev cost", num: true, value: (r) => r.jev_cost[w], html: (r) => money(r.jev_cost[w]) },
     { key: "coach_ai_cost", label: "Coach AI", num: true, value: (r) => r.coach_ai_cost[w], html: (r) => money(r.coach_ai_cost[w]) },
+    { key: "photo_checks", label: "Photo checks", num: true, value: (r) => r.photo_checks?.[w] ?? 0, html: (r) => String(r.photo_checks?.[w] ?? 0) },
+    { key: "photo_ai_cost", label: "Photo AI", num: true, value: (r) => r.photo_ai_cost?.[w] ?? 0, html: (r) => money(r.photo_ai_cost?.[w] ?? 0) },
     { key: "emails", label: "Emails", num: true, value: (r) => r.emails[w], html: (r) => String(r.emails[w]) },
     { key: "revenue", label: "Revenue", num: true, value: (r) => r.revenue_cents[w], html: (r) => cents(r.revenue_cents[w]) },
     { key: "revenue_test", label: "Test rev.", num: true, value: (r) => r.revenue_test_cents[w], html: (r) => cents(r.revenue_test_cents[w]) },
@@ -201,6 +204,7 @@ function renderSpend(s) {
     s.notes.jev,
     s.notes.emails,
     s.notes.revenue,
+    s.notes.photos,
     `Payments are in ${s.payments_mode} mode.`,
   ]
     .map((n) => `<li>${escapeHtml(n)}</li>`)

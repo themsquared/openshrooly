@@ -12,6 +12,7 @@ export const ADMIN_SQL = Object.freeze({
   entitlements: "SELECT user_id, item_id, item_type, granted_at FROM entitlements",
   autopilotLog: "SELECT id, device_id, user_id, readings, created_at FROM coach_autopilot_log WHERE created_at>=?",
   jevCounters: "SELECT cache_key, value FROM coach_cache WHERE cache_key LIKE 'jev:%'",
+  visionCounters: "SELECT cache_key, value FROM coach_cache WHERE cache_key LIKE 'vision:%'",
   coachUsage: "SELECT user_id, day, chats, photos, neurons FROM coach_usage WHERE day>=?",
   alertEmails: "SELECT user_id, created_at FROM alerts WHERE channel='email' AND status='sent' AND created_at>=?",
   magicLinks: "SELECT email, purpose, created_at FROM magic_links WHERE created_at>=?",

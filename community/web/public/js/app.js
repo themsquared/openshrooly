@@ -37,6 +37,7 @@ import {
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
+import { mountPhotoCheck } from "./coach-photo.js";
 import { accessText, coachView, NO_DECISIONS, priceText, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
 import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
@@ -1299,7 +1300,7 @@ async function renderCoach() {
   );
 }
 
-/** Recommendations, then the decision feed, then chamber status. Chat and photo checks sit below for accounts with AI turned on. */
+/** Recommendations, then the decision feed, then chamber status. The photo check and chat show for accounts with AI turned on. */
 async function renderCoachDashboard(catalog) {
   $("#coach-hero")?.classList.add("hidden");
   $("#gated").classList.remove("hidden");
@@ -1400,11 +1401,14 @@ async function renderCoachDashboard(catalog) {
     // Autopilot is switched off on this site, so there is nothing to recommend or log yet.
     for (const id of ["#coach-recs", "#coach-feed", "#coach-chambers"]) $(id)?.classList.add("hidden");
   }
-  // Chat and photo checks need an AI provider on the server (capabilities.coach_chat). Without one they stay hidden.
-  if (catalog.entitled && (await capabilities().catch(() => ({}))).coach_chat) await renderCoachTools(catalog).catch(showCoachError);
+  // Photo checks and chat need an AI provider on the server. Without one they stay hidden.
+  if (catalog.entitled) {
+    await mountPhotoCheck({ root: $("#coach-photo"), api, encodePhoto: encodePhotoForUpload }).catch(() => false);
+    if ((await capabilities().catch(() => ({}))).coach_chat) await renderCoachTools(catalog).catch(showCoachError);
+  }
 }
 
-/** Chat, photo checks, and the auto-tune switch. These call the AI, so only accounts with Coach chat get them. */
+/** Chat and the auto-tune switch. These call the AI, so only accounts with Coach chat get them. Photo checks live in coach-photo.js. */
 async function renderCoachTools(catalog) {
   $("#coach-tools").classList.remove("hidden");
   const devices = await api("/api/devices").catch(() => ({ devices: [] }));
@@ -1416,16 +1420,12 @@ async function renderCoachTools(catalog) {
 
   const deviceId = () => $("#device").value || "";
   const profileId = () => $("#profile")?.value || "";
-  const photosOn = Boolean((await capabilities()).photos);
-  $("#photo-panel")?.classList.toggle("hidden", !photosOn);
   $("#auto-tune").checked = Boolean(catalog.auto_tune);
 
   async function refreshUsage() {
     const usage = await api("/api/coach/usage").catch(() => null);
     if (!usage) return;
-    $("#usage").textContent = photosOn
-      ? `${usage.chats}/${usage.caps.chats} chats · ${usage.photos}/${usage.caps.photos} photo checks today`
-      : `${usage.chats}/${usage.caps.chats} chats today`;
+    $("#usage").textContent = `${usage.chats} of ${usage.caps.chats} chats used today`;
   }
 
   async function loadProfiles() {
@@ -1466,33 +1466,6 @@ async function renderCoachTools(catalog) {
       showCoachError(err);
     }
   });
-  $("#photo-form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const file = $("#photo-file").files?.[0];
-    if (!file) {
-      showCoachError(new Error("Choose a photo first."));
-      return;
-    }
-    try {
-      const data = await api("/api/coach/photo", {
-        method: "POST",
-        jsonBody: {
-          ...(await encodePhotoForUpload(file)),
-          hint: $("#photo-hint").value,
-        },
-      });
-      $("#photo-result").innerHTML = `
-        <p>Stage <strong>${escapeHtml(data.stage)}</strong> · confidence ${fmtNum((data.confidence || 0) * 100, 0)}%</p>
-        <div class="photo-flags">${(data.flags || [])
-          .map((f) => `<span class="chip">${escapeHtml(f.label || f.kind)} · ${fmtNum((f.confidence || 0) * 100, 0)}%</span>`)
-          .join("")}</div>
-        <p>${escapeHtml(data.next_steps || "")}</p>`;
-      await refreshUsage();
-    } catch (err) {
-      showCoachError(err);
-    }
-  });
-
   await loadProfiles().catch(showCoachError);
   await refreshUsage();
 }
