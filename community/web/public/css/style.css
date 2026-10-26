@@ -994,6 +994,23 @@ button.nav-toggle {
   overflow: visible;
   scroll-margin-top: 96px;
 }
+.account-section > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.8rem;
+  min-height: 44px;
+}
+.account-section > summary::-webkit-details-marker { display: none; }
+.account-section > summary::after { content: "+"; margin-left: auto; font-size: 1.4rem; color: var(--sl-ink-dim); }
+.account-section[open] > summary::after { content: "\2212"; }
+.account-section > summary h2 { margin: 0; font-size: clamp(1.25rem, 3.4vw, 1.5rem); }
+.account-summary { font-size: 0.95rem; }
+.first-chamber { padding: 1.3rem 1.25rem; }
+.first-chamber h2 { margin: 0 0 0.4rem; font-family: var(--display); font-size: clamp(1.5rem, 4vw, 1.9rem); }
+.account-signout { margin-top: 0.4rem; }
 .account-section h2 {
   margin: 0 0 0.45rem;
   font-family: var(--display);
@@ -1087,6 +1104,22 @@ td a:not(.button) { display: inline-flex; align-items: center; min-height: 44px;
 /* U14: a new chamber shows one plain line instead of a grid of zeros. */
 .stat-grid .stat-empty { grid-column: 1 / -1; margin: 0; }
 
+dialog.sheet {
+  border: 1px solid var(--sl-line);
+  border-radius: 20px;
+  background: var(--sl-bg-elev);
+  color: var(--sl-ink);
+  padding: 1.4rem 1.3rem 1.2rem;
+  max-width: 26rem;
+  width: calc(100% - 2rem);
+}
+dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.6); }
+dialog.sheet h2 { margin: 0 0 0.5rem; font-family: var(--display); font-size: 1.5rem; }
+.sheet-actions { display: grid; gap: 0.6rem; margin-top: 1.1rem; }
+.sheet-actions button { width: 100%; min-height: 48px; }
+@media (max-width: 767px) {
+  dialog.sheet { margin: auto auto 0; border-radius: 20px 20px 0 0; width: 100%; max-width: none; }
+}
 .coach-sales { margin-top: 1rem; max-width: 30rem; }
 .coach-price { font-size: 1.15rem; margin: 0 0 0.6rem; }
 .coach-price strong { font-size: 1.6rem; }

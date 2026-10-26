@@ -632,6 +632,7 @@ async function renderAccount() {
       })
     );
   }
+  if (checkoutResult() && $("#billing")) $("#billing").open = true;
   if (checkoutResult() === "success" && $("#billing-status")) {
     const status = $("#billing-status");
     status.textContent = "Payment received. Turning on Grow Coach...";
@@ -653,8 +654,24 @@ async function renderAccount() {
       if (caps.fleet) $("#fleet-link")?.classList.remove("hidden");
     })
     .catch(() => {});
+  $("#signout")?.addEventListener("click", async () => {
+    try {
+      await api("/api/auth/logout", { method: "POST", jsonBody: {} });
+    } catch {
+      /* still clear local token */
+    }
+    setToken("");
+    location.href = "/";
+  });
+  openAccountSectionFromHash();
+  window.addEventListener("hashchange", openAccountSectionFromHash);
   const devices = await api("/api/fleet/devices").catch(() => ({ devices: [] }));
-  $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No devices linked yet." });
+  const linked = (devices.devices || []).filter((d) => d.status !== "revoked");
+  // New accounts see one card, "Link your first chamber", instead of an empty Chambers section.
+  $("#first-chamber")?.classList.toggle("hidden", linked.length > 0);
+  $("#devices")?.classList.toggle("hidden", linked.length === 0);
+  if ($("#devices-summary")) $("#devices-summary").textContent = linked.length === 1 ? "1 linked" : `${linked.length} linked`;
+  $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No chambers linked yet." });
   renderAlertSettings().catch((err) => showAlertsStatus(err.message));
   wireYourData(me);
   $("#mint").addEventListener("submit", async (ev) => {
@@ -664,6 +681,17 @@ async function renderAccount() {
     $("#new-token").textContent = data.token;
     $("#new-token-wrap").classList.remove("hidden");
   });
+}
+
+/** Account sections are collapsed; a link like /account.html#alerts opens that one. */
+function openAccountSectionFromHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (!id) return;
+  const el = document.getElementById(id);
+  const section = el?.closest("details.account-section");
+  if (!section) return;
+  section.open = true;
+  el.scrollIntoView({ block: "start" });
 }
 
 function wireYourData(me) {
@@ -1462,7 +1490,7 @@ async function renderClaim() {
 
 const ALERT_STATUS = {
   sent: "Emailed",
-  stub: "Saved here. Email sending is not switched on yet.",
+  stub: "Saved here. Email alerts are off for now.",
   pending: "Sending",
   sending: "Sending",
   held: "Waiting for quiet hours to end",
@@ -1497,7 +1525,7 @@ function alertItems(alerts) {
 function deliveryNotice(data) {
   if (!data.email_ready) return "Verify your email to get alert emails. Alerts are still saved here.";
   if (data.prefs?.unsubscribed && !data.prefs?.email) return "You turned off alert emails from a link in an email. Turn on Email me alerts in alert settings to get them again.";
-  if (data.delivery?.email !== "live") return "Email sending is not switched on yet. Alerts are saved here so you can see them.";
+  if (data.delivery?.email !== "live") return "Email alerts are off for now.";
   return "";
 }
 
@@ -1606,18 +1634,72 @@ function loginRedirect() {
   location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
 }
 
+/**
+ * In-page sheet for unlinking: "Keep linked" is the big safe button, "Unlink" is red.
+ * Resolves true only when the person taps Unlink.
+ */
+function confirmUnlink() {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "sheet";
+    dialog.setAttribute("aria-labelledby", "sheet-title");
+    dialog.innerHTML = `
+      <h2 id="sheet-title">Unlink this chamber?</h2>
+      <p class="muted">It leaves your account. Growing keeps working on the chamber itself, and you can link it again later.</p>
+      <div class="sheet-actions">
+        <button type="button" class="sheet-keep" value="keep">Keep linked</button>
+        <button type="button" class="danger" value="unlink">Unlink</button>
+      </div>`;
+    const done = (yes) => {
+      dialog.close();
+      dialog.remove();
+      resolve(yes);
+    };
+    dialog.querySelector(".sheet-keep").addEventListener("click", () => done(false));
+    dialog.querySelector(".danger").addEventListener("click", () => done(true));
+    dialog.addEventListener("cancel", (ev) => {
+      ev.preventDefault();
+      done(false);
+    });
+    document.body.append(dialog);
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+      dialog.querySelector(".sheet-keep").focus();
+    } else {
+      dialog.remove();
+      resolve(confirm("Unlink this chamber from your account? Growing still works on the chamber itself."));
+    }
+  });
+}
+
+/** Only mention a lost live connection after this long, so a short blip never shows a banner. */
+const POLL_NOTICE_AFTER_MS = 2 * 60 * 1000;
+
 /** Small "Live" / "Updating…" badge next to a page title. */
 function setLiveBadge(el, state, at) {
   if (!el) return;
+  clearTimeout(el._pollNoticeTimer);
+  let shown = state;
+  if (state === "polling") {
+    const since = Number(el.dataset.pollingSince) || Date.now();
+    el.dataset.pollingSince = String(since);
+    const wait = since + POLL_NOTICE_AFTER_MS - Date.now();
+    if (wait > 0) {
+      shown = "quiet";
+      el._pollNoticeTimer = setTimeout(() => setLiveBadge(el, "polling", at), wait);
+    }
+  } else if (state === "live" || state === "gone" || !state) {
+    delete el.dataset.pollingSince;
+  }
   const text = {
     cached: `Updating… showing what this phone saw ${ageText(at) || "earlier"}`,
     loading: "Updating…",
     live: "Live",
-    polling: "Reconnecting. Checking every 30 seconds.",
+    polling: "Live updates paused. Numbers refresh every 30 seconds.",
     gone: "This chamber is no longer on your account.",
-  }[state] || "";
+  }[shown] || "";
   el.textContent = text;
-  el.dataset.state = state;
+  el.dataset.state = shown;
   el.classList.toggle("hidden", !text);
 }
 
@@ -1806,7 +1888,7 @@ async function renderDevice() {
       </p>`;
     dash.classList.remove("hidden");
     $("#unlink-device")?.addEventListener("click", async () => {
-      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      if (!(await confirmUnlink())) return;
       try {
         await api(`/api/fleet/devices/${enc}/unlink`, { method: "POST", jsonBody: { confirm: true } });
         liveCache.clear();
@@ -2171,7 +2253,7 @@ async function renderFleet() {
       }
     });
     $("#unlink-device").addEventListener("click", async () => {
-      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      if (!(await confirmUnlink())) return;
       try {
         await api(`/api/fleet/devices/${encodeURIComponent(detailId)}/unlink`, {
           method: "POST",
