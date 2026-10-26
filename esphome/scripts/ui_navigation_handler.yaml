@@ -43,6 +43,7 @@
 
         id(current_ui_page) = page;
         id(page_just_changed) = false;
+        int link_ui = 0;
         ESP_LOGI("ui", "Page %d, button %d", page, button);
 
         auto change_number = [](number::Number *entity, bool increase) {
@@ -71,17 +72,20 @@
             id(menu_selection) = (id(menu_selection) + 1) % 7;
           } else if (button == 4) {
             static const int menu_pages[7] = {
+              PAGE_CLOUD,
               PAGE_TEMPERATURE,
               PAGE_HUMIDITY,
               PAGE_LIGHT,
               PAGE_AIR,
               PAGE_WATER,
               PAGE_SYSTEM,
-              PAGE_CLOUD,
             };
             id(settings_selection) = 0;
             id(current_ui_page) = menu_pages[id(menu_selection)];
             id(page_just_changed) = true;
+            if (id(current_ui_page) == PAGE_CLOUD) {
+              link_ui = (int) id(shl_cloud)->link_open(wifi::global_wifi_component->is_connected());
+            }
           }
         } else if (page == PAGE_TEMPERATURE) {
           if (button == 1) {
@@ -196,12 +200,23 @@
             }
           }
         } else if (page == PAGE_CLOUD) {
-          if (button == 1) {
-            id(current_ui_page) = PAGE_MENU;
-            id(page_just_changed) = true;
-          } else if (button == 4) {
-            id(shl_cloud)->refresh();
+          link_ui = (int) id(shl_cloud)->link_button(button, wifi::global_wifi_component->is_connected());
+        }
+        // Page moves asked for by the Link this device flow.
+        if (link_ui == (int) shroom_labs::LinkAction::WifiSetup) {
+          if (!id(device_sec)->in_setup()) {
+            id(device_sec)->enter_setup();
           }
+          id(settings_selection) = 2;
+          id(current_ui_page) = PAGE_SYSTEM;
+          id(page_just_changed) = true;
+        } else if (link_ui == (int) shroom_labs::LinkAction::GoGrow) {
+          id(current_ui_page) = PAGE_MAIN;
+          id(page_just_changed) = true;
+        } else if (link_ui == (int) shroom_labs::LinkAction::GoMenu) {
+          id(menu_selection) = 0;
+          id(current_ui_page) = PAGE_MENU;
+          id(page_just_changed) = true;
         } else if (page == PAGE_SYSTEM) {
           if (button == 1) {
             id(current_ui_page) = PAGE_MENU;
@@ -293,6 +308,10 @@
           lambda: 'return id(page_just_changed) && id(current_ui_page) == 8;'
         then:
           - lvgl.page.show: icloudclaim
+    - if:
+        condition:
+          lambda: 'return id(current_ui_page) == 8;'
+        then:
           - script.execute: update_cloud_screen
 
     # Settings menu.
@@ -304,39 +323,39 @@
               id: menu_temp_item
               text: !lambda |-
                 return std::string(
-                    id(menu_selection) == 0 ? "> Temperature" : "  Temperature");
+                    id(menu_selection) == 1 ? "> Temperature" : "  Temperature");
           - lvgl.label.update:
               id: menu_humidity_item
               text: !lambda |-
                 return std::string(
-                    id(menu_selection) == 1 ? "> Humidity" : "  Humidity");
+                    id(menu_selection) == 2 ? "> Humidity" : "  Humidity");
           - lvgl.label.update:
               id: menu_light_item
               text: !lambda |-
                 return std::string(
-                    id(menu_selection) == 2 ? "> Lighting" : "  Lighting");
+                    id(menu_selection) == 3 ? "> Lighting" : "  Lighting");
           - lvgl.label.update:
               id: menu_air_item
               text: !lambda |-
                 return std::string(
-                    id(menu_selection) == 3 ? "> Air Exchange" : "  Air Exchange");
+                    id(menu_selection) == 4 ? "> Air Exchange" : "  Air Exchange");
           - lvgl.label.update:
               id: menu_water_item
               text: !lambda |-
                 return std::string(
-                    id(menu_selection) == 4
+                    id(menu_selection) == 5
                       ? "> Water Calibration"
                       : "  Water Calibration");
           - lvgl.label.update:
               id: menu_system_item
               text: !lambda |-
                 return std::string(
-                    id(menu_selection) == 5 ? "> System" : "  System");
+                    id(menu_selection) == 6 ? "> System" : "  System");
           - lvgl.label.update:
               id: menu_cloud_item
               text: !lambda |-
                 return std::string(
-                    id(menu_selection) == 6 ? "> Cloud" : "  Cloud");
+                    id(menu_selection) == 0 ? "> Link this device" : "  Link this device");
 
     # Temperature settings.
     - if:

@@ -19,22 +19,57 @@ shroom_labs_cloud:
   grow_phase: grow_phase
 
 interval:
+  # Link this device: the web page's Turn on also lands here. Ticks the flow
+  # once a second while the page shows and repaints only when it changes.
   - interval: 1s
     then:
       - if:
           condition:
-            lambda: 'return id(shl_cloud)->take_show_claim();'
+            lambda: |-
+              if (!id(shl_cloud)->take_show_claim() || id(icloudclaim).is_showing()) {
+                return false;
+              }
+              id(shl_cloud)->link_open(wifi::global_wifi_component->is_connected());
+              id(current_ui_page) = 8;
+              id(page_just_changed) = true;
+              return true;
           then:
-            - lambda: |-
-                id(current_ui_page) = 8;
-                id(page_just_changed) = true;
             - lvgl.page.show: icloudclaim
-            - script.execute: update_cloud_screen
-            - component.update: my_display
-  - interval: 10s
-    then:
       - if:
           condition:
             lambda: 'return id(icloudclaim).is_showing();'
           then:
-            - script.execute: update_cloud_screen
+            - lambda: |-
+                const auto act = id(shl_cloud)->link_tick(wifi::global_wifi_component->is_connected());
+                if (act == shroom_labs::LinkAction::GoGrow) {
+                  id(current_ui_page) = 0;
+                  id(page_just_changed) = true;
+                } else if (act == shroom_labs::LinkAction::GoMenu) {
+                  id(menu_selection) = 0;
+                  id(current_ui_page) = 1;
+                  id(page_just_changed) = true;
+                }
+            - if:
+                condition:
+                  lambda: 'return id(current_ui_page) == 0 && id(page_just_changed);'
+                then:
+                  - lambda: 'id(page_just_changed) = false;'
+                  - lvgl.page.show: aaaa
+                  - script.execute: update_growing_screen
+                  - component.update: my_display
+            - if:
+                condition:
+                  lambda: 'return id(current_ui_page) == 1 && id(page_just_changed);'
+                then:
+                  - lambda: 'id(page_just_changed) = false;'
+                  - lvgl.page.show: bsettingsmenu
+                  # Button 0 does nothing; it just repaints the menu labels.
+                  - script.execute:
+                      id: ui_navigation_handler
+                      button: 0
+            - if:
+                condition:
+                  lambda: 'return id(icloudclaim).is_showing() && id(shl_cloud)->link_take_dirty();'
+                then:
+                  - script.execute: update_cloud_screen
+                  - component.update: my_display

@@ -3,6 +3,7 @@
 #include "cloud_http.h"
 #include "cloud_qr.h"
 #include "cloud_sha256.h"
+#include "link_flow.h"
 
 #include <cstdio>
 #include <cstring>
@@ -136,6 +137,184 @@ static bool recover_qr_text(const QrCode &qr, std::string *out) {
   for (unsigned i = 0; i < n; i++)
     out->push_back(static_cast<char>(take(8)));
   return out->size() == n;
+}
+
+static LinkInputs link_in(uint32_t now, bool wifi = true) {
+  LinkInputs in;
+  in.wifi = wifi;
+  in.now_ms = now;
+  return in;
+}
+
+static void test_link_flow() {
+  // No Wi-Fi: say so, Select opens Wi-Fi setup, and Wi-Fi coming up starts linking.
+  {
+    LinkFlow f;
+    LinkInputs in = link_in(0, false);
+    expect(f.open(in) == LinkAction::None && f.view() == LinkView::NoWifi, "link no wifi view");
+    LinkScreen s = f.screen(in);
+    expect(s.line.find("Set up Wi-Fi first") == 0 && std::string(s.select) == "Wi-Fi", "link no wifi copy");
+    expect(f.button(4, in) == LinkAction::WifiSetup, "link no wifi select opens setup");
+    expect(f.button(1, in) == LinkAction::GoMenu, "link no wifi back to menu");
+    in.wifi = true;
+    in.now_ms = 1000;
+    expect(f.tick(in) == LinkAction::Connect && f.view() == LinkView::Starting, "link wifi up starts");
+  }
+  // Cloud off: turn it on, show the code + QR, then Linked to <owner>, then grow screen.
+  {
+    LinkFlow f;
+    LinkInputs in = link_in(1000);
+    expect(f.open(in) == LinkAction::Connect, "link off connects");
+    expect(f.view() == LinkView::Starting && std::string(f.screen(in).back) == "Cancel", "link starting");
+    in.enabled = true;
+    in.state = CloudState::Connecting;
+    expect(f.tick(in) == LinkAction::None && f.view() == LinkView::Starting, "link connecting waits");
+    in.state = CloudState::PendingClaim;
+    in.code = "AB2C3D";
+    in.secs_left = 899;
+    in.now_ms = 3000;
+    f.tick(in);
+    LinkScreen s = f.screen(in);
+    expect(f.view() == LinkView::Code && s.qr && s.big == "AB2C3D", "link code shows qr and code");
+    expect(s.line == "Scan with your phone while signed in", "link code hint");
+    expect(s.title == "Link  15 min", "link code minutes");
+    expect(f.button(2, in) == LinkAction::None && f.button(3, in) == LinkAction::None &&
+               f.button(4, in) == LinkAction::None && f.view() == LinkView::Code,
+           "link code ignores other buttons");
+    in.state = CloudState::Issuing;
+    f.tick(in);
+    expect(f.view() == LinkView::Finishing, "link issuing");
+    expect(f.button(1, in) == LinkAction::GoMenu && f.view() == LinkView::Finishing,
+           "link back while finishing keeps linking");
+    in.state = CloudState::Linked;
+    in.linked = true;
+    in.owner = "Mike M";
+    in.now_ms = 10000;
+    f.tick(in);
+    expect(f.view() == LinkView::JustLinked && f.screen(in).line == "Linked to Mike M", "link done names owner");
+    in.now_ms = 10000 + LINK_DONE_MS - 1;
+    expect(f.tick(in) == LinkAction::None, "link done holds");
+    in.now_ms = 10000 + LINK_DONE_MS;
+    expect(f.tick(in) == LinkAction::GoGrow && f.view() == LinkView::Linked, "link done goes to grow");
+  }
+  // Already linked: status plus Unlink with confirm.
+  {
+    LinkFlow f;
+    LinkInputs in = link_in(0);
+    in.enabled = true;
+    in.linked = true;
+    in.state = CloudState::Linked;
+    expect(f.open(in) == LinkAction::None && f.view() == LinkView::Linked, "link already linked");
+    LinkScreen s = f.screen(in);
+    expect(s.big == "Linked" && std::string(s.select) == "Unlink" && !s.qr, "link linked copy");
+    expect(f.button(4, in) == LinkAction::None && f.view() == LinkView::ConfirmUnlink, "link unlink asks");
+    expect(std::string(f.screen(in).back) == "Keep", "link confirm keep");
+    expect(f.button(1, in) == LinkAction::None && f.view() == LinkView::Linked, "link confirm back keeps link");
+    f.button(4, in);
+    expect(f.button(4, in) == LinkAction::Disconnect && f.view() == LinkView::Unlinking, "link unlink confirmed");
+    in.wiping = true;
+    f.tick(in);
+    expect(f.view() == LinkView::Unlinking, "link unlinking waits");
+    in.wiping = false;
+    in.linked = false;
+    in.enabled = false;
+    in.state = CloudState::Off;
+    in.now_ms = 5000;
+    f.tick(in);
+    expect(f.view() == LinkView::Unlinked, "link unlinked");
+    in.now_ms = 5000 + LINK_NOTE_MS;
+    expect(f.tick(in) == LinkAction::GoGrow, "link unlinked goes to grow");
+  }
+  // Cancel while the code shows: turn the cloud back off, say not linked, back to menu.
+  {
+    LinkFlow f;
+    LinkInputs in = link_in(0);
+    f.open(in);
+    in.enabled = true;
+    in.state = CloudState::PendingClaim;
+    in.code = "AB2C3D";
+    f.tick(in);
+    expect(f.button(1, in) == LinkAction::Disconnect && f.view() == LinkView::Canceled, "link cancel disconnects");
+    expect(f.screen(in).line == "Not linked.", "link cancel copy");
+    in.now_ms = LINK_NOTE_MS;
+    expect(f.tick(in) == LinkAction::GoMenu, "link cancel back to menu");
+  }
+  // Timeout: stop polling and say so; Select tries again once the wipe is done.
+  {
+    LinkFlow f;
+    LinkInputs in = link_in(100);
+    f.open(in);
+    in.enabled = true;
+    in.state = CloudState::PendingClaim;
+    in.code = "AB2C3D";
+    in.now_ms = 100 + LINK_SESSION_MS - 1;
+    expect(f.tick(in) == LinkAction::None && f.view() == LinkView::Code, "link before timeout");
+    in.now_ms = 100 + LINK_SESSION_MS;
+    expect(f.tick(in) == LinkAction::Disconnect && f.view() == LinkView::TimedOut, "link timeout stops");
+    expect(f.screen(in).big == "Timed out" && std::string(f.screen(in).select) == "Retry", "link timeout copy");
+    in.wiping = true;
+    in.code.clear();
+    expect(f.button(4, in) == LinkAction::None && f.view() == LinkView::Starting, "link retry waits for wipe");
+    in.wiping = false;
+    in.enabled = false;
+    in.state = CloudState::Off;
+    expect(f.tick(in) == LinkAction::Connect, "link retry connects after wipe");
+  }
+  // Opened from the web page with a live code: show it, do not mint a new one.
+  {
+    LinkFlow f;
+    LinkInputs in = link_in(0);
+    in.enabled = true;
+    in.state = CloudState::PendingClaim;
+    in.code = "ZZ2C3D";
+    expect(f.open(in) == LinkAction::None && f.view() == LinkView::Code, "link keeps live code");
+    in.code.clear();
+    in.state = CloudState::Revoked;
+    LinkFlow g;
+    expect(g.open(in) == LinkAction::Refresh, "link revoked refreshes");
+  }
+  // Owned by another account: explain, no retry loop.
+  {
+    LinkFlow f;
+    LinkInputs in = link_in(0);
+    in.enabled = true;
+    in.state = CloudState::Owned;
+    f.open(in);
+    f.tick(in);
+    expect(f.view() == LinkView::Problem && f.screen(in).line.find("another account") != std::string::npos,
+           "link owned copy");
+    expect(f.button(4, in) == LinkAction::None, "link owned no retry");
+    in.state = CloudState::Error;
+    f.tick(in);
+    expect(f.button(4, in) == LinkAction::Refresh && f.view() == LinkView::Starting, "link error retry refreshes");
+  }
+  expect(link_owner_line("") == "Linked to your account", "owner fallback");
+  expect(link_owner_line("a@b.co") == "Linked to your account", "owner never email");
+  expect(link_owner_line(std::string(40, 'x')).size() == std::string("Linked to ").size() + 20, "owner capped");
+  // Every screen fits: code-side text wraps in 182 px of 6 px glyphs, hero line in 284 px.
+  for (int v = 0; v <= static_cast<int>(LinkView::Problem); v++) {
+    for (CloudState st : {CloudState::Owned, CloudState::WaitClaim, CloudState::Error}) {
+      struct Peek : LinkFlow {
+        void set(LinkView x) { view_ = x; }
+      } p;
+      p.set(static_cast<LinkView>(v));
+      LinkInputs in = link_in(0);
+      in.state = st;
+      in.code = "AB2C3D";
+      in.owner = std::string(20, 'm');
+      LinkScreen s = p.screen(in);
+      size_t line = 0, widest = 0;
+      for (char c : s.line) {
+        line = c == '\n' ? 0 : line + 1;
+        widest = widest > line ? widest : line;
+      }
+      const bool lines_ok = s.qr || widest * 6 <= 182 || s.line == "Scan with your phone while signed in";
+      expect(lines_ok && s.big.size() * 24 <= (s.qr ? 180u : 284u) && s.title.size() * 12 <= 170 &&
+                 std::strlen(s.back) * 6 <= 70 && std::strlen(s.select) * 6 <= 68 &&
+                 s.line.find('\'') == std::string::npos,
+             "link screen fits");
+    }
+  }
 }
 
 int main() {
@@ -544,7 +723,7 @@ int main() {
       "shroomlabs.io/claim.html?code=AB2C3D\",\"claim_expires_at\":\"2099-01-01T00:00:00Z\"}";
   const char *cert_ok =
       "{\"certificate\":\"-----BEGIN CERTIFICATE-----\\nMIIB\\n-----END CERTIFICATE-----\\n\",\"serial\":\"aa\","
-      "\"rotate_after_ms\":302400000,\"not_after\":\"2099-01-08T00:00:00Z\"}";
+      "\"rotate_after_ms\":302400000,\"not_after\":\"2099-01-08T00:00:00Z\",\"owner_name\":\"Mike M\"}";
 
   HostClock clk;
   HostStore store;
@@ -588,6 +767,8 @@ int main() {
   expect(eng.state() == CloudState::Linked, "engine claimed");
   expect(eng.has_cert(), "engine has cert");
   expect(eng.cert_pem().find("BEGIN CERTIFICATE") != std::string::npos, "engine cert pem");
+  expect(eng.owner_name() == "Mike M", "engine keeps owner name from csr");
+  expect(!eng.wiping(), "engine not wiping when linked");
 
   tr.steps = {{"/rotate", ok_body(429, "{}", true, 120)}};
   tr.i = 0;
@@ -595,6 +776,7 @@ int main() {
   eng.rotate_now();
   expect(eng.state() == CloudState::Linked, "engine rotate 429");
   expect(eng.next_rotate_ms() >= 5000 + 120000, "engine retry-after");
+  expect(eng.owner_name() == "Mike M", "engine owner name survives rotate retry");
 
   tr.steps = {{"/rotate", ok_body(503, "{}")}};
   tr.i = 0;
@@ -2159,5 +2341,6 @@ int main() {
              setpoint_object_id("target_humidity") && !setpoint_object_id("fan"),
          "setpoint ids");
 
+  test_link_flow();
   return fails ? 1 : 0;
 }

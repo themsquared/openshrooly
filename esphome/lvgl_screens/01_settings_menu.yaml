@@ -12,50 +12,50 @@
         text_font: font1
 
     - label:
-        id: menu_temp_item
-        text: "> Temperature"
+        id: menu_cloud_item
+        text: "> Link this device"
         align: TOP_LEFT
         x: 10
         y: 18
+        text_font: font1
+    - label:
+        id: menu_temp_item
+        text: "  Temperature"
+        align: TOP_LEFT
+        x: 10
+        y: 30
         text_font: font1
     - label:
         id: menu_humidity_item
         text: "  Humidity"
         align: TOP_LEFT
         x: 10
-        y: 30
+        y: 42
         text_font: font1
     - label:
         id: menu_light_item
         text: "  Lighting"
         align: TOP_LEFT
         x: 10
-        y: 42
+        y: 54
         text_font: font1
     - label:
         id: menu_air_item
         text: "  Air Exchange"
         align: TOP_LEFT
         x: 10
-        y: 54
+        y: 66
         text_font: font1
     - label:
         id: menu_water_item
         text: "  Water Calibration"
         align: TOP_LEFT
         x: 10
-        y: 66
+        y: 78
         text_font: font1
     - label:
         id: menu_system_item
         text: "  System"
-        align: TOP_LEFT
-        x: 10
-        y: 78
-        text_font: font1
-    - label:
-        id: menu_cloud_item
-        text: "  Cloud"
         align: TOP_LEFT
         x: 10
         y: 90
