@@ -1380,6 +1380,7 @@ export const PAGES = {
   "publish.html": { active: "", path: "/publish", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Build a mushroom grow profile for your chambers, or send it to the Shroom Labs library." },
   "admin.html": { active: "", path: "/admin", robots: "noindex,nofollow", analytics: false, title: "Admin · Shroom Labs", description: "Private Shroom Labs admin page for accounts, chambers, activations, and spend." },
   "moderate.html": { active: "", path: "/moderate", robots: "noindex,nofollow", analytics: false, title: "Review queue · Shroom Labs", description: "Moderator queue for community mushroom grow profiles." },
+  "feed.html": { active: "", path: "/feed", robots: PRIVATE, title: "Grow feed · Shroom Labs", description: "Progress photos and short notes from people growing culinary mushrooms with Shroom Labs profiles." },
   "profile.html": { active: "profiles", path: "/profile", robots: PRIVATE, analytics: false, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
   "legacy-preview.html": { active: "", path: "/legacy-preview", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
   "account/feedback.html": { active: "", path: "/account/feedback", robots: "noindex,nofollow", title: "Beta feedback · Shroom Labs", description: "Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one." },

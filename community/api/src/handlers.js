@@ -36,6 +36,7 @@ import { handleLive } from "./live.js";
 import { handleReview } from "./review-http.js";
 import { readJsonLimited } from "./http-body.js";
 import { canSeeMedia, getMedia, mediaApiUrl, mediaApproved } from "./media-acl.js";
+import { feedMediaHeaders, handleFeed } from "./feed.js";
 import {
   canSeeProfile,
   getReview,
@@ -314,6 +315,8 @@ async function route(method, path, url, request, env) {
   if (alertsResponse) return alertsResponse;
   const accountResponse = await handleAccount(method, path, url, request, env);
   if (accountResponse) return accountResponse;
+  const feedResponse = await handleFeed(method, path, url, request, env);
+  if (feedResponse) return feedResponse;
   const reviewResponse = await handleReview(method, path, url, request, env, {
     seeds: SEED_DOCS,
     parseProfileRow: parseProfile,
@@ -646,13 +649,15 @@ async function route(method, path, url, request, env) {
     }
     const report = await db.one("SELECT * FROM grow_reports WHERE photo_key=?", [key]);
     if (report && !(await canServeReportPhoto(db, env, viewer, report))) return json({ error: "not found" }, 404);
+    const feedPost = await feedMediaHeaders(db, key);
+    if (feedPost.gone) return json({ error: "not found" }, 404);
     const headers = {
       "content-type": PHOTO_TYPES[kind],
       "x-content-type-options": "nosniff",
       "content-disposition": `inline; filename="${mediaFilename(kind)}"`,
       "content-security-policy": "default-src 'none'",
     };
-    if (!mediaApproved(row) || (report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery))) {
+    if (!mediaApproved(row) || (report && !reportPhotoApproved(report)) || (gallery && !photoIsPublic(gallery)) || feedPost.private) {
       headers["cache-control"] = "private, no-store";
     }
     return new Response(bytes, { headers });
