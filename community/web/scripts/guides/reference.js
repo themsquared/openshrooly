@@ -133,7 +133,7 @@ const app = {
     {
       h2: "What is happening with the Shrooly app?",
       html: `<p>The original Shrooly chamber talks to a phone app over Bluetooth, and owners report the app needs a working connection to the company's servers to start a grow program. From August 2025, posts from owners describe the same things: the app will not log in, it says there is no internet connection when there is, pods cannot be ordered, and support emails go unanswered. The ${OPEN} project site says the company appears to have gone out of business.</p>
-<p>Shroom Labs is not part of the company that made Shrooly devices and has no inside information. We only know what owners report and what we see in public.</p>`,
+<p>Shroom Labs is not part of the company that made Shrooly devices and has no inside information. We only know what owners report and what we see in public. The dated facts, with sources, are on <a href="/what-happened-to-shrooly">what happened to the Shrooly app and company</a>.</p>`,
     },
     {
       h2: "What should you check first?",
@@ -159,7 +159,7 @@ const app = {
 <li>Run the installer, from the OpenShrooly site or from the <a href="/install">Shroom Labs install page</a>, which offers releases signed by Shroom Labs when one is published.</li>
 <li>Join the chamber to your Wi-Fi and open its page in a browser.</li>
 </ol>
-<p>Read the <a href="/docs">Shroom Labs docs</a> for how profiles, the Hub, and the chamber fit together.</p>`,
+<p>For what you get, what it costs, and how to go back, read <a href="/reuse-your-shrooly">reuse your Shrooly chamber</a>. Read the <a href="/docs">Shroom Labs docs</a> for how profiles, the Hub, and the chamber fit together.</p>`,
     },
     {
       h2: "What settings should you use once it runs?",
@@ -195,6 +195,8 @@ const app = {
     },
   ],
   related: [
+    ["Reuse your Shrooly chamber", "/reuse-your-shrooly"],
+    ["Shrooly app and device FAQ", "/shrooly-faq"],
     ["Grow kit vs monotub vs smart chamber", "/guides/grow-kit-vs-monotub-vs-smart-chamber"],
     ["Easiest mushrooms to grow at home", "/guides/easiest-mushrooms-to-grow"],
     ["Conditions for every species", "/grow"],
