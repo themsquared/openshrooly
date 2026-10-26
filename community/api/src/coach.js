@@ -13,6 +13,8 @@ import {
 import { requireVerified, userFromRequest } from "./auth.js";
 import { ValidationError, isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { createModelProvider } from "./coach-models.js";
+import { startCheckout } from "./payments.js";
+import { coachPriceId } from "./stripe.js";
 import {
   comingSoonBody,
   capabilities,
@@ -42,7 +44,30 @@ import {
 
 export const CHAT_CAP = 40;
 export const PHOTO_CAP = 8;
-export const NEURON_CAP = 80000;
+/**
+ * Cost caps in Workers AI neurons ($0.011 per 1,000). A chat is about 10 neurons and a photo check
+ * about 25, so these never bite normal use. They stop a runaway client from costing real money.
+ * Per user: 3,000 a day and 20,000 a month (about $0.22 a month, well under the plan price).
+ * Everyone together: 100,000 a day (about $1.10). All four are overridable with env vars.
+ */
+export const NEURON_CAP = 3000;
+export const MONTHLY_NEURON_CAP = 20000;
+export const GLOBAL_DAILY_NEURON_CAP = 100000;
+
+function envInt(env, name, fallback) {
+  const n = Number.parseInt(String(env?.[name] ?? ""), 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+export function coachCaps(env = {}) {
+  return {
+    chats: envInt(env, "COACH_DAILY_CHATS", CHAT_CAP),
+    photos: envInt(env, "COACH_DAILY_PHOTOS", PHOTO_CAP),
+    neurons: envInt(env, "COACH_DAILY_NEURONS", NEURON_CAP),
+    monthly_neurons: envInt(env, "COACH_MONTHLY_NEURONS", MONTHLY_NEURON_CAP),
+    global_daily_neurons: envInt(env, "COACH_GLOBAL_DAILY_NEURONS", GLOBAL_DAILY_NEURON_CAP),
+  };
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -72,9 +97,8 @@ export function coachBetaAccess(env, user) {
 export async function hasPaidCoach(db, user) {
   if (!user) return false;
   const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
-  if (sub && sub.status === "active" && sub.period_end >= nowIso()) return true;
-  const row = await db.one("SELECT * FROM entitlements WHERE user_id=? AND item_id=?", [user.id, COACH_ITEM]);
-  return Boolean(row);
+  // The subscription row is the only source of truth, so a cancel takes access away.
+  return Boolean(sub && sub.status === "active" && sub.period_end >= nowIso());
 }
 
 export async function hasGrowCoach(db, user, env = {}) {
@@ -130,11 +154,25 @@ async function bumpUsage(db, userId, field, neurons = 0) {
   return next;
 }
 
-async function assertCap(db, userId, field) {
+async function sumNeurons(db, sql, params) {
+  const row = await db.one(sql, params);
+  return Number(row?.n || 0);
+}
+
+async function assertCap(db, env, userId, field) {
+  const caps = coachCaps(env);
   const row = await usageRow(db, userId);
-  if (Number(row.neurons || 0) >= NEURON_CAP) throw new ValidationError("daily Coach neuron cap reached", 429);
-  if (field === "chats" && Number(row.chats || 0) >= CHAT_CAP) throw new ValidationError("daily chat cap reached (40)", 429);
-  if (field === "photos" && Number(row.photos || 0) >= PHOTO_CAP) throw new ValidationError("daily photo-check cap reached (8)", 429);
+  if (Number(row.neurons || 0) >= caps.neurons) throw new ValidationError("You have used today's Grow Coach allowance. It resets at midnight UTC.", 429);
+  if (field === "chats" && Number(row.chats || 0) >= caps.chats) throw new ValidationError(`You have asked ${caps.chats} questions today. Grow Coach resets at midnight UTC.`, 429);
+  if (field === "photos" && Number(row.photos || 0) >= caps.photos) throw new ValidationError(`You have checked ${caps.photos} photos today. Grow Coach resets at midnight UTC.`, 429);
+  const month = row.day.slice(0, 7);
+  const monthly = await sumNeurons(db, "SELECT SUM(neurons) AS n FROM coach_usage WHERE user_id=? AND day>=?", [userId, `${month}-01`]);
+  if (monthly >= caps.monthly_neurons) throw new ValidationError("You have used this month's Grow Coach allowance. It resets on the 1st.", 429);
+  const everyone = await sumNeurons(db, "SELECT SUM(neurons) AS n FROM coach_usage WHERE day=?", [row.day]);
+  if (everyone >= caps.global_daily_neurons) {
+    console.error(JSON.stringify({ at: "coach.budget", day: row.day, neurons: everyone, cap: caps.global_daily_neurons }));
+    throw new ValidationError("Grow Coach is very busy today. Try again tomorrow.", 503);
+  }
 }
 
 async function cacheGet(db, key) {
@@ -302,27 +340,25 @@ export async function handleCoach(method, path, url, request, env) {
       if (!(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
       return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }
-    const sessionId = `cs_test_${randomToken().slice(0, 16)}`;
-    await db.run(
-      "INSERT INTO checkouts (id, user_id, item_id, provider, status, amount_cents, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        sessionId,
-        user.id,
-        COACH_ITEM,
-        "stripe",
-        "requires_payment",
-        COACH_PRICE_CENTS,
-        JSON.stringify({ item_type: "subscription", note: "Culinary Grow Coach only." }),
-        nowIso(),
-      ]
-    );
-    return json({
-      id: sessionId,
-      provider: "stripe",
-      amount_cents: COACH_PRICE_CENTS,
-      item_id: COACH_ITEM,
-      checkout_url: devStubsEnabled(env, request) ? `/pay/stub/${sessionId}` : null,
+    if (paymentsConfigured(env) && !coachPriceId(env) && !devStubsEnabled(env, request)) {
+      return json({ error: "Grow Coach checkout opens soon.", coming_soon: true }, 503);
+    }
+    if (await hasPaidCoach(db, user)) {
+      return json({ error: "You already have Grow Coach. Manage it from your account page.", already_active: true }, 409);
+    }
+    const session = await startCheckout(db, env, request, {
+      user,
+      itemId: COACH_ITEM,
+      amountCents: COACH_PRICE_CENTS,
+      details: { item_type: "subscription", note: "Culinary Grow Coach only." },
+      mode: "subscription",
+      priceId: coachPriceId(env),
+      name: "Grow Coach",
+      successPath: "/account.html?checkout=success#billing",
+      cancelPath: "/coach.html?checkout=cancel",
     });
+    if (!session.ok) return json({ error: session.error, coming_soon: session.status === 503 }, session.status || 503);
+    return json(session);
   }
 
   if (method === "POST" && path === "/api/coach/complete-entitlement") {
@@ -443,7 +479,7 @@ export async function handleCoach(method, path, url, request, env) {
     if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
       throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
     }
-    await assertCap(db, user.id, "chats");
+    await assertCap(db, env, user.id, "chats");
     const grounding = await loadGrounding(db, user, body.device_id, body.profile_id);
     const cacheKey = await sha256Hex(`chat:${user.id}:${body.device_id || ""}:${body.profile_id || ""}:${body.message || ""}`);
     const hit = await cacheGet(db, cacheKey);
@@ -472,7 +508,7 @@ export async function handleCoach(method, path, url, request, env) {
       chats: Number(row.chats || 0),
       photos: Number(row.photos || 0),
       neurons: Number(row.neurons || 0),
-      caps: { chats: CHAT_CAP, photos: PHOTO_CAP, neurons: NEURON_CAP },
+      caps: (({ chats, photos, neurons, monthly_neurons }) => ({ chats, photos, neurons, monthly_neurons }))(coachCaps(env)),
     });
   }
 
@@ -482,7 +518,7 @@ export async function handleCoach(method, path, url, request, env) {
     if (refuseRestrictedPack({ pack: body.pack, tags: body.tags })) {
       throw new ValidationError("Grow Coach does not discuss off-menu varieties.", 400);
     }
-    await assertCap(db, user.id, "photos");
+    await assertCap(db, env, user.id, "photos");
     if (!body.photo_base64) throw new ValidationError("photo_base64 required");
     const photo = sanitizeGrowPhoto(decodePhotoBase64(body.photo_base64));
     const caps = capabilities(env, request);
@@ -519,18 +555,16 @@ export async function handleCoach(method, path, url, request, env) {
   return null;
 }
 
-export async function activateCoachSub(db, userId, { replaySafe = false } = {}) {
+/**
+ * Turn Grow Coach on until periodEnd (default: one period from now). replaySafe keeps an
+ * active plan as is, so a repeated checkout event never moves the end date.
+ */
+export async function activateCoachSub(db, userId, { replaySafe = false, periodEnd: explicitEnd = "" } = {}) {
   const existing = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [userId]);
   if (replaySafe && existing && existing.status === "active" && existing.period_end >= nowIso()) {
-    await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
-      userId,
-      COACH_ITEM,
-      "subscription",
-      nowIso(),
-    ]);
     return existing.period_end;
   }
-  const periodEnd = laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
+  const periodEnd = explicitEnd || laterIso(COACH_PERIOD_DAYS * 24 * 3600 * 1000);
   if (existing) {
     await db.run("UPDATE coach_subs SET status=?, period_end=? WHERE user_id=?", ["active", periodEnd, userId]);
   } else {
@@ -542,11 +576,5 @@ export async function activateCoachSub(db, userId, { replaySafe = false } = {}) 
       nowIso(),
     ]);
   }
-  await db.run("INSERT OR IGNORE INTO entitlements (user_id, item_id, item_type, granted_at) VALUES (?, ?, ?, ?)", [
-    userId,
-    COACH_ITEM,
-    "subscription",
-    nowIso(),
-  ]);
   return periodEnd;
 }

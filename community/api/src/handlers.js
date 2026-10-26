@@ -22,8 +22,8 @@ import { handleAccount } from "./account.js";
 import { coachBetaAccess, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { coachAutopilotAvailable } from "./coach-autopilot.js";
-import { applyStripeEvent, parseStripeEvent, startCheckout } from "./payments.js";
-import { capabilities } from "./providers.js";
+import { applyStripeEvent, coachCustomerFor, openBillingPortal, parseStripeEvent, startCheckout } from "./payments.js";
+import { capabilities, paymentsConfigured } from "./providers.js";
 import { corsAllowlist, originAllowed, rateLimit, rateLimitClient, securityHeaders, verifyPaymentWebhook } from "./security.js";
 import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
@@ -353,6 +353,8 @@ async function route(method, path, url, request, env) {
             product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, pack: "culinary" },
           }
         : { available: false },
+      // Show "Manage billing" only to people Stripe knows about.
+      billing_portal: paymentsConfigured(env) && Boolean(await coachCustomerFor(db, user.id)),
       disclosure: DISCLOSURE,
     });
   }
@@ -535,10 +537,13 @@ async function route(method, path, url, request, env) {
     const allowed = profile.allowed_payment_providers || [];
     if (!allowed.includes("stripe")) throw new ValidationError("no configured payment provider in " + allowed);
     const session = await startCheckout(db, env, request, {
-      userId: user.id,
+      user,
       itemId: profile.id,
       amountCents: profile.pricing.amount_cents,
       details: { note: "Culinary checkout." },
+      name: profile.name || "Grow profile",
+      successPath: `/profile.html?id=${encodeURIComponent(checkoutRow.id)}&checkout=success`,
+      cancelPath: `/profile.html?id=${encodeURIComponent(checkoutRow.id)}&checkout=cancel`,
     });
     if (!session.ok) return json({ error: session.error, coming_soon: true }, session.status || 503);
     return json(session);
@@ -559,6 +564,14 @@ async function route(method, path, url, request, env) {
     if (!event) throw new ValidationError("Stripe event object required");
     const result = await applyStripeEvent(db, event);
     return json({ ok: true, provider: "stripe", ...result });
+  }
+
+  if (method === "POST" && path === "/api/billing/portal") {
+    const user = await userFromAuth(request, db);
+    if (!user) return json({ error: "sign in required" }, 401);
+    const portal = await openBillingPortal(db, env, user);
+    if (!portal.ok) return json({ error: portal.error }, portal.status || 503);
+    return json({ url: portal.url });
   }
 
   if (method === "GET" && path === "/api/guides") {

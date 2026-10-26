@@ -63,6 +63,9 @@ GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 # Cloud Autopilot (no [ai] needed). Only beta users can arm it; COACH_PUBLIC stays unset so Coach stays hidden.
 COACH_AUTOPILOT_ENABLED = "1"
 COACH_BETA_USER_IDS = "82"
+# Coach cost caps default in code (src/coach.js coachCaps): per user 40 chats, 8 photos, 3000 neurons a day,
+# 20000 neurons a month; everyone 100000 neurons a day. To change one, add it here as a var, e.g.
+# COACH_MONTHLY_NEURONS = "20000"  (also COACH_DAILY_NEURONS, COACH_DAILY_CHATS, COACH_DAILY_PHOTOS, COACH_GLOBAL_DAILY_NEURONS)
 
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
 [triggers]
@@ -74,7 +77,10 @@ custom_domain = true
 
 # Secrets (do not put live payment keys here):
 #   npx wrangler secret put COMMUNITY_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put STRIPE_SECRET_KEY -c wrangler.deploy.toml
 #   npx wrangler secret put PAYMENTS_WEBHOOK_SECRET -c wrangler.deploy.toml
+#   npx wrangler secret put STRIPE_PRICE_COACH -c wrangler.deploy.toml   (price_ id, not secret, kept here so no deploy is needed)
+# Checkout stays "coming soon" until the first two are set. See docs/PAYMENTS.md.
 #   npx wrangler secret put TOTP_ENC_KEY -c wrangler.deploy.toml
 #   npx wrangler secret put TURNSTILE_SECRET_KEY -c wrangler.deploy.toml
 #   npx wrangler secret put CF_API_TOKEN -c wrangler.deploy.toml

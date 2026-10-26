@@ -757,6 +757,16 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM checkouts WHERE id=")) {
     return tables.checkouts.filter((c) => c.id === params[0]);
   }
+  if (q.startsWith("UPDATE checkouts SET details=")) {
+    const row = tables.checkouts.find((c) => c.id === params[1]);
+    if (row) row.details = params[0];
+    return {};
+  }
+  if (q.startsWith("SELECT * FROM checkouts WHERE user_id=? AND item_id=? AND status=")) {
+    return tables.checkouts
+      .filter((c) => Number(c.user_id) === Number(params[0]) && c.item_id === params[1] && c.status === params[2])
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  }
   if (q.startsWith("UPDATE checkouts SET status=")) {
     const row = tables.checkouts.find((c) => c.id === params[1]);
     if (row) row.status = params[0];
@@ -1123,6 +1133,14 @@ function dispatch(mode, tables, ids, sql, params) {
       neurons: params[4] ?? 0,
     });
     return {};
+  }
+  if (q.startsWith("SELECT SUM(neurons) AS n FROM coach_usage WHERE user_id=? AND day>=")) {
+    const rows = tables.coach_usage.filter((u) => Number(u.user_id) === Number(params[0]) && u.day >= params[1]);
+    return [{ n: rows.reduce((sum, u) => sum + Number(u.neurons || 0), 0) }];
+  }
+  if (q.startsWith("SELECT SUM(neurons) AS n FROM coach_usage WHERE day=")) {
+    const rows = tables.coach_usage.filter((u) => u.day === params[0]);
+    return [{ n: rows.reduce((sum, u) => sum + Number(u.neurons || 0), 0) }];
   }
   if (q.startsWith("SELECT * FROM coach_usage WHERE user_id=? AND day=")) {
     return tables.coach_usage.filter((u) => Number(u.user_id) === Number(params[0]) && u.day === params[1]);

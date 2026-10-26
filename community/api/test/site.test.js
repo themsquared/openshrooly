@@ -237,3 +237,14 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
   }
 });
+
+test("checkout buttons send people only to Stripe or this site, and say so when they come back", () => {
+  const app = read("js/app.js");
+  const assigns = [...app.matchAll(/location\.assign\(([^)]*)\)/g)].map((m) => m[1].trim());
+  assert.deepEqual(assigns, ["target"], "the only redirect goes through safeCheckoutUrl");
+  assert.match(app, /const target = safeCheckoutUrl\(/);
+  assert.match(app, /parsed\.hostname === "checkout\.stripe\.com" \|\| parsed\.hostname === "billing\.stripe\.com"/);
+  assert.match(app, /Checkout canceled\. Nothing was charged\./);
+  assert.match(read("account.html"), /id="billing-portal" class="secondary hidden"/);
+  assert.match(read("profile.html"), /id="buy">Buy recipe</);
+});
