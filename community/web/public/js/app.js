@@ -1238,6 +1238,11 @@ function renderCoachPlans(product) {
 
 async function renderCoach() {
   if (await consumeLocalSignIn()) return;
+  // The static page is the signed-out pitch (what search engines index). Signed-in visitors wait on a skeleton instead.
+  if (isSignedIn()) {
+    for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.add("hidden");
+    $("#coach-skeleton")?.classList.remove("hidden");
+  }
   const catalog = await api("/api/coach").catch((err) => {
     showCoachError(err);
     return null;
@@ -1255,7 +1260,7 @@ async function renderCoach() {
     await renderCoachDashboard(catalog);
     return;
   }
-  $("#coach-hero")?.classList.remove("hidden");
+  for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.remove("hidden");
   $("#gated")?.classList.add("hidden");
   $("#coach-status").textContent = view === "waitlist" ? catalog.marketing : "";
   // Only say "free" to people who might get it: signed out, or no chamber linked yet.
@@ -1302,7 +1307,7 @@ async function renderCoach() {
 
 /** Recommendations, then the decision feed, then chamber status. The photo check and chat show for accounts with AI turned on. */
 async function renderCoachDashboard(catalog) {
-  $("#coach-hero")?.classList.add("hidden");
+  for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.add("hidden");
   $("#gated").classList.remove("hidden");
   // Where the paywall would be: "Free during the beta" plus the price after it, or the paid-through date.
   $("#coach-head-status").textContent = accessText(catalog, catalog.period_end ? fmtDate(catalog.period_end) : "");

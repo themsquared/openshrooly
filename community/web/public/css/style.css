@@ -609,6 +609,9 @@ button.nav-toggle {
 .legal-prominent { padding: 1rem 1.15rem; border-width: 1.5px; margin: 0 0 1.2rem; }
 .supplies { margin-top: 2.4rem; }
 .coach-hero { min-height: 280px; }
+.coach-pitch { max-width: 44rem; margin: 2rem auto 0; padding: 0 1.2rem; }
+.coach-steps { padding-left: 1.2rem; display: grid; gap: 0.8rem; }
+.coach-steps li { line-height: 1.5; }
 .coach-toolbar {
   display: flex;
   gap: 1rem;
