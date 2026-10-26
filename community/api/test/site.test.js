@@ -236,7 +236,8 @@ test("Grow Coach is hidden by default on every static page", () => {
     // No Coach link in static chrome. app.js inserts it only when /api/me says grow_coach.available.
     const navs = (html.match(/<nav[\s\S]*?<\/nav>/g) || []).join("");
     assert.doesNotMatch(navs, /nav-coach|data-coach-link|Grow Coach|href="\/coach"/, `${file} has a static Coach link`);
-    assert.doesNotMatch(html, /\$[34]\.99|[34]\.99 (a|per) month|\$49 (a|per) year|\$49\/yr/, `${file} prices Coach`);
+    // The terms have to state the plan price and renewal. Every other static page stays price free.
+    if (file !== "tos.html") assert.doesNotMatch(html, /\$[34]\.99|[34]\.99 (a|per) month|\$49 (a|per) year|\$49\/yr/, `${file} prices Coach`);
     if (file === "coach.html") continue;
     // The terms and privacy policy must describe the Grow Coach plan and what it does with data
     // (Stripe asks for both). They name it in text but never link to it.
