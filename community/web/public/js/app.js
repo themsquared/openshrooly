@@ -233,15 +233,45 @@ async function renderHome() {
   const supplies = $("#supplies");
   if (supplies) supplies.classList.toggle("hidden", off);
   setCoachOffMenu(off);
+  setGetStarted();
   const profiles = await api(`/api/profiles?pack=${encodeURIComponent(pack)}&q=${encodeURIComponent(q)}`);
+  // First visit: show a handful of cards and one button for the rest. A search shows everything.
+  const preview = !q && profiles.length > HOME_PREVIEW_COUNT;
   $("#cards").innerHTML = profiles.length
-    ? renderProfileCards(profiles)
+    ? renderProfileCards(preview ? profiles.slice(0, HOME_PREVIEW_COUNT) : profiles)
     : `<div class="empty-library">
         <svg class="empty-mark" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg>
         <h2>Nothing in this flush</h2>
         <p>No profiles match that search. Try oyster, lion’s mane, or clear the query.</p>
         <a class="button ghost" href="/?pack=${encodeURIComponent(pack)}#library">Clear search</a>
       </div>`;
+  const row = $("#see-all-row");
+  const btn = $("#see-all");
+  if (row && btn) {
+    row.classList.toggle("hidden", !preview);
+    btn.textContent = `See all ${profiles.length}`;
+    btn.onclick = () => {
+      $("#cards").innerHTML = renderProfileCards(profiles);
+      row.classList.add("hidden");
+    };
+  }
+}
+
+const HOME_PREVIEW_COUNT = 6;
+
+/** "Get started" goes to install for newcomers, and to their chambers once they have one linked. */
+function setGetStarted() {
+  const cta = $("#get-started");
+  if (!cta || cta.dataset.ready || !isSignedIn()) return;
+  cta.dataset.ready = "1";
+  loadDeviceList()
+    .then((list) => {
+      const linked = (list?.devices || []).filter((d) => d.status !== "revoked");
+      if (!linked.length) return;
+      cta.textContent = "Open my chambers";
+      cta.href = "/devices.html";
+    })
+    .catch(() => {});
 }
 
 /** "Grow this" on a profile page: send the profile to a chamber, starting at day 1. */
@@ -1053,6 +1083,11 @@ async function consumeLocalSignIn() {
   return true;
 }
 
+function coachPriceText(product) {
+  const cents = Number(product?.amount_cents);
+  return Number.isFinite(cents) && cents > 0 ? `$${(cents / 100).toFixed(2)}` : "$3.99";
+}
+
 async function renderCoach() {
   if (await consumeLocalSignIn()) return;
   const catalog = await api("/api/coach").catch((err) => {
@@ -1079,9 +1114,13 @@ async function renderCoach() {
     $("#gated")?.classList.add("hidden");
     return;
   }
+  // Sales view: one price, one button, three bullets, cancel anytime.
+  const price = coachPriceText(catalog.product);
+  $("#coach-price").textContent = price;
+  $("#subscribe").textContent = `Start Grow Coach, ${price}/mo`;
+  $("#coach-status").textContent = "";
   if (!isSignedIn()) {
     $("#subscribe-panel").classList.remove("hidden");
-    $("#subscribe").textContent = "Sign in to subscribe";
     $("#subscribe").addEventListener("click", () => {
       location.href = `/login.html?next=${encodeURIComponent("/coach.html")}`;
     });
