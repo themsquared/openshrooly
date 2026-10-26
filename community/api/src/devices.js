@@ -35,6 +35,22 @@ export const ROTATE_AFTER_MS = 3.5 * 24 * 3600 * 1000;
 export const CLAIM_MS = 15 * 60 * 1000;
 export const CLAIM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const CF_CERT_SOFT_CAP = 90;
+/** Open beta: at most this many linked chambers (owned, claimed or active). Set BETA_LINK_CAP to change it. */
+export const BETA_LINK_CAP = 50;
+
+export function betaLinkCap(env = {}) {
+  const raw = env.BETA_LINK_CAP;
+  if (raw === undefined || raw === null || String(raw).trim() === "") return BETA_LINK_CAP;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : BETA_LINK_CAP;
+}
+
+export async function countLinkedDevices(db) {
+  const row = await db.one(
+    "SELECT COUNT(*) AS n FROM cloud_devices WHERE owner_id IS NOT NULL AND status IN ('claimed','active')"
+  );
+  return Number(row?.n || 0);
+}
 export const NONCE_MS = 2 * 60 * 1000;
 export const NONCE_OUTSTANDING_MAX = 8;
 export const MAX_DEVICE_BODY = 16 * 1024;
@@ -574,6 +590,9 @@ export async function handleDevices(method, path, url, request, env) {
     if (row.status === "revoked") throw new ValidationError("device revoked. Start a re-claim on the chamber", 409);
     if (row.owner_id && Number(row.owner_id) !== Number(user.id)) {
       throw new ValidationError("device already claimed. Revoke it or use reclaim", 409, "already_claimed");
+    }
+    if (!row.owner_id && (await countLinkedDevices(db)) >= betaLinkCap(env)) {
+      throw new ValidationError("The beta is full right now. Join the waitlist and we will email you when a spot opens.", 403, "beta_full");
     }
     await db.run("UPDATE cloud_devices SET owner_id=?, status=?, claim_code_hash=? WHERE id=?", [
       user.id,

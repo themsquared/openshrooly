@@ -62,7 +62,12 @@ test("claim page explains pairing and hides the code form until a code or flag",
   const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
   assert.match(main, /<h1[^>]*>Link your chamber<\/h1>/);
   assert.match(main, /How linking works/);
-  assert.match(main, /opens soon/);
+  // Open beta: a Beta label with a feedback link, and a waitlist for when the beta is full.
+  assert.doesNotMatch(main, /opens soon/);
+  assert.match(main, /class="beta-badge">Beta</);
+  assert.match(main, /href="\/account\/feedback"/);
+  assert.match(main, /id="beta-full"[^>]*class="[^"]*\bhidden\b/);
+  assert.match(main, /name="beta-waitlist"[^>]*data-netlify="true"/);
   // Plain words only: no firmware or certificate talk on the first screen.
   assert.doesNotMatch(main, /firmware|certificate/i);
   // The code box comes before anything else on the page (top on mobile).
