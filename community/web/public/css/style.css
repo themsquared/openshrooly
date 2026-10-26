@@ -450,6 +450,15 @@ button.secondary, .button.secondary {
   color: var(--sl-ink);
   box-shadow: none;
 }
+button.danger, .button.danger {
+  background: transparent;
+  border-color: var(--sl-bad);
+  color: var(--sl-bad);
+  box-shadow: none;
+}
+button.danger:not(:disabled):hover { background: rgba(255, 107, 107, 0.12); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.danger-zone { border-top: 1px solid var(--sl-line); padding-top: 0.75rem; }
 button.ghost, .button.ghost {
   background: rgba(255,255,255,0.03);
   box-shadow: none;

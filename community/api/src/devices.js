@@ -463,7 +463,7 @@ async function replaceCert(env, db, deviceId, csrPem, request) {
   return issued;
 }
 
-async function revokeDeviceCerts(env, db, deviceId, status = "revoked") {
+export async function revokeDeviceCerts(env, db, deviceId, status = "revoked") {
   const rows = await db.all("SELECT * FROM device_certs WHERE device_id=?", [deviceId]);
   for (const row of rows) {
     if (row.status === "active" || row.status === "superseded") {

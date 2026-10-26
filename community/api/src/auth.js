@@ -71,6 +71,10 @@ function cookie(value, maxAge) {
  * Google uses Lax (top-level GET redirect). Apple form_post is a cross-site POST, so only the
  * Apple start path sets SameSite=None. The session cookie stays Lax. Cleared on callback.
  */
+export function clearSessionCookie() {
+  return cookie("", 0);
+}
+
 function oidcCookie(value, maxAgeMs, sameSite = "Lax") {
   return `${OIDC_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=${sameSite}; Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`;
 }
