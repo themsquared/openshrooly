@@ -268,6 +268,36 @@ GENERAL_WHY = (
 )
 
 
+# Off-menu pages carry no citations. One plain note keeps the validators happy.
+OFF_MENU_WAVELENGTH_NOTE = (
+    "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation, not a measured spectrum."
+)
+OFF_MENU_NOTE = _src(
+    "Chamber default",
+    "Standard light settings mapped to this chamber's white and RGB LEDs. Not a measured "
+    "value for this variety.",
+)
+CUBENSIS_WHY = (
+    "P. cubensis needs light to start pins, and blue light works for that. Colonization is "
+    "dark. Pinning and fruiting get 12 hours a day at 20% white (92 lux on this chamber) "
+    "with 80% blue."
+)
+
+
+def _off_menu_species_why(species: str) -> str:
+    return (
+        f"No light numbers specific to {species} are known. Colonization is dark. Pinning and "
+        "fruiting use the chamber default: 12 hours a day at 20% white (92 lux on this "
+        "chamber) with 80% blue."
+    )
+
+
+def _off_menu(why: str) -> LightRecipe:
+    recipe = _recipe(why, [OFF_MENU_NOTE], GENERAL_FRUITING)
+    recipe.wavelength_note = OFF_MENU_WAVELENGTH_NOTE
+    return recipe
+
+
 def _oyster() -> LightRecipe:
     return _recipe(
         OYSTER_WHY,
@@ -419,39 +449,13 @@ RECIPES: dict[str, LightRecipe] = {
         [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK],
         GENERAL_FRUITING,
     ),
-    "golden-teacher": _recipe(
-        "Badham 1980 showed P. cubensis initials need light, with peaks at 370, 440, and "
-        "460 nm. Waldbillig 2023 fruited at 12 h. Intensity is the labeled general default "
-        "(20% white / 92 lux) because those papers do not give a room lux.",
-        [BADHAM_1980, WALDBILLIG_2023, SAKAMOTO_2018, GENERAL_DEFAULT],
-        GENERAL_FRUITING,
-    ),
-    "b-plus": _recipe(
-        "Same species as Golden Teacher. No B+-specific light paper was found. Hours and "
-        "mix follow Badham 1980 and the 12 h Waldbillig protocol. Intensity is the labeled "
-        "general default.",
-        [BADHAM_1980, WALDBILLIG_2023, GENERAL_DEFAULT],
-        GENERAL_FRUITING,
-    ),
-    "penis-envy": _recipe(
-        "Same species as Golden Teacher. No strain-specific light paper was found. Hours "
-        "and mix follow Badham 1980 and the 12 h Waldbillig protocol. Intensity is the "
-        "labeled general default.",
-        [BADHAM_1980, WALDBILLIG_2023, GENERAL_DEFAULT],
-        GENERAL_FRUITING,
-    ),
-    "p-cyanescens": _recipe(
-        "No P. cyanescens photoperiod or lux paper was found. This is the labeled general "
-        "default plus the P. cubensis blue-light finding, which is not a cyanescens measurement.",
-        [GENERAL_DEFAULT, BADHAM_1980, SAKAMOTO_2018, STAMETS_BOOK],
-        GENERAL_FRUITING,
-    ),
-    "p-natalensis": _recipe(
-        "No P. natalensis photoperiod or lux paper was found. This is the labeled general "
-        "default plus the P. cubensis blue-light finding, which is not a natalensis measurement.",
-        [GENERAL_DEFAULT, BADHAM_1980, WALDBILLIG_2023],
-        GENERAL_FRUITING,
-    ),
+    "golden-teacher": _off_menu(CUBENSIS_WHY),
+    "b-plus": _off_menu(CUBENSIS_WHY),
+    "penis-envy": _off_menu(CUBENSIS_WHY),
+    "acadian-coast": _off_menu(CUBENSIS_WHY),
+    "treasure-coast": _off_menu(CUBENSIS_WHY),
+    "p-cyanescens": _off_menu(_off_menu_species_why("P. cyanescens")),
+    "p-natalensis": _off_menu(_off_menu_species_why("P. natalensis")),
 }
 
 

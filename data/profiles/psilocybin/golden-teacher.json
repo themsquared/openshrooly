@@ -18,12 +18,12 @@
   "legal_notice": "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
   "source_notes": [
     {
-      "title": "Chamber consensus",
-      "detail": "Community fruiting-chamber consensus (Roger Rabbit / Shroomery-style tek ranges), cross-checked with vendor cards. P. cubensis colonizes ~24 to 27 \u00b0C; pins and fruits ~21 to 24 \u00b0C at high humidity with 12/12 light."
+      "title": "Climate",
+      "detail": "P. cubensis colonizes at about 24 to 27 \u00b0C, then pins and fruits at about 21 to 24 \u00b0C with high humidity and 12 hours of light a day."
     },
     {
       "title": "Practice",
-      "detail": "Fresh air is increased at pinning. Surface should be fine droplets, not standing water."
+      "detail": "Fresh air goes up at pinning. The surface should show fine droplets, not standing water."
     }
   ],
   "stages": [
@@ -125,27 +125,12 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Badham 1980 showed P. cubensis initials need light, with peaks at 370, 440, and 460 nm. Waldbillig 2023 fruited at 12 h. Intensity is the labeled general default (20% white / 92 lux) because those papers do not give a room lux.",
-    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "why": "P. cubensis needs light to start pins, and blue light works for that. Colonization is dark. Pinning and fruiting get 12 hours a day at 20% white (92 lux on this chamber) with 80% blue.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation, not a measured spectrum.",
     "sources": [
       {
-        "title": "Badham 1980",
-        "detail": "Edmond R. Badham, The Effect of Light Upon Basidiocarp Initiation in Psilocybe cubensis, Mycologia 72 (1980). Initials formed only after light. 370, 440, and 460 nm were effective. Wavelengths longer than 510 nm were not. The saturating dose is a flash energy, not a room lux, so intensity here is the general default.",
-        "url": "https://doi.org/10.1080/00275514.1980.12021162"
-      },
-      {
-        "title": "Waldbillig et al. 2023 fruiting protocol",
-        "detail": "Adam Waldbillig et al., Exploring Psilocybe spp. mycelium and fruiting body chemistry for potential therapeutic compounds, Frontiers in Fungal Biology 4 (2023). Fruiting used a 12 h photoperiod at about 6400 K. No lux number.",
-        "url": "https://doi.org/10.3389/ffunb.2023.1295223"
-      },
-      {
-        "title": "Sakamoto 2018",
-        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
-        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
-      },
-      {
-        "title": "General default",
-        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+        "title": "Chamber default",
+        "detail": "Standard light settings mapped to this chamber's white and RGB LEDs. Not a measured value for this variety."
       }
     ],
     "phases": {
