@@ -104,7 +104,7 @@ test("clamp stays inside the profile stage target and the global 10-32 C / 60-98
   assert.ok(clamped.temperature_c >= 10 && clamped.temperature_c <= 32);
   assert.ok(clamped.humidity_percent <= fruiting.humidity_target_max);
   assert.ok(clamped.humidity_percent >= 60 && clamped.humidity_percent <= 98);
-  assert.equal(clamped.fan_speed_percent, 10);
+  assert.equal(clamped.fan_speed_percent, 15);
   const floor = clampAutopilotSetpoints({ temperature_c: 4, humidity_percent: 10 }, { temperature_c: 8, humidity_percent: 50 });
   assert.equal(floor.temperature_c, 10);
   assert.equal(floor.humidity_percent, 60);
@@ -656,7 +656,7 @@ test("Undo stays allowed while paused, clamps, queues, and logs", async () => {
   assert.equal(undo.status, 200, JSON.stringify(undo.data));
   assert.equal(undo.data.restored.temperature_c, fruiting.temperature_target_min);
   assert.equal(undo.data.restored.humidity_percent, fruiting.humidity_target_max);
-  assert.equal(undo.data.restored.fan_speed_percent, 10);
+  assert.equal(undo.data.restored.fan_speed_percent, 15);
   const cmds = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-undo"]);
   assert.equal(cmds.length, 2);
   assert.equal(JSON.parse(cmds[1].payload).source, "grow-coach-autopilot-undo");

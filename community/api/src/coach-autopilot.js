@@ -3,7 +3,8 @@
 import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { isCoachBetaUser } from "./providers.js";
-import { readingMatchesTargets } from "./device-capabilities.js";
+import { chamberKnobs, deviceCapabilities, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
+import { knobTargets, knobsMismatch, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
 import {
   COACH_ITEM,
   READINGS_STALE_MINUTES,
@@ -32,7 +33,7 @@ export const AUTOPILOT_LIMITS = {
   physicalRh: [10, 100],
   jumpTemp: 8,
   jumpRh: 25,
-  fanClamp: [10, 80],
+  fanClamp: [15, 80],
   commandTtlMs: 30 * 60 * 1000,
 };
 
@@ -104,6 +105,7 @@ function commandTargets(payload = {}) {
     temperature_c: payload.temperature_c ?? payload.temperature_target,
     humidity_percent: payload.humidity_percent ?? payload.target_humidity,
     fan_speed_percent: payload.fan_speed_percent,
+    ...knobTargets(payload),
   };
 }
 
@@ -113,7 +115,22 @@ function commandFrom(payload = {}) {
     temperature_c: from.temperature_c ?? from.temperature_target,
     humidity_percent: from.humidity_percent ?? from.target_humidity,
     fan_speed_percent: from.fan_speed_percent,
+    ...knobTargets(from),
   };
+}
+
+function latestDoc(samples = []) {
+  if (!samples.length) return {};
+  const last = samples.slice().sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || ""))).at(-1);
+  return parseJson(last.document, {}) || {};
+}
+
+/** A reading plus the chamber's knob values, so knob commands can be confirmed from telemetry. */
+function withKnobs(reading, doc) {
+  if (!reading) return reading;
+  const out = { ...reading };
+  for (const [key, value] of Object.entries(chamberKnobs(doc))) if (value != null) out[key] = value;
+  return out;
 }
 
 function num(value) {
@@ -142,7 +159,7 @@ export function autopilotHumidityRange(stage = {}) {
   return intersectRange(AUTOPILOT_LIMITS.humidityClamp, stageHumidityTargetRange(stage)) || AUTOPILOT_LIMITS.humidityClamp;
 }
 
-export function clampAutopilotSetpoints(proposed = {}, stage = {}) {
+export function clampAutopilotSetpoints(proposed = {}, stage = {}, { fanRange = AUTOPILOT_LIMITS.fanClamp } = {}) {
   const tempRange = autopilotTempRange(stage);
   const rhRange = autopilotHumidityRange(stage);
   const out = {};
@@ -153,7 +170,7 @@ export function clampAutopilotSetpoints(proposed = {}, stage = {}) {
     out.humidity_percent = Math.round(clip(Number(proposed.humidity_percent), rhRange) * 10) / 10;
   }
   if (proposed.fan_speed_percent != null) {
-    out.fan_speed_percent = clip(Number(proposed.fan_speed_percent), AUTOPILOT_LIMITS.fanClamp);
+    out.fan_speed_percent = clip(Number(proposed.fan_speed_percent), fanRange);
   }
   return out;
 }
@@ -264,7 +281,11 @@ function blockedUntil(reason, waitUntil) {
   };
 }
 
-export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage = {}, state = {}, now = Date.now() } = {}) {
+/**
+ * `fanRange` is the stage's fan guardrail; `extras` are stage recipe knobs (fresh air, light,
+ * phase) that differ from the chamber, already limited to what it can take.
+ */
+export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage = {}, state = {}, now = Date.now(), fanRange, extras = {} } = {}) {
   const intervalAt = nextEligibleAt(state, now);
   if (now < intervalAt) {
     return blockedUntil("Waiting for the minimum interval between changes.", intervalAt);
@@ -277,16 +298,17 @@ export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage =
     humidity_percent: suggestion?.humidity_percent,
     fan_speed_percent: suggestion?.fan_speed_percent,
   };
-  const clamped = clampAutopilotSetpoints(allowed, stage);
+  const clamped = clampAutopilotSetpoints(allowed, stage, fanRange ? { fanRange } : {});
   const stepped = limitAutopilotStep(currentSetpoints, clamped);
   const changed =
     (stepped.temperature_c != null && stepped.temperature_c !== currentSetpoints.temperature_c) ||
     (stepped.humidity_percent != null && stepped.humidity_percent !== currentSetpoints.humidity_percent) ||
-    (stepped.fan_speed_percent != null && stepped.fan_speed_percent !== currentSetpoints.fan_speed_percent);
+    (stepped.fan_speed_percent != null && stepped.fan_speed_percent !== currentSetpoints.fan_speed_percent) ||
+    Object.keys(extras || {}).length > 0;
   if (!changed) return { ok: false, reason: "Already at the profile target.", next_eligible_at: null };
   return {
     ok: true,
-    next: stepped,
+    next: { ...stepped, ...(extras || {}) },
     reason: (suggestion?.reasons || []).join(" ") || "Move setpoints toward the profile stage target.",
   };
 }
@@ -585,10 +607,20 @@ function expandStage(stage = {}) {
   };
 }
 
-export function stageFromProfile(profile) {
+export function stageFromProfile(profile, { knobs = {}, caps = {} } = {}) {
   if (!profile) return {};
-  const stages = profile.stages || [];
-  return expandStage(stages.find((s) => s.id === "fruiting") || stages[0] || {});
+  return expandStage(pickAutopilotStage(profile, knobs, caps).stage);
+}
+
+/**
+ * Firmware payload for a chamber that takes the multi-field command: temperature, RH, fan
+ * (air_exchange_speed) and recipe knobs, each clamped and snapped to the chamber's range.
+ */
+function multiPayload(next = {}, caps, knobs) {
+  const ask = { ...next, air_exchange_speed: next.air_exchange_speed ?? next.fan_speed_percent };
+  delete ask.fan_speed_percent;
+  if (!knobSupported(caps, "air_exchange_speed")) delete ask.air_exchange_speed;
+  return supportedSetpoints(ask, caps, ask, { current: knobs }).payload;
 }
 
 function setpointCommandBody(payload, device) {
@@ -830,7 +862,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   if (!coachAutopilotFlagOn(env)) return { skipped: "kill_switch" };
   if (!(await coachAutopilotAvailable(env, db, user))) return { skipped: "not_entitled" };
   const samplesEarly = await loadRecentTelemetry(db, device.id, { now });
-  const currentEarly = latestReading(samplesEarly, now);
+  const currentEarly = withKnobs(latestReading(samplesEarly, now), latestDoc(samplesEarly));
   await reconcileAutopilotCommands(db, { device, user, now, reading: currentEarly });
   const state = await getDeviceMode(db, device.id, user.id);
   if (state.mode !== "autopilot") return { skipped: "advisor" };
@@ -848,7 +880,10 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
 
   const samples = await loadRecentTelemetry(db, device.id, { now });
   const parsed = parseTelemetry(samples).slice().sort((a, b) => Date.parse(a.created_at || 0) - Date.parse(b.created_at || 0));
-  const current = latestReading(samples, now);
+  const doc = latestDoc(samples);
+  const caps = deviceCapabilities(doc, device.device_type || "shrooly_chamber");
+  const knobs = chamberKnobs(doc);
+  const current = withKnobs(latestReading(samples, now), doc);
   const previous = parsed.length > 1 ? parsed[parsed.length - 2] : null;
   const pause = evaluateAutopilotPause({ reading: current, previous, device, now });
   if (pause.pause) {
@@ -862,7 +897,10 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   ]);
   const pendingAutopilot = (pending || []).filter(isAutopilotCommand);
   const last = parseJson(state.last_setpoints, {});
-  if (setpointsMismatch(current, last, { now, lastChangeAt: state.last_change_at })) {
+  const lastApplied = state.last_change_at ? Date.parse(state.last_change_at) : NaN;
+  const settling = Number.isFinite(lastApplied) && now - lastApplied < AUTOPILOT_LIMITS.staleMs;
+  const knobsMoved = caps.multi && !settling && knobsMismatch(doc, last);
+  if (knobsMoved || setpointsMismatch(current, last, { now, lastChangeAt: state.last_change_at })) {
     for (const command of pendingAutopilot) {
       await finalizeAutopilotCommand(db, {
         command,
@@ -889,21 +927,37 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     return { paused: true, reason, flipped_to: "advisor" };
   }
   const profile = resolved.profile;
-  const stage = stageFromProfile(profile);
+  const pick = pickAutopilotStage(profile, knobs, caps);
+  const stage = expandStage(pick.stage);
   const reports = await db.all("SELECT * FROM grow_reports WHERE author_id=?", [user.id]);
   const model = buildDeviceModel(samples, reports.filter((r) => !String(r.profile_id || "").includes("psilocybin")));
   const suggestion = suggestSetpoints(model, stage, { reading: current });
+  const fanKnob = knobSupported(caps, "air_exchange_speed");
+  const fanSteer = fanKnob ? steerFan(stage, current, caps) : null;
+  if (fanSteer) {
+    suggestion.fan_speed_percent = fanSteer.fan;
+    if (fanSteer.reason) suggestion.reasons = [...(suggestion.reasons || []), fanSteer.reason];
+  }
+  const extras = caps.multi ? recipeChanges(recipeKnobs(stage, pick.stageId, caps), knobs) : {};
   const currentSetpoints = {
     temperature_c: current.temperature_setpoint ?? last.temperature_c,
     humidity_percent: current.humidity_setpoint ?? last.humidity_percent,
-    fan_speed_percent: last.fan_speed_percent ?? suggestion.fan_speed_percent,
+    fan_speed_percent: (fanKnob ? knobs.air_exchange_speed : null) ?? last.fan_speed_percent ?? suggestion.fan_speed_percent,
   };
+  // What the chamber ran before, for the audit log and Undo.
+  const from = { ...currentSetpoints };
+  if (caps.multi) {
+    if (fanKnob && knobs.air_exchange_speed != null) from.air_exchange_speed = knobs.air_exchange_speed;
+    for (const key of Object.keys(extras)) if (knobs[key] != null) from[key] = knobs[key];
+  }
   const plan = planAutopilotChange({
     suggestion,
     currentSetpoints,
     stage,
     state,
     now,
+    fanRange: fanSteer?.range,
+    extras,
   });
   if (!plan.ok) {
     return {
@@ -914,14 +968,23 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     };
   }
 
+  const sendable = caps.multi ? { ...multiPayload(plan.next, caps, knobs), fan_speed_percent: undefined } : plan.next;
+  const reason = [
+    pick.transition ? `Grow day ${pick.grow_day ?? "?"}: moving the chamber to ${pick.phase} (${pick.stageId}).` : null,
+    plan.reason,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const queued = await applySetpointsCommand(
     db,
     device.id,
     {
-      ...plan.next,
-      from: currentSetpoints,
+      ...sendable,
+      from,
       source: "grow-coach-autopilot",
       approved: true,
+      profile_id: profile.id,
+      stage: pick.stageId,
       delivery: state.delivery || inferDelivery(device),
     },
     device,
@@ -931,7 +994,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   state.last_change_at = new Date(now).toISOString();
   state.changes_count = dailyChangeCount(state, now) + 1;
   state.changes_day = day;
-  state.last_setpoints = currentSetpoints;
+  state.last_setpoints = from;
   state.pending_command_id = queued.id;
   state.delivery = state.delivery || inferDelivery(device);
   state.paused = 0;
@@ -941,14 +1004,23 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     device_id: device.id,
     user_id: user.id,
     action: "apply",
-    old_value: currentSetpoints,
-    new_value: plan.next,
-    reason: plan.reason,
+    old_value: from,
+    new_value: commandTargets(queued.payload),
+    reason,
     readings: current,
     command_id: queued.id,
     apply_status: "queued",
   });
-  return { applied: true, queued: true, next: plan.next, reason: plan.reason, command_id: queued.id, delivery: queued.payload.delivery };
+  return {
+    applied: true,
+    queued: true,
+    next: commandTargets(queued.payload),
+    reason,
+    stage: pick.stageId,
+    transition: pick.transition,
+    command_id: queued.id,
+    delivery: queued.payload.delivery,
+  };
 }
 
 export async function runAutopilotPass(env, { now = Date.now(), deviceId = null } = {}) {
@@ -987,7 +1059,18 @@ export async function undoAutopilotAction(db, env, user, actionId) {
   if (!oldValue) return { error: "Nothing to restore.", status: 400 };
   const state = await getDeviceMode(db, row.device_id, user.id);
   const resolved = await resolveAllowedProfile(db, state.profile_id);
-  const restored = clampAutopilotSetpoints(oldValue, stageFromProfile(resolved.profile));
+  const doc = latestDoc(await loadRecentTelemetry(db, row.device_id));
+  const caps = deviceCapabilities(doc, device.device_type || "shrooly_chamber");
+  const knobs = chamberKnobs(doc);
+  const undoStage = stageFromProfile(resolved.profile, { knobs, caps });
+  let restored = clampAutopilotSetpoints(oldValue, undoStage);
+  if (caps.multi) {
+    // Put back every knob the change touched, inside the chamber's ranges.
+    const back = knobTargets(oldValue);
+    delete back.grow_day;
+    if (restored.fan_speed_percent != null && back.air_exchange_speed == null) back.air_exchange_speed = restored.fan_speed_percent;
+    restored = { ...multiPayload({ ...restored, ...back, fan_speed_percent: undefined }, caps, knobs) };
+  }
   const queued = await applySetpointsCommand(
     db,
     row.device_id,
