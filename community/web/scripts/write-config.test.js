@@ -59,6 +59,9 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
     { name: "mTLS", re: /\bmTLS\b/i },
     { name: "JSON", re: /\bJSON\b/ },
   ];
+  // The privacy policy has to name the vendors that see data and say what cookies we set
+  // (Stripe requires both), so it alone may say "Cloudflare" and "cookie".
+  const legalAllow = { "privacy.html": new Set(["Cloudflare", "cookie"]) };
   const hits = [];
   for (const name of readdirSync(publicDir).filter((file) => file.endsWith(".html"))) {
     const html = readFileSync(join(publicDir, name), "utf8")
@@ -72,6 +75,7 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
     }
     const text = `${html.replace(/<[^>]+>/g, " ")} ${extras.join(" ")}`.replace(allow, " ");
     for (const rule of banned) {
+      if (legalAllow[name]?.has(rule.name)) continue;
       const found = text.match(rule.re);
       if (found) hits.push(`${name}: ${rule.name} (${found[0]})`);
     }
@@ -82,6 +86,9 @@ test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or
 test("visitor-facing pages never use en or em dashes", () => {
   const publicDir = join(dirname(fileURLToPath(import.meta.url)), "../public");
   const dash = /[\u2013\u2014]/;
+  // The privacy policy has to name the vendors that see data and say what cookies we set
+  // (Stripe requires both), so it alone may say "Cloudflare" and "cookie".
+  const legalAllow = { "privacy.html": new Set(["Cloudflare", "cookie"]) };
   const hits = [];
   for (const name of readdirSync(publicDir).filter((file) => file.endsWith(".html"))) {
     const html = readFileSync(join(publicDir, name), "utf8")

@@ -46,11 +46,16 @@ function pages() {
   return names.map((name) => ({ name, html: readFileSync(join(PUBLIC, name), "utf8") }));
 }
 
+// The privacy policy has to name the vendors that see data and say what cookies we set
+// (Stripe requires both), so it alone may say "Cloudflare" and "cookie".
+const LEGAL_ALLOW = { "privacy.html": new Set(["Cloudflare", "cookie"]) };
+
 test("visitor-facing pages never mention keys, secrets, docs, infrastructure, or Mike", () => {
   const hits = [];
   for (const page of pages()) {
     const text = visitorFacing(page.html);
     for (const rule of BANNED) {
+      if (LEGAL_ALLOW[page.name]?.has(rule.name)) continue;
       const found = text.match(rule.re);
       if (found) hits.push(`${page.name}: ${rule.name} (${found[0]})`);
     }

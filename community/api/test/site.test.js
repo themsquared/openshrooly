@@ -228,14 +228,23 @@ test("Off-menu pages carry the legal note and no prices, affiliate links, or Gro
   }
 });
 
+const LEGAL_PAGES = ["privacy.html", "tos.html", "contact.html"];
+
 test("Grow Coach is hidden by default on every static page", () => {
   for (const file of allPages()) {
     const html = read(file);
     // No Coach link in static chrome. app.js inserts it only when /api/me says grow_coach.available.
     const navs = (html.match(/<nav[\s\S]*?<\/nav>/g) || []).join("");
     assert.doesNotMatch(navs, /nav-coach|data-coach-link|Grow Coach|href="\/coach"/, `${file} has a static Coach link`);
-    assert.doesNotMatch(html, /\$[34]\.99|[34]\.99 (a|per) month|\$49 (a|per) year|\$49\/yr/, `${file} prices Coach`);
+    // The terms have to state the plan price and renewal. Every other static page stays price free.
+    if (file !== "tos.html") assert.doesNotMatch(html, /\$[34]\.99|[34]\.99 (a|per) month|\$49 (a|per) year|\$49\/yr/, `${file} prices Coach`);
     if (file === "coach.html") continue;
+    // The terms and privacy policy must describe the Grow Coach plan and what it does with data
+    // (Stripe asks for both). They name it in text but never link to it.
+    if (LEGAL_PAGES.includes(file)) {
+      assert.doesNotMatch(html.slice(html.indexOf("<main"), html.indexOf("</main>")), /coach-promo|href="\/coach"/, `${file} links Coach`);
+      continue;
+    }
     const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
     assert.doesNotMatch(main, /Grow Coach|coach-promo|href="\/coach"/, `${file} has Coach in static HTML`);
   }
@@ -286,7 +295,7 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
       '<main id="main"',
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
     // Guide and profile pages are static reading pages: the small lite.js runs the menu. App pages load app.js.
-    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "faq.html" || OWNER_PAGES.some((p) => file === `${p.slug}.html`);
+    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "faq.html" || LEGAL_PAGES.includes(file) || OWNER_PAGES.some((p) => file === `${p.slug}.html`);
     assert.ok(html.includes(`<script type="module" src="/js/${lite ? "lite" : "app"}.js"></script>`), `${file} script`);
   }
 });

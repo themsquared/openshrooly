@@ -1269,3 +1269,9 @@ h1 .beta-badge, h2 .beta-badge { font-size: 0.45em; margin-left: 0.4em; }
   .site-nav a.nav-install { order: -1; }
   .owner-cta .button { width: 100%; justify-content: center; text-align: center; }
 }
+
+/* Legal links in the footer: small and quiet. The contact page thanks note shows only after a send. */
+.footer-legal { justify-content: center; gap: 0.9rem; font-size: 0.8rem; margin: 0.2rem 0; }
+.footer-legal a { color: var(--sl-muted, inherit); opacity: 0.8; text-decoration: underline; text-underline-offset: 2px; }
+.contact-sent { display: none; }
+.contact-sent:target { display: block; }
