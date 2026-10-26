@@ -55,8 +55,8 @@
   <!--/CHROME_HEADER-->
   <main id="main">
     <p class="back-link"><a href="/account.html">Back to account</a></p>
-    <h1>Your chambers</h1>
-    <p class="muted">Bulk tools for many chambers at once. Everyday stats and controls live on <a href="/devices.html">Devices</a>.</p>
+    <h1>Change many chambers at once</h1>
+    <p class="muted">Pick chambers, preview a change, then apply it to all of them. Everyday readings and controls live on <a href="/devices.html">My chambers</a>.</p>
     <p id="fleet-live" class="live-badge muted hidden" aria-live="polite"></p>
     <p id="fleet-error" class="notice hidden" role="alert"></p>
     <p id="fleet-off" class="notice hidden">Chamber list is off on this site.</p>
@@ -109,28 +109,28 @@
               <option value="coach_mode">Coach mode</option>
             </select>
           </label>
-          <label>Temperature C
+          <label data-bulk-for="setpoints">Temperature (°C)
             <input id="bulk-temp" type="number" step="0.1" min="10" max="32">
           </label>
-          <label>Humidity %
+          <label data-bulk-for="setpoints">Humidity (%)
             <input id="bulk-rh" type="number" step="1" min="60" max="98">
           </label>
-          <label>Profile id
-            <input id="bulk-profile" type="text" placeholder="pearl-oyster">
+          <label data-bulk-for="profile coach_mode" class="hidden">Profile
+            <select id="bulk-profile"><option value="">Choose what you're growing</option></select>
           </label>
-          <label>Stage
-            <input id="bulk-stage" type="text" placeholder="fruiting">
+          <label data-bulk-for="profile" class="hidden">Phase
+            <select id="bulk-stage"><option value="">Start from the beginning</option></select>
           </label>
-          <label>Sunrise hour
+          <label data-bulk-for="light" class="hidden">Lights on at (hour)
             <input id="bulk-sunrise" type="number" min="0" max="23" step="1" placeholder="8">
           </label>
-          <label>Duration hours
+          <label data-bulk-for="light" class="hidden">Hours on
             <input id="bulk-duration" type="number" min="0" max="24" step="0.25" placeholder="12">
           </label>
-          <label>White lux
+          <label data-bulk-for="light" class="hidden">White brightness (lux)
             <input id="bulk-lux" type="number" min="0" max="4000" step="1" placeholder="92">
           </label>
-          <label class="hidden" data-coach-only>Coach mode
+          <label class="hidden" data-coach-only data-bulk-for="coach_mode">Coach mode
             <select id="bulk-coach">
               <option value="advisor">I approve changes</option>
               <option value="autopilot">Coach adjusts it for me</option>

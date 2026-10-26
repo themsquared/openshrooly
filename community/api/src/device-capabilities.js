@@ -34,7 +34,7 @@ const NOTES = {
   light: "This chamber can't take light settings from the site yet. Set them on the chamber.",
   firmware_notice: "This chamber can't show update notices from the site yet.",
   profile_translated:
-    "This chamber can't load a whole profile, so Apply sends the phase's temperature and humidity targets.",
+    "This chamber can't load a whole profile, so Start this grow sends the phase's temperature and humidity targets.",
 };
 
 function num(value) {

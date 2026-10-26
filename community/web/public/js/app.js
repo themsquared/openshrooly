@@ -10,6 +10,7 @@ import { escapeHtml, renderSafeMarkdown, safeDisplay } from "./safe-markdown.js"
 import {
   coachLine,
   deviceMetaLine,
+  chartReady,
   drawHistoryChart,
   growLine,
   growingLabels,
@@ -32,6 +33,7 @@ import {
   stageOptionsHtml,
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
+import { lightRecipeLine } from "./light-line.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
 
 function cfg() {
@@ -157,7 +159,7 @@ function renderNav() {
       <summary>Account</summary>
       <div class="account-menu-links">
         <a href="/account.html">Account</a>
-        <a href="/devices.html">Devices</a>
+        <a href="/devices.html">My chambers</a>
         <a href="/fleet.html" id="nav-fleet" class="hidden">Bulk tools</a>
         <a href="/publish.html">Build a profile</a>
         <a href="/moderate.html" id="nav-moderate" class="hidden">Review queue</a>
@@ -357,12 +359,20 @@ async function renderProfile() {
   if (!caps.photos) {
     document.querySelector('input[name="photo"]')?.closest("label")?.classList.add("hidden");
   }
+  // Ratings and reports are public even before a paid recipe unlocks, so never leave an empty heading.
+  $("#ratings").innerHTML =
+    (data.ratings || []).map((r) => `<li>${escapeHtml(r.username)} · ${r.stars}/5 · ${escapeHtml(r.comment || "")}</li>`).join("") ||
+    "<li class='muted'>No ratings yet. Grow it and be the first.</li>";
+  $("#reports").innerHTML =
+    (data.reports || []).map((r) => `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}</li>`).join("") ||
+    "<li class='muted'>No grow reports yet.</li>";
   if (!data.unlocked) {
     $("#locked").classList.remove("hidden");
-    $("#price").textContent = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
+    const price = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
+    $("#buy").textContent = `Buy for ${price}`;
     if (!caps.payments) {
       const notice = $("#locked")?.querySelector("p");
-      if (notice) notice.textContent = "Paid culinary recipe. Checkout is coming soon.";
+      if (notice) notice.textContent = `Paid recipe, ${price}. Checkout opens soon.`;
       $("#buy")?.classList.add("hidden");
       return;
     }
@@ -400,6 +410,7 @@ async function renderProfile() {
     )
     .join("");
   const recipeBox = $("#light-recipe");
+  const sourceItems = (p.source_notes || []).map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`);
   if (recipeBox && p.light_recipe) {
     const recipe = p.light_recipe;
     const rows = Object.entries(recipe.phases || {})
@@ -408,33 +419,31 @@ async function renderProfile() {
           `<tr><th scope="row">${escapeHtml(id)}</th><td>${phase.photoperiod_hours} h on</td><td>white ${phase.white_brightness_percent}%</td><td>RGB ${phase.red_percent} / ${phase.green_percent} / ${phase.blue_percent}</td></tr>`
       )
       .join("");
-    const sources = (recipe.sources || [])
-      .map((note) => {
-        const title = escapeHtml(note.title);
-        const detail = escapeHtml(note.detail);
-        const href = httpsSourceHref(note.url);
-        if (href) {
-          const rel = off ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
-          return `<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`;
-        }
-        return `<li><strong>${title}.</strong> ${detail}</li>`;
-      })
-      .join("");
+    for (const note of recipe.sources || []) {
+      const title = escapeHtml(note.title);
+      const detail = escapeHtml(note.detail);
+      const href = httpsSourceHref(note.url);
+      if (href) {
+        const rel = off ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
+        sourceItems.push(`<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`);
+      } else sourceItems.push(`<li><strong>${title}.</strong> ${detail}</li>`);
+    }
     recipeBox.classList.remove("hidden");
     recipeBox.innerHTML = `<h2 id="light-recipe-heading">Light recipe</h2>
-      <p>${escapeHtml(recipe.why)}</p>
-      <p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p>
-      <table class="light-recipe-table">
-        <caption>Photoperiod and mix for this chamber</caption>
-        <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <h3>Recipe sources</h3>
-      <ul>${sources}</ul>`;
+      <p>${escapeHtml(lightRecipeLine(recipe))}</p>
+      <details class="light-details">
+        <summary>Light details</summary>
+        <p>${escapeHtml(recipe.why)}</p>
+        <p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p>
+        <table class="light-recipe-table">
+          <caption>Photoperiod and mix for this chamber</caption>
+          <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </details>`;
   }
-  $("#sources").innerHTML = (p.source_notes || [])
-    .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
-    .join("");
+  $("#sources").innerHTML = sourceItems.join("");
+  $("#sources-block")?.classList.toggle("hidden", !sourceItems.length);
   if (!off && data.links?.length) {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
@@ -445,7 +454,7 @@ async function renderProfile() {
   }
   $("#ratings").innerHTML =
     data.ratings.map((r) => `<li>${escapeHtml(r.username)} · ${r.stars}/5 · ${escapeHtml(r.comment || "")}</li>`).join("") ||
-    "<li class='muted'>No ratings yet.</li>";
+    "<li class='muted'>No ratings yet. Grow it and be the first.</li>";
   const reportItems = [];
   for (const r of data.reports) {
     let photo = "";
@@ -459,7 +468,7 @@ async function renderProfile() {
     }
     reportItems.push(`<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}</li>`);
   }
-  $("#reports").innerHTML = reportItems.join("") || "<li class='muted'>No community reports yet.</li>";
+  $("#reports").innerHTML = reportItems.join("") || "<li class='muted'>No grow reports yet.</li>";
 
   $("#rate")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -636,6 +645,7 @@ async function renderAccount() {
       })
     );
   }
+  if (checkoutResult() && $("#billing")) $("#billing").open = true;
   if (checkoutResult() === "success" && $("#billing-status")) {
     const status = $("#billing-status");
     status.textContent = "Payment received. Turning on Grow Coach...";
@@ -657,8 +667,24 @@ async function renderAccount() {
       if (caps.fleet) $("#fleet-link")?.classList.remove("hidden");
     })
     .catch(() => {});
+  $("#signout")?.addEventListener("click", async () => {
+    try {
+      await api("/api/auth/logout", { method: "POST", jsonBody: {} });
+    } catch {
+      /* still clear local token */
+    }
+    setToken("");
+    location.href = "/";
+  });
+  openAccountSectionFromHash();
+  window.addEventListener("hashchange", openAccountSectionFromHash);
   const devices = await api("/api/fleet/devices").catch(() => ({ devices: [] }));
-  $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No devices linked yet." });
+  const linked = (devices.devices || []).filter((d) => d.status !== "revoked");
+  // New accounts see one card, "Link your first chamber", instead of an empty Chambers section.
+  $("#first-chamber")?.classList.toggle("hidden", linked.length > 0);
+  $("#devices")?.classList.toggle("hidden", linked.length === 0);
+  if ($("#devices-summary")) $("#devices-summary").textContent = linked.length === 1 ? "1 linked" : `${linked.length} linked`;
+  $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No chambers linked yet." });
   renderAlertSettings().catch((err) => showAlertsStatus(err.message));
   wireYourData(me);
   $("#mint").addEventListener("submit", async (ev) => {
@@ -668,6 +694,17 @@ async function renderAccount() {
     $("#new-token").textContent = data.token;
     $("#new-token-wrap").classList.remove("hidden");
   });
+}
+
+/** Account sections are collapsed; a link like /account.html#alerts opens that one. */
+function openAccountSectionFromHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (!id) return;
+  const el = document.getElementById(id);
+  const section = el?.closest("details.account-section");
+  if (!section) return;
+  section.open = true;
+  el.scrollIntoView({ block: "start" });
 }
 
 function wireYourData(me) {
@@ -1466,7 +1503,7 @@ async function renderClaim() {
 
 const ALERT_STATUS = {
   sent: "Emailed",
-  stub: "Saved here. Email sending is not switched on yet.",
+  stub: "Saved here. Email alerts are off for now.",
   pending: "Sending",
   sending: "Sending",
   held: "Waiting for quiet hours to end",
@@ -1501,7 +1538,7 @@ function alertItems(alerts) {
 function deliveryNotice(data) {
   if (!data.email_ready) return "Verify your email to get alert emails. Alerts are still saved here.";
   if (data.prefs?.unsubscribed && !data.prefs?.email) return "You turned off alert emails from a link in an email. Turn on Email me alerts in alert settings to get them again.";
-  if (data.delivery?.email !== "live") return "Email sending is not switched on yet. Alerts are saved here so you can see them.";
+  if (data.delivery?.email !== "live") return "Email alerts are off for now.";
   return "";
 }
 
@@ -1610,18 +1647,72 @@ function loginRedirect() {
   location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
 }
 
+/**
+ * In-page sheet for unlinking: "Keep linked" is the big safe button, "Unlink" is red.
+ * Resolves true only when the person taps Unlink.
+ */
+function confirmUnlink() {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "sheet";
+    dialog.setAttribute("aria-labelledby", "sheet-title");
+    dialog.innerHTML = `
+      <h2 id="sheet-title">Unlink this chamber?</h2>
+      <p class="muted">It leaves your account. Growing keeps working on the chamber itself, and you can link it again later.</p>
+      <div class="sheet-actions">
+        <button type="button" class="sheet-keep" value="keep">Keep linked</button>
+        <button type="button" class="danger" value="unlink">Unlink</button>
+      </div>`;
+    const done = (yes) => {
+      dialog.close();
+      dialog.remove();
+      resolve(yes);
+    };
+    dialog.querySelector(".sheet-keep").addEventListener("click", () => done(false));
+    dialog.querySelector(".danger").addEventListener("click", () => done(true));
+    dialog.addEventListener("cancel", (ev) => {
+      ev.preventDefault();
+      done(false);
+    });
+    document.body.append(dialog);
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+      dialog.querySelector(".sheet-keep").focus();
+    } else {
+      dialog.remove();
+      resolve(confirm("Unlink this chamber from your account? Growing still works on the chamber itself."));
+    }
+  });
+}
+
+/** Only mention a lost live connection after this long, so a short blip never shows a banner. */
+const POLL_NOTICE_AFTER_MS = 2 * 60 * 1000;
+
 /** Small "Live" / "Updating…" badge next to a page title. */
 function setLiveBadge(el, state, at) {
   if (!el) return;
+  clearTimeout(el._pollNoticeTimer);
+  let shown = state;
+  if (state === "polling") {
+    const since = Number(el.dataset.pollingSince) || Date.now();
+    el.dataset.pollingSince = String(since);
+    const wait = since + POLL_NOTICE_AFTER_MS - Date.now();
+    if (wait > 0) {
+      shown = "quiet";
+      el._pollNoticeTimer = setTimeout(() => setLiveBadge(el, "polling", at), wait);
+    }
+  } else if (state === "live" || state === "gone" || !state) {
+    delete el.dataset.pollingSince;
+  }
   const text = {
     cached: `Updating… showing what this phone saw ${ageText(at) || "earlier"}`,
     loading: "Updating…",
     live: "Live",
-    polling: "Reconnecting. Checking every 30 seconds.",
+    polling: "Live updates paused. Numbers refresh every 30 seconds.",
     gone: "This chamber is no longer on your account.",
-  }[state] || "";
+  }[shown] || "";
   el.textContent = text;
-  el.dataset.state = state;
+  el.dataset.state = shown;
   el.classList.toggle("hidden", !text);
 }
 
@@ -1798,10 +1889,11 @@ async function renderDevice() {
     dash.innerHTML = `
       <div id="dev-identity"></div>
       <div id="dev-gauges"></div>
-      <figure class="fleet-chart card">
+      <figure class="fleet-chart card hidden" id="reading-chart-box">
         <figcaption>Readings, last 24 hours</figcaption>
         <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>
       </figure>
+      <p class="muted hidden" id="reading-chart-wait">A chart of the last 24 hours shows up here after a couple of readings.</p>
       <div id="dev-controls"></div>
       <div id="dev-commands"></div>
       <div id="dev-notes"></div>
@@ -1810,7 +1902,7 @@ async function renderDevice() {
       </p>`;
     dash.classList.remove("hidden");
     $("#unlink-device")?.addEventListener("click", async () => {
-      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      if (!(await confirmUnlink())) return;
       try {
         await api(`/api/fleet/devices/${enc}/unlink`, { method: "POST", jsonBody: { confirm: true } });
         liveCache.clear();
@@ -1864,9 +1956,18 @@ async function renderDevice() {
     swap("#dev-gauges", renderGauges(device));
     if ($("#reading-chart")._history !== JSON.stringify(snap.history || [])) {
       $("#reading-chart")._history = JSON.stringify(snap.history || []);
-      drawHistoryChart($("#reading-chart"), snap.history || []);
+      const ready = chartReady(snap.history);
+      $("#reading-chart-box").classList.toggle("hidden", !ready);
+      $("#reading-chart-wait").classList.toggle("hidden", ready);
+      if (ready) drawHistoryChart($("#reading-chart"), snap.history || []);
     }
     paintControls();
+    // A card or link with #grow lands on the profile picker once it exists.
+    if (!view.jumped && location.hash === "#grow" && $("#grow")) {
+      view.jumped = true;
+      $("#grow").scrollIntoView({ block: "start" });
+      $("#device-controls")?.profile_id?.focus({ preventScroll: true });
+    }
     swap("#dev-commands", renderCommandList(device.commands || []));
     swap("#dev-notes", renderReadonlyNotes(device));
     const alerts = snap.alerts;
@@ -1982,7 +2083,7 @@ async function inFlight(form, run) {
  */
 function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) {
   const form = $("#device-controls");
-  const msg = $("#device-controls-msg");
+  const generalMsg = $("#device-controls-msg");
   // Picking a different profile resets the phase to its first stage (a new grow starts at day 1).
   form?.addEventListener("change", (ev) => {
     if (ev.target?.name !== "profile_id" || !form.stage) return;
@@ -2004,6 +2105,8 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
     if (!canWrite) return;
     const action = ev.submitter?.dataset?.action;
     const device = currentDevice() || {};
+    // Say what happened right under the button that was tapped.
+    const msg = form.querySelector(`.control-msg[data-msg-for="${action}"]`) || generalMsg;
     inFlight(form, async () => {
       try {
         if (action === "name") {
@@ -2020,7 +2123,7 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           payload.temperature_c = numberOrUndefined(form.temperature_c.value);
           payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
           // A disabled fan box means this firmware can't take it; don't ask.
-          if (!form.fan_speed_percent.disabled) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
+          if (form.fan_speed_percent && !form.fan_speed_percent.disabled) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
         }
         if (action === "profile") {
           payload.profile_id = form.profile_id.value;
@@ -2049,7 +2152,9 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         });
         const result = applied.results?.[0];
         if (!result || result.status === "failed") throw new Error(resultMessage(result));
-        flash(msg, resultMessage(result));
+        // Keep this one up: the grower needs to know it is on its way, not just that a click happened.
+        clearTimeout(msg._t);
+        msg.textContent = resultMessage(result);
         onSent();
       } catch (err) {
         flash(msg, err.message);
@@ -2175,7 +2280,7 @@ async function renderFleet() {
       }
     });
     $("#unlink-device").addEventListener("click", async () => {
-      if (!confirm("Unlink this chamber from your account? Growing still works on the chamber itself.")) return;
+      if (!(await confirmUnlink())) return;
       try {
         await api(`/api/fleet/devices/${encodeURIComponent(detailId)}/unlink`, {
           method: "POST",
@@ -2210,6 +2315,39 @@ async function renderFleet() {
   const showCoachColumn = await coachAvailable();
   for (const el of document.querySelectorAll("[data-coach-only]")) el.classList.toggle("hidden", !showCoachColumn);
   if (!showCoachColumn) $('#bulk-action option[value="coach_mode"]')?.remove();
+  // Only the boxes the chosen change needs. Profile and phase are picked from a list, never typed.
+  const showBulkFields = () => {
+    const action = $("#bulk-action")?.value || "";
+    for (const el of document.querySelectorAll("[data-bulk-for]")) {
+      const wanted = el.dataset.bulkFor.split(" ").includes(action);
+      el.classList.toggle("hidden", !wanted || (el.hasAttribute("data-coach-only") && !showCoachColumn));
+    }
+  };
+  $("#bulk-action")?.addEventListener("change", showBulkFields);
+  showBulkFields();
+  loadDeviceCatalog()
+    .then((catalog) => {
+      const picker = $("#bulk-profile");
+      if (!picker) return;
+      picker.innerHTML =
+        `<option value="">Choose what you're growing</option>` +
+        (catalog.profiles || [])
+          .map((p) => {
+            const stages = JSON.stringify((p.stage_list || []).map((st) => ({ id: st.id, name: st.name || st.id })));
+            return `<option value="${escapeHtml(p.id)}" data-stages="${escapeHtml(stages)}">${escapeHtml(p.name)}${p.species ? ` (${escapeHtml(p.species)})` : ""}</option>`;
+          })
+          .join("");
+    })
+    .catch(() => {});
+  $("#bulk-profile")?.addEventListener("change", (ev) => {
+    let stages = [];
+    try {
+      stages = JSON.parse(ev.target.selectedOptions?.[0]?.dataset?.stages || "[]");
+    } catch {
+      stages = [];
+    }
+    $("#bulk-stage").innerHTML = stageOptionsHtml(stages);
+  });
   $("#fleet-group-filter").innerHTML =
     `<option value="">All chambers</option>` +
     groupRows.map((g) => `<option value="${safeDisplay(g.id)}">${escapeHtml(g.name)}</option>`).join("");
@@ -2272,8 +2410,8 @@ async function renderFleet() {
       if ($("#bulk-rh").value) payload.humidity_percent = Number($("#bulk-rh").value);
     }
     if (action === "profile" || action === "light" || action === "coach_mode") {
-      if ($("#bulk-profile").value) payload.profile_id = $("#bulk-profile").value.trim();
-      if ($("#bulk-stage").value) payload.stage = $("#bulk-stage").value.trim();
+      if ($("#bulk-profile").value) payload.profile_id = $("#bulk-profile").value;
+      if ($("#bulk-stage").value) payload.stage = $("#bulk-stage").value;
     }
     if (action === "light") {
       const light = {};
