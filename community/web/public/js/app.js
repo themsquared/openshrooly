@@ -1142,9 +1142,65 @@ async function consumeLocalSignIn() {
   return true;
 }
 
-function coachPriceText(product) {
+function coachPriceText(cents) {
+  const n = Number(cents);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return n % 100 === 0 ? `$${n / 100}` : `$${(n / 100).toFixed(2)}`;
+}
+
+/** Monthly and yearly from the API. Older API answers have no plans, so fall back to the one monthly price. */
+function coachPlanList(product) {
+  if (Array.isArray(product?.plans) && product.plans.length) return product.plans;
   const cents = Number(product?.amount_cents);
-  return Number.isFinite(cents) && cents > 0 ? `$${(cents / 100).toFixed(2)}` : "";
+  return cents > 0 ? [{ id: "monthly", amount_cents: cents, period: "month", savings_percent: 0, available: true }] : [];
+}
+
+function coachPlanLabel(plan) {
+  const price = coachPriceText(plan.amount_cents);
+  return plan.period === "year" ? `${price} a year` : `${price} a month`;
+}
+
+function coachPlanShort(plan) {
+  const price = coachPriceText(plan.amount_cents);
+  return plan.period === "year" ? `${price}/yr` : `${price}/mo`;
+}
+
+/** Draw the plan radios and keep the button text in step. Returns a getter for the picked plan id. */
+function renderCoachPlans(product) {
+  const plans = coachPlanList(product);
+  const list = $("#coach-plan-list");
+  const button = $("#subscribe");
+  if (!plans.length || !list) {
+    if (button) button.textContent = "Start Grow Coach";
+    return () => "monthly";
+  }
+  const firstOpen = plans.find((plan) => plan.available !== false) || plans[0];
+  list.innerHTML = plans
+    .map((plan) => {
+      const off = plan.available === false;
+      const note = off
+        ? "Not available yet"
+        : plan.period === "year" && plan.savings_percent > 0
+          ? `Save about ${plan.savings_percent}%`
+          : "Billed monthly";
+      const title = plan.period === "year" ? "Yearly" : "Monthly";
+      return `<label class="coach-plan${off ? " is-off" : ""}">
+        <input type="radio" name="coach-plan" value="${escapeHtml(plan.id)}"${plan.id === firstOpen.id ? " checked" : ""}${off ? " disabled" : ""}>
+        <span class="coach-plan-name">${title}</span>
+        <span class="coach-plan-price"><strong>${escapeHtml(coachPlanLabel(plan))}</strong></span>
+        <span class="coach-plan-note${plan.period === "year" && !off ? " coach-plan-save" : ""}">${escapeHtml(note)}</span>
+      </label>`;
+    })
+    .join("");
+  $("#coach-plans")?.classList.remove("hidden");
+  const picked = () => list.querySelector('input[name="coach-plan"]:checked')?.value || firstOpen.id;
+  const sync = () => {
+    const plan = plans.find((p) => p.id === picked()) || firstOpen;
+    if (button) button.textContent = `Start Grow Coach, ${coachPlanShort(plan)}`;
+  };
+  list.addEventListener("change", sync);
+  sync();
+  return picked;
 }
 
 async function renderCoach() {
@@ -1173,11 +1229,8 @@ async function renderCoach() {
     $("#gated")?.classList.add("hidden");
     return;
   }
-  // Sales view: one price, one button, three bullets, cancel anytime.
-  const price = coachPriceText(catalog.product);
-  $("#coach-price").textContent = price;
-  $("#coach-price-line")?.classList.toggle("hidden", !price);
-  $("#subscribe").textContent = price ? `Start Grow Coach, ${price}/mo` : "Start Grow Coach";
+  // Sales view: monthly or yearly, one button, three bullets, cancel anytime.
+  const pickedPlan = renderCoachPlans(catalog.product);
   $("#coach-status").textContent = "";
   if (!isSignedIn()) {
     $("#subscribe-panel").classList.remove("hidden");
@@ -1190,7 +1243,7 @@ async function renderCoach() {
     $("#subscribe-panel").classList.remove("hidden");
     if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
     $("#subscribe").addEventListener("click", () =>
-      goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: {} }), showCoachError)
+      goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan: pickedPlan() } }), showCoachError)
     );
     return;
   }

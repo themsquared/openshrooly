@@ -572,6 +572,34 @@ input[type="number"]:focus,
   letter-spacing: -0.03em;
 }
 
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.profile-text { min-width: 0; }
+
+.profile-photo {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: rgba(232, 243, 234, 0.06);
+}
+
+.profile-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sl-spore);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .profile-stage {
   color: var(--sl-mycelium);
   font-weight: 600;

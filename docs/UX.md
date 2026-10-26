@@ -39,7 +39,7 @@ Owners already know the original Shrooly company site (shrooly.com): warm studio
 
 ## Grow Coach
 
-- Culinary copy only. Price is $3.99/month, said in plain language. Never pair the page with Off-menu.
+- Culinary copy only. Price is $4.99 a month or $49 a year (save about 18%), said in plain language. Never pair the page with Off-menu.
 - Subscribe is one button (stub checkout). Gated tools stay hidden until paid.
 - Chamber picker, learned stats, alerts, then **Approve and send to chamber**. Auto-tune is an explicit checkbox with “inside safe bounds” in the label.
 - Chat shows remaining daily caps. Photo checks stay hidden until the photo provider is on, then show their cap too. Photo result always includes confidence and a next step, not color alone.

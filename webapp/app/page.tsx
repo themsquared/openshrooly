@@ -55,6 +55,8 @@ export default function Dashboard() {
   const [otaMessage, setOtaMessage] = useState<string>('')
   const [updateRequestError, setUpdateRequestError] = useState<string>('')
   const [demoMode, setDemoMode] = useState(false)
+  // What is growing, from shroomlabs.io while linked. GET /cloud needs no sign-in.
+  const [cloudGrow, setCloudGrow] = useState({ linked: false, name: '', url: '', image: '' })
   const [reachable, setReachable] = useState<boolean | undefined>(undefined)
   const [lastError, setLastError] = useState('')
   const [applyingPreset, setApplyingPreset] = useState(false)
@@ -717,6 +719,33 @@ export default function Dashboard() {
     }
   }, [draggingTempHandle])
 
+  useEffect(() => {
+    if (demoMode) return
+    let stopped = false
+    const load = async () => {
+      try {
+        const res = await fetch('/grow', { cache: 'no-store' })
+        if (!res.ok) return
+        const body = await res.json()
+        if (stopped) return
+        setCloudGrow({
+          linked: Boolean(body.linked),
+          name: String(body.grow_name || ''),
+          url: String(body.grow_url || ''),
+          image: String(body.grow_image || ''),
+        })
+      } catch {
+        // No cloud on this chamber, or offline: the card falls back to the local stage.
+      }
+    }
+    void load()
+    const id = window.setInterval(() => void load(), 60000)
+    return () => {
+      stopped = true
+      window.clearInterval(id)
+    }
+  }, [demoMode])
+
   // Helper to get alert values
   const getAlert = (id: string) => entities[`binary_sensor-alert__${id}`]?.value === true
 
@@ -784,6 +813,7 @@ export default function Dashboard() {
   const targetHumidity = parseFloat((getNumber('target_humidity') || 0) as string) || 0
   const co2Raw = getSensor('co2') ?? getSensor('co2_ppm') ?? getSensor('carbon_dioxide')
   const co2 = co2Raw == null || co2Raw === '' ? null : parseFloat(co2Raw as string)
+
   const profileName = String(entities['text_sensor-current_profile']?.state || entities['text_sensor-current_profile']?.value || '')
   const stageName = growPhase || String(entities['text_sensor-current_stage']?.state || entities['text_sensor-current_stage']?.value || '')
   const growDay = growDayValue
@@ -917,11 +947,15 @@ export default function Dashboard() {
       </div>
 
       <ProfileStrip
+        growName={cloudGrow.name || undefined}
+        growUrl={cloudGrow.url || undefined}
+        growImage={cloudGrow.image || undefined}
+        linked={cloudGrow.linked}
         profile={profileName || undefined}
         stage={stageName || undefined}
         day={Number.isFinite(growDay) ? growDay : undefined}
         stageDays={Number.isFinite(stageDays) ? stageDays : undefined}
-        stages={demoMode || profileName || (stageName && stageName !== 'Idle') ? DEMO_STAGES : []}
+        stages={demoMode || profileName || cloudGrow.name || (stageName && stageName !== 'Idle') ? DEMO_STAGES : []}
       />
 
       <LightTimeline

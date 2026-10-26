@@ -3,8 +3,28 @@
 import { stageForGrowPhase } from "./device-capabilities.js";
 
 export const COACH_ITEM = "grow-coach";
-export const COACH_PRICE_CENTS = 399;
+/** Monthly list price. Kept as the default plan so older callers keep working. */
+export const COACH_PRICE_CENTS = 499;
+export const COACH_YEARLY_PRICE_CENTS = 4900;
 export const COACH_PERIOD_DAYS = 30;
+export const COACH_YEARLY_PERIOD_DAYS = 365;
+
+/** The two Grow Coach plans. Stripe price ids come from config (see stripe.js coachPriceId). */
+export const COACH_PLANS = Object.freeze({
+  monthly: Object.freeze({ id: "monthly", amount_cents: COACH_PRICE_CENTS, period: "month", period_days: COACH_PERIOD_DAYS }),
+  yearly: Object.freeze({ id: "yearly", amount_cents: COACH_YEARLY_PRICE_CENTS, period: "year", period_days: COACH_YEARLY_PERIOD_DAYS }),
+});
+export const COACH_DEFAULT_PLAN = "monthly";
+
+/** Yearly vs twelve months: 1 - 4900 / (12 x 499) = 18.2%, shown as "save about 18%". */
+export const COACH_YEARLY_SAVINGS_PERCENT = Math.round((1 - COACH_YEARLY_PRICE_CENTS / (12 * COACH_PRICE_CENTS)) * 100);
+
+/** "monthly", "yearly", or "" for anything else. Missing means monthly. */
+export function coachPlanId(value) {
+  if (value === undefined || value === null || value === "") return COACH_DEFAULT_PLAN;
+  const id = String(value).trim().toLowerCase();
+  return Object.hasOwn(COACH_PLANS, id) ? id : "";
+}
 
 /** Chamber heartbeat telemetry cadence (firmware TELEMETRY_INTERVAL_MS). */
 export const DEVICE_HEARTBEAT_MS = 15 * 60 * 1000;

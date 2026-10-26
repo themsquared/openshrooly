@@ -13,7 +13,7 @@ import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./h
 // still needs beta or a paid sub. The test env sets COACH_PUBLIC=1, so the
 // "hidden" cases below pass COACH_PUBLIC: "" to match prod as it ships today.
 
-const PRICE = /3\.99|399|amount_cents/;
+const PRICE = /3\.99|4\.99|\b399\b|\b499\b|4900|amount_cents/;
 
 function env(extra = {}) {
   return testEnv({ GROW_COACH_STUB: "1", FLEET_UI_ENABLED: "1", COACH_AUTOPILOT_ENABLED: "1", ...extra });
@@ -119,7 +119,11 @@ test("COACH_PUBLIC on: a signed in non-beta user sees the Subscribe state, but e
   assert.equal(coach.data.for_sale, true);
   assert.equal(coach.data.waitlist, false);
   assert.equal(coach.data.signed_in, true);
-  assert.equal(coach.data.product.amount_cents, 399);
+  assert.equal(coach.data.product.amount_cents, 499);
+  assert.deepEqual(
+    coach.data.product.plans.map((plan) => [plan.id, plan.amount_cents, plan.period, plan.savings_percent]),
+    [["monthly", 499, "month", 0], ["yearly", 4900, "year", 18]]
+  );
   assert.equal(me.data.grow_coach.available, true);
   assert.equal(me.data.grow_coach.entitled, false);
   assert.equal(me.data.grow_coach.beta, false);

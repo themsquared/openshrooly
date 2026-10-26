@@ -116,11 +116,11 @@ test("alerts fire for humidity trouble, harvest window, and stalled colonization
   assert.equal(refuseRestrictedPack({ pack: "culinary" }), false);
 });
 
-test("neuron estimate stays cheap versus the $3.99 price", () => {
+test("neuron estimate stays cheap versus the $4.99 price", () => {
   const chat = estimateNeurons({ inputTokens: 800, outputTokens: 200 });
   const photo = estimateNeurons({ inputTokens: 2000, outputTokens: 250, vision: true });
   const monthly = 1200 * chat + 240 * photo;
-  assert.ok(estimateUsd(monthly) < 1, `cap-month AI $${estimateUsd(monthly)} should stay well under $3.99`);
+  assert.ok(estimateUsd(monthly) < 1, `cap-month AI $${estimateUsd(monthly)} should stay well under $4.99`);
 });
 
 test("chat and photo check are gated until Grow Coach is paid", async () => {
@@ -128,7 +128,7 @@ test("chat and photo check are gated until Grow Coach is paid", async () => {
   const { token } = await register(ctx);
   const denied = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
   assert.equal(denied.status, 404);
-  assert.doesNotMatch(JSON.stringify(denied.data), /3\.99|Grow Coach/);
+  assert.doesNotMatch(JSON.stringify(denied.data), /3\.99|4\.99|Grow Coach/);
   // COACH_PUBLIC=1 in the test env, so the catalog is on sale but not unlocked.
   const catalog = await call(ctx, "GET", "/api/coach", { token });
   assert.equal(catalog.data.available, true);
@@ -137,7 +137,7 @@ test("chat and photo check are gated until Grow Coach is paid", async () => {
   const paidCatalog = await call(ctx, "GET", "/api/coach", { token });
   assert.equal(paidCatalog.data.available, true);
   assert.equal(paidCatalog.data.entitled, true);
-  assert.equal(paidCatalog.data.product.amount_cents, 399);
+  assert.equal(paidCatalog.data.product.amount_cents, 499);
   assert.match(paidCatalog.data.marketing, /not sold/i);
   const ok = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "why is humidity low?" } });
   assert.equal(ok.status, 200, JSON.stringify(ok.data));
