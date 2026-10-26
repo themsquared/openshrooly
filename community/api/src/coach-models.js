@@ -3,7 +3,9 @@
 import { coachAiConfigured, coachLocalRestEnabled, comingSoonBody, devStubsEnabled, isProdHost } from "./providers.js";
 
 export const DEFAULT_TEXT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
-export const DEFAULT_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+/** Llama 4 Scout reads images with no extra license step on the account (Llama 3.2 Vision needs one). */
+export const DEFAULT_VISION_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
+export const PHOTO_MAX_OUTPUT_TOKENS = 450;
 export const WORKERS_AI_REST_HOST = "https://api.cloudflare.com";
 export const COACH_CHAT_SYSTEM_PROMPT =
   "You are Grow Coach for Shroom Labs. Culinary home cultivation only. Never market, price, or coach the restricted/psilocybin pack. Use only the grounding JSON. Reply in plain, short prose. Do not use JSON or markdown tables. For temperature and humidity, use the selected profile's per-stage target and warning ranges from the grounding, not generic species lore. Compare current readings and setpoints to those stage targets and say plainly when they are out of range. Suggest setpoints only inside the provided safe bounds.";
@@ -85,7 +87,7 @@ function disabledProvider() {
     async chat() {
       return { unavailable: true, ...comingSoonBody("Grow Coach") };
     },
-    async vision() {
+    async photoCheck() {
       return { unavailable: true, ...comingSoonBody("Grow Coach") };
     },
   };
@@ -111,29 +113,28 @@ function stubProvider() {
         .join(" ");
       return { text: reply, input_tokens: 200, output_tokens: 80, cached: false };
     },
-    async vision({ hint }) {
-      const blob = String(hint || "").toLowerCase();
-      const flags = [];
-      if (/mold|green|trich|contam/.test(blob)) {
-        flags.push({ kind: "contamination", label: "Possible mold / contamination", confidence: 0.78 });
+    async photoCheck({ context }) {
+      const note = String(context?.grower_note || "").toLowerCase();
+      const issues = [];
+      if (/mold|green|trich|contam/.test(note)) {
+        issues.push({ label: "Possible mold", detail: "There is a green patch on the block.", severity: "high" });
       }
-      if (/dry|cracked|shrivel/.test(blob)) {
-        flags.push({ kind: "too_dry", label: "Block looks dry", confidence: 0.71 });
+      if (/dry|cracked|shrivel/.test(note)) {
+        issues.push({ label: "Block looks dry", detail: "The surface looks cracked.", severity: "medium" });
       }
-      if (/pin|primordia/.test(blob)) {
-        flags.push({ kind: "pinning", label: "Pinning underway", confidence: 0.74 });
-      }
-      const stage = /fruit|cap/.test(blob) ? "fruiting" : /pin/.test(blob) ? "pinning" : "colonization";
-      const next = flags.some((f) => f.kind === "contamination")
-        ? "Isolate the block. Do not fan toward other chambers. Discard if the spot spreads."
-        : "Keep humidity in the fruiting band and watch the next 24 hours.";
+      const stage = /fruit|cap/.test(note) ? "fruiting" : /pin/.test(note) ? "pinning" : "colonizing";
+      const steps = issues.some((i) => i.severity === "high")
+        ? ["Isolate the block.", "Do not fan air toward other chambers.", "Throw it out if the spot spreads."]
+        : ["Keep humidity in the target band.", "Look again in 24 hours."];
+      const chamber = context?.chamber;
+      const summary = chamber?.now
+        ? `Stub check. ${chamber.name} reads ${chamber.now.humidity_percent}% humidity.`
+        : "Stub check. No live model is connected.";
+      if (/psilocyb|cubensis/.test(note)) return { text: JSON.stringify({ off_topic: true }), usage: { prompt_tokens: 1000, completion_tokens: 10 } };
       return {
-        stage,
-        flags,
-        confidence: flags[0]?.confidence || 0.55,
-        next_steps: next,
-        input_tokens: 1800,
-        output_tokens: 220,
+        text: JSON.stringify({ off_topic: false, summary, stage, issues, next_steps: steps, confidence: issues.length ? 0.78 : 0.55 }),
+        usage: { prompt_tokens: 1070, completion_tokens: 100, neurons: 34 },
+        model: "stub",
       };
     },
   };
@@ -167,37 +168,25 @@ function workersAiProvider(env) {
         model: textModel,
       };
     },
-    async vision({ imageBase64, hint }) {
+    async photoCheck({ imageBase64, contentType, system, context }) {
+      const prompt = context
+        ? `Grow context JSON:\n${JSON.stringify(context)}\n\nLook at the photo and reply with the JSON object only.`
+        : "No chamber or profile was picked. Look at the photo and reply with the JSON object only.";
       const result = await runWorkersAi(env, visionModel, {
         messages: [
+          { role: "system", content: system },
           {
             role: "user",
             content: [
-              {
-                type: "text",
-                text: "Culinary mushroom grow photo. Return JSON: {stage, flags:[{kind,label,confidence}], next_steps}. kinds: contamination, too_dry, pinning, healthy. No psilocybin advice.",
-              },
-              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: `data:${contentType || "image/jpeg"};base64,${imageBase64}` } },
             ],
           },
         ],
+        max_tokens: PHOTO_MAX_OUTPUT_TOKENS,
+        temperature: 0.2,
       });
-      const raw = workersAiText(result);
-      let parsed = {};
-      try {
-        parsed = JSON.parse(String(raw).replace(/^```json|```$/g, "").trim());
-      } catch {
-        parsed = { stage: "unknown", flags: [], next_steps: String(raw).slice(0, 400), hint };
-      }
-      return {
-        stage: parsed.stage || "unknown",
-        flags: parsed.flags || [],
-        confidence: parsed.flags?.[0]?.confidence || 0.5,
-        next_steps: parsed.next_steps || "Watch humidity and look again tomorrow.",
-        input_tokens: result.usage?.prompt_tokens || 2000,
-        output_tokens: result.usage?.completion_tokens || 250,
-        model: visionModel,
-      };
+      return { text: workersAiText(result), usage: result.usage || {}, model: visionModel };
     },
   };
 }

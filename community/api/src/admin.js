@@ -319,7 +319,7 @@ const emptyTotals = () => Object.fromEntries(Object.keys(WINDOWS).map((w) => [w,
 async function spend(env, { now }) {
   const { db } = env;
   const cutoff = new Date(now - 31 * DAY_MS).toISOString();
-  const [userRows, deviceRows, counters, logRows, usage, alertMails, magic, caps, checkouts] = await Promise.all([
+  const [userRows, deviceRows, counters, logRows, usage, alertMails, magic, caps, checkouts, visionRows] = await Promise.all([
     db.all(ADMIN_SQL.users),
     db.all(ADMIN_SQL.devices),
     db.all(ADMIN_SQL.jevCounters),
@@ -329,6 +329,7 @@ async function spend(env, { now }) {
     db.all(ADMIN_SQL.magicLinks, [cutoff]),
     db.all(ADMIN_SQL.emailCaps),
     db.all(ADMIN_SQL.checkouts),
+    db.all(ADMIN_SQL.visionCounters),
   ]);
   const deviceOwner = new Map(deviceRows.map((d) => [d.id, d.owner_id != null ? Number(d.owner_id) : null]));
   const deviceName = new Map(deviceRows.map((d) => [d.id, d.name]));
@@ -344,6 +345,8 @@ async function spend(env, { now }) {
         jev_calls: emptyTotals(),
         jev_cost: emptyTotals(),
         coach_ai_cost: emptyTotals(),
+        photo_checks: emptyTotals(),
+        photo_ai_cost: emptyTotals(),
         emails: emptyTotals(),
         revenue_cents: emptyTotals(),
         revenue_test_cents: emptyTotals(),
@@ -378,6 +381,15 @@ async function spend(env, { now }) {
     perChamber.set(c.device_id, ch);
   }
   for (const u of usage) add(Number(u.user_id), "coach_ai_cost", dayAt(u.day), ((Number(u.neurons) || 0) / 1000) * NEURON_COST_PER_K);
+  // Photo checks: real Workers AI neurons per user per day. Already inside coach_ai_cost, shown on their own too.
+  for (const v of visionRows) {
+    const m = String(v.cache_key).match(/^vision:user:(\d+):(\d{4}-\d{2}-\d{2})$/);
+    if (!m) continue;
+    const value = parse(v.value, {}) || {};
+    const at = m[2] === utcDay(now) ? now : dayAt(m[2]);
+    add(Number(m[1]), "photo_checks", at, Number(value.calls) || 0);
+    add(Number(m[1]), "photo_ai_cost", at, ((Number(value.neurons) || 0) / 1000) * NEURON_COST_PER_K);
+  }
   for (const a of alertMails) add(Number(a.user_id), "emails", a.created_at, 1);
   for (const m of magic) {
     const id = userByEmail.get(String(m.email || "").toLowerCase());
@@ -397,16 +409,19 @@ async function spend(env, { now }) {
     for (const w of Object.keys(WINDOWS)) {
       r.jev_cost[w] = round6(r.jev_cost[w]);
       r.coach_ai_cost[w] = round6(r.coach_ai_cost[w]);
+      r.photo_ai_cost[w] = round6(r.photo_ai_cost[w]);
       cost[w] = round6(r.jev_cost[w] + r.coach_ai_cost[w]);
       net[w] = round6((r.revenue_cents[w] + r.revenue_test_cents[w]) / 100 - cost[w]);
     }
     return { ...r, username: u?.username || (r.user_id == null ? "(no account)" : `#${r.user_id}`), email: u?.email || null, cost, net_incl_test: net };
   });
-  const totals = { cost: emptyTotals(), jev_calls: emptyTotals(), emails: emptyTotals(), revenue_cents: emptyTotals(), revenue_test_cents: emptyTotals() };
+  const totals = { cost: emptyTotals(), jev_calls: emptyTotals(), photo_checks: emptyTotals(), photo_ai_cost: emptyTotals(), emails: emptyTotals(), revenue_cents: emptyTotals(), revenue_test_cents: emptyTotals() };
   for (const r of rows) {
     for (const w of Object.keys(WINDOWS)) {
       totals.cost[w] = round6(totals.cost[w] + r.cost[w]);
       totals.jev_calls[w] += r.jev_calls[w];
+      totals.photo_checks[w] += r.photo_checks[w];
+      totals.photo_ai_cost[w] = round6(totals.photo_ai_cost[w] + r.photo_ai_cost[w]);
       totals.emails[w] += r.emails[w];
       totals.revenue_cents[w] += r.revenue_cents[w];
       totals.revenue_test_cents[w] += r.revenue_test_cents[w];
@@ -422,6 +437,7 @@ async function spend(env, { now }) {
       jev: "Today and yesterday count every Jev call. Older days count only decisions that changed a setting, so they are a lower bound.",
       emails: "Alert emails and sign-in links per user. Other sends (Autopilot pause notices, account notices) are in the all-sends total for today only.",
       revenue: "First payments from checkouts. Subscription renewals are not tracked yet.",
+      photos: "Photo checks use real Workers AI neuron counts. Their cost is already part of Coach AI.",
     },
     emails_sent_today_all: capCount("all"),
     totals,

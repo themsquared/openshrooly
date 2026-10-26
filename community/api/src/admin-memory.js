@@ -46,6 +46,8 @@ function run(t, name, params) {
       return since(t.coach_autopilot_log, "created_at", params[0]).map((r) => pick(r, ["id", "device_id", "user_id", "readings", "created_at"]));
     case "jevCounters":
       return t.coach_cache.filter((r) => String(r.cache_key).startsWith("jev:")).map((r) => pick(r, ["cache_key", "value"]));
+    case "visionCounters":
+      return t.coach_cache.filter((r) => String(r.cache_key).startsWith("vision:")).map((r) => pick(r, ["cache_key", "value"]));
     case "coachUsage":
       return since(t.coach_usage, "day", params[0]).map((r) => pick(r, ["user_id", "day", "chats", "photos", "neurons"]));
     case "alertEmails":

@@ -26,6 +26,7 @@
   <script src="/js/ga.js" defer></script>
   <!--/SEO_HEAD-->
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/coach-photo.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -95,6 +96,30 @@
         <div id="chamber-list" class="coach-stack"></div>
       </section>
 
+      <section id="coach-photo" class="card coach-panel coach-section photo-check hidden" aria-labelledby="cp-title">
+        <h2 id="cp-title">Check a photo</h2>
+        <p class="muted">Take a clear photo of your block or pins. Coach looks at it with your chamber's readings and tells you what to do next. Culinary grows only.</p>
+        <form id="cp-form">
+          <label class="photo-pick" for="cp-file"><span>Take or choose a photo</span>
+            <input id="cp-file" type="file" accept="image/*" capture="environment">
+          </label>
+          <img id="cp-preview" class="hidden" alt="Your photo">
+          <label>Chamber
+            <select id="cp-chamber"></select>
+          </label>
+          <label id="cp-profile-wrap" class="hidden">What are you growing?
+            <select id="cp-profile"></select>
+          </label>
+          <label>Anything you noticed? (optional)
+            <input id="cp-note" type="text" maxlength="300" placeholder="Fuzzy spot near the top">
+          </label>
+          <button type="submit" id="cp-submit">Check my grow</button>
+          <p class="muted">Your photo is not saved. Location and camera details are removed before it is checked.</p>
+          <p id="cp-usage" class="muted"></p>
+        </form>
+        <div id="cp-result" aria-live="polite"></div>
+      </section>
+
       <section id="coach-recs" class="coach-section" aria-labelledby="recs-title">
         <h2 id="recs-title">Recommendations</h2>
         <div id="recs-list" class="coach-stack" aria-busy="true"><div class="sk sk-card"></div></div>
@@ -134,20 +159,6 @@
         </form>
       </section>
 
-      <section id="photo-panel" class="card coach-panel hidden" aria-labelledby="photo-title">
-        <h2 id="photo-title">Photo check</h2>
-        <p class="muted">Upload a culinary grow photo. The coach returns stage, contamination or dryness flags, confidence, and a next step. Stored privately with your account.</p>
-        <form id="photo-form">
-          <label>Photo
-            <input id="photo-file" type="file" accept="image/*">
-          </label>
-          <label>Notes
-            <input id="photo-hint" maxlength="200" placeholder="Optional. What you are seeing">
-          </label>
-          <button type="submit">Check photo</button>
-        </form>
-        <div id="photo-result"></div>
-      </section>
       </div>
     </div>
   </main>
