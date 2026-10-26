@@ -26,6 +26,7 @@ import {
   renderIdentity,
   renderReadonlyNotes,
   speciesLine,
+  stageOptionsHtml,
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
@@ -1725,6 +1726,22 @@ async function inFlight(form, run) {
 function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) {
   const form = $("#device-controls");
   const msg = $("#device-controls-msg");
+  // Picking a different profile resets the phase to its first stage (a new grow starts at day 1).
+  form?.addEventListener("change", (ev) => {
+    if (ev.target?.name !== "profile_id" || !form.stage) return;
+    const option = ev.target.selectedOptions?.[0];
+    let stages = [];
+    try {
+      stages = JSON.parse(option?.dataset?.stages || "[]");
+    } catch {
+      stages = [];
+    }
+    const device = currentDevice() || {};
+    form.stage.innerHTML = stageOptionsHtml(stages, {
+      selectedId: device.stage?.id,
+      sameProfile: Boolean(option?.value) && option.value === device.profile?.id,
+    });
+  });
   form?.addEventListener("submit", (ev) => {
     ev.preventDefault();
     if (!canWrite) return;
