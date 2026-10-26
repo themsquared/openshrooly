@@ -140,7 +140,7 @@ jobs:
           release-summary: "Dev build from ${{ github.ref }} @ ${{ github.sha }}"
           # ESPHome image tag, not the firmware version. VERSION can be
           # preview-<sha>, which is not an ESPHome image.
-          version: latest
+          version: "2026.7.1"
 
       # ----- Dev "latest" moving tag -----
       - name: Tag dev-latest
