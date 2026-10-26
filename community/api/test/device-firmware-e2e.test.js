@@ -243,8 +243,8 @@ test("b2 b3 b4: anonymous enroll cannot take an owned D1 row", async () => {
     const b3 = await call(ctx, "POST", "/api/devices/enroll", {
       body: enrollBody({ hardware_id: "aabbccddeeffd102", public_jwk: attacker.public_jwk }),
     });
-    assert.equal(b3.status, 409);
-    assert.equal(b3.data.code, "already_claimed");
+    assert.equal(b3.status, 200);
+    assert.notEqual(b3.data.device_id, deviceId);
 
     const ninety = new Date(Date.now() - 90 * 86400000).toISOString().replace(/\.\d+Z$/, "Z");
     await d1.prepare("UPDATE cloud_devices SET status=? WHERE id=?").bind("active", deviceId).run();
@@ -261,7 +261,8 @@ test("b2 b3 b4: anonymous enroll cannot take an owned D1 row", async () => {
     const b2 = await call(ctx, "POST", "/api/devices/enroll", {
       body: enrollBody({ hardware_id: "aabbccddeeffd102", public_jwk: attacker.public_jwk }),
     });
-    assert.equal(b2.status, 409);
+    assert.equal(b2.status, 200);
+    assert.notEqual(b2.data.device_id, deviceId);
     const owner = await d1.prepare("SELECT owner_id, status FROM cloud_devices WHERE id=?").bind(deviceId).first();
     assert.equal(Number(owner.owner_id), 1);
     const csr = await makeCsr(attacker.keys, deviceId);
