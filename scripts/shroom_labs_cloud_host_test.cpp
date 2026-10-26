@@ -488,6 +488,7 @@ int main() {
 
   expect(cloud_owns_url("/cloud"), "cloud owns /cloud");
   expect(!cloud_owns_url("/cloud/connect"), "cloud does not own two-segment");
+  expect(cloud_grow_url("/grow") && !cloud_grow_url("/grow/x") && std::strcmp(first_local_handler("/grow"), "cloud") == 0, "grow read is ours");
   expect(!dashboard_catchall_claims("/cloud"), "catchall skips /cloud");
   expect(!dashboard_catchall_claims("/security"), "catchall skips /security");
   expect(!dashboard_catchall_claims("/update"), "catchall skips /update");
@@ -502,7 +503,7 @@ int main() {
              cloud_action_ok("remote_apply_on") && cloud_action_ok("remote_apply_off"),
          "cloud actions");
   expect(!cloud_action_ok("wipe") && !cloud_action_ok(""), "cloud action reject");
-  const char *our_routes[] = {"/cloud", "/security", "/update", "/wifisave"};
+  const char *our_routes[] = {"/cloud", "/grow", "/security", "/update", "/wifisave"};
   bool stolen = false;
   for (const char *p : our_routes)
     stolen = stolen || dashboard_catchall_claims(p);
@@ -771,7 +772,8 @@ int main() {
   expect(!eng.wiping(), "engine not wiping when linked");
 
   // What is growing rides on the inbox and shows on the chamber's own page while linked.
-  expect(std::strstr(eng.status_json().c_str(), "\"grow_name\":\"\"") != nullptr, "no grow before inbox");
+  expect(eng.grow_json() == "{\"linked\":true,\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\"}", "no grow before inbox");
+  expect(eng.status_json().find("grow_name") == std::string::npos, "grow not in the login-only status");
   tr.steps = {{"/inbox", ok_body(200,
       "{\"commands\":[],\"cloud_enabled\":true,\"offline_ok\":true,\"grow_name\":\"Lion's Mane\","
       "\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\","
@@ -779,7 +781,7 @@ int main() {
   tr.i = 0;
   eng.probe_now();
   {
-    const std::string js = eng.status_json();
+    const std::string js = eng.grow_json();
     expect(js.find("\"grow_name\":\"Lion's Mane\"") != std::string::npos, "grow name in status");
     expect(js.find("\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\"") != std::string::npos, "grow url in status");
     expect(js.find("species-lions-mane-640.webp\"") != std::string::npos, "grow image in status");
@@ -788,12 +790,12 @@ int main() {
   tr.steps = {{"/inbox", ok_body(200, "{\"commands\":[]}")}};
   tr.i = 0;
   eng.probe_now();
-  expect(eng.status_json().find("Lion's Mane") != std::string::npos, "grow kept when server sends none");
+  expect(eng.grow_json().find("Lion's Mane") != std::string::npos, "grow kept when server sends none");
   // Empty name clears it.
   tr.steps = {{"/inbox", ok_body(200, "{\"commands\":[],\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\"}")}};
   tr.i = 0;
   eng.probe_now();
-  expect(eng.status_json().find("\"grow_name\":\"\"") != std::string::npos, "grow cleared");
+  expect(eng.grow_json().find("\"grow_name\":\"\"") != std::string::npos, "grow cleared");
   {
     InboxGrow g;
     expect(!parse_inbox_grow("{\"commands\":[]}", &g), "grow absent on old server");

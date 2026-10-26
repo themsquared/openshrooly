@@ -90,6 +90,7 @@ class ShroomLabsCloud : public Component {
   std::string claim_code() const { return engine_.claim_code(); }
   std::string claim_url() const { return engine_.claim_url(); }
   std::string status_json() const;
+  std::string grow_json() const { return this->engine_.grow_json(); }
   std::string display_code() const { return engine_.display_code(); }
   std::string display_hint() const { return engine_.display_hint(); }
   std::string display_expiry() const { return engine_.display_expiry(); }

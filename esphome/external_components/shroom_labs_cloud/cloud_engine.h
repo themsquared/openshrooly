@@ -51,6 +51,7 @@ class CloudEngine {
   std::string claim_code() const;
   std::string claim_url() const;
   std::string status_json() const;
+  std::string grow_json() const;
   std::string display_code() const;
   std::string display_hint() const;
   std::string display_expiry() const;

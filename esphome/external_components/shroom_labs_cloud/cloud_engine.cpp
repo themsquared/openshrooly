@@ -554,6 +554,23 @@ std::string CloudEngine::display_expiry() const {
   return buf;
 }
 
+// What is growing, for the open dashboard. No claim code or keys, so no login needed.
+// Only while linked, so an unlinked chamber shows nothing from the site.
+std::string CloudEngine::grow_json() const {
+  std::lock_guard<std::mutex> g(lock_);
+  const bool show = !pending_wipe_ && state_ == CloudState::Linked && has_cert_;
+  std::string out = "{\"linked\":";
+  out += show ? "true" : "false";
+  out += ",\"grow_name\":\"";
+  out += show ? grow_.name : "";
+  out += "\",\"grow_url\":\"";
+  out += show ? grow_.url : "";
+  out += "\",\"grow_image\":\"";
+  out += show ? grow_.image : "";
+  out += "\"}";
+  return out;
+}
+
 std::string CloudEngine::status_json() const {
   std::lock_guard<std::mutex> g(lock_);
   std::string url = claim_url_;
@@ -579,15 +596,6 @@ std::string CloudEngine::status_json() const {
   out += live ? claim_expires_ : "";
   out += "\",\"expires_in_s\":";
   out += std::to_string(left);
-  // Only while linked, so an unlinked chamber shows nothing from the site.
-  const bool show_grow = !pending_wipe_ && state_ == CloudState::Linked && has_cert_;
-  out += ",\"grow_name\":\"";
-  out += show_grow ? grow_.name : "";
-  out += "\",\"grow_url\":\"";
-  out += show_grow ? grow_.url : "";
-  out += "\",\"grow_image\":\"";
-  out += show_grow ? grow_.image : "";
-  out += "\"";
   out += ",\"remote_apply\":";
   out += remote_apply_ ? "true" : "false";
   out += ",\"message\":\"";

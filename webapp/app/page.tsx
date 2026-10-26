@@ -724,7 +724,7 @@ export default function Dashboard() {
     let stopped = false
     const load = async () => {
       try {
-        const res = await fetch('/cloud', { cache: 'no-store' })
+        const res = await fetch('/grow', { cache: 'no-store' })
         if (!res.ok) return
         const body = await res.json()
         if (stopped) return

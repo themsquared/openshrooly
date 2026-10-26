@@ -51,6 +51,8 @@ inline bool hour_capped_path(const char *path) {
 
 /** Local admin page. GET reads status. POST with action=connect|refresh|disconnect. */
 inline bool cloud_owns_url(const char *url) { return url != nullptr && std::strcmp(url, "/cloud") == 0; }
+/** Open read of what is growing for the dashboard. One segment, so the catch-all leaves it to us. */
+inline bool cloud_grow_url(const char *url) { return url != nullptr && std::strcmp(url, "/grow") == 0; }
 
 /**
  * The dashboard web_server catch-all claims any path match_url treats as valid:
@@ -67,7 +69,7 @@ inline bool dashboard_catchall_claims(const char *url) {
 inline const char *first_local_handler(const char *url) {
   if (dashboard_catchall_claims(url))
     return "dashboard";
-  if (cloud_owns_url(url))
+  if (cloud_owns_url(url) || cloud_grow_url(url))
     return "cloud";
   return "none";
 }
