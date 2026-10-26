@@ -389,3 +389,34 @@ test("billing portal is only for people with a paid plan", async () => {
   const anon = await call(ctx, "POST", "/api/billing/portal", { body: {} });
   assert.equal(anon.status, 401);
 });
+
+test("webhook events for an unknown user or checkout are skipped with a 200, so Stripe stops retrying", async () => {
+  const { ctx } = liveEnv();
+  const logs = [];
+  const orig = console.log;
+  console.log = (line) => logs.push(String(line));
+  try {
+    const meta = { user_id: "999999", item_id: "grow-coach" };
+    const end = unix(Date.now()) + 30 * 86400;
+    const events = [
+      event("evt_ghost_inv", "invoice.paid", { id: "in_ghost", object: "invoice", parent: { subscription_details: { metadata: meta } }, lines: { data: [{ metadata: meta, period: { end } }] } }),
+      event("evt_ghost_upd", "customer.subscription.updated", { id: "sub_ghost", object: "subscription", status: "canceled", metadata: meta }),
+      event("evt_ghost_del", "customer.subscription.deleted", { id: "sub_ghost", object: "subscription", status: "canceled", metadata: meta }),
+      event("evt_ghost_cs", "checkout.session.completed", { id: "cs_test_ghost", object: "checkout.session", payment_status: "paid", metadata: meta }),
+      event("evt_ghost_exp", "checkout.session.expired", { id: "cs_test_ghost", object: "checkout.session", metadata: meta }),
+    ];
+    for (const evt of events) {
+      const res = await signedWebhook(ctx, evt);
+      assert.equal(res.status, 200, `${evt.type}: ${JSON.stringify(res.data)}`);
+      assert.equal(res.data.ignored, true, evt.type);
+      assert.match(res.data.reason, /^unknown (user|checkout)$/, evt.type);
+      const again = await signedWebhook(ctx, evt);
+      assert.equal(again.data.replayed, true, `${evt.type} is recorded, so a resend is a no-op`);
+    }
+    assert.equal(await ctx.db.one("SELECT * FROM coach_subs WHERE user_id=?", [999999]), null);
+    const skipped = logs.filter((l) => l.includes("stripe event skipped"));
+    assert.equal(skipped.length, events.length);
+  } finally {
+    console.log = orig;
+  }
+});
