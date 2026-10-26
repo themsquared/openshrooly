@@ -1070,3 +1070,6 @@ td a:not(.button) { display: inline-flex; align-items: center; min-height: 44px;
 #group-form { align-items: flex-end; }
 #group-form label { margin-bottom: 0; }
 #group-form button { flex: 0 0 auto; min-width: 120px; }
+
+/* U14: a new chamber shows one plain line instead of a grid of zeros. */
+.stat-grid .stat-empty { grid-column: 1 / -1; margin: 0; }

@@ -1059,6 +1059,7 @@ async function renderCoach() {
     showCoachError(err);
     return null;
   });
+  $("#coach-skeleton")?.classList.add("hidden");
   if (!catalog) return;
   if (!catalog.available) {
     // Coach is hidden for this visitor. Send them home instead of showing a sales page.
@@ -1100,6 +1101,7 @@ async function renderCoach() {
   $("#device").innerHTML =
     `<option value="">All culinary history</option>` +
     claimed.map((d) => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name || d.id)}</option>`).join("");
+  $("#device").disabled = false;
 
   const deviceId = () => $("#device").value || "";
   const profileId = () => $("#profile")?.value || "";
@@ -1129,17 +1131,23 @@ async function renderCoach() {
         library.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.id)}</option>`).join("");
       if (data.profile?.id) $("#profile").value = data.profile.id;
       $("#profile").dataset.ready = "1";
+      $("#profile").disabled = false;
     }
     const m = data.model || {};
-    $("#stats").innerHTML = [
-      ["Samples", m.sample_count ?? 0, 0],
-      ["Humidity error", m.humidity_error, 1],
-      ["Humidity droop", m.humidity_droop, 1],
-      ["Temp offset", m.temperature_offset, 1],
-      ["Success rate", m.outcome_success_rate == null ? null : m.outcome_success_rate * 100, 0],
-    ]
-      .map(([label, value, digits]) => `<div class="stat"><strong>${fmtNum(value, digits)}${label === "Success rate" && value != null ? "%" : ""}</strong><span>${label}</span></div>`)
-      .join("");
+    $("#stats").removeAttribute("aria-busy");
+    // Only show numbers that exist. A grid of "0" and "n/a" reads as broken, so a new chamber gets one plain line.
+    const stats = [
+      ["Readings so far", m.sample_count, 0, ""],
+      ["Humidity vs target, on average", m.humidity_error, 1, "%", true],
+      ["Temperature vs target, on average", m.temperature_offset, 1, " °C", true],
+      ["Grows that went well", m.outcome_success_rate == null ? null : m.outcome_success_rate * 100, 0, "%"],
+    ].filter(([, value]) => value != null && !Number.isNaN(Number(value)));
+    const signed = (value, digits) => `${Number(value) > 0 ? "+" : ""}${fmtNum(value, digits)}`;
+    $("#stats").innerHTML = Number(m.sample_count) > 0
+      ? stats
+          .map(([label, value, digits, unit, sign]) => `<div class="stat"><strong>${sign ? signed(value, digits) : fmtNum(value, digits)}${unit}</strong><span>${label}</span></div>`)
+          .join("")
+      : `<p class="muted stat-empty">No readings from this chamber yet. Numbers show up here after it has reported for a few hours.</p>`;
     $("#alerts").innerHTML =
       (data.alerts || [])
         .map((a) => `<li class="${escapeHtml(a.severity || "")}"><strong>${escapeHtml(a.kind)}</strong>. ${escapeHtml(a.message)}</li>`)
