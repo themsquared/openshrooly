@@ -1275,3 +1275,36 @@ h1 .beta-badge, h2 .beta-badge { font-size: 0.45em; margin-left: 0.4em; }
 .footer-legal a { color: var(--sl-muted, inherit); opacity: 0.8; text-decoration: underline; text-underline-offset: 2px; }
 .contact-sent { display: none; }
 .contact-sent:target { display: block; }
+
+/* Grow Coach page: recommendations, decisions, chambers. Single column on phones, two up on wide screens. */
+.coach-page { display: grid; gap: 1.2rem; }
+.coach-head h1 { margin: 0.4rem 0 0.2rem; font-size: clamp(2rem, 7vw, 2.8rem); }
+.coach-head p { margin: 0; }
+.coach-section > h2 { margin: 0 0 0.6rem; }
+.coach-stack { display: grid; gap: 0.9rem; }
+@media (min-width: 900px) { .coach-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.coach-rec, .coach-chamber { padding: 1rem 1.1rem 1.1rem; margin: 0; overflow: visible; }
+.coach-rec h3, .coach-chamber h3 { margin: 0 0 0.5rem; font-family: var(--display); font-size: 1.35rem; }
+.coach-rec p, .coach-chamber p { margin: 0.4rem 0; }
+.coach-todo { margin: 0 0 0.6rem; padding-left: 1.1rem; }
+.coach-todo li { margin: 0.25rem 0; color: #ffd43b; }
+.coach-suggest { list-style: none; padding: 0; margin: 0.3rem 0 0.5rem; display: grid; gap: 0.2rem; }
+.coach-pending { border: 1px solid rgba(255, 212, 59, 0.4); border-radius: 12px; padding: 0.6rem 0.8rem; margin: 0.5rem 0; display: flex; gap: 0.8rem; align-items: center; justify-content: space-between; }
+.coach-pending p { margin: 0; }
+.coach-feed-list li > div { min-width: 0; }
+.coach-feed-list p { margin: 0.2rem 0 0; }
+.coach-outcome { font-size: 0.9em; color: var(--sl-muted); }
+.coach-decision.is-applied .coach-outcome { color: var(--sl-ok); }
+.coach-decision.is-not_applied .coach-outcome { color: var(--sl-warn); }
+.coach-decision.is-waiting .coach-outcome { color: #ffd43b; }
+.coach-growing { display: grid; grid-template-columns: 72px 1fr; gap: 0.8rem; align-items: center; margin: 0.7rem 0; }
+.coach-growing-art img, .coach-growing-art svg { width: 72px; height: 72px; object-fit: cover; border-radius: 12px; display: block; }
+.coach-growing p { margin: 0.1rem 0; }
+.coach-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin: 0.6rem 0 0.4rem; }
+.coach-gauges .device-gauge { padding: 0.7rem 0.8rem; }
+.coach-gauges .device-gauge strong { font-size: 1.3rem; }
+.coach-mode-line { margin-top: 0.7rem !important; }
+.coach-chamber .mode-toggle { display: flex; flex-wrap: wrap; }
+.coach-chamber .mode-toggle button { flex: 1 1 0; min-width: 0; }
+.coach-msg:empty { display: none; }
+button.small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }

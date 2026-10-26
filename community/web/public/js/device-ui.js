@@ -147,7 +147,7 @@ export function reports(device, field) {
   return v != null && v !== "" && Number.isFinite(Number(v));
 }
 
-function identityArt(device) {
+export function identityArt(device) {
   const p = device?.profile;
   if (!p) return "";
   return speciesArt(p.species, p.strain, p.name, p.pack, { id: p.id, linked: false });
