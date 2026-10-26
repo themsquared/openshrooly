@@ -1353,7 +1353,7 @@ async function renderCoach() {
   }
   const monthly = coachSale(catalog.product, "monthly");
   track("view_item", { currency: "USD", value: monthly.value, items: monthly.items });
-  if (checkoutResult() === "cancel") reportCancel({ items: monthly.items });
+  if (checkoutResult() === "cancel") reportCancel({ items: monthly.items, value: monthly.value });
   for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.remove("hidden");
   $("#gated")?.classList.add("hidden");
   $("#coach-status").textContent = view === "waitlist" ? catalog.marketing : "";
