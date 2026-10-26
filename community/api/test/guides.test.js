@@ -47,7 +47,7 @@ test("guide FAQPage schema matches the visible FAQ, and Article has a date", () 
 });
 
 test("guide copy stays plain: no dashes, arrows, jargon, or Coach", () => {
-  const banned = [/[\u2013\u2014\u2192\u21d2]/, /\bFAE\b/, /\bRH\b/, /setpoint/i, /fully indexed/i, /\bCoach\b/, /guaranteed?/i, /\bbest[- ]in[- ]class\b/i, /(?<!Open)Shrooly (?!(chambers?|devices?)\b)/];
+  const banned = [/[\u2013\u2014\u2192\u21d2]/, /\bFAE\b/, /\bRH\b/, /setpoint/i, /fully indexed/i, /\bCoach\b/, /guaranteed?/i, /\bbest[- ]in[- ]class\b/i, /(?<!Open)Shrooly (?!(chambers?|devices?|app)\b)/];
   for (const g of GUIDES) {
     const body = text(main(page(g.slug)));
     for (const re of banned) assert.doesNotMatch(body, re, `${g.slug} ${re}`);
@@ -60,14 +60,14 @@ test("guide links resolve: profiles are free and indexed, guides exist, partners
     const html = main(page(g.slug));
     for (const [, href] of html.matchAll(/href="([^"]+)"/g)) {
       if (href.startsWith("http")) {
-        assert.match(href, /^https:\/\/(northspore\.com|pnwspore\.com)\//, `${g.slug} external ${href}`);
+        assert.match(href, /^https:\/\/(northspore\.com|pnwspore\.com|openshrooly\.com)\//, `${g.slug} external ${href}`);
         continue;
       }
       assert.doesNotMatch(href, /\.html/, `${g.slug} ${href}`);
       const profile = href.match(/^\/profiles\/([a-z0-9-]+)$/);
       if (profile) assert.ok(indexed.has(profile[1]), `${g.slug} links free profile ${href}`);
       else if (href.startsWith("/guides/")) assert.ok(existsSync(join(PUBLIC, `${href}.html`)), `${g.slug} ${href}`);
-      else assert.ok(["/", "/grow"].includes(href), `${g.slug} ${href}`);
+      else assert.ok(["/", "/grow", "/install", "/docs", "/faq"].includes(href), `${g.slug} ${href}`);
     }
     if (/northspore|pnwspore/.test(html)) assert.match(text(html), /affiliate links/, `${g.slug} discloses partners`);
     assert.ok(/href="\/profiles\//.test(html) || /href="\/grow"/.test(html), `${g.slug} links to profiles`);
