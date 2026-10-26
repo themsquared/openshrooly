@@ -6,6 +6,273 @@ Every number below comes from the published Shroom Labs grow profiles. Source: h
 
 ---
 
+## How to grow mushrooms at home
+
+URL: https://shroomlabs.io/guides/grow-mushrooms-at-home
+Updated: 2026-10-26
+
+The easiest way to grow mushrooms at home is to start with an oyster or lion's mane kit or a colonized block, keep it at 85 to 95% humidity with regular fresh air, give it indirect light, and keep the room cool. Most kits start forming mushrooms one to two weeks after you open them. When that works, a fruiting chamber makes every grow repeatable.
+
+### What do mushrooms need to grow?
+
+Every culinary mushroom needs the same five things. Get these right and most grows succeed.
+
+- Food. Mycelium, the root network of the fungus, eats a substrate such as hardwood sawdust, straw, or grain. A kit or block already has this done for you.
+
+- Humidity. Young mushrooms are mostly water and dry out fast. Most species fruit best between 85 and 95% humidity.
+
+- Fresh air. Mycelium breathes out carbon dioxide. If it builds up, mushrooms grow long thin stems and small caps, or do not form at all.
+
+- Light. Mushrooms do not use light for food, but light tells them which way is up and when to fruit. Indirect daylight or about 12 hours of room light a day is enough. Enoki and button mushrooms are the exceptions and fruit in the dark.
+
+- The right temperature. Most species colonize warm and fruit cooler. Blue Oyster fruits at 14 °C (57 °F) in its profile, while Pink Oyster wants 24 °C (75 °F).
+
+### What are the stages of growing mushrooms?
+
+- Colonization. Mycelium spreads through the substrate in warm, dark, still conditions. Lion's Mane colonizes for 16 days at 22 °C (72 °F) in its profile.
+
+- Pinning. Cooler air, higher humidity, more fresh air, and light tell the block to start tiny mushrooms called pins. This takes a few days to a week for most species.
+
+- Fruiting. Pins grow into full mushrooms. Humidity stays high and fresh air goes up as the mushrooms get bigger.
+
+- Harvest and rest. Pick before the caps flatten and drop spores, then let the block rest and fruit again. Most blocks give two or three flushes.
+
+Every species page on this site has a stage by stage table with temperature, humidity, fresh air, light, and days.
+
+### Which mushroom should a beginner grow first?
+
+Start with oyster mushrooms or lion's mane. They colonize fast, forgive small mistakes, and show you quickly if something is wrong. In this library Pearl Oyster runs about 29 days from the start of colonization to the end of the first harvest window, and Lion's Mane about 33 days. Read the easiest mushrooms to grow at home for a full list.
+
+Good first mushrooms, from their profiles |  | Mushroom | Fruiting temperature | Fruiting humidity | Days, start to first harvest window
+ | Pearl Oyster | 16 °C (61 °F) | 88% | 29
+ | Blue Oyster | 14 °C (57 °F) | 87% | 25
+ | Lion's Mane | 17 °C (63 °F) | 90% | 33
+ | Pink Oyster | 24 °C (75 °F) | 86% | 20
+
+### What is the best way to grow mushrooms at home?
+
+There are three common setups. Pick the one that matches how much time you want to spend.
+
+- A grow kit. A colonized block in a bag or box. You cut it open, mist it, and wait. Cheapest and simplest, but results depend on the room you leave it in.
+
+- A tub or monotub. A plastic tub with holes for air, filled with colonized bulk substrate. Bigger harvests, more hands on work, and you need clean technique.
+
+- A fruiting chamber. A box that holds humidity, fresh air, light, and sometimes temperature for you. A Shrooly chamber running OpenShrooly follows a grow profile stage by stage.
+
+The full comparison is in grow kit vs monotub vs smart chamber.
+
+### How do you grow mushrooms from a kit, step by step?
+
+- Check the block. It should be white with mycelium all the way through. A few yellow drops are normal. Green, black, or pink patches are mold.
+
+- Open it where the kit says. Usually a cut or an X in the bag on one side. Mushrooms grow out of the opening.
+
+- Find a spot. Out of direct sun, away from heaters and fans that dry the air, and in a room near the fruiting temperature for your species.
+
+- Keep it humid. Mist the air around the opening two or three times a day, or put the block in a humidity tent or chamber. Mist the walls, not the pins.
+
+- Give it air. Fan the tent a few times a day or leave holes for air. Stuffy air gives long stems and small caps.
+
+- Harvest on time. Twist or cut the cluster off at the base when the caps are mostly open but the edges still curl down a little.
+
+- Rest and repeat. Let the block sit for a week or two, then soak or mist it and start again.
+
+### How much humidity and fresh air do mushrooms need?
+
+Most culinary mushrooms fruit between 85 and 95% humidity. Fresh air matters just as much: oysters need a lot, lion's mane and shiitake need less. The profiles set a different humidity and fan rate for each stage. Too little humidity shows as dry, cracked caps and pins that stall. Too little fresh air shows as long stems and small caps.
+
+### What usually goes wrong?
+
+- No pins after colonization: usually not enough fresh air, light, or a temperature drop.
+
+- Long, thin stems: too much carbon dioxide or too little light.
+
+- Dry, cracked caps: humidity too low or air blowing straight on the caps.
+
+- Green, black, or slimy patches: mold or bacteria.
+
+### Where can you buy mushroom kits and spawn?
+
+Buy from a supplier that sells clean, labeled cultures and stands behind them. Two we work with are North Spore for kits, spawn, and supplies, and PNW Spore for culinary liquid cultures.
+Shroom Labs partners with North Spore and PNW Spore. Some supplier links on this site may be affiliate links. We may earn a commission if you buy through them, at no extra cost to you.
+
+### FAQ
+
+Q: How long does it take to grow mushrooms at home?
+A: From a ready kit, most oysters and lion's mane give a first harvest in two to three weeks. From the start of colonization, the profiles here run from about 20 days for pink oyster to about 74 days for shiitake.
+
+Q: Can you grow mushrooms indoors?
+A: Yes. Indoors is the easiest place to control humidity, temperature, and light. A kitchen counter, a shelf, or a closet with some light all work as long as the mushrooms get fresh air.
+
+Q: Do mushrooms need light to grow?
+A: They do not need light for food, but most species need some light to start pins and grow normal caps. About 12 hours a day of indirect daylight or room light is enough for most culinary mushrooms.
+
+Q: How many times can a mushroom block fruit?
+A: Most blocks give two or three flushes. Each flush is usually smaller than the one before. When a block stops fruiting or turns soft and smelly, compost it.
+
+Q: Is it safe to grow mushrooms at home?
+A: Growing culinary mushrooms is safe for most people. Oysters release a lot of spores once the caps flatten, so harvest before that and keep large grows out of bedrooms if you have allergies. Only eat mushrooms you grew from a known culture.
+
+---
+
+## What is the easiest mushroom to grow at home?
+
+URL: https://shroomlabs.io/guides/easiest-mushrooms-to-grow
+Updated: 2026-10-26
+
+Oyster mushrooms are the easiest mushroom to grow at home. Pearl and blue oyster colonize fast, shrug off small mistakes, and run about 29 and 25 days in their profiles from the start of colonization to the end of the first harvest window. Lion's mane is a close second and just as good in a kit.
+
+### Which mushrooms are easiest for beginners?
+
+Beginner mushrooms, from their profiles |  | Mushroom | Fruiting temperature | Fruiting humidity | Days, start to first harvest window
+ | Pearl Oyster | 16 °C (61 °F) | 88% | 29
+ | Blue Oyster | 14 °C (57 °F) | 87% | 25
+ | Pink Oyster | 24 °C (75 °F) | 86% | 20
+ | Golden Oyster | 21 °C (70 °F) | 87% | 24
+ | Elm Oyster | 15 °C (59 °F) | 86% | 31
+ | Lion's Mane | 17 °C (63 °F) | 90% | 33
+
+All six are tagged beginner in this library. They grow on common hardwood or straw substrates, fruit at room temperature or a little below, and show you fast when something is off.
+
+### Why are oyster mushrooms the easiest?
+
+- Fast. Oysters colonize quickly, so mold has less time to get a start.
+
+- Forgiving. They fruit across a wide range of humidity and temperature.
+
+- Clear signals. If the air is stale you see long stems within days, so you learn fast.
+
+The one thing oysters ask for is plenty of fresh air. The Pearl Oyster profile runs its fan harder in fruiting than most other species.
+
+### Which oyster should you pick for your room temperature?
+
+- Cool room: Blue Oyster fruits at 14 °C (57 °F).
+
+- Normal room: Pearl Oyster fruits at 16 °C (61 °F).
+
+- Warm room or summer: Golden Oyster at 21 °C (70 °F) or Pink Oyster at 24 °C (75 °F).
+
+### Is lion's mane easy to grow?
+
+Yes. Lion's Mane is one of the easiest mushrooms to grow from a kit. It needs less fresh air than oysters but likes high humidity, 90% while fruiting in its profile. Yellowing spines usually mean dry air or an old fruit. A pink tint often comes from cool air or strong light.
+
+### What do you need for a first grow?
+
+- A colonized block or kit of one of the species above.
+
+- A spray bottle for misting, or a humidity tent or chamber that holds humidity for you.
+
+- A spot with indirect light and no heater or fan blowing on it.
+
+- Clean hands and a clean knife for opening the bag and harvesting.
+
+That is all. Grain, pressure cookers, and sterile work only come in when you want to make your own blocks.
+
+### How long until you can eat them?
+
+From a fully colonized kit, oysters usually show pins within one to two weeks and are ready a few days later. From the start of colonization, the beginner profiles here run from about 20 days for Pink Oyster to about 33 days for Lion's Mane. Each profile page has a day by day timeline.
+
+Pick oysters when the cap edges are still curled down a little, before they flatten and drop spores. Pick lion's mane when the spines are about half a centimeter long and before it starts to yellow.
+
+### Which mushrooms should beginners skip at first?
+
+- Shiitake: about 74 days in its profile, with a long browning stage and a cold shock.
+
+- Button / Cremini: grows on compost with a casing layer, which is a different skill set.
+
+- Maitake, Reishi, and Cordyceps militaris: slow or picky. Great second or third projects.
+
+### FAQ
+
+Q: What is the fastest mushroom to grow at home?
+A: Pink oyster is the fastest profile here at about 20 days from the start of colonization to the end of the first harvest window. It likes warm rooms around 24 °C (75 °F).
+
+Q: What is the easiest mushroom to grow without a kit?
+A: Oyster mushrooms on pasteurized straw or on a ready made sawdust block. They colonize fast enough to outrun most molds.
+
+Q: Can mushrooms grow at room temperature?
+A: Yes. Pearl Oyster fruits at 16 °C (61 °F) and Golden Oyster at 21 °C (70 °F) in their profiles, both close to a normal room. Pick the species that matches your room rather than fighting it.
+
+Q: Can you grow lion's mane and oyster in the same room?
+A: Yes, but oysters drop many spores once their caps flatten. Harvest oysters on time so their spores do not land on other blocks.
+
+---
+
+## Grow kit vs monotub vs smart chamber
+
+URL: https://shroomlabs.io/guides/grow-kit-vs-monotub-vs-smart-chamber
+Updated: 2026-10-26
+
+A grow kit is the cheapest and simplest way to get a first harvest. A monotub gives bigger harvests from bulk substrate but takes more hands on work and clean technique. A smart fruiting chamber holds humidity, fresh air, and light for you, and some also manage temperature, so results repeat, but it costs more up front.
+
+### How do they compare side by side?
+
+Three ways to grow mushrooms at home |  |  | Grow kit | Monotub | Smart chamber
+
+ | Setup | Open the box | Drill holes, prepare substrate | Plug in, pick a profile
+
+ | Daily work | Mist two or three times | Check and fan once or twice | Refill water, harvest
+
+ | Control | Whatever your room gives | Humidity by hand, air by holes | Humidity, fan, light, and stage timing set by profile
+
+ | Harvest size | One block | Largest | One or two blocks at a time
+
+ | Best for | A first try | Bulk harvests, hobby growers | Repeatable grows with little daily work
+
+### Is a grow kit worth it?
+
+Yes, for a first grow. A kit removes the hardest part, getting a clean colonized block. The weak spot is the room. Dry winter air or a warm kitchen can stall it, and a kit left in dry air often gives one small flush and stops. A simple humidity tent fixes most of that.
+
+### What is a monotub and who is it for?
+
+A monotub is a plastic storage tub with a few holes for air, filled with colonized bulk substrate. It holds humidity on its own and can give large harvests. It suits growers who already make or buy grain spawn and are comfortable with clean technique. Too many holes dry the surface. Too few give stale air.
+
+### What does a smart fruiting chamber do?
+
+A smart chamber is a small box with a humidifier, a fan, lights, and sensors. It reads the air and adjusts on its own. A Shrooly chamber running OpenShrooly loads a grow profile, then moves from colonization to pinning to fruiting on schedule, changing humidity, fan, and light at each stage. Every species profile on this site is free to load.
+
+### What about a grow tent or shelf setup?
+
+A wire shelf in a clear plastic cover, often called a martha tent, sits between a monotub and a smart chamber. It fits several blocks and you add a humidifier and fan yourself. It is a good next step once one block at a time feels too small.
+
+### How much space does each need?
+
+- Grow kit: a spot on a counter or shelf about the size of a shoebox.
+- Monotub: a storage tub, often 50 to 70 liters, plus room to prepare substrate.
+- Smart chamber: a countertop footprint, with a power outlet nearby.
+- Shelf tent: floor space for a wire shelf, often in a spare room or garage.
+
+### What usually goes wrong with each?
+
+- Grow kit: dry air. Caps crack and pins stall when the room is dry.
+- Monotub: contamination. Bulk substrate gives mold more room if anything was not clean.
+- Smart chamber: an empty water tank or a profile that does not match the species. Check the tank and pick the right profile.
+- Shelf tent: uneven conditions. The top shelf is often warmer and drier than the bottom.
+
+### Which should you choose?
+
+- Never grown before: start with a kit, ideally oyster or lion's mane.
+
+- Want the biggest harvest for the money: monotub or shelf tent.
+
+- Want the same result every time with little daily work: a smart chamber.
+
+### FAQ
+
+Q: Do you need a fruiting chamber to grow mushrooms?
+A: No. A kit on a counter or in a humidity tent can fruit well. A chamber just makes humidity and fresh air steady, which matters most in dry or warm homes.
+
+Q: Is a monotub better than a grow kit?
+A: It can give a much bigger harvest, but it asks more of you. A kit is better for a first grow because the hard part is done.
+
+Q: Can you grow oyster mushrooms in a monotub?
+A: You can, but oysters need a lot of fresh air and do better in bags, buckets with holes, or a tent with good airflow.
+
+Q: What is an automated mushroom fruiting chamber?
+A: A box with a humidifier, fan, lights, and sensors that holds the conditions a mushroom needs and changes them by stage. You still harvest by hand.
+
+---
+
 ## How to grow Beech / Buna Shimeji at home
 
 URL: https://shroomlabs.io/profiles/beech-shimeji
