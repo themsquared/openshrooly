@@ -1085,7 +1085,7 @@ async function consumeLocalSignIn() {
 
 function coachPriceText(product) {
   const cents = Number(product?.amount_cents);
-  return Number.isFinite(cents) && cents > 0 ? `$${(cents / 100).toFixed(2)}` : "$3.99";
+  return Number.isFinite(cents) && cents > 0 ? `$${(cents / 100).toFixed(2)}` : "";
 }
 
 async function renderCoach() {
@@ -1117,7 +1117,8 @@ async function renderCoach() {
   // Sales view: one price, one button, three bullets, cancel anytime.
   const price = coachPriceText(catalog.product);
   $("#coach-price").textContent = price;
-  $("#subscribe").textContent = `Start Grow Coach, ${price}/mo`;
+  $("#coach-price-line")?.classList.toggle("hidden", !price);
+  $("#subscribe").textContent = price ? `Start Grow Coach, ${price}/mo` : "Start Grow Coach";
   $("#coach-status").textContent = "";
   if (!isSignedIn()) {
     $("#subscribe-panel").classList.remove("hidden");
