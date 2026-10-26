@@ -19,7 +19,7 @@ import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
 import { handleFleet } from "./fleet.js";
 import { handleAccount } from "./account.js";
-import { coachBetaAccess, coachVisible, handleCoach, hasGrowCoach } from "./coach.js";
+import { coachBetaAccess, coachPlans, coachVisible, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, coachCustomerFor, openBillingPortal, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities, paymentsConfigured } from "./providers.js";
@@ -355,7 +355,7 @@ async function route(method, path, url, request, env) {
             beta: coachBetaAccess(env, user),
             period_end: coachSub?.period_end || null,
             auto_tune: Boolean(Number(coachSub?.auto_tune)),
-            product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, pack: "culinary" },
+            product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, plans: coachPlans(env, request), pack: "culinary" },
           }
         : { available: false },
       // Show "Manage billing" only to people Stripe knows about.
