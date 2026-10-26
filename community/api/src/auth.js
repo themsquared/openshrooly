@@ -789,8 +789,14 @@ async function completeSignIn(db, user, request, env, body = {}) {
     }
   }
   const issued = await issueSession(db, user, request, env);
-  return json({ user: publicUser(user), ...issued }, 200, issued.headers);
+  // Lets the site label its analytics event sign_up rather than login. A boolean only.
+  const created = Date.parse(user.created_at || "");
+  const newAccount = Number.isFinite(created) && Date.now() - created < NEW_ACCOUNT_MS;
+  return json({ user: publicUser(user), ...issued, new_account: newAccount }, 200, issued.headers);
 }
+
+/** A sign-in this soon after the account row was made is the sign-up. */
+const NEW_ACCOUNT_MS = 15 * 60 * 1000;
 
 async function consumeUserTotp(db, user, env, code) {
   const secret = await decryptSecret(user?.totp_secret_enc, env);

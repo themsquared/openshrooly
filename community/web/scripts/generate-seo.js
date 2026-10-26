@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NAV_ITEMS, POSITIONING, PRODUCT, SITE, TAGLINE, renderFooter, renderHeader } from "../public/js/chrome.js";
 import { speciesArt } from "../public/js/species-art.js";
-import { renderProfileCards } from "../public/js/profile-cards.js";
+import { profileItem, renderProfileCards } from "../public/js/profile-cards.js";
 import { lightRecipeLine } from "../public/js/light-line.js";
 import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.js";
 import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
@@ -698,7 +698,7 @@ export function renderGuideProfilePage(profile, profiles = []) {
   const guides = GUIDES.filter((g) => g.profileLink !== false).slice(0, 4);
   const name = escapeHtml(profile.name);
   const body = `
-    <article class="profile-page guide-page">
+    <article class="profile-page guide-page" data-sl-view-item="${escapeHtml(JSON.stringify(profileItem(profile)))}">
       ${crumbsHtml([["Home", "/"], ["Grow guides", "/grow"], [profile.name, ""]])}
       ${art ? `<div class="card profile-page-art">${art}</div>` : ""}
       <p class="eyebrow">Culinary Profile</p>
@@ -764,8 +764,10 @@ export function renderProfilePage(profile, profiles = []) {
     ? `<p class="actions"><a class="button" href="${tools}">Buy for ${price(profile)}</a></p>`
     : `<p class="actions"><a class="button" href="${tools}">Download, rate, or report a grow</a></p>`;
   const art = speciesArt(profile.species, profile.strain, profile.name, profile.pack, { priority: true, id: profile.id });
+  // js/ga.js sends view_item from this. Off-menu pages have no analytics and no attribute.
+  const viewItem = psi ? "" : ` data-sl-view-item="${escapeHtml(JSON.stringify(profileItem(profile)))}"`;
   const body = `
-    <article class="profile-page">
+    <article class="profile-page"${viewItem}>
       ${art ? `<div class="card profile-page-art">${art}</div>` : ""}
       <p class="eyebrow">${psi ? "Off-menu Profile" : isChef(profile) ? `<a href="/chefs-line">Chef's line</a>` : paid ? "Paid culinary Profile" : "Culinary Profile"}</p>
       <h1>${escapeHtml(profile.name)}</h1>
@@ -918,7 +920,7 @@ export function renderChefsLinePage(profiles) {
       <p class="lede answer-first">${chefs.length} paid profiles, each tuned for one result you can taste or see: dense lion's mane, flower cap shiitake, thick king oyster stems, bright pink oysters, and more. Each is a one-time purchase. Once you buy it, the full recipe is yours for good.</p>
       <p class="muted">Every profile runs on a Shrooly chamber with OpenShrooly. Most cost $2.99. The most involved ones cost $3.99.</p>
     </article>
-    <section class="library chefs-line" aria-label="Chef's line profiles">
+    <section class="library chefs-line" aria-label="Chef's line profiles" data-sl-list="chefs_line" data-sl-list-name="Chef's line" data-sl-view>
       <div class="cards">${renderProfileCards(chefs)}</div>
     </section>
     <article class="profile-page guide-page">

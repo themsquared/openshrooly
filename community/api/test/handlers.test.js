@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { laterIso, nowIso, randomToken, sha256Hex } from "../src/crypto.js";
 import { allowedOrigins, pickCorsOrigin, withCors } from "../src/handlers.js";
@@ -148,7 +148,18 @@ test("magic link sign-in creates a verified user and session cookie", async () =
   const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@example.com"]);
   assertPublicHandle(row, done.data.user);
   const reuse = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: start.data.debug_token } });
-  assert.equal(reuse.status, 401);
+  assert.equal(reuse.status, 401);  // The site labels its analytics sign_up vs login from this boolean.
+  assert.equal(done.data.new_account, true);
+  // An hour later the same email signing in is a login.
+  mock.timers.enable({ apis: ["Date"], now: Date.now() + 3600000 });
+  try {
+    const again = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "grower@example.com", turnstile: "ok" } });
+    const second = await call(ctx, "POST", "/api/auth/magic/complete", { body: { token: again.data.debug_token } });
+    assert.equal(second.status, 200);
+    assert.equal(second.data.new_account, false);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test("OIDC Google stub and passkey challenge", async () => {
