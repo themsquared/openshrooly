@@ -17,6 +17,7 @@ import {
   seoDescription,
   renderFaqPage,
   renderLightRecipe,
+  renderSources,
   renderLlms,
   renderProfilePage,
   renderSitemap,
@@ -163,22 +164,30 @@ test("built-in profiles are served from the bundled seeds, not stale D1 text", a
   assert.doesNotMatch(list.data.find((p) => p.id === "lions-mane").summary, /\bFAE\b|\bRH\b/);
 });
 
-test("profile pages show the light recipe, wavelength note, and at least one source", () => {
+test("profile pages lead with a one-line light recipe and keep details and sources collapsed", () => {
   const profiles = loadProfiles();
   for (const profile of profiles) {
     const html = renderProfilePage(profile);
     assert.match(html, /Light recipe/);
-    assert.match(html, /465 to 475 nm/);
-    assert.match(html, /RGB mix is an approximation/);
     if (profile.pricing?.kind === "paid") {
       assert.match(html, /unlock after purchase/);
-      assert.doesNotMatch(html, /white 20%/);
+      assert.doesNotMatch(html, /white 20%|WS2812/);
+      assert.match(html, />Buy for \$\d+\.\d\d</);
+      assert.doesNotMatch(html, /example/i);
       continue;
     }
-    assert.match(html, /Recipe sources/);
+    const section = html.slice(html.indexOf('class="light-recipe"'), html.indexOf("</section>", html.indexOf('class="light-recipe"')));
+    // The first line is plain words; nm and WS2812 talk only inside the collapsed details.
+    const firstLine = section.slice(0, section.indexOf("<details"));
+    assert.match(firstLine, /h a day|grows in the dark/);
+    assert.doesNotMatch(firstLine, /WS2812|nm\b|RGB/);
+    assert.match(section, /<details class="light-details">[\s\S]*465 to 475 nm/);
     const fruit = profile.light_recipe.phases.fruiting;
-    assert.match(html, new RegExp(`${fruit.photoperiod_hours} h on`));
-    assert.ok(profile.light_recipe.sources.some((note) => html.includes(note.title)));
+    if (fruit) assert.match(html, new RegExp(`${fruit.photoperiod_hours} h on`));
+    // Sources sit at the end of the article, collapsed.
+    const sources = html.indexOf('<details class="sources-block">');
+    assert.ok(sources > html.indexOf('class="actions"'), profile.id);
+    assert.ok(profile.light_recipe.sources.some((note) => html.slice(sources).includes(note.title)));
   }
 });
 
@@ -188,7 +197,7 @@ test("light recipe source links drop javascript, data, and http hrefs", () => {
   for (const badUrl of ["javascript:alert(1)", "data:text/html,hi", "http://example.com/paper"]) {
     assert.equal(httpsSourceHref(badUrl), "");
     pearl.light_recipe.sources = [{ title: "Bad link", detail: "Must not be clickable.", url: badUrl }];
-    const html = renderLightRecipe(pearl);
+    const html = renderSources(pearl);
     assert.doesNotMatch(html, /href="/);
     assert.match(html, /Bad link/);
   }

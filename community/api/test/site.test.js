@@ -248,5 +248,6 @@ test("checkout buttons send people only to Stripe or this site, and say so when 
   assert.match(app, /parsed\.hostname === "checkout\.stripe\.com" \|\| parsed\.hostname === "billing\.stripe\.com"/);
   assert.match(app, /Checkout canceled\. Nothing was charged\./);
   assert.match(read("account.html"), /id="billing-portal" class="secondary hidden"/);
-  assert.match(read("profile.html"), /id="buy">Buy recipe</);
+  assert.match(read("profile.html"), /id="buy">Buy</);
+  assert.match(readFileSync(join(PUBLIC, "js/app.js"), "utf8"), /\$\("#buy"\)\.textContent = `Buy for \$\{price\}`/);
 });
