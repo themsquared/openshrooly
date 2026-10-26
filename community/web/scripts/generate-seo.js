@@ -1315,13 +1315,13 @@ export const PAGES = {
     description: "What Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Docs", `${SITE}/docs`]]) },
   },
-  // Grow Coach is public but still kept out of search and the sitemap for now; the page sends anyone the API hides it from back home.
+  // Grow Coach is public and indexed. The static pitch is what crawlers and signed-out visitors see.
   "coach.html": {
     active: "coach",
+    sitemap: true,
     path: "/coach",
-    robots: "noindex,nofollow",
-    title: "Grow Coach · Shroom Labs",
-    description: "Grow Coach and Autopilot for culinary chambers on Shroom Labs. Free during the beta for linked chambers.",
+    title: "Grow Coach: automatic grow control for your Shrooly · Shroom Labs",
+    description: "Grow Coach reads your Shrooly chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach`]]) },
   },
   "claim.html": {
@@ -1389,7 +1389,7 @@ export const PAGES = {
 
 /** App pages that need sign-in stay out of crawls. Public pages marked noindex stay crawlable so search engines can read the noindex. */
 export function renderRobots() {
-  const blocked = ["/profile$", "/profile?", "/account", "/publish", "/moderate", "/admin", "/device$", "/device?", "/devices", "/fleet", "/coach", "/alerts-unsub", "/auth/"];
+  const blocked = ["/profile$", "/profile?", "/account", "/publish", "/moderate", "/admin", "/device$", "/device?", "/devices", "/fleet", "/alerts-unsub", "/auth/"];
   return `User-agent: *\nAllow: /\n${blocked.map((p) => `Disallow: ${p}`).join("\n")}\nSitemap: ${SITE}/sitemap.xml\n`;
 }
 
