@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { nowIso } from "../src/crypto.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
-// Grow Coach stays hidden from everyone except beta users (COACH_BETA_USER_IDS)
-// and entitled users, and only while COACH_AUTOPILOT_ENABLED is on. The API is
-// the single source of truth: /api/me and /api/coach carry `available`, and no
-// Coach name, price, or state reaches anyone else.
+// Coach access is paid, beta (a chamber inside the beta cap while BETA_ACTIVE is on) or comp
+// (COACH_BETA_USER_IDS), and only while COACH_AUTOPILOT_ENABLED is on. The API is the single
+// source of truth: /api/me and /api/coach carry `available`.
 //
-// The one exception is COACH_PUBLIC=1 with working checkout (Stripe or local stubs):
-// then anyone can see the catalog and a Subscribe button, but every Coach action
-// still needs beta or a paid sub. The test env sets COACH_PUBLIC=1, so the
-// "hidden" cases below pass COACH_PUBLIC: "" to match prod as it ships today.
+// With COACH_PUBLIC=1 (prod and the test env) anyone can see the catalog and plans, but every
+// Coach action still needs access (402 otherwise). With COACH_PUBLIC unset, Coach is hidden
+// (404, no catalog) from everyone without access. Cases that need a user without access and
+// with a chamber pass BETA_ACTIVE: "0", since every linked chamber in a small test db is a
+// beta chamber.
 
 const PRICE = /3\.99|4\.99|\b399\b|\b499\b|4900|amount_cents/;
 
@@ -65,7 +65,7 @@ function assertShown({ me, coach, fleet }) {
 }
 
 test("COACH_PUBLIC unset: a signed in user without beta or entitlement sees no Coach anywhere", async () => {
-  const ctx = env({ COACH_BETA_USER_IDS: "999999", COACH_PUBLIC: "" });
+  const ctx = env({ COACH_BETA_USER_IDS: "999999", COACH_PUBLIC: "", BETA_ACTIVE: "0" });
   const { token, user } = await register(ctx, "plain@example.com");
   await addDevice(ctx, user.id, "dev-plain");
   assertHidden(await surfaces(ctx, token));
@@ -88,27 +88,32 @@ test("COACH_PUBLIC unset: beta user 82 still sees Coach", async () => {
   assertShown(await surfaces(ctx, token));
 });
 
-test("COACH_PUBLIC on but no Stripe: Coach stays hidden for non-beta users", async () => {
-  const ctx = env({ COACH_BETA_USER_IDS: "999999" });
+test("COACH_PUBLIC on but no Stripe: Coach still shows, checkout says coming soon", async () => {
+  const ctx = env({ COACH_BETA_USER_IDS: "999999", BETA_ACTIVE: "0" });
   const { token, user } = await register(ctx, "nostripe@example.com");
   await addDevice(ctx, user.id, "dev-nostripe");
   // Turn off local stubs after sign-up so checkout has nothing to run on.
   ctx.DEV_STUBS = "";
   const coach = await call(ctx, "GET", "/api/coach", { token });
-  assert.deepEqual(coach.data, { available: false });
+  assert.equal(coach.data.available, true);
+  assert.equal(coach.data.for_sale, false);
+  assert.equal(coach.data.waitlist, true);
   const me = await call(ctx, "GET", "/api/me", { token });
-  assert.deepEqual(me.data.grow_coach, { available: false });
+  assert.equal(me.data.grow_coach.available, true);
+  const sub = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { plan: "monthly" } });
+  assert.equal(sub.status, 503);
   // Stripe key alone is not enough; the Coach price must exist too.
   ctx.STRIPE_SECRET_KEY = "sk_test_placeholder";
-  assert.deepEqual((await call(ctx, "GET", "/api/coach", { token })).data, { available: false });
+  assert.equal((await call(ctx, "GET", "/api/coach", { token })).data.for_sale, false);
   ctx.STRIPE_PRICE_COACH = "price_placeholder";
   const sellable = await call(ctx, "GET", "/api/coach", { token });
   assert.equal(sellable.data.available, true);
+  assert.equal(sellable.data.for_sale, true);
   assert.equal(sellable.data.entitled, false);
 });
 
 test("COACH_PUBLIC on: a signed in non-beta user sees the Subscribe state, but every action stays paywalled", async () => {
-  const ctx = env({ COACH_BETA_USER_IDS: "999999" });
+  const ctx = env({ COACH_BETA_USER_IDS: "999999", BETA_ACTIVE: "0" });
   const { token, user } = await register(ctx, "shopper@example.com");
   await addDevice(ctx, user.id, "dev-shopper");
   const { me, coach, chat, fleet } = await surfaces(ctx, token);
@@ -127,21 +132,21 @@ test("COACH_PUBLIC on: a signed in non-beta user sees the Subscribe state, but e
   assert.equal(me.data.grow_coach.available, true);
   assert.equal(me.data.grow_coach.entitled, false);
   assert.equal(me.data.grow_coach.beta, false);
-  // Paywalled server side: no chat, no device Coach state, no Autopilot, no suggest.
-  assert.equal(chat.status, 404);
+  // Paywalled server side (402): no chat, no device Coach state, no Autopilot, no suggest.
+  assert.equal(chat.status, 402);
   for (const device of fleet.data.devices || []) assert.equal(device.coach, null);
   const photo = await call(ctx, "POST", "/api/coach/photo", { token, body: { photo_base64: btoa("x") } });
-  assert.equal(photo.status, 404);
+  assert.equal(photo.status, 402);
   const suggest = await call(ctx, "POST", "/api/coach/suggest", {
     token,
     body: { stage: { humidity_percent: 90, temperature_c: 20 } },
   });
-  assert.equal(suggest.status, 404);
+  assert.equal(suggest.status, 402);
   const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", {
     token,
     body: { device_id: "dev-shopper", mode: "autopilot", profile_id: "pearl-oyster" },
   });
-  assert.equal(mode.status, 404);
+  assert.equal(mode.status, 402);
   // The Subscribe button works, and paying unlocks Coach.
   await entitle(ctx, token);
   assertShown(await surfaces(ctx, token));
@@ -164,7 +169,7 @@ test("COACH_PUBLIC on: off-menu never gets Coach, for shoppers or subscribers", 
   const blocked = await call(ctx, "POST", "/api/coach/subscribe", { token, body: { pack: "psilocybin" } });
   assert.equal(blocked.status, 400);
   const unpaidChat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "pins?", pack: "psilocybin" } });
-  assert.ok(unpaidChat.status === 400 || unpaidChat.status === 404);
+  assert.ok(unpaidChat.status === 400 || unpaidChat.status === 402);
   await entitle(ctx, token);
   const chat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "pins?", pack: "psilocybin" } });
   assert.equal(chat.status, 400);
@@ -178,15 +183,15 @@ test("COACH_PUBLIC on: off-menu never gets Coach, for shoppers or subscribers", 
 });
 
 test("beta: an allowlisted user sees Coach on /api/me, /api/coach, and devices", async () => {
-  const ctx = env();
+  const ctx = env({ BETA_ACTIVE: "0" });
   const { token, user } = await register(ctx, "beta-vis@example.com");
   ctx.COACH_BETA_USER_IDS = String(user.id);
   await addDevice(ctx, user.id, "dev-beta-vis");
   const out = await surfaces(ctx, token);
   assertShown(out);
-  // Stub provider means no AI, so chat stays off without naming a price.
-  assert.equal(out.chat.status, 402);
-  assert.doesNotMatch(JSON.stringify(out.chat.data), /3\.99/);
+  // Comp access works like a paid plan: chat answers when an AI provider is set (the stub here).
+  assert.equal(out.chat.status, 200, JSON.stringify(out.chat.data));
+  assert.equal(out.coach.data.access, "comp");
 });
 
 test("entitled: a paid user sees Coach and can chat", async () => {

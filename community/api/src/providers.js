@@ -123,6 +123,8 @@ export function capabilities(env = {}, request) {
     payments: paymentsConfigured(env) || stubs,
     photos: photosConfigured(env),
     coach: coachAiConfigured(env) && coachPublicEnabled(env),
+    // Chat and photo answers need an AI provider. Access (paid, beta, comp) is separate: src/coach-access.js.
+    coach_chat: coachAiConfigured(env),
     fleet: fleetUiEnabled(env),
     push: pushConfigured() || stubs,
     show_psilocybin: String(env.SHOW_PSILOCYBIN ?? "1") !== "0",

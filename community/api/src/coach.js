@@ -22,12 +22,11 @@ import { coachPriceId } from "./stripe.js";
 import {
   comingSoonBody,
   capabilities,
-  coachAiConfigured,
   coachPublicEnabled,
   devStubsEnabled,
-  isCoachBetaUser,
   paymentsConfigured,
 } from "./providers.js";
+import { betaActive, coachAccess, hasPaidCoach, linkedChamberCount } from "./coach-access.js";
 import { bytesToBase64, decodePhotoBase64, sanitizeGrowPhoto } from "./photos.js";
 import { readJsonLimited } from "./http-body.js";
 import { insertMedia, pendingPhotoKey } from "./media-acl.js";
@@ -116,20 +115,16 @@ export function coachCatalog(env = {}, request) {
   };
 }
 
-export function coachBetaAccess(env, user) {
-  return Boolean(user && isCoachBetaUser(env, user) && coachAiConfigured(env));
-}
+export { hasPaidCoach };
 
-export async function hasPaidCoach(db, user) {
-  if (!user) return false;
-  const sub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
-  // The subscription row is the only source of truth, so a cancel takes access away.
-  return Boolean(sub && sub.status === "active" && sub.period_end >= nowIso());
-}
-
+/** Paid, beta or comp access (src/coach-access.js). Chat and photo checks still need AI turned on to answer. */
 export async function hasGrowCoach(db, user, env = {}) {
-  if (coachBetaAccess(env, user)) return true;
-  return hasPaidCoach(db, user);
+  return (await coachAccess(env, db, user)).entitled;
+}
+
+/** Coach is open to the public (COACH_PUBLIC=1) and the kill switch is on. Checkout readiness is separate. */
+export function coachOpen(env = {}) {
+  return coachPublicEnabled(env) && coachAutopilotFlagOn(env);
 }
 
 /**
@@ -143,32 +138,27 @@ export function coachForSale(env = {}, request) {
   return coachPlanOnSale(env, request, "monthly") || coachPlanOnSale(env, request, "yearly");
 }
 
-/** Coach shows up for this visitor: beta or paying users, or anyone while it is on sale. */
+/** Coach shows up for this visitor: anyone with access, or everyone while Coach is open to the public. */
 export async function coachVisible(env, db, user, request) {
-  if (await coachAutopilotAvailable(env, db, user)) return true;
-  return coachForSale(env, request);
+  if (coachOpen(env)) return true;
+  return coachAutopilotAvailable(env, db, user);
 }
 
+/**
+ * Every Coach and Autopilot route: 401 signed out, 404 while Coach is hidden from this user
+ * (kill switch off, or not public and no access), 402 when Coach is public but this user has
+ * no paid, beta or comp access.
+ */
 async function requireCoach(request, db, env) {
   const { user } = await userFromRequest(request, db);
   requireVerified(user);
-  if (!(await coachAutopilotAvailable(env, db, user))) {
-    throw new ValidationError("not found", 404);
-  }
-  if (!(await hasGrowCoach(db, user, env))) {
-    throw new ValidationError("Grow Coach chat is not turned on for this account yet.", 402);
-  }
-  return user;
+  if (!coachAutopilotFlagOn(env)) throw new ValidationError("not found", 404);
+  if (await coachAutopilotAvailable(env, db, user)) return user;
+  if (coachOpen(env)) throw new ValidationError("Grow Coach needs a plan for this account. Pick one on the Coach page.", 402);
+  throw new ValidationError("not found", 404);
 }
 
-async function requireAutopilotUser(request, db, env) {
-  const { user } = await userFromRequest(request, db);
-  requireVerified(user);
-  if (!(await coachAutopilotAvailable(env, db, user))) {
-    throw new ValidationError("not found", 404);
-  }
-  return user;
-}
+const requireAutopilotUser = requireCoach;
 
 function dayKey() {
   return nowIso().slice(0, 10);
@@ -436,17 +426,22 @@ export async function handleCoach(method, path, url, request, env) {
   if (method === "GET" && path === "/api/coach") {
     const { user } = await userFromRequest(request, db);
     const autopilot = await coachAutopilotAvailable(env, db, user);
+    const open = coachOpen(env);
     const forSale = coachForSale(env, request);
-    // Hidden for everyone except beta and paying users, unless Mike has put Coach on sale.
-    if (!autopilot && !forSale) return json({ available: false });
-    const beta = coachBetaAccess(env, user);
-    const entitled = user ? await hasGrowCoach(db, user, env) : false;
+    // Hidden for everyone without access unless Coach is open to the public (COACH_PUBLIC=1).
+    if (!autopilot && !open && !forSale) return json({ available: false });
+    const access = await coachAccess(env, db, user);
+    const entitled = autopilot && access.entitled;
     const sub = user ? await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]) : null;
     return json({
       available: true,
       product: coachCatalog(env, request),
       entitled,
-      beta,
+      // `beta` means free access (beta chamber or comp). `access` says which one, or "paid".
+      beta: entitled && access.via !== "paid",
+      access: entitled ? access.via : null,
+      beta_active: betaActive(env),
+      chambers: user ? await linkedChamberCount(db, user) : 0,
       signed_in: Boolean(user),
       for_sale: forSale,
       auto_tune: Boolean(Number(sub?.auto_tune)),
@@ -467,11 +462,11 @@ export async function handleCoach(method, path, url, request, env) {
     if (body.pack === "psilocybin") {
       throw new ValidationError("Grow Coach is not sold or marketed with off-menu varieties.", 400);
     }
-    // While COACH_PUBLIC is off, only beta users can reach checkout, and only once Stripe is set up.
-    // That lets Mike test real checkout on prod without putting Coach on sale to anyone else.
+    // Public: any signed-in user can reach checkout once Stripe is set up. While COACH_PUBLIC is
+    // off, only users who already have access can, so Mike can test real checkout on prod.
     const isPublic = coachPublicEnabled(env);
     const checkoutReady = paymentsConfigured(env) || (isPublic && devStubsEnabled(env, request));
-    if ((!isPublic || !checkoutReady) && !(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
+    if (!isPublic && !(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
     if (!checkoutReady) {
       return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }

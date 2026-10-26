@@ -56,13 +56,19 @@ GOOGLE_CLIENT_ID = "222823957535-00k50bpf6bqcletkn8kshggsb2tj1cg1.apps.googleuse
 # Sign in with Apple: set APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_SERVICES_ID, and APPLE_PRIVATE_KEY
 # as Wrangler secrets once the Developer portal items exist. See docs/AUTH.md.
 # The Worker mints the client secret at runtime. Do not commit the .p8 key.
-# Grow Coach stays off until payments exist. Do not add an [ai] binding here.
+# Coach chat and photo answers stay off: do not add an [ai] binding here until Mike says go.
 GROW_COACH_PROVIDER = "workers-ai"
 GROW_COACH_TEXT_MODEL = "@cf/meta/llama-3.2-3b-instruct"
 GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
-# Cloud Autopilot (no [ai] needed). Only beta users can arm it; COACH_PUBLIC stays unset so Coach stays hidden.
+# Grow Coach and Autopilot are public: anyone signed in sees /coach and the plans.
+# Access (src/coach-access.js): a paid plan, a beta chamber, or a comp id in COACH_BETA_USER_IDS.
+# COACH_AUTOPILOT_ENABLED = "0" is the kill switch: it hides Coach and stops Autopilot for everyone.
+COACH_PUBLIC = "1"
 COACH_AUTOPILOT_ENABLED = "1"
 COACH_BETA_USER_IDS = "82"
+# Beta: owners of the first BETA_LINK_CAP (50) linked chambers get Coach free while this is "1".
+# To end the beta, set BETA_ACTIVE = "0" and ship. Beta users then need a paid plan.
+BETA_ACTIVE = "1"
 # Autopilot decider: "rules" (default) or "jev" (TypeSafe System One; needs the TYPESAFE_API_KEY secret).
 # See docs/AUTOPILOT-JEV.md. Jev caps default in code (src/jev.js jevCaps).
 AUTOPILOT_DECIDER = "jev"

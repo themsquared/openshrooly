@@ -1315,13 +1315,13 @@ export const PAGES = {
     description: "What Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Docs", `${SITE}/docs`]]) },
   },
-  // Grow Coach is a private beta. Keep it out of search and the sitemap; the page itself sends anyone the API does not allow back home.
+  // Grow Coach is public but still kept out of search and the sitemap for now; the page sends anyone the API hides it from back home.
   "coach.html": {
     active: "coach",
     path: "/coach",
     robots: "noindex,nofollow",
     title: "Grow Coach · Shroom Labs",
-    description: "Private beta page for invited Shroom Labs accounts. Not open to the public and not listed in search.",
+    description: "Grow Coach and Autopilot for culinary chambers on Shroom Labs. Free during the beta for linked chambers.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach`]]) },
   },
   "claim.html": {

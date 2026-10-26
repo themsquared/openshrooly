@@ -939,7 +939,7 @@ test("Autopilot works for a beta user without an AI binding", async () => {
   });
   const catalog = await call(ctx, "GET", "/api/coach", { token });
   assert.equal(catalog.data.autopilot, true);
-  assert.equal(catalog.data.beta, false);
+  assert.equal(catalog.data.beta, true);
   const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", {
     token,
     body: { device_id: "dev-beta", mode: "autopilot", profile_id: pearlOyster.id },
@@ -948,12 +948,15 @@ test("Autopilot works for a beta user without an AI binding", async () => {
   const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-beta" } });
   assert.equal(run.status, 200, JSON.stringify(run.data));
   assert.equal(run.data.applied, true);
+  // Access no longer needs an AI binding, so there is no paywall. Chat uses the local stub
+  // here; in prod with no AI binding it answers 503 coming soon.
   const chat = await call(ctx, "POST", "/api/coach/chat", { token, body: { message: "hi" } });
-  assert.equal(chat.status, 402);
+  assert.equal(chat.status, 200, JSON.stringify(chat.data));
+  assert.equal(chat.data.provider, "stub");
 });
 
 test("Autopilot stays hidden without the allowlist or a paid sub", async () => {
-  const ctx = env({ COACH_BETA_USER_IDS: "82", COACH_PUBLIC: "" });
+  const ctx = env({ COACH_BETA_USER_IDS: "82", COACH_PUBLIC: "", BETA_ACTIVE: "0" });
   const { token, user } = await register(ctx, "nope@example.com");
   await addDevice(ctx, user.id, "dev-nope");
   const catalog = await call(ctx, "GET", "/api/coach", { token });

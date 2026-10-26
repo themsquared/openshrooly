@@ -405,7 +405,8 @@ test("device identity includes type, species, and grow day without the fleet fla
 });
 
 test("device payload hides Coach from users without Coach beta or entitlement", async () => {
-  const ctx = env();
+  // BETA_ACTIVE off: otherwise this chamber is a beta chamber and gets Coach free.
+  const ctx = env({ BETA_ACTIVE: "0" });
   const { token, user } = await register(ctx, "nocoach@example.com");
   await addDevice(ctx, user.id, "dev-nocoach");
   const detail = await call(ctx, "GET", "/api/fleet/devices/dev-nocoach", { token });

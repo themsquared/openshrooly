@@ -48,9 +48,12 @@ test("wrangler.deploy.toml matches prod: photos on, no AI binding", () => {
   assert.deepEqual(r2Photos(deploy), { binding: "PHOTOS", bucket_name: "shroomlabs-photos" });
   assert.equal(quoted(deploy, "PHOTOS_ENABLED"), "1");
   assert.equal(hasAiTable(deploy), false);
-  assert.equal(quoted(deploy, "COACH_PUBLIC"), null);
-  // Cloud Autopilot is on in prod for the beta user only. Coach stays hidden (COACH_PUBLIC unset).
+  // Coach and Autopilot are public. Beta chambers get them free while BETA_ACTIVE is "1".
+  assert.equal(quoted(deploy, "COACH_PUBLIC"), "1");
+  assert.equal(quoted(deploy, "BETA_ACTIVE"), "1");
   assert.equal(quoted(deploy, "COACH_BETA_USER_IDS"), "82");
+  // Jev stays the Autopilot decider, with its caps in code (src/jev.js jevCaps).
+  assert.equal(quoted(deploy, "AUTOPILOT_DECIDER"), "jev");
   assert.equal(quoted(deploy, "ENVIRONMENT"), null);
   assert.equal(quoted(deploy, "CF_ACCOUNT_ID"), null);
   assert.equal(quoted(deploy, "WORKERS_AI_TOKEN"), null);

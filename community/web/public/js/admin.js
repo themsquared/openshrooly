@@ -98,6 +98,9 @@ function renderOverview(o) {
     ["Online now", o.chambers.online],
     ["Beta cap", `${o.beta_cap.used} / ${o.beta_cap.cap}`],
     ["Active Coach subs", o.subscriptions.active],
+    ["Coach via beta", o.coach_access ? `${o.coach_access.beta}${o.coach_access.beta_active ? "" : " (beta off)"}` : "?"],
+    ["Coach via payment", o.coach_access?.paid ?? "?"],
+    ["Coach comp", o.coach_access?.comp ?? "?"],
     ["Paid profiles", o.profile_purchases.paid],
     ["Payments", o.payments_mode],
   ]);
@@ -112,8 +115,17 @@ function renderUsers(list) {
     { key: "last_login_at", label: "Last sign in", html: (u) => escapeHtml(u.last_login_at ? ago(u.last_login_at) : "never") },
     { key: "chambers", label: "Chambers", num: true },
     {
+      key: "coach_access",
+      label: "Coach access",
+      value: (u) => u.coach_access || "",
+      html: (u) =>
+        u.coach_access
+          ? pill({ paid: "paid", beta: "beta, free", comp: "comp" }[u.coach_access] || u.coach_access, u.coach_access === "paid" ? "is-ok" : "")
+          : '<span class="muted">none</span>',
+    },
+    {
       key: "subscription",
-      label: "Coach",
+      label: "Subscription",
       value: (u) => u.subscription?.status || "",
       html: (u) =>
         u.subscription

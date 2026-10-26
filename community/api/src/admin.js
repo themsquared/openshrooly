@@ -8,6 +8,8 @@ import { userFromRequest } from "./auth.js";
 import { ADMIN_SQL } from "./admin-sql.js";
 import { COACH_ITEM } from "./coach-learn.js";
 import { betaLinkCap, countLinkedDevices } from "./devices.js";
+import { betaActive, betaOwnerIds } from "./coach-access.js";
+import { isCoachBetaUser } from "./providers.js";
 import { deviceIsOnline, enrichDevice } from "./fleet.js";
 import { jevCost } from "./jev.js";
 
@@ -104,6 +106,19 @@ function subActive(sub, now) {
   return Boolean(sub && sub.status === "active" && ms(sub.period_end) >= now);
 }
 
+/** How each user has Coach: "paid", "beta", "comp" or null. Same order as coachAccess (src/coach-access.js). */
+function coachAccessBy(env, userRows, deviceRows, subs, now) {
+  const betaOwners = betaActive(env) ? betaOwnerIds(deviceRows, betaLinkCap(env)) : new Set();
+  const subBy = new Map(subs.map((s) => [Number(s.user_id), s]));
+  const out = new Map();
+  for (const u of userRows) {
+    const id = Number(u.id);
+    const via = subActive(subBy.get(id), now) ? "paid" : betaOwners.has(id) ? "beta" : isCoachBetaUser(env, { id }) ? "comp" : null;
+    out.set(id, via);
+  }
+  return out;
+}
+
 /* ---------- overview ---------- */
 
 async function overview(env, { now }) {
@@ -117,6 +132,8 @@ async function overview(env, { now }) {
   ]);
   const paid = checkouts.filter((c) => c.status === "paid");
   const cap = betaLinkCap(env);
+  const vias = [...coachAccessBy(env, userRows, deviceRows, subs, now).values()];
+  const countVia = (v) => vias.filter((x) => x === v).length;
   return {
     generated_at: new Date(now).toISOString(),
     users: {
@@ -132,6 +149,7 @@ async function overview(env, { now }) {
     },
     beta_cap: { used: linked, cap, left: Math.max(0, cap - linked) },
     subscriptions: { active: subs.filter((s) => subActive(s, now)).length, total: subs.length },
+    coach_access: { beta_active: betaActive(env), beta: countVia("beta"), paid: countVia("paid"), comp: countVia("comp") },
     profile_purchases: { paid: paid.filter((c) => c.item_id !== COACH_ITEM).length },
     payments_mode: paymentsMode(env),
   };
@@ -150,6 +168,7 @@ async function users(env, { now }) {
     db.all(ADMIN_SQL.checkouts),
   ]);
   const lastLogin = new Map(sessions.map((s) => [Number(s.user_id), s.last_at]));
+  const accessBy = coachAccessBy(env, userRows, deviceRows, subs, now);
   const subBy = new Map(subs.map((s) => [Number(s.user_id), s]));
   const planBy = new Map();
   for (const c of checkouts) {
@@ -174,6 +193,7 @@ async function users(env, { now }) {
         subscription: sub
           ? { status: subActive(sub, now) ? "active" : sub.status === "active" ? "lapsed" : sub.status, period_end: sub.period_end, plan: planBy.get(id) || null }
           : null,
+        coach_access: accessBy.get(id) || null,
         entitlements: ents.filter((e) => Number(e.user_id) === id).map((e) => e.item_id),
         feedback: null,
       };

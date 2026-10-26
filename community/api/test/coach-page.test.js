@@ -112,8 +112,11 @@ test("decider says Jev with confidence for Jev rows and rules otherwise", () => 
 test("overview and decisions need Coach access", async () => {
   const ctx = env();
   const { token } = await register(ctx, "nobody@example.com");
+  // Coach is public in the test env, so no access is a 402 paywall, not a 404.
+  assert.equal((await call(ctx, "GET", "/api/coach/overview", { token })).status, 402);
+  assert.equal((await call(ctx, "GET", "/api/coach/decisions", { token })).status, 402);
+  ctx.COACH_PUBLIC = "";
   assert.equal((await call(ctx, "GET", "/api/coach/overview", { token })).status, 404);
-  assert.equal((await call(ctx, "GET", "/api/coach/decisions", { token })).status, 404);
   assert.equal((await call(ctx, "GET", "/api/coach/overview")).status, 401);
 });
 

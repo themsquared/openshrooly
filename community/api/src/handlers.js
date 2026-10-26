@@ -20,7 +20,9 @@ import { handleDevices } from "./devices.js";
 import { handleFleet } from "./fleet.js";
 import { handleAccount } from "./account.js";
 import { handleAdmin } from "./admin.js";
-import { coachBetaAccess, coachPlans, coachVisible, handleCoach, hasGrowCoach } from "./coach.js";
+import { coachPlans, coachVisible, handleCoach } from "./coach.js";
+import { coachAccess } from "./coach-access.js";
+import { coachAutopilotFlagOn } from "./coach-autopilot.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, coachCustomerFor, openBillingPortal, parseStripeEvent, startCheckout } from "./payments.js";
 import { capabilities, paymentsConfigured } from "./providers.js";
@@ -349,18 +351,22 @@ async function route(method, path, url, request, env) {
       tokens,
       entitlements,
       sessions,
-      // Grow Coach is hidden unless the server says this user can use it
-      // (flag on plus beta or entitlement) or Coach is on sale (COACH_PUBLIC plus checkout).
-      // Everyone else gets no Coach details.
+      // Grow Coach shows when this user has access (paid, beta or comp) or Coach is open to the
+      // public (COACH_PUBLIC). Everyone else gets no Coach details.
       grow_coach: (await coachVisible(env, db, user, request))
-        ? {
+        ? await (async () => {
+            const access = await coachAccess(env, db, user);
+            const entitled = coachAutopilotFlagOn(env) && access.entitled;
+            return {
             available: true,
-            entitled: await hasGrowCoach(db, user, env),
-            beta: coachBetaAccess(env, user),
+            entitled,
+            beta: entitled && access.via !== "paid",
+            access: entitled ? access.via : null,
             period_end: coachSub?.period_end || null,
             auto_tune: Boolean(Number(coachSub?.auto_tune)),
             product: { id: COACH_ITEM, amount_cents: COACH_PRICE_CENTS, plans: coachPlans(env, request), pack: "culinary" },
-          }
+            };
+          })()
         : { available: false },
       // Show "Manage billing" only to people Stripe knows about.
       billing_portal: paymentsConfigured(env) && Boolean(await coachCustomerFor(db, user.id)),
