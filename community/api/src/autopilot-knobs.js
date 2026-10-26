@@ -46,16 +46,19 @@ export function stageIndexForPhase(profile, phase) {
 
 /**
  * Which stage Autopilot steers to. The chamber's grow day moves the grow forward through the
- * profile; it never moves a grow back to an earlier stage than the chamber's phase shows.
+ * profile; it never moves a grow back to an earlier stage than the chamber's phase shows or
+ * the stage the grower last applied from the site (`chosenStage`), so a chamber still on its
+ * default phase does not drag a fruiting grow back to colonizing.
  * Chambers that report neither keep the old target (the fruiting stage).
  */
-export function pickAutopilotStage(profile, knobs = {}, caps = {}) {
+export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage = null } = {}) {
   const stages = profile?.stages || [];
   const fallback = Math.max(0, stages.findIndex((s) => s.id === "fruiting"));
   const byPhase = caps.grow_phase ? stageIndexForPhase(profile, knobs.grow_phase) : -1;
   const byDay = caps.grow_day ? stageIndexForDay(profile, knobs.grow_day) : -1;
-  let index = Math.max(byPhase, byDay);
-  let source = byDay > byPhase ? "grow_day" : byPhase >= 0 ? "phase" : "default";
+  const byChoice = chosenStage ? stages.findIndex((s) => s.id === chosenStage) : -1;
+  let index = Math.max(byPhase, byDay, byChoice);
+  let source = byChoice === index && byChoice > Math.max(byPhase, byDay) ? "chosen" : byDay > byPhase ? "grow_day" : byPhase >= 0 ? "phase" : "default";
   if (index < 0) index = fallback;
   const stage = stages[index] || {};
   const phase = growPhaseForStage(stage.id);

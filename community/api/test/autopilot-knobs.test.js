@@ -97,7 +97,7 @@ function env() {
   return testEnv({ GROW_COACH_STUB: "1", COACH_AUTOPILOT_ENABLED: "1" });
 }
 
-async function setup(email, deviceId, doc) {
+async function setup(email, deviceId, doc, profile = pearl, before = null) {
   const ctx = env();
   const { token, user } = await register(ctx, email);
   const session = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
@@ -108,15 +108,16 @@ async function setup(email, deviceId, doc) {
     [deviceId, `hw-${deviceId}`, "{}", "Kitchen", "active", user.id, null, null, null, 1, nowIso(), nowIso()]
   );
   await ctx.db.run("INSERT INTO profiles (id, document, author_id, published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", [
-    pearl.id,
-    JSON.stringify(pearl),
+    profile.id,
+    JSON.stringify(profile),
     user.id,
     1,
     nowIso(),
     nowIso(),
   ]);
+  if (before) await before(ctx);
   await addReading(ctx, deviceId, doc);
-  const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", { token, body: { device_id: deviceId, mode: "autopilot", profile_id: pearl.id } });
+  const mode = await call(ctx, "POST", "/api/coach/autopilot/mode", { token, body: { device_id: deviceId, mode: "autopilot", profile_id: profile.id } });
   assert.equal(mode.status, 200, JSON.stringify(mode.data));
   return { ctx, token, user };
 }
@@ -244,4 +245,46 @@ test("a chamber with old firmware still gets temperature and RH only", async () 
   for (const key of ["grow_phase", "air_exchange_speed", "light_hours", "white_intensity", "air_exchange_period_min"]) {
     assert.equal(cmd[key], undefined, key);
   }
+});
+
+test("a fruiting grow on a chamber still showing its default Colonizing phase stays fruiting (prod regression)", async () => {
+  const lions = JSON.parse(readFileSync(new URL("../../../data/profiles/culinary/lions-mane.json", import.meta.url), "utf8"));
+  assert.equal(pickAutopilotStage(lions, { grow_day: 2, grow_phase: "Colonizing" }, caps105, { chosenStage: "fruiting" }).stageId, "fruiting");
+  // The real first 1.0.5-sl.1 reading from Mike's chamber, after a site apply of lions-mane fruiting.
+  const doc = reading105({
+    day: 2,
+    phase: "Colonizing",
+    temperature: 21.52,
+    humidity: 89.21,
+    temperature_setpoint: 17,
+    humidity_setpoint: 90,
+    air_exchange_speed: 30,
+    air_exchange_period_min: 15,
+    air_exchange_run_sec: 30,
+    light_hours: 5,
+    white_intensity: 150,
+    color_b: 100,
+  });
+  const { ctx, token } = await setup("knobs-prod@example.com", "dev-k5", doc, lions, (c) =>
+    c.db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+      "dev-k5",
+      "apply_profile",
+      JSON.stringify({ profile_id: lions.id, stage: "fruiting", source: "fleet" }),
+      nowIso(),
+      nowIso(),
+    ])
+  );
+  const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-k5" } });
+  assert.equal(run.data.applied, true, JSON.stringify(run.data));
+  assert.notEqual(run.data.paused, true);
+  assert.equal(run.data.stage, "fruiting");
+  const cmd = (await openCommands(ctx, "dev-k5")).at(-1);
+  assert.equal(cmd.temperature_c, 17, "already on the fruiting target");
+  assert.equal(cmd.grow_phase, "Fruiting");
+  assert.equal(cmd.air_exchange_speed, 25);
+  assert.equal(cmd.light_hours, 12);
+  assert.equal(cmd.white_intensity, 190);
+  assert.equal(cmd.air_exchange_period_min, 18);
+  const apply = run.data.actions.find((a) => a.action === "apply");
+  assert.match(apply.reason, /to match the fruiting stage you applied/);
 });

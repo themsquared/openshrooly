@@ -607,9 +607,20 @@ function expandStage(stage = {}) {
   };
 }
 
-export function stageFromProfile(profile, { knobs = {}, caps = {} } = {}) {
+/** The stage the grower last applied to this chamber for this profile (site apply or an Autopilot command). */
+export async function chosenStageFor(db, deviceId, profileId) {
+  if (!deviceId || !profileId) return null;
+  const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? ORDER BY id DESC LIMIT ?", [deviceId, 50]);
+  for (const row of rows || []) {
+    const payload = parseJson(row.payload, {});
+    if (payload?.stage && payload.profile_id === profileId) return String(payload.stage);
+  }
+  return null;
+}
+
+export function stageFromProfile(profile, { knobs = {}, caps = {}, chosenStage = null } = {}) {
   if (!profile) return {};
-  return expandStage(pickAutopilotStage(profile, knobs, caps).stage);
+  return expandStage(pickAutopilotStage(profile, knobs, caps, { chosenStage }).stage);
 }
 
 /**
@@ -927,7 +938,8 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     return { paused: true, reason, flipped_to: "advisor" };
   }
   const profile = resolved.profile;
-  const pick = pickAutopilotStage(profile, knobs, caps);
+  const chosenStage = await chosenStageFor(db, device.id, state.profile_id);
+  const pick = pickAutopilotStage(profile, knobs, caps, { chosenStage });
   const stage = expandStage(pick.stage);
   const reports = await db.all("SELECT * FROM grow_reports WHERE author_id=?", [user.id]);
   const model = buildDeviceModel(samples, reports.filter((r) => !String(r.profile_id || "").includes("psilocybin")));
@@ -970,7 +982,11 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
 
   const sendable = caps.multi ? { ...multiPayload(plan.next, caps, knobs), fan_speed_percent: undefined } : plan.next;
   const reason = [
-    pick.transition ? `Grow day ${pick.grow_day ?? "?"}: moving the chamber to ${pick.phase} (${pick.stageId}).` : null,
+    pick.transition
+      ? pick.source === "chosen"
+        ? `Setting the chamber phase to ${pick.phase} to match the ${pick.stageId} stage you applied.`
+        : `Grow day ${pick.grow_day ?? "?"}: moving the chamber to ${pick.phase} (${pick.stageId}).`
+      : null,
     plan.reason,
   ]
     .filter(Boolean)
@@ -1062,7 +1078,7 @@ export async function undoAutopilotAction(db, env, user, actionId) {
   const doc = latestDoc(await loadRecentTelemetry(db, row.device_id));
   const caps = deviceCapabilities(doc, device.device_type || "shrooly_chamber");
   const knobs = chamberKnobs(doc);
-  const undoStage = stageFromProfile(resolved.profile, { knobs, caps });
+  const undoStage = stageFromProfile(resolved.profile, { knobs, caps, chosenStage: await chosenStageFor(db, row.device_id, state.profile_id) });
   let restored = clampAutopilotSetpoints(oldValue, undoStage);
   if (caps.multi) {
     // Put back every knob the change touched, inside the chamber's ranges.
