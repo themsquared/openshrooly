@@ -14,7 +14,6 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / "shared"))
 
 from openshrooly_lib.models import (  # noqa: E402
-    AffiliateLink,
     FanSchedule,
     LightSchedule,
     MushroomProfile,
@@ -25,21 +24,6 @@ from openshrooly_lib.models import (  # noqa: E402
 from openshrooly_lib.light_recipes import recipe_for  # noqa: E402
 from openshrooly_lib.mapping import apply_recipe_to_profile  # noqa: E402
 from openshrooly_lib.schema import PSILOCYBIN_LEGAL_NOTICE, validate_profile  # noqa: E402
-
-EXAMPLE_SPAWN = AffiliateLink(
-    id="example-spawn",
-    label="Culinary spawn (example affiliate)",
-    merchant="example-supplier",
-    url="https://example.com/affiliate/culinary-spawn",
-)
-
-EXAMPLE_SUBSTRATE = AffiliateLink(
-    id="example-substrate",
-    label="Substrate ingredients (example affiliate)",
-    merchant="example-supplier",
-    url="https://example.com/affiliate/substrate",
-)
-
 
 def light(hours: float, lux: int, sunrise: int = 8, blue: int = 0) -> LightSchedule:
     return LightSchedule(
@@ -105,7 +89,8 @@ def culinary(**kwargs) -> MushroomProfile:
     kwargs.setdefault("restricted", False)
     kwargs.setdefault("affiliates_allowed", True)
     kwargs.setdefault("pricing", Pricing())
-    kwargs.setdefault("affiliate_links", [EXAMPLE_SPAWN, EXAMPLE_SUBSTRATE])
+    # Real partner links get added per profile once they exist. No placeholders.
+    kwargs.setdefault("affiliate_links", [])
     return validate_profile(MushroomProfile(**kwargs))
 
 

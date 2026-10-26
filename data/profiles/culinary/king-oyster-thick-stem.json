@@ -120,22 +120,7 @@
     "stripe"
   ],
   "affiliates_allowed": true,
-  "affiliate_links": [
-    {
-      "id": "example-spawn",
-      "label": "Culinary spawn (example affiliate)",
-      "merchant": "example-supplier",
-      "url": "https://example.com/affiliate/culinary-spawn",
-      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
-    },
-    {
-      "id": "example-substrate",
-      "label": "Substrate ingredients (example affiliate)",
-      "merchant": "example-supplier",
-      "url": "https://example.com/affiliate/substrate",
-      "disclosure": "We may earn a commission if you buy through this link, at no extra cost to you."
-    }
-  ],
+  "affiliate_links": [],
   "fork_of": null,
   "author": null,
   "firmware_compat": {

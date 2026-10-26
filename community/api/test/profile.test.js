@@ -32,7 +32,10 @@ test("culinary seed profiles validate", () => {
   const pearl = load("data/profiles/culinary/pearl-oyster.json");
   const profile = validateProfile(pearl);
   assert.equal(profile.pack, "culinary");
-  assert.ok(affiliateLinksFor(profile).length > 0);
+  assert.equal(profile.affiliates_allowed, true);
+  // No placeholder partner links ship in the seeds.
+  assert.deepEqual(affiliateLinksFor(profile), []);
+  assert.ok(!JSON.stringify(pearl).includes("example.com"));
 });
 
 test("paid culinary profile is allowed", () => {

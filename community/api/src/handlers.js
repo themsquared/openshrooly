@@ -670,21 +670,8 @@ async function route(method, path, url, request, env) {
   }
 
   if (method === "GET" && path === "/api/supplies") {
-    return json({
-      disclosure: DISCLOSURE,
-      items: [
-        {
-          id: "hardwood-pellets",
-          name: "Hardwood fuel pellets",
-          url: "https://example.com/affiliate/hardwood-pellets",
-        },
-        {
-          id: "master-spawn-bag",
-          name: "Filter-patch grow bags",
-          url: "https://example.com/affiliate/grow-bags",
-        },
-      ],
-    });
+    // No partner links yet. The page hides the supplies block when this list is empty.
+    return json({ disclosure: DISCLOSURE, items: [] });
   }
 
   return json({ error: "not found" }, 404);
