@@ -142,3 +142,12 @@ test("delete waits for a paid Grow Coach plan to be cancelled", async () => {
   assert.equal(res.status, 409, JSON.stringify(res.data));
   assert.ok(await ctx.db.one("SELECT * FROM users WHERE id=?", [user.id]));
 });
+
+test("a failed person check says what to do, in plain words", async () => {
+  const ctx = env();
+  const res = await call(ctx, "POST", "/api/auth/magic/start", { body: { email: "bot@example.com", turnstile: "nope" } });
+  assert.equal(res.status, 400);
+  assert.equal(res.data.error, "We couldn't confirm you're a person. Tap the box and try again.");
+  assert.equal(res.data.code, "turnstile_failed");
+  assert.doesNotMatch(res.data.error, /Turnstile/);
+});

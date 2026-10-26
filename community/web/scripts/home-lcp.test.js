@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { speciesArt } from "../public/js/species-art.js";
@@ -15,6 +15,18 @@ test("only the priority card image is eager with fetchpriority=high", () => {
   const rest = speciesArt("Pleurotus ostreatus", "", "Blue Oyster", "culinary");
   assert.match(rest, /loading="lazy"/);
   assert.doesNotMatch(rest, /fetchpriority/);
+});
+
+test("card photos offer small WebP sizes so phones skip the full JPEG", () => {
+  const rest = speciesArt("Pleurotus ostreatus", "", "Blue Oyster", "culinary");
+  assert.match(rest, /srcset="\/img\/species\/species-blue-oyster-640\.webp 640w, \/img\/species\/species-blue-oyster-960\.webp 960w"/);
+  assert.match(rest, /sizes="\(max-width: 767px\) 100vw, 360px"/);
+  assert.match(rest, /src="\/img\/species\/species-blue-oyster\.jpg"/);
+  // Every culinary JPEG has both WebP sizes next to it.
+  const dir = join(PUBLIC, "img", "species");
+  for (const f of readdirSync(dir).filter((n) => /^species-.*\.jpg$/.test(n))) {
+    for (const w of [640, 960]) assert.ok(existsSync(join(dir, f.replace(/\.jpg$/, `-${w}.webp`))), `${f} ${w}`);
+  }
 });
 
 test("home grid marks only the first card as the LCP image", () => {
