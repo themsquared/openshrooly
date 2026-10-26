@@ -326,6 +326,10 @@ test("track.js: profile items, checkout reasons, purchase from the saved checkou
       price: 2.99,
     });
     assert.equal(t.profileItem({ id: "shiitake", name: "Shiitake", pricing: { kind: "free" } }).item_category, "free");
+    // The profile API has no tags: paid seed profiles still count as the Chef's line, community uploads as paid.
+    assert.equal(t.detailItem({ id: "king-oyster-thick-stem", name: "King", pricing: { kind: "paid", amount_cents: 299 } }).item_category, "chef");
+    assert.equal(t.detailItem({ id: "someones-upload", name: "Mine", pricing: { kind: "paid", amount_cents: 299 } }).item_category, "paid");
+    assert.equal(t.detailItem({ id: "shiitake", name: "Shiitake", pricing: { kind: "free" } }).item_category, "free");
     assert.equal(t.blockedReason({ status: 401 }), "signed_out");
     assert.equal(t.blockedReason({ status: 409 }), "already_owned");
     assert.equal(t.blockedReason(new Error("x")), "error");
