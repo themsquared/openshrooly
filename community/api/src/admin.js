@@ -51,6 +51,7 @@ const ROUTES = {
   "/api/admin/devices": devices,
   "/api/admin/activations": activations,
   "/api/admin/spend": spend,
+  "/api/admin/funnel": funnel,
 };
 
 export async function handleAdmin(method, path, url, request, env) {
@@ -426,5 +427,72 @@ async function spend(env, { now }) {
     totals,
     users: rows.sort((a, b) => b.cost["30d"] - a.cost["30d"] || (b.user_id || 0) - (a.user_id || 0)),
     chambers: [...perChamber.values()].sort((a, b) => b.jev_calls["30d"] - a.jev_calls["30d"]),
+  };
+}
+
+/* ---------- checkout funnel ---------- */
+
+/** Stripe Checkout sessions expire after 24 hours, so an older unpaid one was abandoned. */
+const CHECKOUT_OPEN_MS = DAY_MS;
+
+function emptyFunnel() {
+  return { started: 0, completed: 0, expired: 0, failed: 0, abandoned: 0, open: 0, revenue_cents: 0, conversion: null };
+}
+
+/** started = completed + open + abandoned; abandoned = expired + failed + unpaid sessions past 24 h. */
+function addToFunnel(f, c, now) {
+  f.started += 1;
+  if (c.status === "paid") {
+    f.completed += 1;
+    f.revenue_cents += Number(c.amount_cents) || 0;
+  } else if (c.status === "expired" || c.status === "failed") {
+    f[c.status] += 1;
+    f.abandoned += 1;
+  } else if (now - ms(c.created_at) > CHECKOUT_OPEN_MS) {
+    f.abandoned += 1;
+  } else {
+    f.open += 1;
+  }
+}
+
+/** Completed out of the checkouts that are settled (not still open), 0..1 with 3 decimals. */
+function finishFunnel(f) {
+  const settled = f.started - f.open;
+  f.conversion = settled > 0 ? Math.round((f.completed / settled) * 1000) / 1000 : null;
+  return f;
+}
+
+/** Checkouts per product and plan, live and test apart. Dev stub sessions are left out. */
+async function funnel(env, { now }) {
+  const checkouts = await env.db.all(ADMIN_SQL.checkouts);
+  const out = {};
+  for (const mode of ["live", "test"]) {
+    out[mode] = {};
+    for (const win of Object.keys(WINDOWS)) {
+      const total = emptyFunnel();
+      const items = new Map();
+      for (const c of checkouts) {
+        if (stripeMode(c.id) !== mode || !inWindow(c.created_at, win, now)) continue;
+        const plan = parse(c.details, {})?.plan || null;
+        const key = `${c.item_id}|${plan || ""}`;
+        if (!items.has(key)) items.set(key, { item_id: c.item_id, plan, ...emptyFunnel() });
+        addToFunnel(items.get(key), c, now);
+        addToFunnel(total, c, now);
+      }
+      out[mode][win] = {
+        total: finishFunnel(total),
+        items: [...items.values()].map(finishFunnel).sort((a, b) => b.started - a.started || String(a.item_id).localeCompare(b.item_id)),
+      };
+    }
+  }
+  return {
+    generated_at: new Date(now).toISOString(),
+    payments_mode: paymentsMode(env),
+    ...out,
+    notes: {
+      abandoned: "Abandoned is expired, failed, or unpaid for more than 24 hours (Stripe ends a Checkout session after 24 hours).",
+      conversion: "Conversion is completed out of started, leaving out checkouts still open.",
+      ga: "Clicks that never reach Stripe (signed out, already owned) are only in Google Analytics as checkout_blocked.",
+    },
   };
 }

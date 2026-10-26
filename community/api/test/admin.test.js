@@ -4,7 +4,7 @@ import { nowIso } from "../src/crypto.js";
 import { adminIds, isAdmin } from "../src/admin.js";
 import { call, register, testEnv } from "./helpers.js";
 
-const ROUTES = ["/api/admin/overview", "/api/admin/users", "/api/admin/devices", "/api/admin/activations", "/api/admin/spend"];
+const ROUTES = ["/api/admin/overview", "/api/admin/users", "/api/admin/devices", "/api/admin/activations", "/api/admin/spend", "/api/admin/funnel"];
 
 async function addDevice(ctx, userId, id, { status = "active", lastSeen = nowIso(), hw = `AABBCC${id}` } = {}) {
   await ctx.db.run(
@@ -126,4 +126,39 @@ test("admin numbers come from the tables", async () => {
   assert.equal(s.chambers[0].lower_bound_days.today, 0);
   assert.equal(s.chambers[0].lower_bound_days["7d"], 1);
   assert.doesNotMatch(JSON.stringify(s), /sk_|whsec/);
+});
+
+test("checkout funnel counts started, completed and abandoned per item, live and test apart", async () => {
+  const ctx = testEnv({ ADMIN_USER_IDS: "1" });
+  const admin = await register(ctx, "boss@example.com");
+  const buyer = await register(ctx, "buyer@example.com");
+  const hoursAgo = (h) => new Date(Date.now() - h * 3600000).toISOString();
+  const rows = [
+    ["cs_live_a", "king-oyster-thick-stem", "paid", 299, {}, hoursAgo(1)],
+    ["cs_live_b", "king-oyster-thick-stem", "expired", 299, {}, hoursAgo(30)],
+    ["cs_live_c", "king-oyster-thick-stem", "requires_payment", 299, {}, hoursAgo(2)],
+    ["cs_live_d", "king-oyster-thick-stem", "requires_payment", 299, {}, hoursAgo(48)],
+    ["cs_live_e", "grow-coach", "paid", 4900, { plan: "yearly" }, hoursAgo(3)],
+    ["cs_live_f", "grow-coach", "failed", 499, { plan: "monthly" }, hoursAgo(5)],
+    ["cs_live_old", "grow-coach", "paid", 499, { plan: "monthly" }, hoursAgo(24 * 20)],
+    ["cs_test_x", "grow-coach", "paid", 499, { plan: "monthly" }, hoursAgo(1)],
+    ["stub_sess", "grow-coach", "paid", 499, { plan: "monthly" }, hoursAgo(1)],
+  ];
+  for (const [id, item, status, cents, details, at] of rows) {
+    await ctx.db.run(
+      "INSERT INTO checkouts (id, user_id, item_id, provider, status, amount_cents, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, buyer.user.id, item, "stripe", status, cents, JSON.stringify(details), at]
+    );
+  }
+  const f = (await call(ctx, "GET", "/api/admin/funnel", { token: admin.token })).data;
+  const week = f.live["7d"];
+  assert.deepEqual(week.total, { started: 6, completed: 2, expired: 1, failed: 1, abandoned: 3, open: 1, revenue_cents: 5199, conversion: 0.4 });
+  const king = week.items.find((i) => i.item_id === "king-oyster-thick-stem");
+  assert.deepEqual([king.started, king.completed, king.expired, king.abandoned, king.open, king.conversion], [4, 1, 1, 2, 1, 0.333]);
+  const yearly = week.items.find((i) => i.plan === "yearly");
+  assert.deepEqual([yearly.started, yearly.completed, yearly.conversion], [1, 1, 1]);
+  assert.equal(f.live["30d"].total.started, 7, "the 20-day-old checkout is in 30 days only");
+  assert.equal(f.test["7d"].total.started, 1, "test sessions are apart and stub sessions are left out");
+  assert.ok(f.live.today.total.started <= week.total.started);
+  assert.doesNotMatch(JSON.stringify(f), /buyer@example\.com|cs_live_/, "no emails or session ids");
 });

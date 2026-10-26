@@ -561,7 +561,8 @@ async function route(method, path, url, request, env) {
       requirePrice: true,
       details: { note: "Culinary checkout." },
       name: profile.name || "Grow profile",
-      successPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=success`,
+      // Stripe fills in {CHECKOUT_SESSION_ID}. The site uses it only as the analytics transaction id.
+      successPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancelPath: `/profile?id=${encodeURIComponent(checkoutRow.id)}&checkout=cancel`,
     });
     if (!session.ok) return json({ error: session.error, coming_soon: true }, session.status || 503);
