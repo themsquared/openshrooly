@@ -324,7 +324,7 @@ export class ProfileBuilder extends HTMLElement {
       ),
       h("div", { class: "pb-field" },
         h("span", {}, "Live color swatch"),
-        h("div", { class: "pb-swatch", style: { background: rgb }, "aria-label": "Approximate strip color" })
+        h("div", { class: "pb-swatch", role: "img", style: { background: rgb }, "aria-label": "Approximate strip color" })
       ),
       this.renderLightSources(issues)
     );

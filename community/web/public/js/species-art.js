@@ -77,7 +77,11 @@ export function speciesArt(species, strain = "", name = "", pack = "", { priorit
   const src = culinaryPhoto(species, strain, name);
   const label = [name, species].filter(Boolean).join(" · ") || "mushroom";
   const loading = priority ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
-  return `<img src="${src}" alt="${escapeAttr(label)}" width="960" height="540" ${loading} decoding="async">`;
+  // Cards are small, so phones fetch the 640 wide WebP instead of the full 960 JPEG.
+  const base = src.replace(/\.jpg$/, "");
+  const srcset = `${base}-640.webp 640w, ${base}-960.webp 960w`;
+  const sizes = priority ? "(max-width: 767px) 100vw, 720px" : "(max-width: 767px) 100vw, 360px";
+  return `<img src="${src}" srcset="${srcset}" sizes="${sizes}" alt="${escapeAttr(label)}" width="960" height="540" ${loading} decoding="async">`;
 }
 
 function escapeAttr(value) {

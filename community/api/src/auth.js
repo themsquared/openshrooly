@@ -224,7 +224,7 @@ export async function handleAuth(method, path, url, request, env) {
     const limited = await rateLimit(db, `magic:${rateLimitClient(request)}:${email}`, 5, 900);
     if (!limited.ok) return json({ error: "Too many sign-in attempts. Try again later." }, 429);
     const turnstile = await verifyTurnstile(env, body.turnstile, ip, request);
-    if (!turnstile.ok) return json({ error: "Turnstile check failed." }, 400);
+    if (!turnstile.ok) return json({ error: "We couldn't confirm you're a person. Tap the box and try again.", code: "turnstile_failed" }, 400);
     const token = randomToken() + randomToken();
     await db.run(
       "INSERT INTO magic_links (email, token_hash, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",

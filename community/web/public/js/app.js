@@ -566,6 +566,10 @@ async function renderAuth(mode) {
     } catch (err) {
       $("#error").textContent = err.message;
       $("#error").classList.remove("hidden");
+      // A person check token works once. Give a fresh box to tap after any failed try.
+      try {
+        globalThis.turnstile?.reset?.();
+      } catch {}
     }
   });
 }
