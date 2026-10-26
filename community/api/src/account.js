@@ -228,7 +228,7 @@ export async function handleAccount(method, path, url, request, env) {
     }
     if (user.role === "admin") throw new ValidationError("Admin accounts cannot be deleted here.", 403);
     if (await paidCoachActive(db, user)) {
-      throw new ValidationError("Cancel your Grow Coach plan first. Then you can delete your account.", 409);
+      throw new ValidationError("Your Grow Coach plan is still running. Cancel it under Manage billing above. You can delete your account once it ends.", 409);
     }
     await deleteAccount(env, db, user);
     // Kept without a user id so abuse can still be traced to an address for a while.
