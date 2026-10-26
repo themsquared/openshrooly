@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Build prerendered profile pages (culinary and Off-menu), sitemap, robots, llms.txt, FAQ, OG cards, and stamp shared head and chrome. */
 
-import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -184,14 +184,33 @@ const TODAY = new Date().toISOString().slice(0, 10);
  */
 export const PAGES_UPDATED = "2026-10-26";
 
-export function lastUpdated(file) {
-  if (!file) return TODAY;
-  try {
-    const out = execFileSync("git", ["log", "-1", "--format=%cs", "--", file], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-    return out || TODAY;
-  } catch {
-    return TODAY;
-  }
+/**
+ * Profile page dates live in scripts/page-dates.json, keyed by profile id with a hash of the
+ * profile data and the page layout version. A date moves only when the hash changes, so the
+ * build gives the same output on any machine and in a shallow CI checkout.
+ * Bump PAGE_LAYOUT when the profile page layout changes enough to count as an update.
+ */
+const PAGE_LAYOUT = "guide-v1";
+const DATES_FILE = join(ROOT, "scripts", "page-dates.json");
+const PAGE_DATES = existsSync(DATES_FILE) ? JSON.parse(readFileSync(DATES_FILE, "utf8")) : {};
+let datesChanged = false;
+
+export function lastUpdated(profile) {
+  if (!profile?.id) return TODAY;
+  const hash = createHash("sha256").update(PAGE_LAYOUT).update(JSON.stringify(profile)).digest("hex").slice(0, 16);
+  const known = PAGE_DATES[profile.id];
+  if (known?.hash === hash) return known.date;
+  PAGE_DATES[profile.id] = { hash, date: TODAY };
+  datesChanged = true;
+  return TODAY;
+}
+
+export function savePageDates() {
+  if (!datesChanged) return false;
+  const sorted = Object.fromEntries(Object.entries(PAGE_DATES).sort(([a], [b]) => a.localeCompare(b)));
+  writeFileSync(DATES_FILE, `${JSON.stringify(sorted, null, 2)}\n`);
+  datesChanged = false;
+  return true;
 }
 
 export function cToF(c) {
@@ -420,7 +439,7 @@ export function profileJsonLd(profile) {
     "@id": `${url}#article`,
     headline: guide ? `How to grow ${profile.name} at home` : `${profile.name} grow profile`,
     description: guide ? directAnswer(profile) : answerFirst(profile),
-    dateModified: lastUpdated(profile._file),
+    dateModified: lastUpdated(profile),
     url,
     mainEntityOfPage: url,
     image,
@@ -619,7 +638,7 @@ function updatedHtml(date) {
 export function renderGuideProfilePage(profile, profiles = []) {
   const tools = `/profile?id=${encodeURIComponent(profile.id)}`;
   const art = speciesArt(profile.species, profile.strain, profile.name, profile.pack, { priority: true, id: profile.id });
-  const updated = lastUpdated(profile._file);
+  const updated = lastUpdated(profile);
   const timeline = stageRows(profile)
     .map(
       ({ stage, from, to }) =>
@@ -907,7 +926,7 @@ export function sitemapEntries(profiles) {
     ...pages,
     { path: "/grow", lastmod: HUB_UPDATED.value },
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
-    ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p._file) })),
+    ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
   ];
 }
 
@@ -980,7 +999,7 @@ export function renderLlmsFull(profiles) {
       .map((s) => `- ${s.name}: ${s.duration_days} days, ${tempText(s.temperature_c)}, ${s.humidity_percent}% humidity, ${fanText(s)}, light ${lightText(p, s).toLowerCase()}.${s.notes ? ` ${s.notes}` : ""}`)
       .join("\n");
     out.push(
-      `## How to grow ${p.name} at home\n\nURL: ${SITE}/profiles/${p.id}\nSpecies: ${p.species || ""}\nUpdated: ${lastUpdated(p._file)}\n\n${directAnswer(p)}${p.summary ? ` ${p.summary}` : ""}\n\n### Conditions by stage\n\n${stages}${
+      `## How to grow ${p.name} at home\n\nURL: ${SITE}/profiles/${p.id}\nSpecies: ${p.species || ""}\nUpdated: ${lastUpdated(p)}\n\n${directAnswer(p)}${p.summary ? ` ${p.summary}` : ""}\n\n### Conditions by stage\n\n${stages}${
         p.chamber_notes ? `\n\n### Notes\n\n${p.chamber_notes}` : ""
       }\n\n### FAQ\n\n${profileFaq(p).map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}`
     );
@@ -1116,7 +1135,7 @@ export function renderRobots() {
 
 export function writeSeoFiles(dir = PUBLIC) {
   const profiles = loadProfiles();
-  HUB_UPDATED.value = profiles.filter(isSearchProfile).map((p) => lastUpdated(p._file)).sort().pop() || TODAY;
+  HUB_UPDATED.value = profiles.filter(isSearchProfile).map((p) => lastUpdated(p)).sort().pop() || TODAY;
   mkdirSync(join(dir, "profiles"), { recursive: true });
   mkdirSync(join(dir, "guides"), { recursive: true });
   writeFileSync(join(dir, "sitemap.xml"), renderSitemap(profiles));
@@ -1143,5 +1162,6 @@ export function writeSeoFiles(dir = PUBLIC) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const { profiles } = writeSeoFiles();
+  if (savePageDates()) console.log("updated scripts/page-dates.json");
   console.log(`wrote SEO files for ${profiles} profiles`);
 }

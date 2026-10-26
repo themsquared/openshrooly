@@ -10,7 +10,7 @@ Every number below comes from the published Shroom Labs grow profiles. Source: h
 
 URL: https://shroomlabs.io/profiles/beech-shimeji
 Species: Hypsizygus tessulatus
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Beech / Buna Shimeji at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window. Clustered beech mushroom. Cool, humid, and a little less fresh air than oysters.
 
@@ -43,7 +43,7 @@ A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/blue-oyster
 Species: Pleurotus ostreatus var. columbinus
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Blue Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 25 days from the start of colonization to the end of the first harvest window. Cool-preferring oyster. Deep color holds better below 18 °C.
 
@@ -83,7 +83,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/button-cremini
 Species: Agaricus bisporus
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Button / Cremini at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and no light. This profile runs about 36 days from the start of colonization to the end of the first harvest window. Compost + casing species. Low light, cool fruiting, casing required.
 
@@ -123,7 +123,7 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/chestnut
 Species: Pholiota adiposa
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Chestnut Mushroom at home, colonize at 23 °C (73 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 34 days from the start of colonization to the end of the first harvest window. Clustered woodlover. Cool fruiting and high humidity keep caps glossy.
 
@@ -156,7 +156,7 @@ A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/cordyceps-militaris
 Species: Cordyceps militaris
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Cordyceps militaris at home, colonize at 20 °C (68 °F) in the dark, then fruit at 18 °C (64 °F) and 84% humidity with moderate fresh air and 12 h of light a day. This profile runs about 57 days from the start of colonization to the end of the first harvest window. Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.
 
@@ -196,7 +196,7 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/elm-oyster
 Species: Hypsizygus ulmarius
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Elm Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window. Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.
 
@@ -232,7 +232,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/enoki
 Species: Flammulina velutipes
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Enoki at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 93% humidity with little fresh air and no light. This profile runs about 43 days from the start of colonization to the end of the first harvest window. Needs cold fruiting and little fresh air for supermarket-long stems.
 
@@ -272,7 +272,7 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/golden-oyster
 Species: Pleurotus citrinopileatus
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Golden Oyster at home, colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 24 days from the start of colonization to the end of the first harvest window. Warm oyster with dense golden clusters. Needs plenty of fresh air to keep stems short.
 
@@ -305,7 +305,7 @@ A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization 
 
 URL: https://shroomlabs.io/profiles/king-oyster
 Species: Pleurotus eryngii
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow King Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 82% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window. Thick-stem oyster. Cooler, slightly drier, and less fresh air than cluster oysters.
 
@@ -342,7 +342,7 @@ A: Moderate fresh air: fan runs 25 s every 25 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/lions-mane
 Species: Hericium erinaceus
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Lion's Mane at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 33 days from the start of colonization to the end of the first harvest window. Tooth fungus. Moderate fresh air, since too much air yellows the spines.
 
@@ -382,7 +382,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/maitake
 Species: Grifola frondosa
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Maitake at home, colonize at 22 °C (72 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 54 days from the start of colonization to the end of the first harvest window. Slow woodlover. Primordia look like brains; do not dry them out.
 
@@ -418,7 +418,7 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/nameko
 Species: Pholiota microspora
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Nameko at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 93% humidity with moderate fresh air and 12 h of light a day. This profile runs about 39 days from the start of colonization to the end of the first harvest window. Cool, very wet fruiting. The slime coat is normal.
 
@@ -451,7 +451,7 @@ A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/pearl-oyster
 Species: Pleurotus ostreatus
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Pearl Oyster at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 29 days from the start of colonization to the end of the first harvest window. Forgiving beginner oyster. Fast, lots of fresh air, cool-to-room fruiting.
 
@@ -491,7 +491,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/pink-oyster
 Species: Pleurotus djamor
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Pink Oyster at home, colonize at 27 °C (81 °F) in the dark, then fruit at 24 °C (75 °F) and 86% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 20 days from the start of colonization to the end of the first harvest window. Tropical oyster. Wants warmth; stalls and fades in a cold room.
 
@@ -531,7 +531,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/pioppino
 Species: Cyclocybe aegerita
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Pioppino at home, colonize at 25 °C (77 °F) in the dark, then fruit at 16 °C (61 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window. Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.
 
@@ -564,7 +564,7 @@ A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/reishi
 Species: Ganoderma lucidum
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Reishi at home, colonize at 27 °C (81 °F) in the dark, then fruit at 23 °C (73 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 77 days from the start of colonization to the end of the first harvest window. Antlers under high CO2, then consoles when fresh air increases.
 
@@ -604,7 +604,7 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/shiitake
 Species: Lentinula edodes
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Shiitake at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 74 days from the start of colonization to the end of the first harvest window. Needs a full colonize + browning rest, then a cold shock before fruiting.
 
@@ -642,7 +642,7 @@ A: Moderate fresh air: fan runs 35 s every 12 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/turkey-tail
 Species: Trametes versicolor
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Turkey Tail at home, colonize at 24 °C (75 °F) in the dark, then fruit at 20 °C (68 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 78 days from the start of colonization to the end of the first harvest window. Thin polypore. Long fruiting, lots of fresh air, not a thick-fleshed edible.
 
@@ -675,7 +675,7 @@ A: Moderate fresh air: fan runs 30 s every 12 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/wine-cap
 Species: Stropharia rugosoannulata
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Wine Cap at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window. Best as an outdoor bed mushroom. Indoor profile is a climate approximation only.
 
@@ -715,7 +715,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/wood-ear
 Species: Auricularia auricula-judae
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 To grow Wood Ear at home, colonize at 26 °C (79 °F) in the dark, then fruit at 24 °C (75 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window. Warm, wet jelly fungus. High humidity matters more than light intensity.
 
