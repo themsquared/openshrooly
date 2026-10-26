@@ -1195,3 +1195,41 @@ test("profile apply on the raw route is translated for setpoint-only firmware", 
   });
   assert.equal(notice.status, 409);
 });
+
+test("inbox never ships a command a newer one of the same kind replaced, and retires it", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeff5566");
+  const exp = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const add = (kind, payload) =>
+    ctx.db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+      d.deviceId,
+      kind,
+      JSON.stringify({ ...payload, expires_at: exp }),
+      new Date().toISOString(),
+      null,
+    ]);
+  await add("setpoints", { source: "site", air_exchange_speed: 30, light_hours: 5 }); // 1: replaced by 3
+  await add("setpoints", { source: "site", white_intensity: 120 }); // 2: 3 sets white too, replaced
+  await add("setpoints", { source: "grow-coach-autopilot", air_exchange_speed: 25, light_hours: 10, white_intensity: 200 }); // 3
+  await add("setpoints", { source: "site", color_b: 50 }); // 4: newer than 3 but only blue, so 3 stays
+  await add("apply_profile", { profile_id: "x", stage: "fruiting" }); // 5: other kind, untouched
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+  });
+  assert.equal(inbox.status, 200, JSON.stringify(inbox.data));
+  const rows = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=?", [d.deviceId]);
+  const shipped = inbox.data.commands.map((c) => Number(c.id));
+  const byPayload = (n) => rows.find((r) => JSON.parse(r.payload).air_exchange_speed === n || JSON.parse(r.payload).white_intensity === n);
+  const older = byPayload(30);
+  const white = byPayload(120);
+  assert.equal(shipped.length, 3);
+  assert.ok(!shipped.includes(Number(older.id)) && !shipped.includes(Number(white.id)));
+  for (const row of [older, white]) {
+    assert.ok(row.consumed_at);
+    assert.equal(JSON.parse(row.payload)._ack.status, "expired");
+    assert.match(JSON.parse(row.payload)._ack.reason, /Replaced by a newer/);
+  }
+});

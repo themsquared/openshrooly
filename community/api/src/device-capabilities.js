@@ -15,7 +15,42 @@ import {
   whitePercentToLux,
 } from "./profile-schema.js";
 
-export const COMMAND_TTL_MS = 24 * 60 * 60 * 1000;
+/** Long enough to outlive a poll the chamber's hourly connect cap pushes back (polls are 15 min). */
+export const COMMAND_TTL_MS = 2 * 60 * 60 * 1000;
+
+/** Kinds where a newer command replaces an older one that has not applied yet. */
+const SUPERSEDABLE_KINDS = new Set(["setpoints", "apply_profile", "schedule"]);
+const NON_SETTING_KEYS = new Set([
+  "expires_at", "source", "request_id", "from", "approved", "profile_id", "stage", "delivery",
+  "temperature_target", "target_humidity", "mode",
+]);
+
+function settingKeys(payload = {}) {
+  const keys = new Set();
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (key.startsWith("_") || NON_SETTING_KEYS.has(key) || value == null) continue;
+    keys.add(key === "fan_speed_percent" ? "air_exchange_speed" : key);
+  }
+  return keys;
+}
+
+/**
+ * True when `newer` makes `older` stale: same device and kind, issued later, did not itself fail,
+ * and (for setpoints) sets every knob the older one sets. A stale command must never apply over it.
+ */
+export function commandSupersedes(newer, older) {
+  if (!newer || !older || newer.device_id !== older.device_id || newer.kind !== older.kind) return false;
+  if (!SUPERSEDABLE_KINDS.has(older.kind) || Number(newer.id) <= Number(older.id)) return false;
+  const np = parseJson(newer.payload, {}) || {};
+  const ack = String(np._ack?.status || "");
+  if (["failed", "refused", "expired"].includes(ack)) return false;
+  if (older.kind !== "setpoints") return true;
+  const mine = settingKeys(parseJson(older.payload, {}) || {});
+  const theirs = settingKeys(np);
+  if (!mine.size) return false;
+  for (const key of mine) if (!theirs.has(key)) return false;
+  return true;
+}
 export const IDEMPOTENCY_WINDOW_MS = 60 * 1000;
 
 /** Capability tokens firmware can report. Each names the chamber entities it writes. */

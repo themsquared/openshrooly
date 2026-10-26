@@ -805,12 +805,8 @@ test("failed, refused, or expired commands restore last_setpoints to from", asyn
     { humidity: 88, humidity_setpoint: 90, temperature: 22.76, temperature_setpoint: 24 },
     new Date(expireAt).toISOString()
   );
-  const expired = await runAutopilotForDevice(ctx.db, ctx, {
-    device,
-    user,
-    now: expireAt,
-  });
-  assert.equal(expired.applied, undefined);
+  // Reconcile alone: past the 2 h TTL a full run would also resend right away.
+  await reconcileAutopilotCommands(ctx.db, { device, user, now: expireAt });
   const afterExpire = await getDeviceMode(ctx.db, "dev-fail", user.id);
   assert.equal(JSON.parse(afterExpire.last_setpoints).temperature_c, 24);
   const logs = await ctx.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", [
