@@ -30,11 +30,11 @@ export const FIRMWARE_SETPOINT_LIMITS = { temperature_c: [10, 32], humidity_perc
 export const COMMAND_STATUSES = ["queued", "delivered", "applied", "failed", "expired"];
 
 const NOTES = {
-  fan: "This chamber's firmware can't change fan speed from the cloud yet. Set it on the chamber.",
-  light: "This chamber's firmware can't take light settings from the cloud yet. Set them on the chamber.",
-  firmware_notice: "This chamber's firmware can't show update notices from the cloud.",
+  fan: "This chamber can't change fan speed from the site yet. Set it on the chamber.",
+  light: "This chamber can't take light settings from the site yet. Set them on the chamber.",
+  firmware_notice: "This chamber can't show update notices from the site yet.",
   profile_translated:
-    "This chamber's firmware can't load a whole profile, so Apply sends the phase's temperature and humidity targets.",
+    "This chamber can't load a whole profile, so Apply sends the phase's temperature and humidity targets.",
 };
 
 function num(value) {
@@ -93,8 +93,8 @@ export function deviceCapabilities(doc = {}) {
 export function controlSupport(caps) {
   const light = caps.light_schedule || caps.light_color;
   return {
-    temperature: { supported: caps.temperature, note: caps.temperature ? null : "This chamber's firmware can't change the temperature target from the cloud." },
-    humidity: { supported: caps.humidity, note: caps.humidity ? null : "This chamber's firmware can't change the humidity target from the cloud." },
+    temperature: { supported: caps.temperature, note: caps.temperature ? null : "This chamber can't change the temperature target from the site." },
+    humidity: { supported: caps.humidity, note: caps.humidity ? null : "This chamber can't change the humidity target from the site." },
     fan: { supported: caps.fan, note: caps.fan ? null : NOTES.fan },
     light: { supported: light, note: light ? null : NOTES.light },
     profile: {
@@ -229,7 +229,7 @@ export function commandState(command, { device = {}, caps = deviceCapabilities({
     status = "expired";
     reason = runnable
       ? "The chamber didn't confirm this before it expired."
-      : `This chamber's firmware can't run ${KIND_LABEL[command.kind] || command.kind} commands, so it expired unused.`;
+      : `This chamber can't take ${KIND_LABEL[command.kind] || command.kind} changes yet, so this one expired unused.`;
     at = expiresAt;
   } else {
     const inbox = Date.parse(device.last_inbox_at || "");
@@ -239,7 +239,7 @@ export function commandState(command, { device = {}, caps = deviceCapabilities({
       at = device.last_inbox_at;
     }
     if (!runnable) {
-      reason = `This chamber's firmware can't run ${KIND_LABEL[command.kind] || command.kind} commands, so it will not be applied.`;
+      reason = `This chamber can't take ${KIND_LABEL[command.kind] || command.kind} changes yet, so this one was not sent.`;
     } else if (status === "delivered") {
       reason = "Waiting for the chamber to confirm.";
     } else {

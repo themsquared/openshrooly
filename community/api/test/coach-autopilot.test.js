@@ -391,7 +391,7 @@ test("a manual setpoint change pauses Autopilot for 12 hours", async () => {
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-manual", { token });
   assert.equal(status.data.mode, "advisor");
   assert.equal(status.data.status, "paused");
-  assert.match(status.data.pause_reason, /you changed a setpoint/i);
+  assert.match(status.data.pause_reason, /you changed a target yourself/i);
   const until = Date.parse(status.data.pause_until);
   assert.ok(until - Date.now() > 11 * 60 * 60 * 1000);
   const again = await call(ctx, "POST", "/api/coach/autopilot/mode", {
@@ -606,11 +606,11 @@ test("reported setpoints that differ from last_setpoints pause for 12 hours", as
   });
   assert.equal(second.paused, true);
   assert.equal(second.flipped_to, "advisor");
-  assert.match(second.reason, /you changed a setpoint/i);
+  assert.match(second.reason, /you changed a target yourself/i);
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-lan", { token });
   assert.equal(status.data.mode, "advisor");
   assert.equal(status.data.status, "paused");
-  assert.match(status.data.pause_reason, /you changed a setpoint/i);
+  assert.match(status.data.pause_reason, /you changed a target yourself/i);
 });
 
 test("setpointsMismatch ignores a just-applied command and detects a LAN change", () => {
