@@ -25,7 +25,7 @@ Checkout is off until Stripe keys are set. With no keys, buy and subscribe butto
    npx wrangler secret put STRIPE_PRICE_YEARLY -c wrangler.deploy.toml
    ```
 
-Paid culinary recipes go live as soon as the first two are set. Grow Coach checkout also needs a price id and `COACH_PUBLIC=1`, which stays unset until launch.
+Paid culinary recipes go live as soon as the first two are set. Grow Coach checkout also needs a price id and `COACH_PUBLIC=1`, which stays unset until launch. Before launch, beta users (`COACH_BETA_USER_IDS`) can already open a real checkout once Stripe is set, so Mike can test it on prod. Everyone else still gets a 404.
 
 Each plan opens on its own. With only `STRIPE_PRICE_MONTHLY` set, the yearly choice shows "Not available yet" and the API answers 503 `coming_soon` for it without calling Stripe. The older single `STRIPE_PRICE_COACH` still works as the monthly price if `STRIPE_PRICE_MONTHLY` is unset.
 

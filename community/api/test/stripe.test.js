@@ -215,6 +215,24 @@ test("Coach subscribe stays hidden without COACH_PUBLIC even with keys", async (
   assert.equal(stripe.calls.length, 0);
 });
 
+test("with COACH_PUBLIC off, only a beta user can open a real Coach checkout once Stripe is set", async () => {
+  const { ctx, stripe } = liveEnv({ env: { COACH_PUBLIC: "", STRIPE_PRICE_COACH: "", STRIPE_PRICE_MONTHLY: "price_m", STRIPE_PRICE_YEARLY: "price_y" } });
+  const stranger = await register(ctx, "stranger@example.com");
+  const beta = await register(ctx, "beta-buyer@example.com");
+  ctx.COACH_BETA_USER_IDS = String(beta.user.id);
+  const hidden = await call(ctx, "POST", "/api/coach/subscribe", { token: stranger.token, body: { plan: "monthly" } });
+  assert.equal(hidden.status, 404);
+  assert.equal(stripe.calls.length, 0);
+  const publicView = await call(ctx, "GET", "/api/coach");
+  assert.equal(publicView.data.available, false);
+  for (const [plan, price] of [["monthly", "price_m"], ["yearly", "price_y"]]) {
+    const res = await call(ctx, "POST", "/api/coach/subscribe", { token: beta.token, body: { plan } });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.equal(stripe.calls.at(-1).form.get("line_items[0][price]"), price);
+    assert.equal(stripe.calls.at(-1).form.get("metadata[plan]"), plan);
+  }
+});
+
 test("Coach lifecycle: pay, renew, cancel at period end keeps access, deletion removes it", async () => {
   const { ctx, stripe } = liveEnv();
   const { token, user } = await register(ctx, "coachlife@example.com");

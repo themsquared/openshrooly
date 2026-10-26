@@ -377,8 +377,12 @@ export async function handleCoach(method, path, url, request, env) {
     if (body.pack === "psilocybin") {
       throw new ValidationError("Grow Coach is not sold or marketed with off-menu varieties.", 400);
     }
-    if (!coachPublicEnabled(env) || (!paymentsConfigured(env) && !devStubsEnabled(env, request))) {
-      if (!(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
+    // While COACH_PUBLIC is off, only beta users can reach checkout, and only once Stripe is set up.
+    // That lets Mike test real checkout on prod without putting Coach on sale to anyone else.
+    const isPublic = coachPublicEnabled(env);
+    const checkoutReady = paymentsConfigured(env) || (isPublic && devStubsEnabled(env, request));
+    if ((!isPublic || !checkoutReady) && !(await coachAutopilotAvailable(env, db, user))) return json({ error: "not found" }, 404);
+    if (!checkoutReady) {
       return json({ error: "Grow Coach is in preview. Checkout is not open yet.", coming_soon: true, waitlist: true }, 503);
     }
     const plan = coachPlanId(body.plan);
