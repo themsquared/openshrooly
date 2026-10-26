@@ -294,3 +294,25 @@ test("a new grow's phase list defaults to the first stage", async () => {
   assert.match(same, /value="fruiting" selected/);
   assert.equal(phaseLine({ grow: { phase: "Colonization", day: 0, total_days: 29 } }), "Colonization · day 1 of 29");
 });
+
+test("devices empty state gives one clear next step", async () => {
+  const { devicesEmptyHtml } = await import("../public/js/device-ui.js");
+  const html = devicesEmptyHtml();
+  assert.match(html, /href="\/claim.html">Link your chamber</);
+  assert.match(html, /href="\/install.html"/);
+  assert.doesNotMatch(html, /filter/i);
+});
+
+test("grow this adapts to sign in and chamber count", async () => {
+  const { growThisHtml } = await import("../public/js/device-ui.js");
+  assert.match(growThisHtml({ signedIn: false, next: "/profile.html?id=x" }), /Sign in to grow this/);
+  assert.match(growThisHtml({ signedIn: true, devices: [] }), /Link a chamber to grow this/);
+  assert.match(growThisHtml({ signedIn: true, devices: [{ id: "a", status: "revoked" }] }), /Link a chamber/);
+  const one = growThisHtml({ signedIn: true, devices: [{ id: "a", name: "Kitchen", status: "active" }] });
+  assert.match(one, /Grow this in Kitchen/);
+  assert.doesNotMatch(one, /<select/);
+  const two = growThisHtml({ signedIn: true, devices: [{ id: "a", name: "Kitchen" }, { id: "b", name: "<b>Shed</b>" }] });
+  assert.match(two, /<select id="grow-this-device">/);
+  assert.match(two, /&lt;b&gt;Shed/);
+  assert.match(two, /Start from day 1/);
+});

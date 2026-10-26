@@ -56,9 +56,9 @@
   <main id="main">
     <p class="back-link"><a href="/account.html#devices">Back to account</a></p>
     <h1>Devices</h1>
-    <p class="muted">One chamber or many. Open a card for live stats and the same climate, light, and profile controls the chamber page uses.</p>
+    <p id="devices-intro" class="muted hidden">Tap a chamber for live numbers and controls.</p>
     <p id="devices-error" class="notice hidden" role="alert"></p>
-    <div class="coach-toolbar card">
+    <div id="devices-toolbar" class="coach-toolbar card hidden">
       <label>Filter
         <input id="devices-filter" type="search" placeholder="Name, species, or profile">
       </label>
@@ -73,7 +73,7 @@
     <p id="devices-live" class="live-badge muted hidden" aria-live="polite"></p>
     <div id="devices-list"><div class="device-skeleton" aria-hidden="true"><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>
     <p id="devices-bulk" class="hidden"><a class="button secondary" href="/fleet.html">Bulk tools</a></p>
-    <p><a class="button" href="/claim.html">How linking works</a></p>
+    <p id="devices-add" class="hidden"><a class="button secondary" href="/claim.html">Link another chamber</a></p>
   </main>
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">

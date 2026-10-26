@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!--SEO_HEAD-->
   <title>Link a chamber · Shroom Labs</title>
-  <meta name="description" content="Link your chamber to your account so you can see it, get grow alerts by email, and change its profile. Firmware update not out yet.">
+  <meta name="description" content="Link your chamber to your account so you can see it, get grow alerts by email, and change its profile. Optional. Your chamber works fully on your Wi-Fi without it.">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://shroomlabs.io/claim.html">
   <meta property="og:site_name" content="Shroom Labs">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Link a chamber · Shroom Labs">
-  <meta property="og:description" content="Link your chamber to your account so you can see it, get grow alerts by email, and change its profile. Firmware update not out yet.">
+  <meta property="og:description" content="Link your chamber to your account so you can see it, get grow alerts by email, and change its profile. Optional. Your chamber works fully on your Wi-Fi without it.">
   <meta property="og:url" content="https://shroomlabs.io/claim.html">
   <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
   <meta property="og:image:width" content="1200">
@@ -19,7 +19,7 @@
   <meta property="og:image:alt" content="Link a chamber · Shroom Labs">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Link a chamber · Shroom Labs">
-  <meta name="twitter:description" content="Link your chamber to your account so you can see it, get grow alerts by email, and change its profile. Firmware update not out yet.">
+  <meta name="twitter:description" content="Link your chamber to your account so you can see it, get grow alerts by email, and change its profile. Optional. Your chamber works fully on your Wi-Fi without it.">
   <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Link a chamber","item":"https://shroomlabs.io/claim.html"}]}</script>
   <!--/SEO_HEAD-->
@@ -41,65 +41,35 @@
   <!--/CHROME_HEADER-->
   <main id="main">
     <article class="profile-page claim-page">
-      <p class="eyebrow">Optional cloud link</p>
-      <h1 id="claim-title">Link your chamber to your account</h1>
-      <p class="lede answer-first">Link your chamber to your Shroom Labs account so you can see it, get grow alerts by email, and change its profile from anywhere.</p>
-      <p class="notice" role="status">Cloud linking needs a firmware update that is not out yet. Until then your chamber works fully on your own network. Open its page on your Wi-Fi, or use <a href="/docs.html#hub">Hub</a> to apply Profiles.</p>
-      <h2>What you need</h2>
-      <ul class="claim-need">
-        <li>A chamber running OpenShrooly on your Wi-Fi</li>
-        <li>A Shroom Labs account with a verified email</li>
-        <li>The next firmware update, which is not out yet</li>
-      </ul>
-      <h2>How pairing works</h2>
-      <p class="muted">Arriving with the next firmware update. Cloud stays off until you turn it on.</p>
-      <ol class="claim-flow" aria-label="Where pairing happens">
-        <li>Chamber</li>
-        <li>Code</li>
-        <li>This page</li>
-        <li>Account</li>
-      </ol>
-      <ol class="claim-steps">
-        <li>
-          <p class="chip">01</p>
-          <h3>Turn it on</h3>
-          <p>On your chamber's local web page, turn on Connect to Shroom Labs. Cloud is off unless you do.</p>
-        </li>
-        <li>
-          <p class="chip">02</p>
-          <h3>Read the code</h3>
-          <p>The chamber shows a 6-character code and a QR on its screen and local web page. The code lasts 15 minutes.</p>
-        </li>
-        <li>
-          <p class="chip">03</p>
-          <h3>Scan or type</h3>
-          <p>Scan the QR with your phone, or come to this page signed in and type the code.</p>
-        </li>
-        <li>
-          <p class="chip">04</p>
-          <h3>Linked</h3>
-          <p>The chamber is linked to your account and keeps its own security certificate renewed automatically. No password on the device.</p>
-        </li>
-      </ol>
-      <p class="muted">Selling or replacing a chamber? Remove it from your <a href="/account.html">account</a> and the new owner pairs it again.</p>
-      <h2>Do this now</h2>
-      <p>Make an account so you are ready when the firmware ships. Keep growing on your network as usual.</p>
-      <p class="actions">
-        <a id="claim-now-primary" class="button" href="/register.html">Create an account</a>
-        <a class="button secondary" href="/docs.html#hub">How Hub works</a>
-      </p>
-      <section id="claim-code-panel" class="card claim-code-card hidden">
-        <h2>Enter the code from your chamber</h2>
-        <p class="muted">The code lasts 15 minutes. If it expired, refresh it on the chamber.</p>
+      <h1 id="claim-title">Link your chamber</h1>
+      <section id="claim-code-panel" class="card claim-code-card hidden" aria-labelledby="claim-title">
+        <p class="lede">Type the code your chamber shows. It lasts 15 minutes.</p>
         <p id="claim-signin" class="hidden"></p>
         <p id="error" class="notice hidden" role="alert"></p>
         <form id="claim-form" class="hidden">
-          <label>Device code
-            <input id="code" name="code" maxlength="8" autocomplete="one-time-code" spellcheck="false" placeholder="e.g. 7K3M9P" required>
+          <label>Chamber code
+            <input id="code" name="code" maxlength="8" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="7K3M9P" required>
           </label>
           <button type="submit">Link chamber</button>
         </form>
       </section>
+      <section id="claim-soon" class="card claim-code-card" aria-labelledby="claim-title">
+        <p class="lede">Linking from this site opens soon. Your chamber already works fully on your own Wi-Fi.</p>
+        <p class="actions">
+          <a id="claim-now-primary" class="button" href="/register.html">Create an account</a>
+          <a class="button secondary" href="/docs.html#hub">Grow with Hub now</a>
+        </p>
+      </section>
+      <details class="claim-how">
+        <summary>How linking works</summary>
+        <ol class="claim-steps-plain">
+          <li>On your chamber's own page, turn on <strong>Connect to Shroom Labs</strong>. It stays off unless you do.</li>
+          <li>The chamber shows a 6-character code and a QR code.</li>
+          <li>Scan the QR with your phone, or type the code here while signed in.</li>
+          <li>Done. Your chamber shows up in your account and you can change what it grows from anywhere. There is no password on the chamber.</li>
+        </ol>
+        <p class="muted">Linking is optional. It gives you your chamber on your phone, email alerts, and remote profile changes. Selling or replacing a chamber? Remove it from your <a href="/account.html">account</a> and the new owner links it again.</p>
+      </details>
     </article>
   </main>
   <!--CHROME_FOOTER-->

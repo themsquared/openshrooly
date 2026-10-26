@@ -18,6 +18,9 @@ import {
   renderControls,
   renderCommandList,
   resultMessage,
+  devicesEmptyHtml,
+  growThisHtml,
+  growableDevices,
   newRequestId,
   commandPending,
   commandStatusLabel,
@@ -241,6 +244,56 @@ async function renderHome() {
       </div>`;
 }
 
+/** "Grow this" on a profile page: send the profile to a chamber, starting at day 1. */
+async function renderGrowThis(profile) {
+  const box = $("#grow-this");
+  if (!box) return;
+  const next = location.pathname + location.search;
+  if (!getToken()) {
+    box.innerHTML = growThisHtml({ signedIn: false, next });
+    box.classList.remove("hidden");
+    return;
+  }
+  const list = await loadDeviceList();
+  box.innerHTML = growThisHtml({ signedIn: true, devices: list?.devices || [], next });
+  box.classList.remove("hidden");
+  const go = $("#grow-this-go");
+  const confirmRow = $("#grow-this-confirm");
+  const msg = $("#grow-this-msg");
+  if (!go || !confirmRow) return;
+  go.addEventListener("click", () => {
+    go.classList.add("hidden");
+    confirmRow.classList.remove("hidden");
+    $("#grow-this-yes")?.focus();
+  });
+  $("#grow-this-no")?.addEventListener("click", () => {
+    confirmRow.classList.add("hidden");
+    go.classList.remove("hidden");
+  });
+  $("#grow-this-yes")?.addEventListener("click", async (ev) => {
+    const yes = ev.currentTarget;
+    const deviceId = $("#grow-this-device")?.value;
+    if (!deviceId) return;
+    yes.disabled = true;
+    yes.textContent = "Sending...";
+    try {
+      const applied = await api(`/api/fleet/devices/${encodeURIComponent(deviceId)}/apply`, {
+        method: "POST",
+        jsonBody: { action: "profile", payload: { request_id: newRequestId(), profile_id: profile.id } },
+      });
+      const result = applied.results?.[0];
+      if (!result || result.status === "failed") throw new Error(resultMessage(result));
+      confirmRow.classList.add("hidden");
+      const when = result.status === "queued" ? "Your chamber picks it up in about 15 minutes." : "Your chamber has it.";
+      msg.innerHTML = `Sent. ${when} <a href="/device.html?id=${encodeURIComponent(deviceId)}">Open the chamber</a>`;
+    } catch (err) {
+      yes.disabled = false;
+      yes.textContent = "Start the grow";
+      msg.textContent = err.message;
+    }
+  });
+}
+
 async function renderProfile() {
   bindBlobUrlCleanup();
   const id = profileIdFromLocation();
@@ -292,6 +345,7 @@ async function renderProfile() {
     return;
   }
   $("#full").classList.remove("hidden");
+  renderGrowThis(p).catch(() => $("#grow-this")?.classList.add("hidden"));
   $("#notes").textContent = p.notes || "";
   $("#chamber").textContent = p.chamber_notes || "";
   $("#json-link").href = `${apiBase()}/api/profiles/${id}`;
@@ -1182,15 +1236,13 @@ function deviceClaimingLive() {
 
 async function renderClaim() {
   const primary = $("#claim-now-primary");
-  if (getToken() && primary) {
-    primary.textContent = "Open your account";
-    primary.setAttribute("href", "/account.html");
-  }
+  if (getToken() && primary) primary.classList.add("hidden");
 
   const live = deviceClaimingLive();
   const panel = $("#claim-code-panel");
   const form = $("#claim-form");
   const signin = $("#claim-signin");
+  $("#claim-soon")?.classList.toggle("hidden", live);
   if (!live) {
     panel?.classList.add("hidden");
     form?.classList.add("hidden");
@@ -1206,7 +1258,7 @@ async function renderClaim() {
     form?.classList.add("hidden");
     if (signin) {
       const next = encodeURIComponent(location.pathname + location.search);
-      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in to enter a code</a>`;
+      signin.innerHTML = `<a class="button" href="/login.html?next=${next}">Sign in to link it</a> <a href="/register.html?next=${next}">or make an account</a>`;
       signin.classList.remove("hidden");
     }
     return;
@@ -1214,14 +1266,25 @@ async function renderClaim() {
 
   signin?.classList.add("hidden");
   form?.classList.remove("hidden");
+  if (!preset) $("#code")?.focus();
   form?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Linking...";
+    }
     try {
-      const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code: $("#code").value } });
-      location.href = `/account.html#device-${encodeURIComponent(data.device.id)}`;
+      const code = $("#code").value.trim().toUpperCase();
+      const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code } });
+      location.href = `/device.html?id=${encodeURIComponent(data.device.id)}`;
     } catch (err) {
       $("#error").textContent = err.message;
       $("#error").classList.remove("hidden");
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Link chamber";
+      }
     }
   });
 }
@@ -1445,14 +1508,26 @@ async function renderDevices() {
   // The cached paint runs synchronously; wait until the rest of this module (STATE_LABEL etc.) is initialized.
   await Promise.resolve();
   if (!getToken()) return loginRedirect();
-  capabilities()
-    .then((caps) => caps.fleet && $("#devices-bulk")?.classList.remove("hidden"))
-    .catch(() => {});
   let rows = [];
+  let fleet = false;
+  let badge = ["loading"];
   const paint = () => {
     const q = ($("#devices-filter")?.value || "").toLowerCase();
     const sort = $("#devices-sort")?.value || "name";
-    $("#devices-list").innerHTML = renderDeviceCards(sortDeviceRows(rows, q, sort), { empty: "No devices match that filter." });
+    const mine = growableDevices(rows);
+    // Filter and sort only help with a few chambers. None: one clear next step.
+    $("#devices-toolbar")?.classList.toggle("hidden", mine.length < 2);
+    $("#devices-intro")?.classList.toggle("hidden", !mine.length);
+    $("#devices-add")?.classList.toggle("hidden", !mine.length);
+    $("#devices-bulk")?.classList.toggle("hidden", !(fleet && mine.length > 1));
+    // A connection badge means nothing until there is a chamber to watch.
+    if (mine.length) setLiveBadge($("#devices-live"), ...badge);
+    else setLiveBadge($("#devices-live"), "");
+    if (!mine.length) {
+      $("#devices-list").innerHTML = devicesEmptyHtml();
+      return;
+    }
+    $("#devices-list").innerHTML = renderDeviceCards(sortDeviceRows(rows, q, sort), { empty: "No chambers match that search." });
   };
   $("#devices-filter")?.addEventListener("input", paint);
   $("#devices-sort")?.addEventListener("change", paint);
@@ -1462,8 +1537,17 @@ async function renderDevices() {
       rows = next;
       paint();
     },
-    onState: (s, at) => setLiveBadge($("#devices-live"), s, at),
+    onState: (s, at) => {
+      badge = [s, at];
+      if (growableDevices(rows).length) setLiveBadge($("#devices-live"), s, at);
+    },
   });
+  capabilities()
+    .then((caps) => {
+      fleet = Boolean(caps.fleet);
+      paint();
+    })
+    .catch(() => {});
   try {
     live.push(await loadDeviceList());
   } catch (err) {
