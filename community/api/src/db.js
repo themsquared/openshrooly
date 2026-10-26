@@ -1233,9 +1233,10 @@ function dispatch(mode, tables, ids, sql, params) {
   }
   if (q.startsWith("SELECT * FROM coach_autopilot_log WHERE device_id=")) {
     let rows = tables.coach_autopilot_log.filter((r) => r.device_id === params[0]);
+    if (q.includes("AND id<?")) rows = rows.filter((r) => Number(r.id) < Number(params[1]));
     if (q.includes("ORDER BY id DESC")) rows = rows.slice().sort((a, b) => Number(b.id) - Number(a.id));
     if (q.includes("LIMIT")) {
-      const limit = Number(params[1] ?? params[params.length - 1]);
+      const limit = Number(params[params.length - 1]);
       if (Number.isFinite(limit)) rows = rows.slice(0, limit);
     }
     return rows;
