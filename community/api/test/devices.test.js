@@ -1233,3 +1233,34 @@ test("inbox never ships a command a newer one of the same kind replaced, and ret
     assert.match(JSON.parse(row.payload)._ack.reason, /Replaced by a newer/);
   }
 });
+
+test("beta link cap: new links stop at BETA_LINK_CAP with beta_full, existing owners and relinks are not blocked", async () => {
+  const ctx = { ...env(), BETA_LINK_CAP: "2" };
+  const a = await register(ctx, "a@example.com");
+  const b = await register(ctx, "b@example.com");
+  const c = await register(ctx, "c@example.com");
+  await enrollClaim(ctx, a.token, "aa00000000000001");
+  await enrollClaim(ctx, b.token, "aa00000000000002");
+  const pair = await devicePair();
+  const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aa00000000000003", public_jwk: pair.public_jwk, name: "Third" },
+  });
+  assert.equal(enrolled.status, 200);
+  const full = await call(ctx, "POST", "/api/devices/claim", { token: c.token, body: { code: enrolled.data.claim_code } });
+  assert.equal(full.status, 403);
+  assert.equal(full.data.code, "beta_full");
+  assert.match(full.data.error, /beta is full/i);
+  // Raising the cap lets the same code through.
+  ctx.BETA_LINK_CAP = "3";
+  const ok = await call(ctx, "POST", "/api/devices/claim", { token: c.token, body: { code: enrolled.data.claim_code } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+});
+
+test("beta link cap defaults to 50 and ignores junk values", async () => {
+  const { betaLinkCap } = await import("../src/devices.js");
+  assert.equal(betaLinkCap({}), 50);
+  assert.equal(betaLinkCap({ BETA_LINK_CAP: "" }), 50);
+  assert.equal(betaLinkCap({ BETA_LINK_CAP: "abc" }), 50);
+  assert.equal(betaLinkCap({ BETA_LINK_CAP: "0" }), 0);
+  assert.equal(betaLinkCap({ BETA_LINK_CAP: "75" }), 75);
+});

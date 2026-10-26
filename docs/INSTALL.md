@@ -107,6 +107,9 @@ cd ../community/web && npm test && npm run deploy
 `community/web/scripts/install-verify.test.js` re-verifies a published manifest and both
 images with the device key whenever `public/firmware/stable/manifest.json` is present.
 
+The current public release is 1.0.5-sl.1. See `docs/RELEASE-1.0.5-sl.1.md` for its hashes and
+how the production deploy copies and checks the release before it goes live.
+
 ## Tests
 
 ```bash

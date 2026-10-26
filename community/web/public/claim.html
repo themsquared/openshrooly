@@ -42,6 +42,7 @@
   <main id="main">
     <article class="profile-page claim-page">
       <h1 id="claim-title">Link your chamber</h1>
+      <p class="beta-note"><span class="beta-badge">Beta</span> Linking is in open beta. Tell us what trips you up. <a href="/account/feedback" data-feedback-link>Send feedback</a></p>
       <section id="claim-code-panel" class="card claim-code-card hidden" aria-labelledby="claim-title">
         <p class="lede">Type the code your chamber shows. It lasts 15 minutes.</p>
         <p id="claim-signin" class="hidden"></p>
@@ -53,12 +54,27 @@
           <button type="submit">Link chamber</button>
         </form>
       </section>
-      <section id="claim-soon" class="card claim-code-card" aria-labelledby="claim-title">
-        <p class="lede">Linking from this site opens soon. Your chamber already works fully on your own Wi-Fi.</p>
+      <section id="claim-soon" class="card claim-code-card hidden" aria-labelledby="claim-title">
+        <p class="lede">Linking is paused for a moment. Your chamber keeps working fully on your own Wi-Fi. Try again later today.</p>
         <p class="actions">
           <a id="claim-now-primary" class="button" href="/register">Create an account</a>
           <a class="button secondary" href="/docs#hub">Grow with Hub now</a>
         </p>
+      </section>
+      <section id="beta-full" class="card claim-code-card hidden" aria-labelledby="beta-full-title">
+        <h2 id="beta-full-title">The beta is full right now</h2>
+        <p class="lede">Your chamber keeps working fully on your own Wi-Fi. Leave your email and we'll tell you when a spot opens.</p>
+        <form name="beta-waitlist" method="POST" action="/claim?waitlist=1" data-netlify="true" netlify-honeypot="company" class="waitlist-form">
+          <input type="hidden" name="form-name" value="beta-waitlist">
+          <input type="hidden" name="subject" value="Shroom Labs beta waitlist">
+          <input type="hidden" name="page_url" value="">
+          <p class="hp" aria-hidden="true"><label>Company <input name="company" tabindex="-1" autocomplete="off"></label></p>
+          <label>Email
+            <input type="email" name="email" autocomplete="email" required>
+          </label>
+          <button type="submit">Join the waitlist</button>
+          <p class="muted" data-waitlist-msg role="status" aria-live="polite"></p>
+        </form>
       </section>
       <details class="claim-how">
         <summary>How linking works</summary>

@@ -36,6 +36,7 @@ import {
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
+import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
 
 function cfg() {
@@ -685,6 +686,7 @@ async function renderAccount() {
   // New accounts see one card, "Link your first chamber", instead of an empty Chambers section.
   $("#first-chamber")?.classList.toggle("hidden", linked.length > 0);
   $("#devices")?.classList.toggle("hidden", linked.length === 0);
+  $("#feedback")?.classList.toggle("hidden", linked.length === 0);
   if ($("#devices-summary")) $("#devices-summary").textContent = linked.length === 1 ? "1 linked" : `${linked.length} linked`;
   $("#device-cards").innerHTML = renderDeviceCards(devices.devices || [], { empty: "No chambers linked yet." });
   renderAlertSettings().catch((err) => showAlertsStatus(err.message));
@@ -1028,6 +1030,11 @@ if (page === "device") renderDevice().catch((err) => {
 });
 if (page === "alerts-unsub") renderUnsubscribe();
 if (page === "claim") renderClaim();
+if (page === "feedback") renderFeedback();
+wireWaitlistForms();
+if (page === "device" && params().get("id")) {
+  document.querySelectorAll("a[data-feedback-link]").forEach((a) => (a.href = `/account/feedback?device=${encodeURIComponent(params().get("id"))}`));
+}
 if (page === "coach") renderCoach().catch((err) => {
   const box = $("#coach-error");
   if (box) {
@@ -1491,6 +1498,11 @@ async function renderClaim() {
       const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code } });
       location.href = `/device?id=${encodeURIComponent(data.device.id)}`;
     } catch (err) {
+      if (err.status === 403 && err.data?.code === "beta_full") {
+        $("#claim-code-panel")?.classList.add("hidden");
+        $("#beta-full")?.classList.remove("hidden");
+        return;
+      }
       $("#error").textContent = err.message;
       $("#error").classList.remove("hidden");
       if (button) {
@@ -2549,4 +2561,103 @@ async function renderUnsubscribe() {
         : "This link has expired or is not valid. Sign in and turn off alert emails in your account settings instead.";
   }
   $("#unsub-next").classList.remove("hidden");
+}
+
+/* Netlify forms: post in the page so people stay on the site. Netlify reads the form-name field. */
+async function postNetlifyForm(form) {
+  const res = await fetch("/", { method: "POST", body: new FormData(form) });
+  if (!res.ok) throw new Error("That did not send. Check your connection and try again.");
+}
+
+function wireWaitlistForms() {
+  document.querySelectorAll('form[name="beta-waitlist"]').forEach((form) => {
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const page = form.elements.namedItem("page_url");
+      if (page) page.value = location.href.slice(0, 300);
+      const msg = form.querySelector("[data-waitlist-msg]");
+      const button = form.querySelector('button[type="submit"]');
+      if (button) button.disabled = true;
+      try {
+        await postNetlifyForm(form);
+        form.reset();
+        if (msg) msg.textContent = "You're on the list. We'll email you when a spot opens.";
+      } catch (err) {
+        if (msg) msg.textContent = err.message;
+      } finally {
+        if (button) button.disabled = false;
+      }
+    });
+  });
+}
+
+async function renderFeedback() {
+  const gate = $("#feedback-gate");
+  const form = $("#feedback-form");
+  const thanks = $("#feedback-thanks");
+  const say = (html) => {
+    gate.innerHTML = html;
+    gate.classList.remove("hidden");
+  };
+  if (!getToken()) {
+    say(`Feedback is for beta testers. <a href="/login?next=${encodeURIComponent("/account/feedback")}">Sign in</a> first.`);
+    return;
+  }
+  let me;
+  let devices;
+  try {
+    me = await api("/api/me");
+    devices = linkedDevices((await api("/api/fleet/devices")).devices);
+  } catch (err) {
+    if (err.status === 401) {
+      location.href = `/login?next=${encodeURIComponent("/account/feedback")}`;
+      return;
+    }
+    say(escapeHtml(err.message));
+    return;
+  }
+  if (!devices.length) {
+    say(`Feedback is for beta testers with a linked chamber. <a href="/claim">Link your chamber</a> first, then come back.`);
+    return;
+  }
+  gate.classList.add("hidden");
+  form.classList.remove("hidden");
+  const picker = $("#feedback-device");
+  picker.innerHTML = deviceOptions(devices, params().get("device") || "");
+  const preset = params().get("type");
+  if (preset) form.querySelector(`input[name="type"][value="${CSS.escape(preset)}"]`)?.click();
+  const err = $("#feedback-error");
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    err.classList.add("hidden");
+    const file = form.elements.namedItem("screenshot")?.files?.[0];
+    const problem = screenshotProblem(file);
+    if (problem) {
+      err.textContent = problem;
+      err.classList.remove("hidden");
+      return;
+    }
+    const device = devices.find((d) => d.id === picker.value) || null;
+    fillHidden(form, { me, device, href: document.referrer || location.href, userAgent: navigator.userAgent });
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.textContent = "Sending...";
+    try {
+      await postNetlifyForm(form);
+      form.reset();
+      form.classList.add("hidden");
+      thanks.classList.remove("hidden");
+      thanks.focus?.();
+    } catch (e) {
+      err.textContent = e.message;
+      err.classList.remove("hidden");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Send feedback";
+    }
+  });
+  $("#feedback-again")?.addEventListener("click", () => {
+    thanks.classList.add("hidden");
+    form.classList.remove("hidden");
+  });
 }

@@ -833,6 +833,9 @@ function dispatch(mode, tables, ids, sql, params) {
     });
     return {};
   }
+  if (q === "SELECT COUNT(*) AS n FROM cloud_devices WHERE owner_id IS NOT NULL AND status IN ('claimed','active')") {
+    return [{ n: tables.cloud_devices.filter((d) => d.owner_id != null && (d.status === "claimed" || d.status === "active")).length }];
+  }
   if (q.startsWith("SELECT * FROM cloud_devices WHERE id=")) {
     return tables.cloud_devices.filter((d) => d.id === params[0]);
   }
