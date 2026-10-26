@@ -177,6 +177,13 @@ export function isSearchProfile(profile) {
 const TODAY = new Date().toISOString().slice(0, 10);
 
 /** Last commit date of a file, so "Updated" and sitemap lastmod only move when the content does. */
+/**
+ * Sitemap date for the hand written pages (home, FAQ, docs, install, claim). Bump it when their
+ * copy changes. It is a literal on purpose: these files are regenerated, so their own git date
+ * would move on every commit and the generated output would never settle.
+ */
+export const PAGES_UPDATED = "2026-10-26";
+
 export function lastUpdated(file) {
   if (!file) return TODAY;
   try {
@@ -895,7 +902,7 @@ export function renderGuidePage(guide) {
 export function sitemapEntries(profiles) {
   const pages = Object.entries(PAGES)
     .filter(([, p]) => p.sitemap)
-    .map(([file, p]) => ({ path: p.path, lastmod: lastUpdated(join(PUBLIC, file)) }));
+    .map(([, p]) => ({ path: p.path, lastmod: p.updated || PAGES_UPDATED }));
   return [
     ...pages,
     { path: "/grow", lastmod: HUB_UPDATED.value },
