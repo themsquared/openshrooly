@@ -46,13 +46,18 @@ def build(src, dst, family):
     if "zero.tf" in f["glyf"].glyphs:
         f["glyf"]["zero.tf"] = pen.glyph()
     g.recalcBounds(f["glyf"])
+    # OFL 1.1: "Atkinson" and "Hyperlegible" are Reserved Font Names, so the modified font gets its own
+    # name. Copyright (ID 0) and license (IDs 13, 14) records are kept.
+    ps = family.replace(" ", "") + "-" + ("Bold" if "700" in src else "Regular")
     for rec_ in f["name"].names:
-        if rec_.nameID in (1, 4, 16):
-            rec_.string = family + ("" if rec_.nameID != 4 else "")
+        if rec_.nameID in (1, 16): rec_.string = family
+        elif rec_.nameID in (3, 4): rec_.string = family + (" Bold" if "700" in src else "")
+        elif rec_.nameID == 6: rec_.string = ps
+        elif rec_.nameID in (17,): rec_.string = "Bold" if "700" in src else "Regular"
     opts = subset.Options(); opts.flavor = "woff2"; opts.layout_features = ["tnum", "pnum"]; opts.name_IDs = ["*"]
     s = subset.Subsetter(opts); s.populate(unicodes=range(0x30, 0x3A)); s.subset(f)
     f.flavor = "woff2"; f.save(dst)
 
 d = sys.argv[1]
-build(f"{d}/atkinson-400.woff2", f"{d}/atkinson-digits-400.woff2", "Atkinson Digits")
-build(f"{d}/atkinson-700.woff2", f"{d}/atkinson-digits-700.woff2", "Atkinson Digits")
+build(f"{d}/atkinson-400.woff2", f"{d}/sl-digits-400.woff2", "Shroom Labs Digits")
+build(f"{d}/atkinson-700.woff2", f"{d}/sl-digits-700.woff2", "Shroom Labs Digits")

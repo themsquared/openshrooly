@@ -22,19 +22,19 @@
   font-display: swap;
 }
 /* U12: Atkinson's slashed zero made "90%" read like "98%" at tile sizes. These digits-only files are
-   Atkinson with one oval counter in the zero (built by scripts/make-digit-fonts.py). Claim codes keep
+   Atkinson Hyperlegible (OFL 1.1, renamed as the license asks) with one oval counter in the zero (built by scripts/make-digit-fonts.py). Claim codes keep
    the slashed zero, since they mix letters and numbers. */
 @font-face {
-  font-family: "Atkinson Digits";
-  src: url("/fonts/atkinson-digits-400.woff2") format("woff2");
+  font-family: "Shroom Labs Digits";
+  src: url("/fonts/sl-digits-400.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
   unicode-range: U+0030-0039;
 }
 @font-face {
-  font-family: "Atkinson Digits";
-  src: url("/fonts/atkinson-digits-700.woff2") format("woff2");
+  font-family: "Shroom Labs Digits";
+  src: url("/fonts/sl-digits-700.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -50,7 +50,7 @@
 
 :root {
   --display: "Fraunces", "Iowan Old Style", Palatino, serif;
-  --sans: "Atkinson Digits", "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --sans: "Shroom Labs Digits", "Atkinson", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
