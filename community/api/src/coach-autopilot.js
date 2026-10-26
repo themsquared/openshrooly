@@ -34,7 +34,8 @@ export const AUTOPILOT_LIMITS = {
   jumpTemp: 8,
   jumpRh: 25,
   fanClamp: [15, 80],
-  commandTtlMs: 30 * 60 * 1000,
+  // Outlives an inbox poll the chamber's connect cap defers; a newer command supersedes it sooner.
+  commandTtlMs: 2 * 60 * 60 * 1000,
 };
 
 export function coachAutopilotFlagOn(env = {}) {
@@ -727,6 +728,19 @@ async function finalizeAutopilotCommand(db, { command, state, user, status, reas
     });
   }
   return { status, last_setpoints: state.last_setpoints };
+}
+
+/** Close an Autopilot command a newer one replaced, keeping the log and pending state honest. */
+export async function expireSupersededAutopilotCommand(db, device, command, now = Date.now()) {
+  const state = await getDeviceMode(db, device.id, device.owner_id);
+  return finalizeAutopilotCommand(db, {
+    command,
+    state,
+    user: { id: state.user_id || device.owner_id },
+    status: "expired",
+    reason: "Replaced by a newer command.",
+    now,
+  });
 }
 
 async function loadReconcileCommands(db, device, state) {

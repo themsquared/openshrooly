@@ -6,13 +6,14 @@ import { devStubsEnabled } from "./providers.js";
 import { ValidationError, validateStageLight } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
 import {
+  expireSupersededAutopilotCommand,
   inferAutopilotApplyFromReading,
   isAutopilotCommand,
   noteAutopilotCommandAck,
   setpointsMatch,
 } from "./coach-autopilot.js";
 import { applyDeviceChange, commandExpired } from "./fleet.js";
-import { deviceCapabilities } from "./device-capabilities.js";
+import { commandSupersedes, deviceCapabilities } from "./device-capabilities.js";
 import { loadRecentTelemetry } from "./coach-learn.js";
 import {
   buildCsr,
@@ -814,10 +815,17 @@ export async function handleDevices(method, path, url, request, env) {
       // 0011 not applied yet: commands just stay "queued" until it is.
     }
     const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", [bound.device.id]);
-    const open = (rows || []).filter((row) => {
+    const recent = (await db.all("SELECT * FROM device_commands WHERE device_id=? ORDER BY id DESC LIMIT ?", [bound.device.id, 50])) || [];
+    const open = [];
+    for (const row of (rows || []).slice().sort((a, b) => Number(a.id) - Number(b.id))) {
       const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
-      return !commandExpired(payload);
-    });
+      if (commandExpired(payload)) continue;
+      if (recent.some((newer) => commandSupersedes(newer, row)) || open.some((newer) => commandSupersedes(newer, row))) {
+        await retireSuperseded(db, bound.device, row);
+        continue;
+      }
+      open.push(row);
+    }
     return json({
       commands: open.map((row) => ({
         id: row.id,
@@ -871,6 +879,26 @@ export async function handleDevices(method, path, url, request, env) {
 }
 
 const ACK_STATUSES = new Set(["applied", "refused", "failed"]);
+
+/** A newer command of the same kind replaced this one before the chamber took it: never deliver it. */
+async function retireSuperseded(db, device, command) {
+  try {
+    if (isAutopilotCommand(command)) {
+      await expireSupersededAutopilotCommand(db, device, command);
+      return;
+    }
+  } catch {
+    // Fall through to a plain close so the stale command still never ships.
+  }
+  const payload = typeof command.payload === "string" ? JSON.parse(command.payload || "{}") : command.payload || {};
+  payload._ack = { status: "expired", reason: "Replaced by a newer change.", at: nowIso(), via: "superseded" };
+  await db.run("UPDATE device_commands SET consumed_at=?, payload=? WHERE id=? AND device_id=?", [
+    nowIso(),
+    JSON.stringify(payload),
+    command.id,
+    device.id,
+  ]);
+}
 
 /** Keep the chamber's ack result on a non-Autopilot command so the site can show it. */
 async function recordDeviceAck(db, device, body) {
