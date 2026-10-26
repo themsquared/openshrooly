@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { renderRobots, sitemapEntries } from "./generate-seo.js";
 import {
   accessText,
   canAccept,
@@ -150,4 +152,34 @@ test("coach view: access gets the dashboard, no chamber gets the link panel, oth
   assert.equal(coachView({ entitled: false, chambers: 1, waitlist: true }, true), "waitlist");
   assert.equal(coachView({ entitled: false }, false), "signin");
   assert.equal(coachView({ entitled: false, waitlist: true }, false), "waitlist");
+});
+
+const COACH_HTML = readFileSync(new URL("../public/coach.html", import.meta.url), "utf8");
+
+test("/coach is indexable: no noindex, in the sitemap, not blocked in robots, with title, description, canonical, og tags", () => {
+  assert.doesNotMatch(COACH_HTML, /noindex/);
+  assert.match(COACH_HTML, /<title>Grow Coach: automatic grow control for your Shrooly · Shroom Labs<\/title>/);
+  assert.match(COACH_HTML, /<meta name="description" content="Grow Coach reads your Shrooly chamber's live readings[^"]+">/);
+  assert.match(COACH_HTML, /<link rel="canonical" href="https:\/\/shroomlabs.io\/coach">/);
+  for (const tag of ["og:title", "og:description", "og:url", "og:image"]) assert.match(COACH_HTML, new RegExp(`property="${tag}"`));
+  assert.ok(sitemapEntries([]).some((e) => e.path === "/coach"));
+  assert.doesNotMatch(renderRobots(), /Disallow: \/coach/);
+});
+
+test("/coach static HTML is the signed-out pitch: hero and how it works visible, skeleton and dashboard hidden", () => {
+  assert.match(COACH_HTML, /<section id="coach-hero" class="hero coach-hero" /);
+  assert.match(COACH_HTML, /<section id="coach-pitch" class="coach-pitch"/);
+  assert.match(COACH_HTML, /id="coach-skeleton" class="device-skeleton hidden"/);
+  assert.match(COACH_HTML, /id="gated" class="hidden/);
+  assert.match(COACH_HTML, /<h1>Automatic grow control for your Shrooly.<\/h1>/);
+  const pitch = COACH_HTML.slice(COACH_HTML.indexOf('id="coach-hero"'), COACH_HTML.indexOf('id="gated"'));
+  assert.doesNotMatch(pitch, DASHES);
+  assert.doesNotMatch(pitch, /psilocybin|off-menu/i);
+});
+
+test("/coach dashboard order: chambers, then recommendations, then the decisions feed", () => {
+  const at = (id) => COACH_HTML.indexOf(`<section id="${id}"`);
+  assert.ok(at("coach-chambers") > 0);
+  assert.ok(at("coach-chambers") < at("coach-recs"), "chambers before recommendations");
+  assert.ok(at("coach-recs") < at("coach-feed"), "recommendations before decisions");
 });
