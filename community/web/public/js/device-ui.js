@@ -32,7 +32,9 @@ export function phaseLine(device) {
   const parts = [];
   if (phase) parts.push(phase);
   if (day != null && day !== "" && Number.isFinite(Number(day))) {
-    parts.push(total ? `day ${Number(day)} of ${total}` : `day ${Number(day)}`);
+    // The API counts days elapsed (0 on the day the grow starts). People count from day 1.
+    const shown = Math.max(1, Math.floor(Number(day)) + 1);
+    parts.push(total ? `day ${Math.min(shown, total)} of ${total}` : `day ${shown}`);
   }
   return parts.join(" · ");
 }
@@ -212,6 +214,21 @@ export function resultMessage(result) {
   return parts.join(" ");
 }
 
+/**
+ * Phase choices for a profile. A new grow defaults to the first stage, day 1, so a fresh
+ * block never gets fruiting conditions. Keep the running stage only for the same profile.
+ */
+export function stageOptionsHtml(stages = [], { selectedId = "", sameProfile = false } = {}) {
+  if (!stages.length) return `<option value="">Start from the beginning</option>`;
+  const pick = sameProfile && stages.some((s) => s.id === selectedId) ? selectedId : stages[0].id;
+  return stages
+    .map((s, i) => {
+      const label = i === 0 ? `${s.name || s.id} (start here)` : s.name || s.id;
+      return `<option value="${escapeHtml(s.id)}"${s.id === pick ? " selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
 export function newRequestId() {
   const c = globalThis.crypto;
   if (c?.randomUUID) return c.randomUUID();
@@ -262,15 +279,13 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       .map((p) => {
         const selected = p.id === device.profile?.id ? " selected" : "";
         const species = p.species ? ` (${p.species})` : "";
-        return `<option value="${escapeHtml(p.id)}"${selected}>${escapeHtml(p.name)}${escapeHtml(species)}</option>`;
+        const stages = JSON.stringify((p.stage_list || []).map((st) => ({ id: st.id, name: st.name || st.id })));
+        return `<option value="${escapeHtml(p.id)}" data-stages="${escapeHtml(stages)}"${selected}>${escapeHtml(p.name)}${escapeHtml(species)}</option>`;
       })
       .join("");
-  const stageOptions = (device.grow?.stages || [])
-    .map((s) => {
-      const selected = s.id === device.stage?.id ? " selected" : "";
-      return `<option value="${escapeHtml(s.id)}"${selected}>${escapeHtml(s.name || s.id)}</option>`;
-    })
-    .join("");
+  const stageOptions = device.profile?.id
+    ? stageOptionsHtml(device.grow?.stages || [], { selectedId: device.stage?.id, sameProfile: true })
+    : "";
   const notice = canWrite
     ? "Changes use the same limits as the chamber list tools."
     : device.online
@@ -301,7 +316,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       <legend>Profile and grow</legend>
       <div class="row">
         <label>Profile <select name="profile_id"${disabled}>${profileOptions}</select></label>
-        <label>Phase <select name="stage"${disabled}>${stageOptions || `<option value="${escapeHtml(device.stage?.id || "")}">${escapeHtml(device.stage?.name || "Current phase")}</option>`}</select></label>
+        <label>Phase <select name="stage"${disabled}>${stageOptions || `<option value="">Start from the beginning</option>`}</select></label>
       </div>
       <button type="submit" data-action="profile"${profileOff}>Apply profile</button>
       ${controlNote(controls.profile)}
@@ -404,4 +419,48 @@ export function demoDevices() {
       local_only: [{ id: "water_calibration", label: "Water calibration", note: "Empty-tank calibration has to run on the chamber." }],
     },
   ];
+}
+
+/** First screen for someone with no chambers yet: one line, one button, one small link. */
+export function devicesEmptyHtml() {
+  return `<section class="card empty-devices">
+    <h2>No chambers yet</h2>
+    <p class="muted">Link your chamber to see it here and change what it grows from your phone.</p>
+    <a class="button" href="/claim.html">Link your chamber</a>
+    <a class="small-link" href="/install.html">I don't have OpenShrooly on it yet</a>
+  </section>`;
+}
+
+/** Chambers a person can send a profile to. */
+export function growableDevices(devices) {
+  return (Array.isArray(devices) ? devices : []).filter((d) => d && d.status !== "revoked" && d.id);
+}
+
+/**
+ * The "Grow this" box on a profile page.
+ * Signed out: a sign in link. No chambers: link one. One chamber: one button. Several: pick, then the button.
+ */
+export function growThisHtml({ signedIn, devices = [], next = "/" } = {}) {
+  if (!signedIn) {
+    return `<div class="grow-this-row"><a class="button" href="/login.html?next=${encodeURIComponent(next)}">Sign in to grow this</a></div>`;
+  }
+  const list = growableDevices(devices);
+  if (!list.length) {
+    return `<div class="grow-this-row"><a class="button" href="/claim.html">Link a chamber to grow this</a></div>`;
+  }
+  const label = (d) => escapeHtml(d.name || "My chamber");
+  const picker =
+    list.length > 1
+      ? `<label class="grow-this-pick">Chamber
+          <select id="grow-this-device">${list.map((d) => `<option value="${escapeHtml(d.id)}">${label(d)}</option>`).join("")}</select>
+        </label>`
+      : `<input type="hidden" id="grow-this-device" value="${escapeHtml(list[0].id)}">`;
+  const button = list.length > 1 ? "Grow this" : `Grow this in ${label(list[0])}`;
+  return `<div class="grow-this-row">${picker}<button type="button" id="grow-this-go">${button}</button></div>
+    <div id="grow-this-confirm" class="grow-this-row hidden">
+      <p class="grow-this-ask">Start from day 1? This replaces what the chamber is growing now.</p>
+      <button type="button" id="grow-this-yes">Start the grow</button>
+      <button type="button" id="grow-this-no" class="secondary">Cancel</button>
+    </div>
+    <p id="grow-this-msg" class="grow-this-msg muted" role="status"></p>`;
 }

@@ -823,6 +823,9 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q.startsWith("SELECT * FROM cloud_devices WHERE id=")) {
     return tables.cloud_devices.filter((d) => d.id === params[0]);
   }
+  if (q === "SELECT * FROM cloud_devices WHERE hardware_id=? OR substr(hardware_id, 1, ?)=?") {
+    return tables.cloud_devices.filter((d) => d.hardware_id === params[0] || String(d.hardware_id).slice(0, params[1]) === params[2]);
+  }
   if (q.startsWith("SELECT * FROM cloud_devices WHERE hardware_id=")) {
     return tables.cloud_devices.filter((d) => d.hardware_id === params[0]);
   }
@@ -908,6 +911,11 @@ function dispatch(mode, tables, ids, sql, params) {
       row.cloud_enabled = params[1];
     }
     return {};
+  }
+  if (q === "UPDATE cloud_devices SET hardware_id=? WHERE id=?") {
+    const row = tables.cloud_devices.find((d) => d.id === params[1]);
+    if (row) row.hardware_id = params[0];
+    return { changes: row ? 1 : 0 };
   }
   if (q.startsWith("UPDATE cloud_devices SET name=? WHERE id=")) {
     const row = tables.cloud_devices.find((d) => d.id === params[1]);

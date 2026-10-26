@@ -53,10 +53,13 @@ test("generated pages, sitemap, robots, and llms.txt are up to date", () => {
 test("claim page explains pairing and hides the code form until a code or flag", () => {
   const html = read("claim.html");
   const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
-  assert.match(main, /Link your chamber to your account/);
-  assert.match(main, /How pairing works/);
-  assert.match(main, /firmware update that is not out yet/);
-  assert.match(main, /Connect to Shroom Labs/);
+  assert.match(main, /<h1[^>]*>Link your chamber<\/h1>/);
+  assert.match(main, /How linking works/);
+  assert.match(main, /opens soon/);
+  // Plain words only: no firmware or certificate talk on the first screen.
+  assert.doesNotMatch(main, /firmware|certificate/i);
+  // The code box comes before anything else on the page (top on mobile).
+  assert.ok(main.indexOf('id="claim-code-panel"') < main.indexOf('id="claim-soon"'));
   assert.match(html, /id="claim-code-panel"[^>]*class="[^"]*\bhidden\b/);
   assert.match(html, /id="claim-form"[^>]*class="[^"]*\bhidden\b/);
   assert.doesNotMatch(main, /Cloud is opt-in/);

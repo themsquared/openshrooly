@@ -122,6 +122,11 @@ function expandStage(stage = {}) {
   };
 }
 
+function firstStageId(profile) {
+  const stages = Array.isArray(profile?.stages) ? profile.stages : [];
+  return stages[0]?.id || null;
+}
+
 function stageFromProfile(profile, stageId) {
   if (!profile) return {};
   const stages = profile.stages || [];
@@ -536,7 +541,14 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   const samples = await loadRecentTelemetry(db, device.id, { now });
   const current = latestReading(samples, now);
   const caps = deviceCapabilities(latestDocFrom(samples));
-  const stage = stageFromProfile(profile, payload.stage || current?.stage);
+  // A new grow starts at day 1 of the first stage. Only reuse the chamber's stage when the
+  // same profile is already running there; never carry another profile's stage over.
+  const sameProfile = Boolean(profile && modeRow.profile_id && modeRow.profile_id === profile.id);
+  const defaultStage = sameProfile ? current?.stage : firstStageId(profile);
+  // Trust the chamber's own grow day for the same profile, or when the user picked the stage
+  // the chamber says it is already in.
+  const trustReported = sameProfile || Boolean(payload.stage && current?.stage === payload.stage);
+  const stage = stageFromProfile(profile, payload.stage || defaultStage);
   const currentSetpoints = {
     temperature_c: current?.temperature_setpoint,
     humidity_percent: current?.humidity_setpoint,
@@ -544,7 +556,7 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   const plan = validateFleetChange({ action, payload, profile, stage, currentSetpoints });
   const cloudKind = plan.ok && ["setpoints", "apply_profile", "schedule"].includes(plan.kind);
   const translated = cloudKind ? planForCapabilities(plan, caps, { stage, requested: payload }) : null;
-  return { modeRow, profile, stage, current, caps, plan, translated };
+  return { modeRow, profile, stage, current, caps, plan, translated, trustReported };
 }
 
 function previewResult(device, { plan, translated, profile, stage }) {
@@ -573,7 +585,7 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
     return { device_id: device.id, status: "failed", error: "Chamber is not linked." };
   }
   const planned = await planChange(db, user, device, { action, payload }, now);
-  const { modeRow, profile, stage, current, caps, plan, translated } = planned;
+  const { modeRow, profile, stage, current, caps, plan, translated, trustReported } = planned;
   const base = { device_id: device.id, name: device.name };
   if (!plan.ok) return { ...base, status: "failed", error: plan.error, preview: null };
   if (plan.kind === "coach_mode") {
@@ -595,7 +607,9 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
     return { ...base, status: "failed", error: translated.error, skipped: translated.skipped || [], preview: plan.preview };
   }
   if (plan.kind === "apply_profile") {
-    await setActiveGrow(db, user, device, profile, plan.payload.stage, now, current);
+    // The chamber's reported grow day belongs to whatever it ran before, so only trust it
+    // for the same profile. A different profile starts its own clock.
+    await setActiveGrow(db, user, device, profile, plan.payload.stage, now, trustReported ? current : null);
     if (autopilotSteering(env, modeRow)) {
       return {
         ...base,

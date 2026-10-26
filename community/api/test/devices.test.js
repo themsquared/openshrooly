@@ -421,9 +421,62 @@ test("a pending claim cannot be hijacked by re-enrolling with another key", asyn
   assert.equal(a.status, 200);
   const attacker = await devicePair();
   const b = await call(ctx, "POST", "/api/devices/enroll", { body: { hardware_id: "4444444444444444", public_jwk: attacker.public_jwk } });
-  assert.equal(b.status, 409);
+  // Another key gets its own row. The first chamber's row and code are untouched.
+  assert.equal(b.status, 200);
+  assert.notEqual(b.data.device_id, a.data.device_id);
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [a.data.device_id]);
+  assert.equal(JSON.parse(row.public_jwk).x, first.public_jwk.x);
   const again = await call(ctx, "POST", "/api/devices/enroll", { body: { hardware_id: "4444444444444444", public_jwk: first.public_jwk } });
   assert.equal(again.status, 200);
+  assert.equal(again.data.device_id, a.data.device_id);
+});
+
+test("b13: a squatter who enrolls and claims a hardware id first cannot block the real chamber", async () => {
+  const ctx = env();
+  const { token: squatter } = await register(ctx, "squatter-b13@example.com");
+  const { token: owner } = await register(ctx, "owner-b13@example.com");
+  const fake = await devicePair();
+  const squat = await call(ctx, "POST", "/api/devices/enroll", { body: { hardware_id: "aabbccddeeffb013", public_jwk: fake.public_jwk } });
+  assert.equal(squat.status, 200);
+  assert.equal((await call(ctx, "POST", "/api/devices/claim", { token: squatter, body: { code: squat.data.claim_code } })).status, 200);
+  // The real chamber with its own key enrolls and links normally.
+  const real = await enrollClaimIssue(ctx, owner, "aabbccddeeffb013");
+  assert.notEqual(real.deviceId, squat.data.device_id);
+  const mine = await call(ctx, "GET", "/api/devices", { token: owner });
+  assert.deepEqual(mine.data.devices.map((d) => [d.id, d.hardware_id, d.status]), [[real.deviceId, "aabbccddeeffb013", "active"]]);
+  const theirs = await call(ctx, "GET", "/api/devices", { token: squatter });
+  assert.deepEqual(theirs.data.devices.map((d) => d.id), [squat.data.device_id]);
+});
+
+test("b13: after a rotate to a new key the chamber still finds its own row", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "owner-b13-rot@example.com");
+  const d = await enrollClaimIssue(ctx, token, "aabbccddeeffb015");
+  const next = await devicePair();
+  // Simulate a finished rotate: the row now holds the new key.
+  await ctx.db.run("UPDATE cloud_devices SET public_jwk=? WHERE id=?", [JSON.stringify(next.public_jwk), d.deviceId]);
+  const relink = await deviceCall(ctx, "POST", "/api/devices/enroll", {
+    deviceId: d.deviceId,
+    key: next.keys.privateKey,
+    body: { hardware_id: "aabbccddeeffb015", public_jwk: next.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(relink.status, 200, JSON.stringify(relink.data));
+  assert.equal(relink.data.device_id, d.deviceId);
+});
+
+test("b13: a row from before key binding is reused only by the same key", async () => {
+  const ctx = env();
+  const pair = await devicePair();
+  await ctx.db.run(
+    "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["sldev_legacy0001", "aabbccddeeffb014", JSON.stringify(pair.public_jwk), "Old", "unclaimed", null, null, null, "2000-01-01T00:00:00Z", 0, null, "2026-01-01T00:00:00Z"]
+  );
+  const same = await call(ctx, "POST", "/api/devices/enroll", { body: { hardware_id: "aabbccddeeffb014", public_jwk: pair.public_jwk } });
+  assert.equal(same.data.device_id, "sldev_legacy0001");
+  const other = await devicePair();
+  const diff = await call(ctx, "POST", "/api/devices/enroll", { body: { hardware_id: "aabbccddeeffb014", public_jwk: other.public_jwk } });
+  assert.equal(diff.status, 200);
+  assert.notEqual(diff.data.device_id, "sldev_legacy0001");
 });
 
 test("authz: unauthenticated and other users cannot claim, command, or revoke a device", async () => {
@@ -747,7 +800,7 @@ test("pending claim polls do not count against the CSR issue limit", async () =>
   assert.equal(issued.status, 200, JSON.stringify(issued.data));
 });
 
-test("enroll 409 codes distinguish already claimed from a claim in progress", async () => {
+test("enroll 409 only for the same key without proof; other keys get their own row", async () => {
   const ctx = env();
   const { token } = await register(ctx);
   const d = await enrollClaimIssue(ctx, token, "aabbccddeeff9902");
@@ -755,8 +808,15 @@ test("enroll 409 codes distinguish already claimed from a claim in progress", as
   const claimed = await call(ctx, "POST", "/api/devices/enroll", {
     body: { hardware_id: "aabbccddeeff9902", public_jwk: other.public_jwk, name: "Kitchen" },
   });
-  assert.equal(claimed.status, 409);
-  assert.equal(claimed.data.code, "already_claimed");
+  // A different key never touches the claimed row. It gets its own.
+  assert.equal(claimed.status, 200);
+  assert.notEqual(claimed.data.device_id, d.deviceId);
+  // The same key without a signed proof is refused.
+  const copied = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeff9902", public_jwk: d.pair.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(copied.status, 409);
+  assert.equal(copied.data.code, "already_claimed");
 
   const first = await devicePair();
   const pending = await call(ctx, "POST", "/api/devices/enroll", {
@@ -766,9 +826,8 @@ test("enroll 409 codes distinguish already claimed from a claim in progress", as
   const busy = await call(ctx, "POST", "/api/devices/enroll", {
     body: { hardware_id: "aabbccddeeff9903", public_jwk: other.public_jwk, name: "Kitchen" },
   });
-  assert.equal(busy.status, 409);
-  assert.equal(busy.data.code, "claim_in_progress");
-  void d;
+  assert.equal(busy.status, 200);
+  assert.notEqual(busy.data.device_id, pending.data.device_id);
 });
 
 test("claim-status is nonce-free and reports only claimed", async () => {
@@ -930,8 +989,8 @@ test("b2: anonymous enroll cannot take a chamber past cert grace", async () => {
   const hijack = await call(ctx, "POST", "/api/devices/enroll", {
     body: { hardware_id: "aabbccddeeffbb02", public_jwk: attacker.public_jwk, name: "Stolen" },
   });
-  assert.equal(hijack.status, 409, JSON.stringify(hijack.data));
-  assert.equal(hijack.data.code, "already_claimed");
+  assert.equal(hijack.status, 200, JSON.stringify(hijack.data));
+  assert.notEqual(hijack.data.device_id, d.deviceId);
   const kept = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
   assert.equal(Number(kept.owner_id) > 0, true);
   assert.notEqual(kept.status, "unclaimed");
@@ -959,8 +1018,7 @@ test("b3: anonymous enroll cannot take a claimed chamber before the first cert",
   const hijack = await call(ctx, "POST", "/api/devices/enroll", {
     body: { hardware_id: "aabbccddeeffbb03", public_jwk: attacker.public_jwk, name: "Stolen" },
   });
-  assert.equal(hijack.status, 409);
-  assert.equal(hijack.data.code, "already_claimed");
+  assert.notEqual(hijack.data.device_id, d.deviceId);
   const issued = await requestCert(ctx, d);
   assert.equal(issued.status, 200, JSON.stringify(issued.data));
 });
@@ -973,7 +1031,7 @@ test("b4: attacker cannot complete CSR after a failed takeover", async () => {
   const hijack = await call(ctx, "POST", "/api/devices/enroll", {
     body: { hardware_id: "aabbccddeeffbb04", public_jwk: attacker.public_jwk, name: "Stolen" },
   });
-  assert.equal(hijack.status, 409);
+  assert.notEqual(hijack.data.device_id, d.deviceId);
   const csr = await buildCsr(attacker.keys.privateKey, attacker.keys.publicKey, d.deviceId);
   const stolen = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/csr`, {
     deviceId: d.deviceId,
@@ -1003,7 +1061,7 @@ test("claimed owner plus proof is relink_in_progress not revoked", async () => {
   assert.ok(Number(row.owner_id) > 0);
 });
 
-test("revoked re-enroll issues a new device id and drops old telemetry", async () => {
+test("revoked re-enroll issues a new device id and keeps the old owner's history", async () => {
   const ctx = env();
   const { token } = await register(ctx, "owner-b5@example.com");
   const d = await enrollClaimIssue(ctx, token, "aabbccddeeffbb05");
@@ -1020,10 +1078,18 @@ test("revoked re-enroll issues a new device id and drops old telemetry", async (
   });
   assert.equal(enrolled.status, 200, JSON.stringify(enrolled.data));
   assert.notEqual(enrolled.data.device_id, d.deviceId);
+  // An anonymous enroll never deletes anything.
   const oldTel = await ctx.db.all("SELECT * FROM device_telemetry WHERE device_id=?", [d.deviceId]);
-  assert.equal(oldTel.length, 0);
+  assert.equal(oldTel.length, 1);
   const oldRow = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
-  assert.equal(oldRow, null);
+  assert.equal(oldRow.status, "revoked");
+  // Same key after a revoke (firmware normally wipes it) also gets a fresh row.
+  const reused = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "aabbccddeeffbb05", public_jwk: d.pair.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(reused.status, 200, JSON.stringify(reused.data));
+  assert.notEqual(reused.data.device_id, d.deviceId);
+  assert.equal((await ctx.db.all("SELECT * FROM device_telemetry WHERE device_id=?", [d.deviceId])).length, 1);
 });
 
 async function commandStatus(ctx, token, deviceId) {

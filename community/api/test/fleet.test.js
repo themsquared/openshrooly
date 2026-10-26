@@ -488,3 +488,24 @@ test("claimed but unlinked chambers cannot take a cloud write", async () => {
   assert.equal(applied.data.results[0].status, "failed");
   assert.match(applied.data.results[0].error, /not linked/i);
 });
+
+test("applying a new profile starts at day 1 of the first stage, not fruiting", async () => {
+  const ctx = env({ FLEET_UI_ENABLED: "0" });
+  const { token, user } = await register(ctx, "fresh-grow@example.com");
+  await addDevice(ctx, user.id, "dev-fresh");
+  await addProfile(ctx, user.id, pearlOyster);
+  // The chamber still reports a day from whatever it ran before.
+  await addReading(ctx, "dev-fresh", { temperature: 21, humidity: 89, temperature_setpoint: 21, humidity_setpoint: 90, grow_day: 19 });
+  const applied = await call(ctx, "POST", "/api/fleet/devices/dev-fresh/apply", {
+    token,
+    body: { action: "profile", payload: { profile_id: pearlOyster.id } },
+  });
+  assert.equal(applied.status, 200, JSON.stringify(applied.data));
+  assert.notEqual(applied.data.results[0].status, "failed", JSON.stringify(applied.data));
+  const first = pearlOyster.stages[0];
+  assert.equal(applied.data.results[0].preview.stage, first.id);
+  const detail = await call(ctx, "GET", "/api/fleet/devices/dev-fresh", { token });
+  const d = detail.data.device;
+  assert.equal(d.stage.id, first.id);
+  assert.equal(d.grow.day, 0, "day 0 elapsed, shown as day 1");
+});

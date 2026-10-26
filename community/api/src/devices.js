@@ -105,7 +105,7 @@ function publicDevice(row) {
   return {
     id: row.id,
     name: row.name,
-    hardware_id: row.hardware_id,
+    hardware_id: String(row.hardware_id || "").split(/[#~]/)[0],
     status: row.status,
     owner_id: row.owner_id,
     cloud_enabled: Boolean(Number(row.cloud_enabled)),
@@ -331,11 +331,27 @@ async function purgeDeviceHistory(db, deviceId) {
   await db.run("DELETE FROM device_nonces WHERE device_id=?", [deviceId]);
 }
 
-async function retireDeviceRow(env, db, device) {
-  await revokeDeviceCerts(env, db, device.id, "revoked");
-  await purgeDeviceHistory(db, device.id);
-  await db.run("DELETE FROM device_certs WHERE device_id=?", [device.id]);
-  await db.run("DELETE FROM cloud_devices WHERE id=?", [device.id]);
+/**
+ * A chamber row is bound to its hardware id AND its key. Stored as "hardware#keythumb".
+ * Rows from before this change hold the bare hardware id and match only when the key matches.
+ */
+async function boundHardwareId(hardwareId, jwk) {
+  return `${hardwareId}#${(await sha256Hex(`${jwk.x}.${jwk.y}`)).slice(0, 16)}`;
+}
+
+function sameJwk(a, b) {
+  return Boolean(a && b && a.x === b.x && a.y === b.y);
+}
+
+async function findEnrolledRow(db, hardwareId, jwk) {
+  // Match on the key on file, not the stored thumbprint: rotate and reclaim can move a row to a new key.
+  const rows = await db.all("SELECT * FROM cloud_devices WHERE hardware_id=? OR substr(hardware_id, 1, ?)=?", [
+    hardwareId,
+    hardwareId.length + 1,
+    `${hardwareId}#`,
+  ]);
+  const mine = rows.filter((row) => !String(row.hardware_id).includes("~") && sameJwk(deviceJwk(row), jwk));
+  return mine.find((row) => row.status !== "revoked") || mine[0] || null;
 }
 
 /**
@@ -481,7 +497,9 @@ export async function handleDevices(method, path, url, request, env) {
     const hardwareId = String(body.hardware_id || "").slice(0, 64);
     if (hardwareId.length < 8) throw new ValidationError("hardware_id required");
     const publicJwk = await verifyPublicJwk(body.public_jwk);
-    let existing = await db.one("SELECT * FROM cloud_devices WHERE hardware_id=?", [hardwareId]);
+    // Only a row with this same key can be reused. A different key, a squatter or a re-flash,
+    // always gets its own new row, so it can never block, take, or wipe someone else's chamber.
+    let existing = await findEnrolledRow(db, hardwareId, publicJwk);
     const code = claimCode();
     const codeHash = await sha256Hex(code);
     const enrollToken = randomToken();
@@ -490,11 +508,9 @@ export async function handleDevices(method, path, url, request, env) {
     const name = String(body.name || "OpenShrooly").slice(0, 80);
 
     if (existing && existing.owner_id && existing.status !== "revoked") {
-      // Hardware id alone is never enough to re-key or free an owned chamber.
+      // Knowing the public key is not enough: the request must be signed by it.
       const proven = await verifyRequestProof(request, db, existing, bytes);
-      const onFile = deviceJwk(existing);
-      const sameKey = onFile && onFile.x === publicJwk.x && onFile.y === publicJwk.y;
-      if (!proven || !sameKey) {
+      if (!proven) {
         throw new ValidationError("device already claimed. Revoke it or use reclaim", 409, "already_claimed");
       }
       await db.run(
@@ -513,19 +529,9 @@ export async function handleDevices(method, path, url, request, env) {
       });
     }
 
-    if (existing && existing.status === "unclaimed" && existing.claim_expires_at > nowIso()) {
-      const onFile = deviceJwk(existing);
-      if (!onFile || onFile.x !== publicJwk.x || onFile.y !== publicJwk.y) {
-        throw new ValidationError(
-          "a claim is already in progress for this device; try again after it expires",
-          409,
-          "claim_in_progress"
-        );
-      }
-    }
-
     if (existing && existing.status === "revoked") {
-      await retireDeviceRow(env, db, existing);
+      // Keep the revoked row and its history for its owner. Free the hardware id slot only.
+      await db.run("UPDATE cloud_devices SET hardware_id=? WHERE id=?", [`${existing.hardware_id}~${existing.id}`, existing.id]);
       existing = null;
     }
 
@@ -538,7 +544,7 @@ export async function handleDevices(method, path, url, request, env) {
     } else {
       await db.run(
         "INSERT INTO cloud_devices (id, hardware_id, public_jwk, name, status, owner_id, enroll_hash, claim_code_hash, claim_expires_at, cloud_enabled, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [id, hardwareId, JSON.stringify(publicJwk), name, "unclaimed", null, enrollHash, codeHash, expires, 0, null, nowIso()]
+        [id, await boundHardwareId(hardwareId, publicJwk), JSON.stringify(publicJwk), name, "unclaimed", null, enrollHash, codeHash, expires, 0, null, nowIso()]
       );
     }
     await audit(db, null, "device_enroll", id, request);
