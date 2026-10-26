@@ -49,3 +49,15 @@ export function hasTag(id, tag) {
 }
 
 export const FREE_IDS = Object.keys(PROFILES).sort();
+
+/** Fan schedule for one stage in plain words, like the profile pages. */
+export function air(id, stageId) {
+  const fan = stage(id, stageId).fan || {};
+  return `a fan run of ${fan.run_duration_s} s every ${fan.period_min} min`;
+}
+
+/** Lowest and highest value of one stage field across the free culinary profiles. */
+export function range(stageId, field) {
+  const values = FREE_IDS.map((id) => profile(id).stages.find((s) => s.id === stageId)).filter(Boolean).map((s) => Number(s[field]));
+  return [Math.min(...values), Math.max(...values)];
+}

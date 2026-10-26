@@ -79,7 +79,7 @@ The full comparison is in grow kit vs monotub vs smart chamber.
 
 ### How much humidity and fresh air do mushrooms need?
 
-Most culinary mushrooms fruit between 85 and 95% humidity. Fresh air matters just as much: oysters need a lot, lion's mane and shiitake need less. The profiles set a different humidity and fan rate for each stage. Too little humidity shows as dry, cracked caps and pins that stall. Too little fresh air shows as long stems and small caps.
+Most culinary mushrooms fruit between 85 and 95% humidity. Fresh air matters just as much: oysters need a lot, lion's mane and shiitake need less. The profiles set a different humidity and fan rate for each stage. Too little humidity shows as dry, cracked caps and pins that stall. Too little fresh air shows as long stems and small caps. More on both in humidity and fresh air for mushrooms.
 
 ### What usually goes wrong?
 
@@ -270,6 +270,394 @@ A: You can, but oysters need a lot of fresh air and do better in bags, buckets w
 
 Q: What is an automated mushroom fruiting chamber?
 A: A box with a humidifier, fan, lights, and sensors that holds the conditions a mushroom needs and changes them by stage. You still harvest by hand.
+
+---
+
+## How much humidity and fresh air do mushrooms need?
+
+URL: https://shroomlabs.io/guides/humidity-and-fresh-air
+Updated: 2026-10-26
+
+Most culinary mushrooms need 86 to 95% humidity while pins form and 82 to 93% while they fruit, plus regular fresh air to clear the carbon dioxide they breathe out. Too little humidity gives dry, cracked caps and stalled pins. Too little fresh air gives long stems and small caps. The two pull against each other, so the goal is steady humidity with gentle, regular air changes.
+
+### What humidity do mushrooms need at each stage?
+
+Humidity is highest while pins form, then drops a little while mushrooms fruit so the caps do not stay wet. These are the numbers each profile uses.
+
+Humidity and fresh air by species, from their profiles |  | Mushroom | Pinning humidity | Fruiting humidity | Fruiting fan
+ | Pearl Oyster | 93% | 88% | every 10 min
+ | Blue Oyster | 94% | 87% | every 10 min
+ | Pink Oyster | 92% | 86% | every 10 min
+ | Lion's Mane | 94% | 90% | every 18 min
+ | Shiitake | 85% | 85% | every 12 min
+ | King Oyster | 90% | 82% | every 25 min
+ | Chestnut Mushroom | 95% | 92% | every 15 min
+ | Nameko | 95% | 93% | every 18 min
+
+During colonization the bag or block holds its own moisture, so room humidity matters less. Fresh air also matters less then, because mycelium grows well in the carbon dioxide it makes.
+
+### Why do mushrooms need fresh air?
+
+Mushrooms breathe in oxygen and breathe out carbon dioxide, like we do. In a closed box carbon dioxide builds up fast. High carbon dioxide tells the mushroom it is still underground, so it stretches its stem to reach open air and keeps its cap small. Fresh air tells it that it has reached the surface and can open its cap.
+
+Oysters are the most sensitive. Pearl Oyster runs a fan run of 40 s every 10 min while fruiting in its profile, while Lion's Mane runs a fan run of 25 s every 18 min.
+
+### How do you know if humidity is too low?
+
+- Pins form and then turn dry, yellow, or stop growing.
+
+- Caps crack, curl up at the edges, or look leathery.
+
+- The cut surface of the block looks pale and dry.
+
+- Lion's mane turns yellow or its spines stay short.
+
+Read dry or cracked mushroom caps for fixes.
+
+### How do you know if humidity is too high?
+
+- Water pools on the caps or the block surface.
+
+- Caps get yellow or brown sticky spots, a sign of bacteria.
+
+- Mushrooms feel slimy instead of firm.
+
+The fix is usually more fresh air, not less humidity. Air moving across the surface lets water evaporate, which is what mushrooms need to pull moisture up through the block.
+
+### How do you know if fresh air is too low?
+
+- Long, thin stems with small caps.
+
+- Oysters that look like coral or tubes instead of shelves.
+
+- Fuzzy white growth on the stems or caps.
+
+- A heavy, stale smell when you open the tent or chamber.
+
+Read long, leggy mushroom stems for fixes.
+
+### How do you raise humidity without stale air?
+
+- Mist the walls, not the mushrooms. Two or three times a day in a tent or tub. Fine mist, no puddles.
+
+- Use a humidity tent. A clear bag or tub over the block with a few holes holds moisture while air still moves.
+
+- Add damp perlite to the bottom of a tub. It gives off moisture slowly.
+
+- Use a humidifier on a timer or a chamber. A Shrooly chamber running OpenShrooly holds the profile's humidity and runs its fan on a schedule for each stage.
+
+### How do you check your humidity reading?
+
+Cheap hygrometers often read several percent off, and the error is often worst near the top of the range, where mushrooms live. To check one, seal it in a bag or jar with a small cap of table salt mixed with a few drops of water to a damp paste. After 8 to 12 hours at steady room temperature it should read 75%. Note how far off it is and correct your readings by that much.
+
+### FAQ
+
+Q: What humidity do oyster mushrooms need?
+A: Pearl Oyster pins at 93% and fruits at 88% humidity in its profile. Oysters also need more fresh air than most species.
+
+Q: Can mushrooms get too much humidity?
+A: Yes. Standing water on caps can cause bacterial spots and soft, slimy mushrooms. More fresh air usually fixes it faster than lowering humidity.
+
+Q: How often should you fan mushrooms?
+A: In a tent or tub, fan two to four times a day, more often for oysters. A chamber runs its fan on a schedule. The oyster profiles here run the fan as often as every 10 minutes while fruiting. Slower species need less.
+
+Q: Do mushrooms need fresh air during colonization?
+A: Very little. Mycelium grows well in the carbon dioxide it makes. Fresh air becomes important when you want pins to form.
+
+---
+
+## Why are my mushrooms not pinning?
+
+URL: https://shroomlabs.io/guides/mushrooms-not-pinning
+Updated: 2026-10-26
+
+Mushrooms usually fail to pin for one of two reasons: the block is not fully colonized yet, or nothing has told it to fruit. Pins form when the block is fully white and then gets a change: cooler air, more fresh air, higher humidity, and light. Check those four, give it a week, and most blocks start to pin.
+
+### Is the block fully colonized?
+
+A block is ready when it is white all the way through, firm, and you cannot see much of the substrate. Patches of brown sawdust or straw mean the mycelium is still working. Starting fruiting early is the most common reason a block sits for weeks with no pins. Give it another week in warm, dark conditions.
+Yellow or amber drops on the surface are normal. They are liquid the mycelium makes, and they often show up when it is close to done.
+
+### Did the block get a fruiting trigger?
+
+In the wild, mushrooms fruit when the weather turns: cooler nights, rain, and open air. At home you copy that. Most profiles drop the temperature a few degrees and raise humidity when pinning starts.
+
+Colonization and pinning conditions, from their profiles |  | Mushroom | Colonization | Pinning | Pinning humidity
+ | Pearl Oyster | 24 °C (75 °F) | 18 °C (64 °F) | 93%
+ | Blue Oyster | 22 °C (72 °F) | 15 °C (59 °F) | 94%
+ | Lion's Mane | 22 °C (72 °F) | 18 °C (64 °F) | 94%
+ | Pink Oyster | 27 °C (81 °F) | 24 °C (75 °F) | 92%
+ | Chestnut Mushroom | 23 °C (73 °F) | 16 °C (61 °F) | 95%
+ | Beech / Buna Shimeji | 22 °C (72 °F) | 16 °C (61 °F) | 94%
+
+Pink Oyster stays warm the whole way, with only a small drop. Cool-weather species such as Blue Oyster pin best with a bigger drop.
+
+### Is there enough fresh air?
+
+Pins need far more fresh air than colonization. A sealed bag or a closed tub can colonize well and then never pin because carbon dioxide stays high. Open the bag where the kit says, cut an X, or add holes, and fan a tent several times a day. In its pinning stage Blue Oyster runs a fan run of 40 s every 12 min. See humidity and fresh air for mushrooms.
+
+### Is there enough light?
+
+Most species need light to know where to fruit. About 12 hours a day of indirect daylight or room light is enough. A dark closet can stall pins. Enoki and button mushrooms are exceptions and fruit in the dark.
+
+### Is humidity high enough at the surface?
+
+If the cut opening dries out, pins cannot form there. Keep the surface damp but not wet. The profiles here pin at 86 to 95% humidity.
+
+### Does your species need something special?
+
+- Shiitake needs weeks of browning, then a cold shock. In its profile that is 21 days of browning and a 1 day cold shock at 16 °C (61 °F) before it fruits.
+
+- Maitake and Reishi are slow. Reishi often grows antlers before it forms a cap.
+
+- Button / Cremini needs a casing layer on top of compost before it pins.
+
+### What if it still will not pin?
+
+If a fully white block has had a week of fruiting conditions with no pins, try a stronger trigger: a few days a bit cooler, or soak the block in cold water for a few hours, drain it, and put it back. Many growers find that wakes it up. If the block shrinks away from the bag, smells sour, or shows colored patches, it may be old or contaminated. Read mushroom contamination.
+
+### FAQ
+
+Q: How long does it take for mushrooms to pin?
+A: Usually a few days to two weeks after fruiting conditions start. In the profiles here pinning runs from 3 days for the fastest species to about 21 days for the slowest.
+
+Q: Do mushrooms need a cold shock to pin?
+A: Most do best with a drop of a few degrees, and shiitake needs a real cold shock. Warm species such as pink oyster pin without one.
+
+Q: Should I open the bag before it is fully colonized?
+A: No. Opening early lets mold in and invites the block to fruit before it has the energy. Wait until it is white all the way through.
+
+Q: Why are my pins forming inside the bag?
+A: Pins inside the bag mean the block is ready and is getting fresh air or light through the plastic. Open the bag at that spot so they can grow out.
+
+---
+
+## Why do my mushrooms have long stems and small caps?
+
+URL: https://shroomlabs.io/guides/leggy-mushroom-stems
+Updated: 2026-10-26
+
+Long, thin stems with small caps almost always mean too much carbon dioxide. The mushrooms are stretching to reach fresh air. Add more air changes, open more holes, or fan more often. If air is good, check light next: mushrooms in a dark corner also stretch toward the nearest light.
+
+### What causes leggy mushrooms?
+
+- Too little fresh air. The most common cause by far. Carbon dioxide builds up around the block and the mushrooms grow stems instead of caps.
+- Too little light. Mushrooms grow toward light. In a dark spot they stretch and the caps stay small and pale.
+- Light from one side. Stems bend and stretch toward a window.
+- Too warm. Some species, especially cool-weather oysters, grow thin and fast in a warm room.
+
+### How do you fix long stems?
+
+- Add fresh air. Fan a tent four or more times a day, add holes, or prop the lid open a little. In a chamber, check that the fan runs and the profile matches the species.
+
+- Give 12 hours of indirect light a day, from above or in front of the opening.
+
+- Move the block somewhere a bit cooler if your species likes it cool. Blue Oyster fruits at 14 °C (57 °F) in its profile.
+
+- Keep humidity up while you add air. Mist the walls more often if the extra air dries things out.
+
+The current flush may stay leggy, but it is still safe to eat. The next flush should look better.
+
+### Which mushrooms show it most?
+
+Oysters show it fastest. Pearl Oyster, Blue Oyster, and Golden Oyster all run their fans hardest in fruiting for this reason. In its profile Pearl Oyster runs a fan run of 40 s every 10 min.
+
+Some species are grown with long stems on purpose. Enoki is grown in the dark with high carbon dioxide to get its thin white stems, and king oyster growers sometimes keep air lower to grow a thick stem.
+
+### How do you set up the next flush so it does not stretch?
+
+- Open the right spot. Mushrooms grow out of the opening. Face it toward the light and toward open air, not into a corner.
+
+- Do not crowd blocks. Several blocks in one small tent share the same air. Leave space, or add air changes for each block you add.
+
+- Start fresh air before pins form. Leggy stems start early. Raise air changes when you start fruiting conditions, not when you first notice long stems.
+
+- Match the profile to the species. In a chamber, an oyster on a lion's mane profile gets less air than it wants. Pearl Oyster pins with a fan run of 35 s every 15 min in its profile.
+
+### Is it fresh air or light?
+
+- Stems long and caps small but normal color: fresh air.
+- Caps pale and stems bending toward one side: light.
+- Fuzzy white growth on the stems: fresh air. This fuzz is mycelium reaching for air, not mold.
+
+### FAQ
+
+Q: Are leggy mushrooms safe to eat?
+A: Yes, if they grew from a clean block and look and smell normal. Long stems change texture, not safety. Stems can be tougher, so slice them thin or use them for stock.
+
+Q: Why are my oyster mushrooms shaped like coral?
+A: Coral-like or tube-shaped oysters are a classic sign of too much carbon dioxide. Add fresh air and the next flush should form normal shelves.
+
+Q: Do leggy mushrooms mean the block is bad?
+A: No. It means the conditions around the block need changing. The same block can give a normal flush next time with more air and light.
+
+Q: Can too much fresh air hurt mushrooms?
+A: Strong air blowing straight on the mushrooms dries them out and cracks caps. Aim for regular gentle air changes, not a constant breeze.
+
+---
+
+## Why are my mushroom caps dry or cracked?
+
+URL: https://shroomlabs.io/guides/dry-cracked-mushroom-caps
+Updated: 2026-10-26
+
+Dry, cracked, or curled caps mean the mushrooms are losing water faster than the block can supply it. Usually the air is drier than the species wants, or a fan, heater, or vent is blowing straight on them. Raise humidity, block direct airflow, and keep air changes gentle. Most culinary profiles here fruit at 82 to 93% humidity.
+
+### What causes cracked caps?
+
+- Low humidity. Dry winter air and heated rooms are the usual cause.
+- Direct airflow. A fan, heater, or air vent blowing on the block dries the caps even when the room humidity is fine.
+- A dry block. After a flush or two, the block has less water to give. Soak it before the next flush.
+- Too much light or heat from a lamp close to the mushrooms.
+
+### How do you fix dry caps?
+
+- Put the block in a humidity tent or chamber if it is out in the room.
+
+- Mist the tent walls two or three times a day. Mist the air above the mushrooms, not the mushrooms themselves.
+
+- Move it away from heaters, fans, and vents.
+
+- Check your hygrometer. Read humidity and fresh air for mushrooms for a simple salt test.
+
+- Soak a spent block in cold water for a few hours before the next flush.
+
+### What humidity stops caps from cracking?
+
+- Pearl Oyster: 88% while fruiting.
+
+- Lion's Mane: 90% while fruiting.
+
+- Chestnut Mushroom: 92% while fruiting.
+
+- Shiitake: 85% while fruiting.
+
+Every species page lists humidity for each stage.
+
+### Why do caps crack more in winter?
+
+Cold outdoor air holds little water, and heating it indoors drops the humidity further. Many heated homes sit well below 40% humidity in winter, far below what fruiting mushrooms need. Air conditioning in summer dries the air too. A kit that fruited fine in spring can crack in January in the same spot. A tent or chamber keeps the air around the mushrooms humid no matter what the room does.
+
+### How do you keep a kit on the counter from drying out?
+
+- Cover it loosely with a clear plastic bag or a large clear bin with a few holes, so humidity stays in and some air gets through.
+
+- Set it on a tray of damp perlite or a damp towel inside the cover.
+
+- Keep it out of direct sun and away from the stove, the fridge vent, and heating vents.
+
+- Check the opening every morning. If it looks pale and dry, mist the cover and the air above.
+
+Once you have grown one kit, a chamber removes the daily misting. Lion's Mane and the oysters are good species to try in one.
+
+### Are cracked shiitake caps a problem?
+
+Not always. Cracked caps on Shiitake grown in dry, cool air are prized in parts of Asia and sold as flower shiitake. They are thick and dense. If you want smooth caps, raise humidity. If you like the look, they are safe to eat.
+
+### What about lion's mane turning yellow?
+
+Yellow or brown patches on Lion's Mane usually mean dry air or a fruit that is past its best. Harvest yellowing lion's mane soon and raise humidity for the next one. It fruits at 90% in its profile.
+
+### FAQ
+
+Q: Can you eat mushrooms with cracked caps?
+A: Yes. Cracks from dry air change the look and texture, not safety. Toss any mushroom that is slimy, smells off, or shows mold.
+
+Q: Should I spray water directly on mushrooms?
+A: A light mist on young pins is fine, but water that sits on caps can cause bacterial spots. Mist the walls and the air above instead.
+
+Q: Why are my oyster mushroom edges curling up?
+A: Edges that curl up and go wavy usually mean the mushrooms are past their best or the air is dry. Harvest oysters while the edges still curl down a little.
+
+---
+
+## Is my mushroom block contaminated?
+
+URL: https://shroomlabs.io/guides/mushroom-contamination
+Updated: 2026-10-26
+
+Healthy mycelium is white, sometimes with yellow or amber drops. Contamination usually shows as color: green, blue-green, black, pink, or orange patches, or wet, slimy spots that smell sour. If you see colored mold, bag the block, take it outside without opening it, and clean the area. Do not eat mushrooms from a moldy block.
+
+### Is it mold or mycelium?
+
+- Mycelium: white, cottony or rope-like, smells earthy or like fresh mushrooms.
+- Yellow or amber drops: normal liquid from the mycelium. Not mold.
+- Fuzzy white growth on stems: usually mycelium reaching for air. Add fresh air.
+- Colored patches or powder: mold.
+- Wet, sour, or slimy patches: bacteria.
+
+### What does each kind of contamination look like?
+
+Common contamination at home |  | What you see | Likely cause | What to do
+
+ | Green or blue-green powdery patches | Green mold, often Trichoderma | Bag and remove the block
+
+ | Black or dark gray fuzz | Black mold | Bag and remove the block
+
+ | Pink or orange powder | Fast molds such as Neurospora | Bag and remove at once, it spreads fast
+
+ | Gray, wispy growth that spreads in a day | Cobweb mold | Spot treat early or remove
+
+ | Wet, slimy, sour-smelling patches | Bacteria | Remove the block
+
+ | Yellow or brown sticky spots on caps | Bacterial blotch from standing water | Harvest, then add fresh air
+
+### What should you do with a contaminated block?
+
+- Do not open it indoors. Mold spores spread when you disturb it.
+- Put it in a trash bag, seal it, and take it outside.
+- Wipe the tent, tub, or chamber with soap and water, then 70% isopropyl alcohol, and let it dry.
+- Wash your hands and anything that touched the block.
+A block with green mold will not recover, and mushrooms from it are not worth the risk. Compost it outside, away from other grows, or throw it out.
+
+### Can you save a block with cobweb mold?
+
+Sometimes. Cobweb mold is gray and wispy and spreads very fast. Some growers spot treat small patches early with 3% hydrogen peroxide and more fresh air. If it comes back, remove the block.
+
+### Why does contamination happen?
+
+Mold spores and bacteria are everywhere, in the air, on hands, and on every surface. A healthy, fully colonized block usually wins because the mycelium has already claimed the food. Contamination wins when it gets in early or when the block is weak:
+
+- The bag was opened or damaged before the mycelium finished.
+- The substrate was not sterilized or pasteurized well enough.
+- The block sat too warm, which helps green mold and bacteria.
+- The air was wet and stale for days.
+- The block is old and has given its best flushes.
+
+### What if mold shows up after a flush?
+
+A block that has fruited two or three times has less food left and weaker defenses, so mold often shows up late. Small spots of green on a spent block mean it is done. Harvest anything clean that is already growing, then bag the block and remove it. Many growers put spent blocks in an outdoor compost pile or under wood chips, where they sometimes give one last flush on their own.
+
+### How do you prevent contamination?
+
+- Buy blocks and cultures from a supplier that sells clean, labeled products.
+
+- Do not open bags before they are fully colonized.
+
+- Clean your hands, tools, and chamber before each grow.
+
+- Keep fresh air flowing. Stale, wet air favors bacteria and mold.
+
+- Pick species that colonize fast. Oysters such as Pearl Oyster outrun most molds.
+
+- Harvest on time and remove old mushrooms. Rotting fruit invites mold.
+
+### FAQ
+
+Q: Can you eat mushrooms from a contaminated block?
+A: It is safest not to. Mold can spread into the mushrooms before you can see it. Grow a new block instead.
+
+Q: Is green mold on mushrooms dangerous?
+A: Green mold mainly ruins the grow. Its spores can irritate lungs and allergies, so do not open or shake a moldy block indoors.
+
+Q: Why is there yellow liquid on my mushroom block?
+A: Yellow or amber drops are normal. The mycelium makes them, especially when it is stressed or nearly done colonizing. They are not mold.
+
+Q: Does contamination spread to other blocks?
+A: It can. Spores from an open moldy block drift to nearby blocks and surfaces. Remove it quickly and clean the area before the next grow.
+
+Q: What is the white fuzz on my mushroom stems?
+A: Usually mycelium reaching for fresh air, not mold. It goes away when you add more air changes.
 
 ---
 
