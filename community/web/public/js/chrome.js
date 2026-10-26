@@ -7,6 +7,7 @@ export const PRODUCT =
 export const POSITIONING = "Works with Shrooly devices running OpenShrooly.";
 
 export const NAV_ITEMS = [
+  { id: "install", href: "/install", label: "Install on your Shrooly", className: "nav-install" },
   { id: "profiles", href: "/", label: "Profiles" },
   { id: "grow", href: "/grow", label: "Grow guides" },
   { id: "faq", href: "/faq", label: "FAQ" },
@@ -19,6 +20,13 @@ export const NAV_ITEMS = [
  * an Off-menu page. Crawlers and signed-out visitors never see it.
  */
 export const COACH_NAV = { href: "/coach", label: "Grow Coach", before: "/docs" };
+
+/** Pages for Shrooly owners, linked from every footer. */
+export const OWNER_LINKS = [
+  { href: "/what-happened-to-shrooly", label: "What happened to Shrooly?" },
+  { href: "/reuse-your-shrooly", label: "Reuse your Shrooly" },
+  { href: "/shrooly-faq", label: "Shrooly FAQ" },
+];
 
 /** Add or remove the runtime Coach link in the header and footer navs. */
 export function setCoachNav(show) {
@@ -46,7 +54,8 @@ export function brandSvg() {
 function navLinks(activeId = "") {
   return NAV_ITEMS.map((item) => {
     const current = item.id === activeId ? ' aria-current="page"' : "";
-    return `<a href="${item.href}"${current}>${item.label}</a>`;
+    const cls = item.className ? ` class="${item.className}"` : "";
+    return `<a href="${item.href}"${cls}${current}>${item.label}</a>`;
   }).join("");
 }
 
@@ -64,6 +73,7 @@ export function renderFooter() {
   return `<footer class="site-footer" data-chrome="footer">
     <p>${POSITIONING}</p>
     <nav class="footer-nav" aria-label="Footer">${navLinks("")}</nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span>${OWNER_LINKS.map((l) => `<a href="${l.href}">${l.label}</a>`).join("")}</nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>`;
