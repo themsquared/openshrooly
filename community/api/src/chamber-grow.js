@@ -2,13 +2,22 @@
  * What a linked chamber's own page shows about its grow: the mushroom's name,
  * its page on the site, and a small photo. Rides on the inbox reply.
  * Strings are short printable ASCII so the chamber can store and echo them as is.
- * The photo table mirrors web/public/js/species-art.js; test/chamber-grow.test.js keeps them in step.
+ * The photo tables mirror web/public/js/species-art.js and species-photos.js; test/chamber-grow.test.js keeps them in step.
  */
 import { SQL as ALERT_SQL } from "./alerts/store.js";
 import { readRules } from "./alerts/rules.js";
 import { isOffMenu, profilePath } from "./pack.js";
 
-const LICENSED = new Set(["golden-teacher", "b-plus", "p-cyanescens"]);
+// Off-menu profiles with a licensed photo, and the smallest copy the site has of each.
+const LICENSED = {
+  "golden-teacher": "/img/species/golden-teacher-640.webp",
+  "b-plus": "/img/species/b-plus-640.webp",
+  "p-cyanescens": "/img/species/p-cyanescens-640.webp",
+  "penis-envy": "/img/species/penis-envy-640.webp",
+  "p-natalensis": "/img/species/p-natalensis-528.webp",
+  "acadian-coast": "/img/species/acadian-coast-640.webp",
+  "treasure-coast": "/img/species/treasure-coast-640.webp",
+};
 
 const PHOTOS = [
   [["pink", "oyster"], "pink-oyster"],
@@ -58,7 +67,7 @@ function offMenuArt(profile) {
 /** Site path of the small photo for a profile, or "" when it has none (Off-menu without a licensed photo). */
 export function chamberPhotoPath(profile) {
   if (!profile) return "";
-  if (LICENSED.has(profile.id)) return `/img/species/${profile.id}-640.webp`;
+  if (LICENSED[profile.id]) return LICENSED[profile.id];
   if (offMenuArt(profile)) return "";
   const blob = `${profile.species || ""} ${profile.strain || ""} ${profile.name || ""}`.toLowerCase();
   const hit = PHOTOS.find(([keys]) => keys.every((key) => blob.includes(key)));
