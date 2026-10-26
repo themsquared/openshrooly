@@ -15,6 +15,7 @@ import {
 import { applyDeviceChange, commandExpired } from "./fleet.js";
 import { commandSupersedes, deviceCapabilities } from "./device-capabilities.js";
 import { loadRecentTelemetry } from "./coach-learn.js";
+import { chamberGrow } from "./chamber-grow.js";
 import {
   buildCsr,
   bytesToB64url,
@@ -868,6 +869,8 @@ export async function handleDevices(method, path, url, request, env) {
       })),
       cloud_enabled: Boolean(Number(bound.device.cloud_enabled)),
       offline_ok: true,
+      // Firmware 1.0.6-sl.2 shows these on the chamber's own page. Older firmware ignores them.
+      ...(await chamberGrow(db, env, bound.device)),
     });
   }
 
