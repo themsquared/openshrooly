@@ -43,6 +43,8 @@ const SESSION_MS = 30 * 60 * 1000;
 const REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
 const MAGIC_MS = 15 * 60 * 1000;
 const COOKIE = "__Host-sl_session";
+// api_tokens name for the access token issued at sign in (personal API tokens use other names).
+const SIGN_IN_TOKEN = "mobile-access";
 const OIDC_COOKIE = "__Host-sl_oidc";
 const OIDC_STATE_MS = 10 * 60 * 1000;
 const OIDC_HANDOFF_MS = 2 * 60 * 1000;
@@ -150,7 +152,7 @@ export async function issueSession(db, user, request, env) {
   );
   await db.run("INSERT INTO api_tokens (user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?)", [
     user.id,
-    "mobile-access",
+    SIGN_IN_TOKEN,
     await sha256Hex(access),
     nowIso(),
   ]);
@@ -509,6 +511,14 @@ export async function handleAuth(method, path, url, request, env) {
   if (method === "POST" && path === "/api/auth/logout") {
     const raw = readCookie(request);
     if (raw) await db.run("UPDATE sessions SET revoked_at=? WHERE session_hash=?", [nowIso(), await sha256Hex(raw)]);
+    // The web app also sends the sign-in access token as a bearer. Revoke it here too, or it keeps
+    // working after sign out. Only the sign-in token goes; personal API tokens stay.
+    const header = request.headers.get("authorization") || "";
+    if (header.toLowerCase().startsWith("bearer ")) {
+      const tokenHash = await sha256Hex(header.slice(7).trim());
+      await db.run("DELETE FROM api_tokens WHERE token_hash=? AND name=?", [tokenHash, SIGN_IN_TOKEN]);
+      await db.run("UPDATE refresh_tokens SET revoked_at=? WHERE token_hash=?", [nowIso(), tokenHash]);
+    }
     return json({ ok: true }, 200, { "set-cookie": cookie("", 0) });
   }
 
@@ -517,6 +527,7 @@ export async function handleAuth(method, path, url, request, env) {
     if (!user) return json({ error: "sign in required" }, 401);
     await db.run("UPDATE sessions SET revoked_at=? WHERE user_id=?", [nowIso(), user.id]);
     await db.run("UPDATE refresh_tokens SET revoked_at=? WHERE user_id=?", [nowIso(), user.id]);
+    await db.run("DELETE FROM api_tokens WHERE user_id=? AND name=?", [user.id, SIGN_IN_TOKEN]);
     await audit(db, user.id, "logout_all", "", request);
     return json({ ok: true }, 200, { "set-cookie": cookie("", 0) });
   }

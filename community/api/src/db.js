@@ -527,6 +527,14 @@ function dispatch(mode, tables, ids, sql, params) {
     tables.api_tokens.push(row);
     return { lastRowId: row.id };
   }
+  if (q.startsWith("DELETE FROM api_tokens WHERE token_hash=? AND name=?")) {
+    tables.api_tokens = tables.api_tokens.filter((t) => !(t.token_hash === params[0] && t.name === params[1]));
+    return {};
+  }
+  if (q.startsWith("DELETE FROM api_tokens WHERE user_id=? AND name=?")) {
+    tables.api_tokens = tables.api_tokens.filter((t) => !(t.user_id === Number(params[0]) && t.name === params[1]));
+    return {};
+  }
   if (q.includes("FROM users JOIN api_tokens")) {
     const token = tables.api_tokens.find((t) => t.token_hash === params[0]);
     if (!token) return [];
