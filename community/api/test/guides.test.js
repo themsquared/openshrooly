@@ -67,7 +67,7 @@ test("guide links resolve: profiles are free and indexed, guides exist, affiliat
       const profile = href.match(/^\/profiles\/([a-z0-9-]+)$/);
       if (profile) assert.ok(indexed.has(profile[1]), `${g.slug} links free profile ${href}`);
       else if (href.startsWith("/guides/")) assert.ok(existsSync(join(PUBLIC, `${href}.html`)), `${g.slug} ${href}`);
-      else assert.ok(["/", "/grow", "/install", "/docs", "/faq"].includes(href), `${g.slug} ${href}`);
+      else assert.ok(["/", "/grow", "/install", "/docs", "/faq", "/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq"].includes(href), `${g.slug} ${href}`);
     }
     // The affiliate note shows only when the page holds a tagged affiliate link, and then it must.
     if (/\sdata-affiliate[\s>]/.test(html)) assert.match(text(html), /commission/, `${g.slug} discloses affiliate links`);

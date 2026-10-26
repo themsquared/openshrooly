@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { NAV_ITEMS, POSITIONING, SITE } from "../../web/public/js/chrome.js";
 import { PAGES, isPaid, isPsi, loadProfiles, writeSeoFiles } from "../../web/scripts/generate-seo.js";
 import { GUIDES } from "../../web/scripts/guides/index.js";
+import { OWNER_PAGES } from "../../web/scripts/owners/index.js";
 
 const PUBLIC = join(import.meta.dirname, "../../web/public");
 const profiles = loadProfiles();
@@ -15,7 +16,7 @@ function read(file) {
 }
 
 function allPages() {
-  return [...Object.keys(PAGES), "grow.html", ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
+  return [...Object.keys(PAGES), "grow.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
 }
 
 /** Clean public URL path for a page file: no .html anywhere. */
@@ -92,7 +93,10 @@ test("every page has the same header, nav, and footer", () => {
   assert.match(reference, /data-chrome="footer"/);
   assert.ok(reference.includes(POSITIONING));
   for (const label of NAV_ITEMS.map((n) => n.label)) assert.ok(reference.includes(`>${label}</a>`), label);
-  assert.doesNotMatch(reference, /Install|Restricted|psilocybin|Off-menu/i);
+  // One install entry, worded for Shrooly owners. Nothing else in the chrome says install.
+  assert.equal((reference.match(/>Install on your Shrooly</g) || []).length, 2, "install link in header and footer nav");
+  assert.doesNotMatch(reference.replaceAll('<a href="/install" class="nav-install">Install on your Shrooly</a>', ""), /Install|Restricted|psilocybin|Off-menu/i);
+  for (const href of ["/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq"]) assert.ok(reference.includes(`href="${href}"`), `footer links ${href}`);
   for (const file of allPages()) assert.equal(chrome(read(file)), reference, `${file} chrome differs`);
 });
 
@@ -282,7 +286,7 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
       '<main id="main"',
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
     // Guide and profile pages are static reading pages: the small lite.js runs the menu. App pages load app.js.
-    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "faq.html";
+    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "faq.html" || OWNER_PAGES.some((p) => file === `${p.slug}.html`);
     assert.ok(html.includes(`<script type="module" src="/js/${lite ? "lite" : "app"}.js"></script>`), `${file} script`);
   }
 });

@@ -6,6 +6,307 @@ Every number below comes from the published Shroom Labs grow profiles. Source: h
 
 ---
 
+## What happened to Shrooly?
+
+URL: https://shroomlabs.io/what-happened-to-shrooly
+Updated: 2026-10-26
+
+We could not find a public shutdown notice from the company that made Shrooly. Its last customer update was July 31, 2025. Since August 2025 many owners report the app will not sign in, support does not answer, and orders did not arrive. Your chamber can still run on free community software.
+
+### Is Shrooly out of business?
+
+It is unclear, because the company has not said so in public and its website and status page still load.
+
+Here is what we can see as of October 26, 2026. The shrooly.com store still loads and lists products as available. status.shrooly.com says all services are online. We could not confirm that new orders ship.
+
+      At the same time, the last post on the Shrooly customer updates index page is from July 31, 2025. In August 2025 owners on r/shrooly began asking if the company was r/shrooly: Out of business?. The OpenShrooly.com, project page by Graham Stewart project page says that it appears, as of September 2025, that the company has gone out of business. We found no bankruptcy notice or public statement either way.
+
+### What can we confirm, and when?
+
+These are the dated facts we could check against a public page.
+
+- June 2022. Shrooly runs a crowdfunding campaign on Shrooly on Indiegogo.
+
+- September 23 to November 13, 2022. Shrooly on Kickstarter: 144 backers pledged $63,240.
+
+- December 2023 to July 2025. Regular Shrooly customer updates index report on manufacturing, then shipping to backers in Europe, the US, and Canada.
+
+- July 31, 2025. The Shrooly customer update, July 31, 2025 says European crowdfunding shipments are done, US and Canada orders are shipping, and new chamber software is in testing. It is the last update posted.
+
+- August 2025. Owners report the app shows a no internet connection error at sign in (r/shrooly: EU/UK website gone) and ask if the company closed.
+
+- August 30, 2025. Graham Stewart posts the first r/shrooly: Workable OpenShrooly release!, free replacement software for the chamber.
+
+- Late 2025. Owners report that support emails go unanswered or bounce (r/shrooly: No customer service, r/shrooly: Got an email from support).
+
+- July 28, 2026. r/shrooly: OpenShrooly 1.0 is released.
+
+- October 26, 2026. shrooly.com and status.shrooly.com still load. Whether orders are filled is unclear.
+
+### Why did my Shrooly app stop working?
+
+Many owners see a no internet connection error when they sign in to the Shrooly app, even on working Wi-Fi, and we do not know the cause.
+
+Reports of this started in August 2025 (r/shrooly: EU/UK website gone) and continue in Shrooly app on Google Play and its reviews. Shrooly's own Shrooly support article: Connection issues article says the chamber needs internet and Bluetooth to start a new cultivation. So if the app cannot sign in, a new guided grow cannot start.
+
+### What still works on a stock Shrooly?
+
+Owners report that manual programs on the chamber still run, but app guided grows cannot start without the app.
+
+That comes from owner reports in Shrooly app on Google Play and its reviews and on r/shrooly. We have not tested a stock chamber ourselves, so treat it as unconfirmed. The hardware itself, the humidifier, fan, lights, and sensors, does not depend on the app.
+
+### Can I get a refund from Shrooly?
+
+We do not know of a working way to get a refund from Shrooly right now.
+
+Owners report that support emails stopped working in 2025 (r/shrooly: Got an email from support). If you paid by card or PayPal, your card issuer or PayPal is the place to ask about a dispute. Crowdfunding backers can message the creator through Shrooly on Kickstarter or Shrooly on Indiegogo. Owners discussed a r/shrooly: Class Action lawsuit on Reddit in September 2025. We could not confirm that any case was filed.
+
+### Is my Shrooly hardware still worth keeping?
+
+Yes. The chamber is a sensor driven grow box with a humidifier, fan, and lights, and free software can run it with no Shrooly app.
+
+OpenShrooly, by Graham Stewart (grahamsz), replaces the stock software so the chamber runs on your Wi-Fi with its own web page. Shroom Labs builds on it with stage by stage grow profiles and an optional phone dashboard. See how to reuse your Shrooly.
+
+### Who wrote this page?
+
+Shroom Labs wrote it. We are not made by or affiliated with the company behind Shrooly.
+
+We build free tools for Shrooly owners on top of OpenShrooly. We only state what a public page shows, and we say unclear when we cannot confirm something. If anything here is wrong or out of date, tell us and we will fix it.
+
+### Sources
+
+- shrooly.com store: https://shrooly.com/
+- status.shrooly.com: https://status.shrooly.com/
+- Shrooly customer updates index: https://shrooly.com/blogs/customer-updates
+- Shrooly customer update, July 31, 2025 (the latest posted): https://shrooly.com/blogs/customer-updates/july-update-2025
+- Shrooly support article: Connection issues: https://support.shrooly.com/en/articles/9675290-connection-issues
+- Shrooly on Kickstarter: https://www.kickstarter.com/projects/shrooly/shrooly-grow-rare-and-healthy-mushrooms-with-zero-effort
+- Shrooly on Indiegogo: https://www.indiegogo.com/projects/shrooly-grow-mushrooms-you-can-t-find-anywhere
+- Shrooly app on Google Play and its reviews: https://play.google.com/store/apps/details?id=com.bitraptors.shrooly.prod
+- r/shrooly: Out of business? (August 19, 2025): https://www.reddit.com/r/shrooly/comments/1mupwan/out_of_business/
+- r/shrooly: EU/UK website gone (August 20, 2025): https://www.reddit.com/r/shrooly/comments/1mvq1la/
+- r/shrooly: No customer service (2025): https://www.reddit.com/r/shrooly/comments/1m8e5k0/
+- r/shrooly: Got an email from support (2025): https://www.reddit.com/r/shrooly/comments/1nj2dgv/
+- r/shrooly: Class Action lawsuit (September 2025): https://www.reddit.com/r/shrooly/comments/1n5whkl/
+- OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+- r/shrooly: Workable OpenShrooly release! (August 30, 2025): https://www.reddit.com/r/shrooly/comments/1n4d9ib/
+- r/shrooly: OpenShrooly 1.0 (July 28, 2026): https://www.reddit.com/r/shrooly/comments/1v8lh50/openshrooly_10/
+
+---
+
+## Reuse your Shrooly
+
+URL: https://shroomlabs.io/reuse-your-shrooly
+Updated: 2026-10-26
+
+Yes, you can reuse your Shrooly. Free, open source software called OpenShrooly replaces the stock software, so the chamber runs on your own Wi-Fi with no Shrooly app. You install it from Chrome or Edge with a USB-C cable in about 5 minutes. Shroom Labs adds grow profiles and an optional phone dashboard.
+
+### What do I need to reuse my Shrooly?
+
+A computer with Chrome or Edge, a USB-C data cable, your Shrooly, and about 5 minutes.
+
+Some USB-C cables only carry power, so if the chamber does not show up, try another cable. You do not need an account to install, and you do not need the Shrooly app at all.
+
+### How do I install it?
+
+Open the install page on a computer, plug in the chamber, and press Install.
+
+- Write down your current humidity and temperature settings.
+
+- Plug your Shrooly into the computer with the USB-C cable.
+
+- Open the install page, press Install, and pick your Shrooly from the list.
+
+- Enter your Wi-Fi details when it finishes. That is it.
+
+      If the screen does not change after installing, unplug both the USB and power cables, wait 10 seconds, and plug in power only.
+
+### Should I back up my Shrooly first?
+
+Yes, if you might ever want the original software back, save a backup before you install.
+
+The browser installer does not save the original for you. The USB recovery guide shows how to save a full copy with a free command line tool. It takes about 10 minutes and is the only way to restore the stock software later. If you are sure you will not go back, you can skip it.
+
+### Can I go back to the original Shrooly software?
+
+Yes, if you saved a backup first, you can write it back over USB.
+
+USB is always the way back. Even if an update goes wrong, the chip can be reached over the cable and set up again, and installing twice does no harm. Without a backup you can still reinstall OpenShrooly at any time, but the stock software cannot be restored.
+
+### What do I get?
+
+Your chamber back, on your own Wi-Fi, with free grow profiles and an optional dashboard on your phone.
+
+- Local control. The chamber's own web page sets temperature, humidity, fresh air, and light. It also works with Home Assistant. No cloud needed.
+
+- Grow profiles. Stage by stage conditions for oyster, lion's mane, shiitake, and more.
+
+- Your chamber on your phone. Link it to a free account to see live readings from anywhere, get email alerts, change the profile and stage, and set fresh air and light.
+
+- Link this device. Press button 4 on the chamber, choose Link this device, and scan the QR code. This came in release 1.0.6-sl.1.
+
+- Safe updates. New versions install over Wi-Fi, only if they are signed by Shroom Labs, and the chamber keeps its current version if anything looks wrong.
+
+### What does it cost?
+
+Installing is free, the software is free and open source, and most grow profiles are free.
+
+OpenShrooly is MIT licensed. Linking a chamber to an account is optional and free during the open beta. A few specialty profiles are paid, such as King Oyster: thick-stem method at $2.99. You never need to buy anything to grow.
+
+### Is it safe to flash my Shrooly?
+
+Many owners have installed it without trouble, but it is beta software, so use it at your own risk.
+
+The OpenShrooly project says many users have installed it successfully, and that it is experimental. Our installer only offers releases signed by Shroom Labs, and your browser checks the signature before anything is sent to the chamber. If something goes wrong, the USB cable gets you back.
+
+### Who made the software?
+
+OpenShrooly was created by Graham Stewart, and Shroom Labs builds on his work.
+
+See Graham Stewart (grahamsz) and OpenShrooly. Shroom Labs adds grow profiles, the install page, and the optional account. We are not made by or affiliated with the company behind Shrooly. Community help lives on r/shrooly.
+
+### Sources
+
+- OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+- grahamsz/openshrooly on GitHub: https://github.com/grahamsz/openshrooly
+- r/shrooly: Workable OpenShrooly release! (August 30, 2025): https://www.reddit.com/r/shrooly/comments/1n4d9ib/
+- r/shrooly: OpenShrooly 1.0 (July 28, 2026): https://www.reddit.com/r/shrooly/comments/1v8lh50/openshrooly_10/
+- Shrooly support article: Connection issues: https://support.shrooly.com/en/articles/9675290-connection-issues
+
+---
+
+## Shrooly FAQ
+
+URL: https://shroomlabs.io/shrooly-faq
+Updated: 2026-10-26
+
+Short version: many Shrooly owners lost the app in 2025, and the company has not said why. The chamber itself still works. Free OpenShrooly firmware runs it on your own Wi-Fi with no Shrooly app, and you can install it from Chrome or Edge in about 5 minutes. Answers to the questions owners ask most are below.
+
+### Why is my Shrooly app not working?
+
+Since August 2025 many owners cannot sign in to the Shrooly app, and the company has not explained why.
+
+The usual symptom is a no internet connection error on a working network (r/shrooly: EU/UK website gone, Shrooly app on Google Play and its reviews). Your chamber is not broken. See how to keep using your chamber.
+
+### What does no internet connection mean in the Shrooly app?
+
+Owners see it even when their Wi-Fi works fine, so it points to the app's sign in service rather than your network.
+
+We cannot see why the sign in fails. Your chamber does not need that service if you move it to OpenShrooly.
+
+### Is the Shrooly server down?
+
+The company's status page says all services are online, but owners still report that the app cannot sign in.
+
+status.shrooly.com showed all services online when we checked on October 26, 2026. We cannot see inside their servers, so we cannot say why the app fails.
+
+### Is Shrooly out of business?
+
+It is unclear, because there is no public statement and shrooly.com still loads.
+
+The last customer update was July 31, 2025, and owners report no support since. The full picture, with sources, is on what happened to Shrooly.
+
+### Is Shrooly bankrupt?
+
+We found no public bankruptcy notice for Shrooly.
+
+That does not mean the company is running normally. It means we cannot confirm it either way.
+
+### Can I still use my Shrooly?
+
+Yes. Owners report manual programs still run on a stock chamber, and free OpenShrooly firmware gives you full control again.
+
+With OpenShrooly the chamber runs on your Wi-Fi with its own web page, and Shroom Labs adds grow profiles. See reuse your Shrooly.
+
+### Can I use my Shrooly offline?
+
+Yes, on OpenShrooly the chamber runs on your home Wi-Fi with no internet and no Shrooly app.
+
+Its own web page and its buttons keep working if your internet goes down. A Shroom Labs account is optional.
+
+### Is my Shrooly bricked?
+
+Almost certainly not. The hardware still works, and only the app side stopped for most owners.
+
+If the chamber powers on, it can take new software over the USB cable. If an install goes wrong, you can run it again over the same cable.
+
+### Is there a replacement for the Shrooly app?
+
+Yes. OpenShrooly gives the chamber its own web page on your Wi-Fi, and Shroom Labs adds a phone dashboard if you want one.
+
+The web page works from any phone or computer on your home network. Linking to a free Shroom Labs account adds live readings from anywhere and email alerts.
+
+### Is there custom Shrooly firmware?
+
+Yes. OpenShrooly is free, open source replacement firmware for the Shrooly, created by Graham Stewart.
+
+See OpenShrooly. The Shroom Labs release, 1.0.6-sl.1, adds grow profiles and the Link this device menu.
+
+### How do I flash my Shrooly?
+
+Plug it into a computer with a USB-C data cable, open the install page in Chrome or Edge, and press Install.
+
+It takes about 5 minutes. Open the installer. Back up first if you might want the stock software back.
+
+### Can I go back to the original Shrooly firmware?
+
+Only if you save a backup before you install.
+
+The USB recovery guide shows how to save and restore it over USB.
+
+### How do I get a Shrooly refund?
+
+We do not know of a working way to get one from the company right now.
+
+If you paid by card or PayPal, ask your card issuer or PayPal about a dispute. Backers can message the creator on Shrooly on Kickstarter or Shrooly on Indiegogo.
+
+### How do I contact Shrooly customer service?
+
+Owners report that Shrooly support emails stopped getting answers in 2025, and some now bounce.
+
+See r/shrooly: No customer service and r/shrooly: Got an email from support. Shroom Labs is not Shrooly support, but owners help each other on r/shrooly.
+
+### Is there a Shrooly class action lawsuit?
+
+Owners discussed one on Reddit in September 2025, but we could not confirm that any case was filed.
+
+See the r/shrooly: Class Action lawsuit thread.
+
+### Can I use my Shrooly without Shrooly pods?
+
+Yes. OpenShrooly runs the chamber by temperature, humidity, fresh air, and light, so you can fruit your own blocks if they fit.
+
+Pick a species on the conditions table and follow its stages.
+
+### Should I buy a Shrooly now?
+
+Be careful. Owners report orders that never arrived, and we cannot confirm that new orders ship.
+
+If you already own one, it is worth reusing.
+
+### Is Shroom Labs part of Shrooly?
+
+No. Shroom Labs is not made by or affiliated with the company behind Shrooly.
+
+We build free tools for owners on top of OpenShrooly.
+
+### Sources
+
+- status.shrooly.com: https://status.shrooly.com/
+- Shrooly customer updates index: https://shrooly.com/blogs/customer-updates
+- Shrooly customer update, July 31, 2025 (the latest posted): https://shrooly.com/blogs/customer-updates/july-update-2025
+- Shrooly support article: Connection issues: https://support.shrooly.com/en/articles/9675290-connection-issues
+- Shrooly on Kickstarter: https://www.kickstarter.com/projects/shrooly/shrooly-grow-rare-and-healthy-mushrooms-with-zero-effort
+- Shrooly on Indiegogo: https://www.indiegogo.com/projects/shrooly-grow-mushrooms-you-can-t-find-anywhere
+- Shrooly app on Google Play and its reviews: https://play.google.com/store/apps/details?id=com.bitraptors.shrooly.prod
+- r/shrooly: EU/UK website gone (August 20, 2025): https://www.reddit.com/r/shrooly/comments/1mvq1la/
+- r/shrooly: No customer service (2025): https://www.reddit.com/r/shrooly/comments/1m8e5k0/
+- r/shrooly: Got an email from support (2025): https://www.reddit.com/r/shrooly/comments/1nj2dgv/
+- r/shrooly: Class Action lawsuit (September 2025): https://www.reddit.com/r/shrooly/comments/1n5whkl/
+- OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+
+---
+
 ## How to grow mushrooms at home
 
 URL: https://shroomlabs.io/guides/grow-mushrooms-at-home
@@ -718,7 +1019,7 @@ Since about August 2025, many owners report that the Shrooly app will not log in
 
 The original Shrooly chamber talks to a phone app over Bluetooth, and owners report the app needs a working connection to the company's servers to start a grow program. From August 2025, posts from owners describe the same things: the app will not log in, it says there is no internet connection when there is, pods cannot be ordered, and support emails go unanswered. The OpenShrooly project site says the company appears to have gone out of business.
 
-Shroom Labs is not part of the company that made Shrooly devices and has no inside information. We only know what owners report and what we see in public.
+Shroom Labs is not part of the company that made Shrooly devices and has no inside information. We only know what owners report and what we see in public. The dated facts, with sources, are on what happened to the Shrooly app and company.
 
 ### What should you check first?
 
@@ -750,7 +1051,7 @@ It is an experimental hobby project. Many owners have installed it, but it is us
 
 - Join the chamber to your Wi-Fi and open its page in a browser.
 
-Read the Shroom Labs docs for how profiles, the Hub, and the chamber fit together.
+For what you get, what it costs, and how to go back, read reuse your Shrooly chamber. Read the Shroom Labs docs for how profiles, the Hub, and the chamber fit together.
 
 ### What settings should you use once it runs?
 
