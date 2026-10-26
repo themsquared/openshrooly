@@ -39,6 +39,7 @@ import {
 import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
 import { mountPhotoCheck } from "./coach-photo.js";
+import { mountFeed } from "./feed.js";
 import { accessText, coachView, NO_DECISIONS, priceText, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
 import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
@@ -363,6 +364,14 @@ async function renderGrowThis(profile) {
   });
 }
 
+function mountProfilePosts(profileId) {
+  const section = $("#grow-posts");
+  if (!section) return;
+  mountFeed({ root: $("#grow-posts-feed"), api, encodePhoto: encodePhotoForUpload, signedIn: isSignedIn(), profileId, apiBase: apiBase() })
+    .then((ok) => section.classList.toggle("hidden", !ok))
+    .catch(() => {});
+}
+
 async function renderProfile() {
   bindBlobUrlCleanup();
   const id = profileIdFromLocation();
@@ -370,6 +379,8 @@ async function renderProfile() {
   const data = await api(`/api/profiles/${encodeURIComponent(id)}`);
   const p = data.profile;
   const off = isOffMenu(p);
+  // Grow progress photos: culinary only. Off-menu profiles never show or accept posts.
+  if (!off && !p.restricted) mountProfilePosts(p.id);
   const label = p.pack_label || packLabel(p.pack);
   // GA on /profile only for public culinary profiles: never Off-menu, never a community upload's page.
   const item = profileItem(p);
@@ -1121,6 +1132,7 @@ if (page === "devices") renderDevices().catch((err) => {
 });
 if (page === "publish") renderPublish();
 if (page === "moderate") renderModerate();
+if (page === "feed") mountFeed({ root: $("#feed"), api, encodePhoto: encodePhotoForUpload, signedIn: isSignedIn(), apiBase: apiBase() });
 if (page === "device") renderDevice().catch((err) => {
   if (err.status === 401) {
     location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
