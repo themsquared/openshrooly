@@ -337,3 +337,11 @@ test("the Chef's line page lists every chef profile with its price and no recipe
   assert.match(read("index.html"), /id="pack-chef"/);
   assert.match(read("grow.html"), /href="\/chefs-line"/);
 });
+
+test("owned paid profiles say You own this and the Chef's line view hides the off-menu hint", () => {
+  assert.match(read("profile.html"), /id="owned"[^>]*>You own this\./);
+  const app = read("js/app.js");
+  assert.match(app, /\$\("#owned"\)\?\.classList\.remove\("hidden"\)/);
+  assert.match(app, /err\.status === 409/);
+  assert.match(app, /\$\("#pack-hint"\)\?\.classList\.toggle\("hidden", chef\)/);
+});

@@ -539,6 +539,8 @@ async function route(method, path, url, request, env) {
       throw new ValidationError("Psilocybin pack is free-only. Card processors cannot be attached.");
     }
     if (isFree(profile)) throw new ValidationError("free items do not go through checkout");
+    // A purchase is for good, so a second checkout would only charge twice.
+    if (await canRead(db, user, profile)) return json({ error: "already owned" }, 409);
     const allowed = profile.allowed_payment_providers || [];
     if (!allowed.includes("stripe")) throw new ValidationError("no configured payment provider in " + allowed);
     const session = await startCheckout(db, env, request, {

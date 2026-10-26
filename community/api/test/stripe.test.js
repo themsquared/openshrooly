@@ -389,3 +389,28 @@ test("billing portal is only for people with a paid plan", async () => {
   const anon = await call(ctx, "POST", "/api/billing/portal", { body: {} });
   assert.equal(anon.status, 401);
 });
+
+test("a profile the buyer already owns cannot be bought twice", async () => {
+  const { ctx, stripe } = liveEnv();
+  const { token, user } = await register(ctx, "owner-twice@example.com");
+  const first = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  const done = await signedWebhook(
+    ctx,
+    event("evt_owned_1", "checkout.session.completed", {
+      id: first.data.id,
+      object: "checkout.session",
+      payment_status: "paid",
+      client_reference_id: String(user.id),
+      metadata: { user_id: String(user.id), item_id: "king-oyster-thick-stem" },
+    })
+  );
+  assert.equal(done.status, 200, JSON.stringify(done.data));
+  const profile = await call(ctx, "GET", "/api/profiles/king-oyster-thick-stem", { token });
+  assert.equal(profile.data.unlocked, true);
+  const callsBefore = stripe.calls.length;
+  const again = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(again.status, 409);
+  assert.deepEqual(again.data, { error: "already owned" });
+  assert.equal(stripe.calls.length, callsBefore, "no second Stripe session");
+});
