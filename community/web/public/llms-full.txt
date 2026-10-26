@@ -240,7 +240,7 @@ The web page works from any phone or computer on your home network. Linking to a
 
 Yes. OpenShrooly is free, open source replacement firmware for the Shrooly, created by Graham Stewart.
 
-See OpenShrooly. The Shroom Labs release, 1.0.6-sl.1, adds grow profiles and the Link this device menu.
+See OpenShrooly. The current Shroom Labs release, 1.0.6-sl.2, adds grow profiles, the Link this device menu, and the name and photo of what is growing on the chamber's own page.
 
 ### How do I flash my Shrooly?
 
