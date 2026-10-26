@@ -1124,6 +1124,14 @@ function dispatch(mode, tables, ids, sql, params) {
     });
     return {};
   }
+  if (q.startsWith("SELECT SUM(neurons) AS n FROM coach_usage WHERE user_id=? AND day>=")) {
+    const rows = tables.coach_usage.filter((u) => Number(u.user_id) === Number(params[0]) && u.day >= params[1]);
+    return [{ n: rows.reduce((sum, u) => sum + Number(u.neurons || 0), 0) }];
+  }
+  if (q.startsWith("SELECT SUM(neurons) AS n FROM coach_usage WHERE day=")) {
+    const rows = tables.coach_usage.filter((u) => u.day === params[0]);
+    return [{ n: rows.reduce((sum, u) => sum + Number(u.neurons || 0), 0) }];
+  }
   if (q.startsWith("SELECT * FROM coach_usage WHERE user_id=? AND day=")) {
     return tables.coach_usage.filter((u) => Number(u.user_id) === Number(params[0]) && u.day === params[1]);
   }
