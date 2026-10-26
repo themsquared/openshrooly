@@ -425,6 +425,24 @@ export function profileUrl(profile) {
 
 const ORG_REF = { "@type": "Organization", "@id": `${SITE}/#org`, name: "Shroom Labs", url: `${SITE}/` };
 
+/** The /beta landing page. FAQ answers match the visible text on public/beta.html word for word. */
+const BETA = {
+  title: "Join the Shroom Labs beta for Shrooly owners · Shroom Labs",
+  description: "Free beta for Shrooly owners: OpenShrooly firmware, your chamber on your phone, free grow profiles. First 50 linked chambers. Install in about 5 minutes.",
+  answer: "If your Shrooly sits unused because the app stopped working, this beta puts it back to work. It is free. Spots are limited to the first 50 linked chambers.",
+  faq: [
+    { q: "Does it cost anything?", a: "No. The firmware, the dashboard, and the grow profiles are free in the beta." },
+    { q: "Can I install from my phone?", a: "No. The install needs a computer with Chrome or Edge and a USB-C data cable. Linking happens on your phone." },
+    { q: "Do I need an account?", a: "Not to grow. An account adds the dashboard, your chamber on your phone, and email alerts." },
+    { q: "Who makes this?", a: "Shroom Labs builds on OpenShrooly, the open source firmware started by Graham Stewart (grahamsz). We are not made by or affiliated with the company behind Shrooly." },
+  ],
+  steps: [
+    "Install. On a computer with Chrome or Edge, plug the chamber in with a USB-C data cable and open the install page. About 5 minutes. A phone cannot do this step.",
+    "Link. On the chamber, press button 4, choose Link this device, and scan the QR code with your phone.",
+    "Done. Your chamber shows up in your account. Pick a profile and grow.",
+  ],
+};
+
 function breadcrumbs(rows) {
   return {
     "@type": "BreadcrumbList",
@@ -1041,6 +1059,7 @@ All numbers on this site come from the published grow profiles. Temperatures are
 
 ${OWNER_PAGES.map((p) => `- [${p.h1}](${SITE}/${p.slug}): ${p.answer}`).join("\n")}
 - [Install on your Shrooly](${SITE}/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C cable.
+- [Join the Shroom Labs beta](${SITE}/beta): ${BETA.answer}
 
 ## Start here
 
@@ -1084,6 +1103,9 @@ export function renderLlmsFull(profiles) {
         .join("\n\n")}\n\n### Sources\n\n${p.sources.map((key) => `- ${OWNER_SOURCES[key].label}: ${OWNER_SOURCES[key].url}`).join("\n")}`
     );
   }
+  out.push(
+    `## Join the Shroom Labs beta\n\nURL: ${SITE}/beta\n\n${BETA.answer}\n\n### Join in three steps\n\n${BETA.steps.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\n### Before you start\n\nIt is a beta. Back up first: the installer does not save the original Shrooly software for you. The recovery guide shows how to save it over USB in about 10 minutes, and with that backup you can flash the original back at any time. Without one, you can always reinstall OpenShrooly over USB.\n\n### FAQ\n\n${BETA.faq.map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}`
+  );
   for (const g of GUIDES) {
     out.push(
       `## ${g.h1}\n\nURL: ${SITE}/guides/${g.slug}\nUpdated: ${g.updated}\n\n${g.answer}\n\n${g.sections.map((sec) => `### ${sec.h2}\n\n${stripHtml(sec.html)}`).join("\n\n")}${
@@ -1202,6 +1224,31 @@ export const PAGES = {
     title: "Link a chamber · Shroom Labs",
     description: "Link your chamber to your account to see it, get grow alerts by email, and change what it grows. Optional. It works fully on your Wi-Fi without it.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Link a chamber", `${SITE}/claim`]]) },
+  },
+  "beta.html": {
+    active: "",
+    sitemap: true,
+    path: "/beta",
+    title: BETA.title,
+    description: BETA.description,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "HowTo",
+          "@id": `${SITE}/beta#join`,
+          name: "Join the Shroom Labs beta in three steps",
+          totalTime: "PT5M",
+          step: BETA.steps.map((text, i) => ({ "@type": "HowToStep", position: i + 1, text })),
+        },
+        {
+          "@type": "FAQPage",
+          "@id": `${SITE}/beta#faq`,
+          mainEntity: BETA.faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+        },
+        breadcrumbs([["Home", `${SITE}/`], ["Beta", `${SITE}/beta`]]),
+      ],
+    },
   },
   "install.html": {
     active: "install",

@@ -1259,3 +1259,11 @@ h1 .beta-badge, h2 .beta-badge { font-size: 0.45em; margin-left: 0.4em; }
   .site-nav a.nav-install { order: -1; }
   .owner-cta .button { width: 100%; justify-content: center; text-align: center; }
 }
+
+/* /beta landing page */
+.hero-beta { margin: 0.6rem 0 0; color: var(--sl-ink-dim); }
+.hero-beta .text-link { color: var(--sl-ink); text-decoration: underline; text-underline-offset: 3px; display: inline-flex; min-height: 44px; align-items: center; }
+.owner-card-beta { border-color: var(--sl-spore); }
+.beta-page .beta-list li, .beta-page .beta-steps li { margin: 0.55rem 0; }
+.beta-page h3 { margin: 1.2rem 0 0.3rem; font-size: 1.05rem; }
+.beta-page #waitlist { margin: 1.6rem 0; scroll-margin-top: 80px; }

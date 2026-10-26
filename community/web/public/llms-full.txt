@@ -307,6 +307,38 @@ We build free tools for owners on top of OpenShrooly.
 
 ---
 
+## Join the Shroom Labs beta
+
+URL: https://shroomlabs.io/beta
+
+If your Shrooly sits unused because the app stopped working, this beta puts it back to work. It is free. Spots are limited to the first 50 linked chambers.
+
+### Join in three steps
+
+1. Install. On a computer with Chrome or Edge, plug the chamber in with a USB-C data cable and open the install page. About 5 minutes. A phone cannot do this step.
+2. Link. On the chamber, press button 4, choose Link this device, and scan the QR code with your phone.
+3. Done. Your chamber shows up in your account. Pick a profile and grow.
+
+### Before you start
+
+It is a beta. Back up first: the installer does not save the original Shrooly software for you. The recovery guide shows how to save it over USB in about 10 minutes, and with that backup you can flash the original back at any time. Without one, you can always reinstall OpenShrooly over USB.
+
+### FAQ
+
+Q: Does it cost anything?
+A: No. The firmware, the dashboard, and the grow profiles are free in the beta.
+
+Q: Can I install from my phone?
+A: No. The install needs a computer with Chrome or Edge and a USB-C data cable. Linking happens on your phone.
+
+Q: Do I need an account?
+A: Not to grow. An account adds the dashboard, your chamber on your phone, and email alerts.
+
+Q: Who makes this?
+A: Shroom Labs builds on OpenShrooly, the open source firmware started by Graham Stewart (grahamsz). We are not made by or affiliated with the company behind Shrooly.
+
+---
+
 ## How to grow mushrooms at home
 
 URL: https://shroomlabs.io/guides/grow-mushrooms-at-home
