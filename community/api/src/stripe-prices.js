@@ -66,5 +66,66 @@ export const STRIPE_PROFILE_PRICES = {
       "amount_cents": 299
     }
   },
-  "live": {}
+  "live": {
+    "beech-shimeji-bouquet": {
+      "product": "prod_VVxeRYTO3Y0QwY",
+      "price": "price_1UUvinJSH6QIItA5Xw6p4Ddr",
+      "amount_cents": 299
+    },
+    "chestnut-long-stem": {
+      "product": "prod_VVxev7ZXTfesX2",
+      "price": "price_1UUvioJSH6QIItA5JUxjXW2i",
+      "amount_cents": 299
+    },
+    "cordyceps-high-color": {
+      "product": "prod_VVxeiKF28rtXJA",
+      "price": "price_1UUvioJSH6QIItA5vnec0EG7",
+      "amount_cents": 399
+    },
+    "golden-oyster-deep-yellow": {
+      "product": "prod_VVxeplnVSiAups",
+      "price": "price_1UUvipJSH6QIItA5WYIpUipt",
+      "amount_cents": 299
+    },
+    "king-oyster-thick-stem": {
+      "product": "prod_VVxegz8NZnWXeX",
+      "price": "price_1UUviqJSH6QIItA5oI7iAYJj",
+      "amount_cents": 299
+    },
+    "lions-mane-dense-head": {
+      "product": "prod_VVxegij7ZMqqNh",
+      "price": "price_1UUvirJSH6QIItA5OYEehuIv",
+      "amount_cents": 399
+    },
+    "pearl-oyster-baby-clusters": {
+      "product": "prod_VVxeTjPhuFcrGI",
+      "price": "price_1UUvisJSH6QIItA5Iz89f4CK",
+      "amount_cents": 299
+    },
+    "pearl-oyster-dark-cap": {
+      "product": "prod_VVxe2pzhAcRqGm",
+      "price": "price_1UUvisJSH6QIItA5cZ6MICg8",
+      "amount_cents": 299
+    },
+    "pink-oyster-bright": {
+      "product": "prod_VVxedkkiVGxVs3",
+      "price": "price_1UUvitJSH6QIItA5IjqGssiZ",
+      "amount_cents": 299
+    },
+    "shiitake-donko": {
+      "product": "prod_VVxeiu8TQw2EvJ",
+      "price": "price_1UUviuJSH6QIItA5kG1gPp18",
+      "amount_cents": 299
+    },
+    "shiitake-flower-cap": {
+      "product": "prod_VVxeagNP2geYBa",
+      "price": "price_1UUvivJSH6QIItA5VVsUwt0l",
+      "amount_cents": 399
+    },
+    "wood-ear-dark": {
+      "product": "prod_VVxegXLDwJa1Go",
+      "price": "price_1UUviwJSH6QIItA54b89KsCc",
+      "amount_cents": 299
+    }
+  }
 };
