@@ -61,6 +61,14 @@ COACH_BETA_USER_IDS = "82"
 # 20000 neurons a month; everyone 100000 neurons a day. To change one, add it here as a var, e.g.
 # COACH_MONTHLY_NEURONS = "20000"  (also COACH_DAILY_NEURONS, COACH_DAILY_CHATS, COACH_DAILY_PHOTOS, COACH_GLOBAL_DAILY_NEURONS)
 
+# Workers Logs: keep what the code logs (errors carry a request id and are redacted).
+# Invocation logs stay off so request URLs and headers (magic links, tokens) are never stored.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
+
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
 [triggers]
 crons = ["*/5 * * * *"]
