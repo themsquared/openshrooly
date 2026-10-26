@@ -1133,7 +1133,7 @@ export function renderRedirects(profiles) {
     if (file === "index.html") continue;
     lines.push(`/${file} ${page.path} 301!`);
   }
-  lines.push("/grow.html /grow 301!");
+  lines.push("/grow.html /grow 301!", "/terms /tos 301!", "/terms.html /tos 301!");
   for (const p of OWNER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
   for (const p of profiles) lines.push(`/profiles/${p.id}.html /profiles/${p.id} 301!`);
@@ -1270,6 +1270,10 @@ export const PAGES = {
   "profile.html": { active: "profiles", path: "/profile", robots: PRIVATE, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
   "legacy-preview.html": { active: "", path: "/legacy-preview", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
   "account/feedback.html": { active: "", path: "/account/feedback", robots: "noindex,nofollow", title: "Beta feedback · Shroom Labs", description: "Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one." },
+  // Legal pages: public, no sign-in, linked from every footer. Not in the sitemap.
+  "privacy.html": { active: "", path: "/privacy", title: "Privacy policy · Shroom Labs", description: "What Shroom Labs collects, how it's used, who else sees it, how it's kept safe, and how to download or delete it." },
+  "tos.html": { active: "", path: "/tos", title: "Terms of Service · Shroom Labs", description: "The rules for using Shroom Labs and Grow Coach: billing, renewals, refunds, the beta, and installing on your Shrooly at your own risk." },
+  "contact.html": { active: "", path: "/contact", title: "Contact · Shroom Labs", description: "Send Shroom Labs a message about your account, billing, a refund, a chamber, or your data." },
   "auth/callback.html": { active: "", path: "/auth/callback", robots: "noindex,nofollow", title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
 };
 

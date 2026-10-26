@@ -29,6 +29,13 @@ export const OWNER_LINKS = [
   { href: "/beta", label: "Join the beta" },
 ];
 
+/** Small legal links at the bottom of every footer. Stripe needs Privacy and Terms reachable from every page. */
+export const LEGAL_LINKS = [
+  { href: "/privacy", label: "Privacy" },
+  { href: "/tos", label: "Terms" },
+  { href: "/contact", label: "Contact" },
+];
+
 /** Add or remove the runtime Coach link in the header and footer navs. */
 export function setCoachNav(show) {
   for (const nav of document.querySelectorAll("#site-nav, .footer-nav")) {
@@ -76,6 +83,7 @@ export function renderFooter() {
     <nav class="footer-nav" aria-label="Footer">${navLinks("")}</nav>
     <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span>${OWNER_LINKS.map((l) => `<a href="${l.href}">${l.label}</a>`).join("")}</nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <nav class="footer-legal" aria-label="Legal">${LEGAL_LINKS.map((l) => `<a href="${l.href}">${l.label}</a>`).join("")}</nav>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>`;
 }
