@@ -1,5 +1,7 @@
 /** Deterministic per-device learning. No model call, so it is cheap and testable. */
 
+import { stageForGrowPhase } from "./device-capabilities.js";
+
 export const COACH_ITEM = "grow-coach";
 export const COACH_PRICE_CENTS = 399;
 export const COACH_PERIOD_DAYS = 30;
@@ -231,12 +233,13 @@ export function parseTelemetry(rows = []) {
         temperature: num(doc.temperature ?? doc.temperature_c),
         humidity_setpoint: num(doc.humidity_setpoint ?? doc.target_humidity),
         temperature_setpoint: num(doc.temperature_setpoint ?? doc.target_temperature ?? doc.temperature_target),
-        fan_speed: num(doc.fan_speed ?? doc.fan_speed_percent),
+        fan_speed: num(doc.fan_speed ?? doc.fan_speed_percent ?? doc.air_exchange_speed),
         water_level: num(doc.water_level ?? doc.water ?? doc.water_level_percent),
         temperature_calibration: num(
           doc.temperature_calibration ?? doc.temp_calibration_c ?? doc.calibration_c
         ),
-        stage: doc.stage || doc.stage_id || doc.grow_phase || "",
+        // The chamber's grow_phase is a display name ("Fruiting"); map it to a profile stage id.
+        stage: doc.stage || doc.stage_id || stageForGrowPhase(doc.grow_phase),
         grow_day: num(doc.grow_day ?? doc.day),
         created_at: row.created_at || doc.created_at || "",
       };

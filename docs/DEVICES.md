@@ -177,11 +177,13 @@ The site never says "applied" when it queues a change. Every cloud write is a ro
 
 ### Capabilities
 
-A chamber may report `firmware_version` and `capabilities` (a list of tokens) in telemetry. Tokens: `setpoints.temperature`, `setpoints.humidity`, `setpoints.fan`, `light.schedule`, `light.color`, `apply_profile`, `firmware_notice`. A chamber that reports none (1.0.4-sl.2 today) is treated as `setpoints.temperature` + `setpoints.humidity`, within the firmware clamp of 10 to 32 °C and 60 to 98 % RH intersected with the chamber's reported min/max.
+A chamber may report `firmware_version`, `capabilities` (a list of tokens) and `ranges` (`{key: [min, max, step]}`) in telemetry. Tokens: `setpoints.temperature`, `setpoints.humidity`, `setpoints.multi`, `setpoints.fan`, `air.schedule`, `light.schedule`, `light.color`, `grow.day`, `grow.phase`, `ack.refused`, `apply_profile`, `firmware_notice`. Firmware 1.0.5-sl.1 and later reports them all and takes one atomic `setpoints` command with any of `temperature_c`, `humidity_percent`, `air_exchange_speed`, `air_exchange_period_min`, `air_exchange_run_sec`, `sunrise_hour`, `light_hours`, `white_intensity` (lux), `color_r/g/b`, `grow_day`, `grow_phase`: all fields apply or none do. Knob controls other than temperature and RH need `setpoints.multi` plus the knob's token. The site shows white light as a percent and sends lux (`lux = 0.02307 x pct^2.768`, linear below 20 %, capped at 4000). A chamber that reports none (1.0.4-sl.4 and older) is treated as `setpoints.temperature` + `setpoints.humidity`, within the firmware clamp of 10 to 32 °C and 60 to 98 % RH intersected with the chamber's reported min/max.
 
 The API returns `firmware`, `capabilities` and per-control `controls` on each device, and every write is checked against them:
 
 - **Profile apply** on setpoint-only firmware becomes one `setpoints` command with the chosen phase's temperature and RH (plus fan if `setpoints.fan`). Light is skipped with a note unless `light.schedule` is reported. It also sets the chamber's active grow profile and species (Autopilot profile and alert grow tracking), so the Devices card and device page show it. If Autopilot is on and steering, Apply only switches Autopilot's target and sends nothing direct.
+- **Profile apply on 1.0.5-sl.1+** sends the whole phase (temperature, RH, fan, fresh air, light, chamber phase and grow day) in one `setpoints` command.
+- **Stage** (`action: "stage"`, `grow_phase` and or `grow_day`) sets what the chamber shows and counts, on `grow.phase` / `grow.day` firmware.
 - **Fan-only, light, and update-notice changes** are refused with a plain message on firmware that can't take them.
 - **Repeat submits**: the same `request_id`, or the same change to the same chamber within 60 seconds, returns the existing command (`deduped: true`) instead of queueing another. The buttons are disabled while a send is in flight.
 

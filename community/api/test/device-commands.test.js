@@ -293,3 +293,140 @@ test("Mike's 12:14 profile commands read as not runnable on sl.2, never applied"
   assert.equal(expired.status, "expired");
   assert.match(expired.reason, /expired unused/i);
 });
+
+// What 1.0.5-sl.1 sends: knob values, ranges, and capability tokens.
+const SL5_READING = {
+  ...SL2_READING,
+  firmware_version: "1.0.5-sl.1",
+  air_exchange_speed: 30,
+  air_exchange_period_min: 20,
+  air_exchange_run_sec: 60,
+  sunrise_hour: 8,
+  light_hours: 0,
+  white_intensity: 0,
+  color_r: 0,
+  color_g: 0,
+  color_b: 0,
+  grow_day: 3,
+  grow_phase: "Colonizing",
+  ranges: { air_exchange_speed: [15, 100, 5], white_intensity: [0, 4000, 5], light_hours: [0, 24, 0.25] },
+  capabilities: [
+    "setpoints.temperature",
+    "setpoints.humidity",
+    "setpoints.multi",
+    "ack.refused",
+    "setpoints.fan",
+    "air.schedule",
+    "light.schedule",
+    "light.color",
+    "grow.day",
+    "grow.phase",
+  ],
+};
+
+async function setupSl5(email) {
+  const s = await setup(email);
+  await s.ctx.db.run("DELETE FROM device_telemetry WHERE device_id=?", ["dev-1"]);
+  await addReading(s.ctx, "dev-1", SL5_READING);
+  return s;
+}
+
+test("1.0.5-sl.1 capabilities turn on fan, air, light and stage controls", () => {
+  const caps = deviceCapabilities(SL5_READING);
+  assert.equal(caps.firmware, "1.0.5-sl.1");
+  assert.equal(caps.multi, true);
+  const c = controlSupport(caps);
+  for (const key of ["fan", "air", "light", "stage"]) assert.equal(c[key].supported, true, key);
+  assert.equal(c.profile.mode, "full");
+  assert.equal(deviceCapabilities(SL5_READING, "some_other_box").list.length, 10, "reported caps win for any type");
+  assert.deepEqual(deviceCapabilities({}, "some_other_box").list, [], "unknown types assume nothing");
+});
+
+test("profile apply on 1.0.5 sends the whole stage in one setpoints command", async () => {
+  const { ctx, token } = await setupSl5("full@example.com");
+  const res = await applyProfile(ctx, token);
+  const r = res.data.results[0];
+  assert.equal(r.status, "queued", JSON.stringify(res.data));
+  assert.match(r.message, /whole phase/);
+  const all = await rows(ctx);
+  assert.equal(all.length, 1);
+  const p = JSON.parse(all[0].payload);
+  assert.equal(all[0].kind, "setpoints");
+  assert.equal(p.temperature_c, fruiting.temperature_c);
+  assert.equal(p.humidity_percent, fruiting.humidity_percent);
+  assert.equal(p.fan_speed_percent, undefined, "never the key the firmware ignores");
+  assert.equal(p.air_exchange_speed, Math.round(fruiting.fan.speed_percent / 5) * 5);
+  assert.equal(p.air_exchange_period_min, fruiting.fan.period_min);
+  assert.equal(p.air_exchange_run_sec, Math.round(fruiting.fan.run_duration_s / 5) * 5);
+  for (const key of ["sunrise_hour", "light_hours", "white_intensity", "color_r", "color_g", "color_b"]) assert.notEqual(p[key], undefined, key);
+  assert.ok(p.light_hours > 0);
+  assert.equal(p.grow_phase, "Fruiting");
+  assert.equal(typeof p.grow_day, "number");
+});
+
+test("light from the site: white % becomes lux, a lit light never goes out with 0 hours", async () => {
+  const { ctx, token } = await setupSl5("light@example.com");
+  const res = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
+    token,
+    body: { action: "setpoints", payload: { light: { white_percent: 50, red_percent: 10 } } },
+  });
+  assert.equal(res.data.results[0].status, "queued", JSON.stringify(res.data));
+  const p = JSON.parse((await rows(ctx))[0].payload);
+  assert.equal(p.white_intensity, 1165);
+  assert.equal(p.color_r, 10);
+  assert.equal(p.color_g, 0);
+  assert.equal(p.sunrise_hour, 8);
+  assert.equal(p.light_hours, 12, "chamber had 0 h; the light is on, so 12 h");
+  const capped = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
+    token,
+    body: { action: "setpoints", payload: { white_intensity: 9000, air_exchange_period_min: 999, air_exchange_run_sec: 33 } },
+  });
+  assert.equal(capped.data.results[0].status, "queued", JSON.stringify(capped.data));
+  const q = JSON.parse((await rows(ctx))[1].payload);
+  assert.equal(q.white_intensity, 4000);
+  assert.equal(q.air_exchange_period_min, 240);
+  assert.equal(q.air_exchange_run_sec, 35);
+});
+
+test("stage action sets the chamber phase and day; bad values are refused", async () => {
+  const { ctx, token } = await setupSl5("stage@example.com");
+  const ok = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
+    token,
+    body: { action: "stage", payload: { grow_phase: "pinning", grow_day: 14 } },
+  });
+  assert.equal(ok.data.results[0].status, "queued", JSON.stringify(ok.data));
+  const p = JSON.parse((await rows(ctx))[0].payload);
+  assert.equal(p.grow_phase, "Pinning");
+  assert.equal(p.grow_day, 14);
+  const bad = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", { token, body: { action: "stage", payload: { grow_phase: "Sleeping" } } });
+  assert.equal(bad.data.results[0].status, "failed");
+  const sl2 = await setup("stage-sl2@example.com");
+  const old = await call(sl2.ctx, "POST", "/api/fleet/devices/dev-1/apply", { token: sl2.token, body: { action: "stage", payload: { grow_day: 4 } } });
+  assert.equal(old.data.results[0].status, "failed");
+  assert.equal((await rows(sl2.ctx)).length, 0);
+});
+
+test("a reading confirms a knob command only when every knob matches", () => {
+  const caps = deviceCapabilities(SL5_READING);
+  const target = { temperature_c: 20, air_exchange_speed: 40, light_hours: 12, grow_phase: "Fruiting" };
+  const reading = { temperature_setpoint: 20, air_exchange_speed: 40, light_hours: 12, grow_phase: "Fruiting" };
+  assert.equal(caps.multi, true);
+  return import("../src/device-capabilities.js").then(({ readingMatchesTargets }) => {
+    assert.equal(readingMatchesTargets(reading, target), true);
+    assert.equal(readingMatchesTargets({ ...reading, air_exchange_speed: 30 }, target), false);
+    assert.equal(readingMatchesTargets({ ...reading, grow_phase: "Pinning" }, target), false);
+    assert.equal(readingMatchesTargets(reading, {}), false);
+  });
+});
+
+test("device payload exposes chamber knobs, light in lux and %, and drops the air local-only note", async () => {
+  const { ctx, token } = await setupSl5("detail@example.com");
+  const d = (await call(ctx, "GET", "/api/fleet/devices/dev-1", { token })).data.device;
+  assert.equal(d.chamber.air_exchange_period_min, 20);
+  assert.equal(d.chamber.grow_phase, "Colonizing");
+  assert.equal(d.chamber_light.white_led_lux, 0);
+  assert.equal(d.controls.air.supported, true);
+  assert.ok(!d.local_only.some((c) => c.id === "air_period"));
+  assert.deepEqual(d.capabilities.knob_ranges.white_intensity, [0, 4000, 5]);
+  assert.ok(d.cloud_controls.find((c) => c.id === "stage").supported);
+});

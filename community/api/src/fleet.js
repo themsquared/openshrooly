@@ -31,8 +31,14 @@ import {
   COMMAND_TTL_MS,
   commandIntent,
   commandState,
+  chamberKnobs,
   controlSupport,
   deviceCapabilities,
+  GROW_PHASE_OPTIONS,
+  growPhaseForStage,
+  KNOB_KEYS,
+  lightFromKnobs,
+  setpointParts,
   IDEMPOTENCY_WINDOW_MS,
   planForCapabilities,
 } from "./device-capabilities.js";
@@ -60,7 +66,9 @@ export const LOCAL_ONLY_CONTROLS = [
 export const CLOUD_CONTROLS = [
   { id: "setpoints", label: "Temperature and humidity targets" },
   { id: "fan", label: "Fan speed" },
+  { id: "air", label: "Air exchange period and run time" },
   { id: "light", label: "Light schedule and color" },
+  { id: "stage", label: "Chamber grow phase and day" },
   { id: "profile", label: "Profile and grow phase" },
   { id: "name", label: "Device name" },
   { id: "grow", label: "Grow start day" },
@@ -293,7 +301,10 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
   ]);
   const current = latestReading(samples, now);
   const latestDoc = latestDocFrom(samples);
-  const caps = deviceCapabilities(latestDoc);
+  const deviceType = device.device_type || DEFAULT_DEVICE_TYPE;
+  const caps = deviceCapabilities(latestDoc, deviceType);
+  const knobs = chamberKnobs(latestDoc);
+  const controls = controlSupport(caps);
   const [tracked, commands] = await Promise.all([
     loadGrowTracking(db, user, device, modeRow, current, now),
     commandStates(db, device, caps, { now }),
@@ -315,7 +326,6 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
         };
   const linked = device.status === "active" || device.status === "claimed";
   const online = deviceIsOnline(device, now);
-  const deviceType = device.device_type || DEFAULT_DEVICE_TYPE;
   return {
     id: device.id,
     name: device.name,
@@ -353,20 +363,23 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     setpoints: {
       temperature_c: current?.temperature_setpoint ?? parseJson(modeRow.last_setpoints, {})?.temperature_c ?? null,
       humidity_percent: current?.humidity_setpoint ?? parseJson(modeRow.last_setpoints, {})?.humidity_percent ?? null,
-      fan_speed_percent: current?.fan_speed ?? parseJson(modeRow.last_setpoints, {})?.fan_speed_percent ?? null,
+      fan_speed_percent: current?.fan_speed ?? knobs.air_exchange_speed ?? parseJson(modeRow.last_setpoints, {})?.fan_speed_percent ?? null,
     },
+    // What the chamber reports it is running now (null per knob when it doesn't say).
+    chamber: knobs,
+    chamber_light: lightFromKnobs(knobs),
     light: lightFromStage(stage),
     coach,
     firmware: caps.firmware,
-    capabilities: { source: caps.source, list: caps.list, ranges: caps.ranges },
-    controls: controlSupport(caps),
+    capabilities: { source: caps.source, list: caps.list, ranges: caps.ranges, knob_ranges: caps.knob_ranges },
+    controls,
     commands,
     cert_expires_at: activeCert?.not_after || null,
     alerts: fleetAlerts({ device, reading: current, stage, now }),
     group_ids: groupIds,
     off_menu: offMenu,
     cloud_controls: cloudControls(caps),
-    local_only: LOCAL_ONLY_CONTROLS,
+    local_only: LOCAL_ONLY_CONTROLS.filter((c) => !(c.id === "air_period" && controls.air.supported)),
   };
 }
 
@@ -387,7 +400,7 @@ export async function deviceDetail(db, env, user, device, { hours = 24, now = Da
 /** Cloud controls with whether this chamber's firmware can take each one. */
 export function cloudControls(caps) {
   const support = controlSupport(caps);
-  const key = { setpoints: "temperature", fan: "fan", light: "light", profile: "profile", name: "name", grow: "grow" };
+  const key = { setpoints: "temperature", fan: "fan", air: "air", light: "light", stage: "stage", profile: "profile", name: "name", grow: "grow" };
   return CLOUD_CONTROLS.map((c) => ({ ...c, supported: support[key[c.id]]?.supported ?? true, note: support[key[c.id]]?.note || null }));
 }
 
@@ -396,12 +409,20 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
     const proposed = {
       temperature_c: payload.temperature_c,
       humidity_percent: payload.humidity_percent,
-      fan_speed_percent: payload.fan_speed_percent,
+      fan_speed_percent: payload.fan_speed_percent ?? payload.air_exchange_speed,
     };
-    if (proposed.temperature_c == null && proposed.humidity_percent == null && proposed.fan_speed_percent == null) {
-      return { ok: false, error: "Pick a temperature, humidity, or fan change." };
+    // Air and light knobs pass through; the chamber's own ranges clamp them when the command is built.
+    const knobs = {};
+    for (const key of KNOB_KEYS) {
+      if (key === "air_exchange_speed") continue;
+      const n = Number(payload[key]);
+      if (payload[key] != null && payload[key] !== "" && Number.isFinite(n)) knobs[key] = n;
     }
-    const next = clampAutopilotSetpoints({ ...currentSetpoints, ...proposed }, stage);
+    if (payload.light && typeof payload.light === "object") knobs.light = payload.light;
+    if (proposed.temperature_c == null && proposed.humidity_percent == null && proposed.fan_speed_percent == null && !Object.keys(knobs).length) {
+      return { ok: false, error: "Pick a temperature, humidity, fan, air, or light change." };
+    }
+    const next = { ...clampAutopilotSetpoints({ ...currentSetpoints, ...proposed }, stage), ...knobs };
     return {
       ok: true,
       kind: "setpoints",
@@ -430,6 +451,21 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
     } catch (err) {
       return { ok: false, error: err.message || "Light recipe is not valid." };
     }
+  }
+  if (action === "stage") {
+    const out = {};
+    if (payload.grow_phase != null && payload.grow_phase !== "") {
+      const phase = growPhaseForStage(String(payload.grow_phase));
+      if (!phase || !GROW_PHASE_OPTIONS.includes(phase)) return { ok: false, error: `Phase must be one of ${GROW_PHASE_OPTIONS.join(", ")}.` };
+      out.grow_phase = phase;
+    }
+    if (payload.grow_day != null && payload.grow_day !== "") {
+      const day = Number(payload.grow_day);
+      if (!Number.isInteger(day) || day < 0 || day > 90) return { ok: false, error: "Grow day must be a whole number from 0 to 90." };
+      out.grow_day = day;
+    }
+    if (!Object.keys(out).length) return { ok: false, error: "Pick a phase or a grow day." };
+    return { ok: true, kind: "stage", payload: out, preview: { to: out } };
   }
   if (action === "coach_mode") {
     if (profile && refuseRestrictedPack(profile)) {
@@ -479,6 +515,13 @@ function requestIdFrom(payload = {}) {
   return raw ? String(raw).slice(0, 64) : null;
 }
 
+/** Whole days of the profile before `stageId` starts (day 0 for the first stage). */
+function daysBeforeStage(profile, stageId) {
+  const stages = Array.isArray(profile?.stages) ? profile.stages : [];
+  const index = stages.findIndex((s) => s.id === stageId);
+  return Math.floor(stages.slice(0, Math.max(0, index)).reduce((sum, s) => sum + (Number(s.duration_days) || 0), 0));
+}
+
 /** Day the grow would have started for `stageId` to be today's phase. */
 function startForStage(profile, stageId, now, reportedDay = null) {
   // The chamber's own grow day wins: use it when it puts the grow in the chosen stage,
@@ -524,11 +567,9 @@ function translationMessage(plan, translated, profile, stage) {
   const notes = [...new Set((translated.skipped || []).map((s) => s.note).filter(Boolean))];
   if (plan.kind === "apply_profile" && translated.translated) {
     const sent = translated.commands.find((c) => c.kind === "setpoints")?.payload || {};
-    const parts = [];
-    if (sent.temperature_c != null) parts.push(`${sent.temperature_c} °C`);
-    if (sent.humidity_percent != null) parts.push(`${sent.humidity_percent}% RH`);
-    if (sent.fan_speed_percent != null) parts.push(`fan ${sent.fan_speed_percent}%`);
-    return [`${profileLabel(profile, stage)}: sending ${parts.join(" and ")}.`, ...notes].join(" ");
+    const parts = setpointParts(sent);
+    const what = translated.full ? `sending the whole phase in one change: ${parts.join(", ")}` : `sending ${parts.join(" and ")}`;
+    return [`${profileLabel(profile, stage)}: ${what}.`, ...notes].join(" ");
   }
   return notes.length ? notes.join(" ") : null;
 }
@@ -540,7 +581,9 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   const profile = await loadProfile(db, user, profileId);
   const samples = await loadRecentTelemetry(db, device.id, { now });
   const current = latestReading(samples, now);
-  const caps = deviceCapabilities(latestDocFrom(samples));
+  const latestDoc = latestDocFrom(samples);
+  const caps = deviceCapabilities(latestDoc, device.device_type || DEFAULT_DEVICE_TYPE);
+  const knobs = chamberKnobs(latestDoc);
   // A new grow starts at day 1 of the first stage. Only reuse the chamber's stage when the
   // same profile is already running there; never carry another profile's stage over.
   const sameProfile = Boolean(profile && modeRow.profile_id && modeRow.profile_id === profile.id);
@@ -554,8 +597,10 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
     humidity_percent: current?.humidity_setpoint,
   };
   const plan = validateFleetChange({ action, payload, profile, stage, currentSetpoints });
-  const cloudKind = plan.ok && ["setpoints", "apply_profile", "schedule"].includes(plan.kind);
-  const translated = cloudKind ? planForCapabilities(plan, caps, { stage, requested: payload }) : null;
+  const cloudKind = plan.ok && ["setpoints", "apply_profile", "schedule", "stage"].includes(plan.kind);
+  // The chamber's grow day only carries over for the same grow; otherwise it restarts at 0.
+  const growDay = plan.kind === "apply_profile" && caps.grow_day ? (trustReported && knobs.grow_day != null ? knobs.grow_day : daysBeforeStage(profile, plan.payload.stage)) : null;
+  const translated = cloudKind ? planForCapabilities(plan, caps, { stage, requested: payload, current: knobs, growDay }) : null;
   return { modeRow, profile, stage, current, caps, plan, translated, trustReported };
 }
 
@@ -708,7 +753,7 @@ export async function handleFleet(method, path, url, request, env) {
     const device = await ownedDevice(db, user, decodeURIComponent(commandsMatch[1]));
     if (!device) return json({ error: "not your device" }, 403);
     const now = Date.now();
-    const caps = deviceCapabilities(latestDocFrom(await loadRecentTelemetry(db, device.id, { now })));
+    const caps = deviceCapabilities(latestDocFrom(await loadRecentTelemetry(db, device.id, { now })), device.device_type || DEFAULT_DEVICE_TYPE);
     const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit")) || 10));
     return json({ device_id: device.id, commands: await commandStates(db, device, caps, { limit, now }) });
   }

@@ -3,6 +3,7 @@
 import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { isCoachBetaUser } from "./providers.js";
+import { readingMatchesTargets } from "./device-capabilities.js";
 import {
   COACH_ITEM,
   READINGS_STALE_MINUTES,
@@ -93,15 +94,9 @@ export function sameSetpoints(a = {}, b = {}) {
   return ta != null || ha != null;
 }
 
+/** Whether a reading shows a command's targets (temperature, RH, and any chamber knobs). */
 export function setpointsMatch(reading = {}, target = {}) {
-  if (!target || (target.temperature_c == null && target.humidity_percent == null)) return false;
-  const reportedTemp = num(reading.temperature_setpoint ?? reading.temperature_target ?? reading.target_temperature);
-  const reportedRh = num(reading.humidity_setpoint ?? reading.target_humidity);
-  const lastTemp = num(target.temperature_c);
-  const lastRh = num(target.humidity_percent);
-  if (lastTemp != null && (reportedTemp == null || Math.abs(reportedTemp - lastTemp) > 0.15)) return false;
-  if (lastRh != null && (reportedRh == null || Math.abs(reportedRh - lastRh) > 0.6)) return false;
-  return true;
+  return readingMatchesTargets(reading, target);
 }
 
 function commandTargets(payload = {}) {

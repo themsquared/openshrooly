@@ -15,6 +15,7 @@ import {
   growLine,
   growingLabels,
   lastSeenLine,
+  luxPreview,
   readingWhenLine,
   renderControls,
   renderCommandList,
@@ -32,7 +33,7 @@ import {
   speciesLine,
   stageOptionsHtml,
 } from "./device-ui.js";
-import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
+import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
 
@@ -2085,6 +2086,12 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
   const form = $("#device-controls");
   const generalMsg = $("#device-controls-msg");
   // Picking a different profile resets the phase to its first stage (a new grow starts at day 1).
+  // Live lux preview under the white % box.
+  form?.addEventListener("input", (ev) => {
+    if (ev.target?.name !== "white_percent") return;
+    const out = form.querySelector("[data-lux-preview]");
+    if (out) out.textContent = luxPreview(Number(ev.target.value) || 0);
+  });
   form?.addEventListener("change", (ev) => {
     if (ev.target?.name !== "profile_id" || !form.stage) return;
     const option = ev.target.selectedOptions?.[0];
@@ -2129,11 +2136,20 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           payload.profile_id = form.profile_id.value;
           payload.stage = form.stage.value;
         }
+        if (action === "air") {
+          payload.air_exchange_period_min = numberOrUndefined(form.air_exchange_period_min.value);
+          payload.air_exchange_run_sec = numberOrUndefined(form.air_exchange_run_sec.value);
+        }
+        if (action === "stage") {
+          if (form.grow_phase) payload.grow_phase = form.grow_phase.value;
+          if (form.grow_day) payload.grow_day = numberOrUndefined(form.grow_day.value);
+        }
         if (action === "light") {
+          const whitePct = numberOrUndefined(form.white_percent.value);
           payload.light = {
             sunrise_hour: numberOrUndefined(form.sunrise_hour.value),
             duration_hours: numberOrUndefined(form.duration_hours.value),
-            white_led_lux: numberOrUndefined(form.white_led_lux.value),
+            white_led_lux: whitePct == null ? undefined : whitePercentToLux(whitePct),
             red_percent: numberOrUndefined(form.red_percent.value),
             green_percent: numberOrUndefined(form.green_percent.value),
             blue_percent: numberOrUndefined(form.blue_percent.value),
@@ -2148,7 +2164,7 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         flash(msg, "Sending...");
         const applied = await api(`/api/fleet/devices/${encodeURIComponent(id)}/apply`, {
           method: "POST",
-          jsonBody: { action: action === "climate" ? "setpoints" : action, payload },
+          jsonBody: { action: action === "climate" || action === "air" ? "setpoints" : action, payload },
         });
         const result = applied.results?.[0];
         if (!result || result.status === "failed") throw new Error(resultMessage(result));
@@ -2324,6 +2340,9 @@ async function renderFleet() {
     }
   };
   $("#bulk-action")?.addEventListener("change", showBulkFields);
+  $("#bulk-white")?.addEventListener("input", (ev) => {
+    $("#bulk-lux-preview").textContent = ev.target.value === "" ? "" : luxPreview(Number(ev.target.value) || 0);
+  });
   showBulkFields();
   loadDeviceCatalog()
     .then((catalog) => {
@@ -2417,12 +2436,24 @@ async function renderFleet() {
       const light = {};
       if ($("#bulk-sunrise").value) light.sunrise_hour = Number($("#bulk-sunrise").value);
       if ($("#bulk-duration").value) light.duration_hours = Number($("#bulk-duration").value);
-      if ($("#bulk-lux").value) light.white_led_lux = Number($("#bulk-lux").value);
+      if ($("#bulk-white").value) light.white_led_lux = whitePercentToLux(Number($("#bulk-white").value));
+      if ($("#bulk-red").value) light.red_percent = Number($("#bulk-red").value);
+      if ($("#bulk-green").value) light.green_percent = Number($("#bulk-green").value);
+      if ($("#bulk-blue").value) light.blue_percent = Number($("#bulk-blue").value);
       if (Object.keys(light).length) payload.light = light;
+    }
+    if (action === "air") {
+      if ($("#bulk-fan").value) payload.fan_speed_percent = Number($("#bulk-fan").value);
+      if ($("#bulk-air-period").value) payload.air_exchange_period_min = Number($("#bulk-air-period").value);
+      if ($("#bulk-air-run").value) payload.air_exchange_run_sec = Number($("#bulk-air-run").value);
+    }
+    if (action === "stage") {
+      if ($("#bulk-phase").value) payload.grow_phase = $("#bulk-phase").value;
+      if ($("#bulk-day").value) payload.grow_day = Number($("#bulk-day").value);
     }
     if (action === "coach_mode") payload.mode = $("#bulk-coach").value;
     payload.request_id = newRequestId();
-    return { action, payload, device_ids: selectedIds(), group_id: $("#fleet-group-filter").value ? Number($("#fleet-group-filter").value) : undefined };
+    return { action: action === "air" ? "setpoints" : action, payload, device_ids: selectedIds(), group_id: $("#fleet-group-filter").value ? Number($("#fleet-group-filter").value) : undefined };
   }
 
   async function runBulk(path) {
