@@ -99,20 +99,30 @@ function identityArt(device) {
   return speciesArt(p.species, p.strain, p.name, p.pack, { id: p.id, linked: false });
 }
 
+/** Small mushroom mark for a chamber with nothing picked yet, instead of a big empty photo box. */
+export const MUSHROOM_ICON = `<svg class="mushroom-icon" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" focusable="false"><path d="M6 24c0-10 8-17 18-17s18 7 18 17c0 2-1 3-3 3H9c-2 0-3-1-3-3z" fill="currentColor" opacity=".85"/><path d="M19 27h10v10c0 3-2 5-5 5s-5-2-5-5z" fill="currentColor" opacity=".55"/><circle cx="17" cy="17" r="2.5" fill="#0b1210"/><circle cx="29" cy="14" r="2" fill="#0b1210"/><circle cx="33" cy="21" r="1.6" fill="#0b1210"/></svg>`;
+
+export const PICK_GROW_LABEL = "Pick what you're growing";
+
 export function renderDeviceCard(device) {
   const grow = growingLabels(device);
   const online = device.online ? "Online" : "Offline";
   const coach = coachLine(device);
-  const href = `/device.html?id=${encodeURIComponent(device.id)}`;
+  const picked = Boolean(device?.profile);
+  const href = `/device.html?id=${encodeURIComponent(device.id)}${picked ? "" : "#grow"}`;
   const art = identityArt(device);
-  return `<article class="card device-card" data-device-id="${escapeHtml(device.id)}">
+  return `<article class="card device-card${art ? "" : " is-empty"}" data-device-id="${escapeHtml(device.id)}">
     <a class="device-card-link" href="${href}">
-      <div class="device-card-art">${art || `<div class="device-card-fallback" aria-hidden="true"></div>`}</div>
+      <div class="device-card-art">${art || `<div class="device-card-fallback">${MUSHROOM_ICON}</div>`}</div>
       <div class="device-card-body">
         <p class="device-card-kicker">${escapeHtml(deviceTypeLabel(device.device_type))} · <span class="${device.online ? "is-on" : "is-off"}">${online}</span></p>
         <h3>${escapeHtml(device.name || "Unnamed device")}</h3>
-        <p class="device-card-species">${escapeHtml(grow.title)}${grow.latin ? ` <em class="muted">${escapeHtml(grow.latin)}</em>` : ""}</p>
-        ${grow.phase ? `<p class="muted">${escapeHtml(grow.phase)}</p>` : ""}
+        ${
+          picked
+            ? `<p class="device-card-species">${escapeHtml(grow.title)}${grow.latin ? ` <em class="muted">${escapeHtml(grow.latin)}</em>` : ""}</p>
+        ${grow.phase ? `<p class="muted">${escapeHtml(grow.phase)}</p>` : ""}`
+            : `<p class="device-card-cta"><span class="button small">${escapeHtml(PICK_GROW_LABEL)}</span></p>`
+        }
         <p class="device-card-read">${escapeHtml(readingLine(device))}</p>
         <p class="muted">${escapeHtml(lastSeenLine(device))}${coach ? ` · ${escapeHtml(coach)}` : ""}</p>
       </div>
@@ -143,6 +153,16 @@ function gauge(label, value, unit, target) {
 export function renderIdentity(device) {
   const grow = growingLabels(device);
   const art = identityArt(device);
+  if (!device?.profile) {
+    return `<section class="device-identity card is-empty" aria-labelledby="growing-title">
+    <div class="device-identity-icon">${MUSHROOM_ICON}</div>
+    <div>
+      <p class="device-card-kicker">What is growing</p>
+      <h2 id="growing-title">Nothing picked yet</h2>
+      <p><a class="button" href="#grow">${escapeHtml(PICK_GROW_LABEL)}</a></p>
+    </div>
+  </section>`;
+  }
   return `<section class="device-identity card" aria-labelledby="growing-title">
     <div class="device-identity-art">${art || ""}</div>
     <div>
@@ -176,12 +196,14 @@ export function deviceMetaLine(device, { showCoach = false } = {}) {
 }
 
 export function renderReadonlyNotes(device) {
-  const items = (device.local_only || []).map((item) => `<li><strong>${escapeHtml(item.label)}</strong> ${escapeHtml(item.note)}</li>`).join("");
-  return `<section class="card device-local-only" aria-labelledby="local-only-title">
-    <h2 id="local-only-title">On the chamber only</h2>
-    <p class="muted">These stay on the chamber page when the device is not linked, and they are not sent through the cloud yet.</p>
+  const list = device.local_only || [];
+  if (!list.length) return "";
+  const items = list.map((item) => `<li><strong>${escapeHtml(item.label)}</strong> ${escapeHtml(item.note)}</li>`).join("");
+  const count = list.length === 1 ? "1 setting stays" : `${list.length} settings stay`;
+  return `<details class="card device-local-only">
+    <summary>${count} on the chamber itself. <span class="link-like">See which</span></summary>
     <ul class="device-note-list">${items}</ul>
-  </section>`;
+  </details>`;
 }
 
 /** Plain labels for what the chamber has actually done with a change. Enqueue is never "applied". */
@@ -201,6 +223,8 @@ export function commandPending(command) {
   return command?.status === "queued" || command?.status === "delivered";
 }
 
+export const SENT_MESSAGE = "Sent. Your chamber picks it up in about 15 minutes.";
+
 /** What to tell the grower right after Save or Apply, from the API's per-device result. */
 export function resultMessage(result) {
   if (!result) return "The chamber did not accept that change.";
@@ -208,7 +232,7 @@ export function resultMessage(result) {
   const parts = [];
   if (result.message) parts.push(result.message);
   if (result.deduped) parts.push("You already sent this, so it was not sent again.");
-  if (result.status === "queued") parts.push("Queued. It shows as applied only after the chamber confirms it.");
+  if (result.status === "queued") parts.push(SENT_MESSAGE);
   else if (result.status === "delivered") parts.push("The chamber picked it up. Waiting for it to confirm.");
   else if (result.status === "applied" && !result.message) parts.push("Saved.");
   return parts.join(" ");
@@ -235,14 +259,10 @@ export function newRequestId() {
   return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** Chamber software version, only when the chamber tells us. Nothing to say otherwise. */
 export function renderCapabilities(device) {
-  const firmware = device.firmware ? `Chamber software ${device.firmware}` : "Chamber software version not reported";
-  const source = device.capabilities?.source;
-  const how =
-    source === "reported"
-      ? "The chamber reported what it can take from the cloud."
-      : "The chamber does not report what it can take yet, so the site assumes temperature and humidity targets only.";
-  return `<p class="muted device-capabilities">${escapeHtml(firmware)}. ${escapeHtml(how)}</p>`;
+  if (!device.firmware) return "";
+  return `<p class="muted device-capabilities">Chamber software ${escapeHtml(device.firmware)}.</p>`;
 }
 
 function commandLine(command) {
@@ -265,16 +285,32 @@ function controlNote(control) {
   return control?.note ? `<p class="muted control-note">${escapeHtml(control.note)}</p>` : "";
 }
 
+/** Where each Save says what happened, right under the button that was tapped. */
+function controlMsg(action) {
+  return `<p class="muted control-msg" role="status" data-msg-for="${action}"></p>`;
+}
+
+/** Settings this chamber can't take from the cloud, said once instead of as greyed-out boxes. */
+export function chamberOnlyLine(controls = {}) {
+  const off = [];
+  if (controls.fan?.supported === false) off.push("fan speed");
+  if (controls.light?.supported === false) off.push("the light schedule");
+  if (!off.length) return "";
+  return `This chamber takes ${off.join(" and ")} on the chamber itself for now, not from here.`;
+}
+
+/**
+ * Chamber controls, top to bottom: what is growing, the climate, then light and name.
+ * Controls this chamber can't take from the cloud are left out, with one plain line saying so.
+ */
 export function renderControls(device, { profiles = [], canWrite = false, showCoach = false } = {}) {
   const disabled = canWrite ? "" : " disabled";
   const controls = device.controls || {};
-  const off = (key) => (canWrite && controls[key]?.supported !== false ? "" : " disabled");
-  const fanOff = off("fan");
-  const lightOff = off("light");
-  const profileOff = off("profile");
+  const supported = (key) => controls[key]?.supported !== false;
+  const profileOff = canWrite && supported("profile") ? "" : " disabled";
   const light = device.light || {};
   const profileOptions =
-    `<option value="">Choose a profile</option>` +
+    `<option value="">Choose what you're growing</option>` +
     profiles
       .map((p) => {
         const selected = p.id === device.profile?.id ? " selected" : "";
@@ -287,10 +323,11 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
     ? stageOptionsHtml(device.grow?.stages || [], { selectedId: device.stage?.id, sameProfile: true })
     : "";
   const notice = canWrite
-    ? "Changes use the same limits as the chamber list tools."
+    ? ""
     : device.online
-      ? "This chamber is not linked, so cloud controls stay off."
-      : "This chamber looks offline. Cloud controls stay off until it reports again.";
+      ? "This chamber is not linked, so changes from here are off."
+      : "This chamber looks offline. Changes from here come back when it reports again.";
+  const onlyHere = chamberOnlyLine(controls);
   const coach =
     showCoach && !device.off_menu
       ? `<fieldset>
@@ -301,72 +338,84 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
               <option value="autopilot"${device.coach?.mode === "autopilot" ? " selected" : ""}>Coach adjusts it for me</option>
             </select>
           </label>
-          <button type="submit" data-action="coach_mode"${disabled}>Save Coach mode</button>
+          <button type="submit" class="secondary" data-action="coach_mode"${disabled}>Save Coach mode</button>
+          ${controlMsg("coach_mode")}
         </fieldset>`
       : "";
+  const fan = supported("fan")
+    ? `<label>Fan speed (%)
+          <input name="fan_speed_percent" type="number" step="1" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${disabled}>
+        </label>
+        <p class="muted">Fan period and run time stay on the chamber.</p>`
+    : "";
+  const lightBlock = supported("light")
+    ? `<fieldset>
+      <legend>Light</legend>
+      ${controlNote(controls.light)}
+      <div class="row">
+        <label>Lights on at (hour)
+          <input name="sunrise_hour" type="number" step="0.25" min="0" max="23.75" value="${numOrBlank(light.sunrise_hour)}"${disabled}>
+        </label>
+        <label>Hours on
+          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${disabled}>
+        </label>
+      </div>
+      <label>White brightness (lux)
+        <input name="white_led_lux" type="number" min="0" max="4000" value="${numOrBlank(light.white_led_lux)}"${disabled}>
+      </label>
+      <div class="row">
+        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${disabled}></label>
+        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${disabled}></label>
+        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${disabled}></label>
+      </div>
+      <p class="muted">Set hours on to 0 only for a dark stage, with brightness and colors at 0 too.</p>
+      <button type="submit" class="secondary" data-action="light"${disabled}>Save light</button>
+      ${controlMsg("light")}
+    </fieldset>`
+    : "";
   return `<form id="device-controls" class="card alert-form">
-    <p class="muted">${escapeHtml(notice)}</p>
-    ${renderCapabilities(device)}
-    <fieldset>
-      <legend>Device name</legend>
-      <label>Name <input name="device_name" maxlength="80" value="${escapeHtml(device.name || "")}"${disabled}></label>
-      <button type="submit" data-action="name"${disabled}>Save name</button>
-    </fieldset>
-    <fieldset>
-      <legend>Profile and grow</legend>
+    ${notice ? `<p class="muted">${escapeHtml(notice)}</p>` : ""}
+    <fieldset id="grow">
+      <legend>What's growing</legend>
       <div class="row">
         <label>Profile <select name="profile_id"${disabled}>${profileOptions}</select></label>
         <label>Phase <select name="stage"${disabled}>${stageOptions || `<option value="">Start from the beginning</option>`}</select></label>
       </div>
-      <button type="submit" data-action="profile"${profileOff}>Apply profile</button>
+      <button type="submit" data-action="profile"${profileOff}>Start this grow</button>
       ${controlNote(controls.profile)}
+      ${controlMsg("profile")}
     </fieldset>
     <fieldset>
-      <legend>Temperature</legend>
-      <label>Target temperature (°C)
-        <input name="temperature_c" type="number" step="0.1" min="10" max="32" value="${numOrBlank(device.setpoints?.temperature_c)}"${disabled}>
-      </label>
-      <button type="submit" data-action="climate"${disabled}>Save climate</button>
-    </fieldset>
-    <fieldset>
-      <legend>Humidity</legend>
-      <label>Target humidity (%)
-        <input name="humidity_percent" type="number" step="1" min="60" max="98" value="${numOrBlank(device.setpoints?.humidity_percent)}"${disabled}>
-      </label>
-    </fieldset>
-    <fieldset>
-      <legend>Air exchange</legend>
-      <label>Fan speed (%)
-        <input name="fan_speed_percent" type="number" step="1" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${fanOff}>
-      </label>
-      ${controlNote(controls.fan)}
-      <p class="muted">Period and run time stay on the chamber.</p>
-    </fieldset>
-    <fieldset>
-      <legend>Lighting</legend>
-      ${controlNote(controls.light)}
-      <p class="muted">Duration is required when the light is on. 0 hours is only for a dark stage with lux 0 and RGB 0.</p>
+      <legend>Climate</legend>
       <div class="row">
-        <label>Sunrise hour
-          <input name="sunrise_hour" type="number" step="0.25" min="0" max="23.75" value="${numOrBlank(light.sunrise_hour)}"${lightOff}>
+        <label>Temperature (°C)
+          <input name="temperature_c" type="number" step="0.1" min="10" max="32" value="${numOrBlank(device.setpoints?.temperature_c)}"${disabled}>
         </label>
-        <label>Duration (hours)
-          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${lightOff}>
+        <label>Humidity (%)
+          <input name="humidity_percent" type="number" step="1" min="60" max="98" value="${numOrBlank(device.setpoints?.humidity_percent)}"${disabled}>
         </label>
       </div>
-      <label>White intensity (lux)
-        <input name="white_led_lux" type="number" min="0" max="4000" value="${numOrBlank(light.white_led_lux)}"${lightOff}>
-      </label>
-      <div class="row">
-        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${lightOff}></label>
-        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${lightOff}></label>
-        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${lightOff}></label>
-      </div>
-      <button type="submit" data-action="light"${lightOff}>Save light schedule</button>
+      ${fan}
+      <button type="submit" class="secondary" data-action="climate"${disabled}>Save climate</button>
+      ${controlMsg("climate")}
+    </fieldset>
+    ${lightBlock}
+    ${onlyHere ? `<p class="muted chamber-only-line">${escapeHtml(onlyHere)}</p>` : ""}
+    <fieldset>
+      <legend>Chamber name</legend>
+      <label>Name <input name="device_name" maxlength="80" value="${escapeHtml(device.name || "")}"${disabled}></label>
+      <button type="submit" class="secondary" data-action="name"${disabled}>Save name</button>
+      ${controlMsg("name")}
     </fieldset>
     ${coach}
+    ${renderCapabilities(device)}
     <p id="device-controls-msg" class="muted" role="status"></p>
   </form>`;
+}
+
+/** The chart needs two readings to draw a line. Before that, say when it shows up. */
+export function chartReady(points) {
+  return (points || []).filter((p) => p && (p.temperature != null || p.humidity != null)).length >= 2;
 }
 
 export function drawHistoryChart(svg, points) {

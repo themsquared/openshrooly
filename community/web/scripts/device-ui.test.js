@@ -51,8 +51,8 @@ test("device page identity and controls use chamber names, not product Shrooly",
   assert.match(identity, /Pleurotus ostreatus/);
   assert.match(identity, /Pearl Oyster/);
   const controls = renderControls(pearl, { profiles: [pearl.profile], canWrite: true, showCoach: true });
-  assert.match(controls, /Target temperature/);
-  assert.match(controls, /Target humidity/);
+  assert.match(controls, /Temperature \(°C\)/);
+  assert.match(controls, /Humidity \(%\)/);
   assert.match(controls, /Fan speed/);
   assert.match(controls, /Light/);
   assert.match(controls, /I approve changes/);
@@ -117,7 +117,7 @@ const SL2_CONTROLS = {
   profile: {
     supported: true,
     mode: "translated",
-    note: "This chamber's firmware can't load a whole profile, so Apply sends the phase's temperature and humidity targets.",
+    note: "This chamber's firmware can't load a whole profile, so Start this grow sends the phase's temperature and humidity targets.",
   },
 };
 const sl2 = { ...pearl, firmware: null, capabilities: { source: "inferred", list: ["setpoints.temperature", "setpoints.humidity"] }, controls: SL2_CONTROLS };
@@ -126,19 +126,55 @@ function tagFor(html, name) {
   return html.match(new RegExp(`<input name="${name}"[^>]*>`))[0];
 }
 
-test("controls the firmware can't take are disabled with a plain note", () => {
+test("controls the firmware can't take are left out, with one plain line", () => {
   const html = renderControls(sl2, { profiles: [pearl.profile], canWrite: true });
-  assert.match(tagFor(html, "fan_speed_percent"), /disabled/);
-  assert.match(tagFor(html, "white_led_lux"), /disabled/);
-  assert.match(html, /<button type="submit" data-action="light" disabled>/);
+  assert.doesNotMatch(html, /name="fan_speed_percent"/);
+  assert.doesNotMatch(html, /name="white_led_lux"/);
+  assert.doesNotMatch(html, /data-action="light"/);
   assert.doesNotMatch(tagFor(html, "temperature_c"), /disabled/);
   assert.doesNotMatch(tagFor(html, "humidity_percent"), /disabled/);
-  assert.match(html, /<button type="submit" data-action="profile">/);
-  assert.match(html, /can't change fan speed from the cloud/);
-  assert.match(html, /can't take light settings from the cloud/);
+  assert.match(html, /<button type="submit" data-action="profile">Start this grow/);
+  assert.match(html, /takes fan speed and the light schedule on the chamber itself/);
   assert.match(html, /can't load a whole profile/);
-  assert.match(html, /Chamber software version not reported/);
+  // Nothing to say about an unreported software version.
+  assert.doesNotMatch(html, /not reported|Chamber software/);
   assert.doesNotMatch(html, DASH);
+});
+
+test("one Save for the climate, and every Save says what happened right under it", () => {
+  const html = renderControls(pearl, { profiles: [pearl.profile], canWrite: true });
+  assert.equal(html.split('data-action="climate"').length - 1, 1);
+  assert.doesNotMatch(html, /data-action="setpoints"/);
+  for (const action of ["profile", "climate", "light", "name"]) assert.match(html, new RegExp(`data-msg-for="${action}"`));
+  // What's growing comes first and is the one primary button.
+  assert.ok(html.indexOf('id="grow"') < html.indexOf('data-action="climate"'));
+  assert.match(html, /<button type="submit" data-action="profile">/);
+  assert.match(html, /class="secondary" data-action="climate"/);
+});
+
+test("an empty chamber gets a small icon and one next step, on the card and the page", async () => {
+  const { PICK_GROW_LABEL } = await import("../public/js/device-ui.js");
+  const bare = { id: "dev-new", name: "New chamber", online: true, device_type: "shrooly_chamber", reading: null };
+  const card = renderDeviceCard(bare);
+  assert.match(card, /mushroom-icon/);
+  assert.match(card, new RegExp(PICK_GROW_LABEL.replace("'", "(&#39;|')")));
+  assert.match(card, /device\.html\?id=dev-new#grow/);
+  assert.doesNotMatch(card, /No species selected|No grow selected/);
+  const identity = renderIdentity(bare);
+  assert.match(identity, /href="#grow"/);
+  assert.match(identity, /Nothing picked yet/);
+  assert.doesNotMatch(identity, /<img/);
+});
+
+test("the chart waits for two readings, and chamber-only settings fold to one line", async () => {
+  const { chartReady, renderReadonlyNotes } = await import("../public/js/device-ui.js");
+  assert.equal(chartReady([]), false);
+  assert.equal(chartReady([{ temperature: 20 }]), false);
+  assert.equal(chartReady([{ temperature: 20 }, { humidity: 90 }]), true);
+  const notes = renderReadonlyNotes({ local_only: [{ label: "Wi-Fi", note: "Set on the chamber." }, { label: "Fan period", note: "Set on the chamber." }] });
+  assert.match(notes, /<details/);
+  assert.match(notes, /2 settings stay on the chamber itself/);
+  assert.equal(renderReadonlyNotes({ local_only: [] }), "");
 });
 
 test("a chamber that reports light support keeps the light controls on", () => {
@@ -167,7 +203,7 @@ test("command states read plainly and queued is never called applied", () => {
   assert.match(html, /Applied, confirmed by the chamber/);
   assert.match(renderCommandList([]), /Nothing sent from the cloud yet/);
   const queued = resultMessage({ status: "queued", command_id: 5 });
-  assert.match(queued, /Queued/);
+  assert.equal(queued, "Sent. Your chamber picks it up in about 15 minutes.");
   assert.doesNotMatch(queued.replace(/shows as applied only after/, ""), /applied/i);
   assert.match(resultMessage({ status: "queued", deduped: true }), /already sent/);
   assert.match(resultMessage({ status: "failed", error: "No light from the cloud." }), /No light/);
