@@ -48,6 +48,8 @@ function reading105({ day = 15, phase = "Colonizing", ...extra } = {}) {
 
 test("grow day moves Autopilot forward through the profile, never back", () => {
   assert.equal(pickAutopilotStage(pearl, { grow_day: 3, grow_phase: "Colonizing" }, caps105).stageId, "colonization");
+  // Grow days count from 1 like the chamber: day 14 is the last day of a 14 day colonization.
+  assert.equal(pickAutopilotStage(pearl, { grow_day: 14, grow_phase: "Colonizing" }, caps105).stageId, "colonization");
   const pin = pickAutopilotStage(pearl, { grow_day: 15, grow_phase: "Colonizing" }, caps105);
   assert.equal(pin.stageId, "pinning");
   assert.equal(pin.transition, true);

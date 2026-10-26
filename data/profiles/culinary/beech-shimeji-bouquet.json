@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "id": "beech-shimeji-bouquet",
+  "name": "Beech Shimeji: tight bouquet",
+  "species": "Hypsizygus tessulatus",
+  "strain": "Brown beech hypsizygus",
+  "variety_group": "hypsizygus",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "chef",
+    "intermediate"
+  ],
+  "restricted": false,
+  "summary": "A commercial light schedule: very dim light to set many pins, then brighter light for a tight bouquet of dark, round caps on firm stems.",
+  "notes": "The dim pinning stage looks like almost nothing is on. That is intended.",
+  "chamber_notes": " Chamber limits: there is no heater or cooler, so temperature targets only hold if the room sits near them. There is no CO2 sensor, so the fan schedule stands in for fresh air. The humidifier can only add moisture, so a low humidity target depends on dry room air.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Inatomi et al. 2002, Hokuto shimeji light",
+      "detail": "Inatomi S. et al., Hokuto Corporation and Shinshu University, 2002. 50 lux during spawn run raised yield. At initiation, darkness gave no primordia; 2 lux gave the most primordia, the highest yield, and the longest stipes; caps were largest at 30 to 100 lux. During development, stipe elongation fell as light rose toward 2,000 lux, caps were largest at 500 lux, yield peaked at 200 to 500 lux, and color turned dark greyish brown above 100 lux.",
+      "url": "https://www.jstage.jst.go.jp/article/apmsb/10/3/10_KJ00007318151/_article/-char/en"
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 21.0,
+      "humidity_percent": 88.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17.0,
+      "temperature_warning_max_c": 27.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 51,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Dim pinning",
+      "duration_days": 7.0,
+      "humidity_percent": 94.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 16.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 11.0,
+      "temperature_warning_max_c": 21.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 5,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 20,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Bright fruiting",
+      "duration_days": 12.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 10.0,
+      "temperature_warning_max_c": 20.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 506,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 18,
+        "run_duration_s": 25,
+        "speed_percent": 30
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "paid",
+    "amount_cents": 299,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [
+    "stripe"
+  ],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "11% white is about 51 lux in spawn run. 1% white is about 5 lux, the dimmest step near the 2 lux that gave the most primordia. 37% white is about 506 lux, where caps were largest and yield peaked.",
+    "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
+    "sources": [
+      {
+        "title": "Inatomi et al. 2002, Hokuto shimeji light",
+        "detail": "Inatomi S. et al., Hokuto Corporation and Shinshu University, 2002. 50 lux during spawn run raised yield. At initiation, darkness gave no primordia; 2 lux gave the most primordia, the highest yield, and the longest stipes; caps were largest at 30 to 100 lux. During development, stipe elongation fell as light rose toward 2,000 lux, caps were largest at 500 lux, yield peaked at 200 to 500 lux, and color turned dark greyish brown above 100 lux.",
+        "url": "https://www.jstage.jst.go.jp/article/apmsb/10/3/10_KJ00007318151/_article/-char/en"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 11.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 1.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fruiting": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 37.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      }
+    }
+  }
+}

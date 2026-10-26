@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "id": "pearl-oyster-dark-cap",
+  "name": "Pearl Oyster: dark cap",
+  "species": "Pleurotus ostreatus",
+  "strain": "Pearl oyster",
+  "variety_group": "oyster",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "chef",
+    "intermediate",
+    "oyster"
+  ],
+  "restricted": false,
+  "summary": "Cool fruiting with enough light for the deep grey-brown caps and firm flesh that warm, dim grows never give.",
+  "notes": "Growth is slower than the free card. Darker color comes from cool air and light together.",
+  "chamber_notes": "Needs a cool room. Chamber limits: there is no heater or cooler, so temperature targets only hold if the room sits near them. There is no CO2 sensor, so the fan schedule stands in for fresh air. The humidifier can only add moisture, so a low humidity target depends on dry room air.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Scientia Agricola 2003, oyster cap color",
+      "detail": "Scientia Agricola 60(3), 2003. P. ostreatus fruited at 15 \u00b0C with 120 lux for 12 h and 85 to 90% RH gave grey to lead-colored caps. At 28 \u00b0C with 900 lux the caps were white.",
+      "url": "https://doi.org/10.1590/S0103-90162003000300018"
+    },
+    {
+      "title": "MAPA 1985 oyster leaflet",
+      "detail": "Ministerio de Agricultura, Hojas Divulgadoras 8/85, Spain. Fruiting at 12 to 14 \u00b0C, 85 to 95% RH, CO2 under 0.06%, and 60 to 300 lux for about 12 h. Too little light gives pale caps and long stems.",
+      "url": "https://www.mapa.gob.es/ministerio/pags/biblioteca/hojas/hd_1985_08.pdf"
+    },
+    {
+      "title": "MushWorld 2004, oyster abnormalities",
+      "detail": "Mushroom Growers' Handbook 1, ch. 8, MushWorld 2004. P. ostreatus fruits best at 13 to 16 \u00b0C and over 80% RH. Low temperature with high humidity gives strong color and firm fruits that grow slowly; high temperature gives lighter caps. At 0.03% CO2 caps were 6.5 mm with 4.6 mm stipes; at 0.1% caps were 3.4 mm with 6.8 mm stipes. Too much air movement also deforms fruits.",
+      "url": "https://www.fungifun.org/docs/mushworld/Oyster-Mushroom-Cultivation/mushroom-growers-handbook-1-mushworld-com-chapter-8-4.pdf"
+    },
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). P. ostreatus spawn run ~24 \u00b0C; fruiting often 10 to 21 \u00b0C at 85 to 90% humidity."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 14.0,
+      "humidity_percent": 90.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 24.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 19.0,
+      "temperature_warning_max_c": 29.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0.0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Dark, little fresh air until the block is white."
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 5.0,
+      "humidity_percent": 93.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 10.0,
+      "temperature_warning_max_c": 20.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 190,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 12,
+        "run_duration_s": 40,
+        "speed_percent": 45
+      },
+      "notes": "Drop temperature and add fresh air to trigger clusters."
+    },
+    {
+      "id": "fruiting",
+      "name": "Cool dark caps",
+      "duration_days": 10.0,
+      "humidity_percent": 87.0,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 13.0,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 8.0,
+      "temperature_warning_max_c": 18.0,
+      "humidifier_speed_percent": 75.0,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12.0,
+        "white_led_lux": 190,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 10,
+        "run_duration_s": 45,
+        "speed_percent": 45
+      },
+      "notes": "Harvest when caps flatten and edges just begin to upturn."
+    }
+  ],
+  "pricing": {
+    "kind": "paid",
+    "amount_cents": 299,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [
+    "stripe"
+  ],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "26% white is about 190 lux: above the 120 lux that gave dark caps in Scientia Agricola 2003 and inside the 60 to 300 lux band in the MAPA leaflet.",
+    "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
+    "sources": [
+      {
+        "title": "Scientia Agricola 2003, oyster cap color",
+        "detail": "Scientia Agricola 60(3), 2003. P. ostreatus fruited at 15 \u00b0C with 120 lux for 12 h and 85 to 90% RH gave grey to lead-colored caps. At 28 \u00b0C with 900 lux the caps were white.",
+        "url": "https://doi.org/10.1590/S0103-90162003000300018"
+      },
+      {
+        "title": "MAPA 1985 oyster leaflet",
+        "detail": "Ministerio de Agricultura, Hojas Divulgadoras 8/85, Spain. Fruiting at 12 to 14 \u00b0C, 85 to 95% RH, CO2 under 0.06%, and 60 to 300 lux for about 12 h. Too little light gives pale caps and long stems.",
+        "url": "https://www.mapa.gob.es/ministerio/pags/biblioteca/hojas/hd_1985_08.pdf"
+      },
+      {
+        "title": "De Bonis 2024 LED wavelengths",
+        "detail": "Marina De Bonis et al., Effect of Different LED Light Wavelengths on Production and Quality of Pleurotus ostreatus, Horticulturae 10 (2024), with Penn State co-authors. 450 nm blue increased cap diameter versus red 610 nm.",
+        "url": "https://www.mdpi.com/2311-7524/10/4/349"
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0.0,
+        "white_brightness_percent": 0.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 26.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fruiting": {
+        "photoperiod_hours": 12.0,
+        "white_brightness_percent": 26.0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
+  }
+}

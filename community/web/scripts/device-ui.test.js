@@ -32,7 +32,8 @@ test("device cards make species and grow identity obvious", () => {
   assert.match(html, /Pleurotus ostreatus/);
   assert.match(html, /Pearl Oyster/);
   assert.match(html, /Fruiting/);
-  assert.match(html, /day 7 of 29/);
+  assert.match(html, /Fruiting, day 6 of 15/);
+  assert.match(html, /Grow day 20 of 29/);
   assert.match(html, /Shrooly chamber/);
   assert.match(html, /Kitchen chamber/);
   assert.match(html, /device\?id=demo-kitchen/);
@@ -412,7 +413,24 @@ test("a new grow's phase list defaults to the first stage", async () => {
   assert.match(fresh, /start here/);
   const same = stageOptionsHtml(stages, { selectedId: "fruiting", sameProfile: true });
   assert.match(same, /value="fruiting" selected/);
-  assert.equal(phaseLine({ grow: { phase: "Colonization", day: 0, total_days: 29 } }), "Colonization · day 1 of 29");
+});
+
+test("grow days count from 1 like the chamber, with stage day and grow day labeled apart", async () => {
+  const { phaseLine, growDayLine, growDaysLine } = await import("../public/js/device-ui.js");
+  // Thing One style: lion's mane, fruiting starts on grow day 22 of 33.
+  const fruiting = { grow: { phase: "Fruiting", grow_day: 23, stage_day: 2, stage_days: 12, total_days: 33 } };
+  assert.equal(phaseLine(fruiting), "Fruiting, day 2 of 12");
+  assert.equal(growDayLine(fruiting), "Grow day 23 of 33");
+  assert.equal(growDaysLine(fruiting), "Fruiting, day 2 of 12. Grow day 23 of 33");
+  // The first day is day 1, never day 0, and the chamber's day is not bumped by one.
+  assert.equal(phaseLine({ grow: { phase: "Colonization", grow_day: 1, stage_day: 1, stage_days: 16, total_days: 33 } }), "Colonization, day 1 of 16");
+  assert.equal(growDayLine({ grow: { grow_day: 2, total_days: 33 } }), "Grow day 2 of 33");
+  // A chamber that is not counting (day 0) shows no day at all.
+  assert.equal(phaseLine({ grow: { phase: "Fruiting", grow_day: 0, stage_day: null } }), "Fruiting");
+  assert.equal(growDayLine({ grow: { phase: "Fruiting", grow_day: 0 } }), "");
+  // Past the end of the stage or grow, the count stops at the end.
+  assert.equal(phaseLine({ grow: { phase: "Fruiting", stage_day: 15, stage_days: 12 } }), "Fruiting, day 12 of 12");
+  assert.doesNotMatch(growDaysLine(fruiting), /[\u2013\u2014\u00b7]/);
 });
 
 test("devices empty state gives one clear next step", async () => {

@@ -36,7 +36,9 @@ function parseDetails(row) {
  * Start a checkout. With keys set this creates a real Stripe Checkout Session and stores its id.
  * Local dev stubs keep the old fake session so tests never call Stripe.
  */
-export async function startCheckout(db, env, request, { user, itemId, amountCents, details, mode = "payment", priceId, name, successPath, cancelPath, plan }) {
+export const NOT_AVAILABLE_YET = "This profile is not available yet. Check back soon.";
+
+export async function startCheckout(db, env, request, { user, itemId, amountCents, details, mode = "payment", priceId, requirePrice = false, name, successPath, cancelPath, plan }) {
   const stubs = devStubsEnabled(env, request);
   if (!paymentsConfigured(env) && !stubs) return { ok: false, status: 503, ...comingSoonBody("Payments") };
   if (stubs) {
@@ -44,6 +46,7 @@ export async function startCheckout(db, env, request, { user, itemId, amountCent
     await db.run(SQL.insertCheckout, [sessionId, user.id, itemId, "stripe", "requires_payment", amountCents, JSON.stringify(details || {}), nowIso()]);
     return { ok: true, id: sessionId, provider: "stripe", status: "requires_payment", checkout_url: `/pay/stub/${sessionId}`, amount_cents: amountCents, item_id: itemId };
   }
+  if (requirePrice && !priceId) return { ok: false, status: 503, error: NOT_AVAILABLE_YET, coming_soon: true };
   const ref = `chk_${randomToken().slice(0, 20)}`;
   let session;
   try {

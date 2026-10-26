@@ -361,7 +361,10 @@ test("profile apply on 1.0.5 sends the whole stage in one setpoints command", as
   for (const key of ["sunrise_hour", "light_hours", "white_intensity", "color_r", "color_g", "color_b"]) assert.notEqual(p[key], undefined, key);
   assert.ok(p.light_hours > 0);
   assert.equal(p.grow_phase, "Fruiting");
-  assert.equal(typeof p.grow_day, "number");
+  // A new grow starts the chamber on the first grow day of fruiting, counted from 1 like the
+  // chamber (its grow_day setter treats the value as day N and ignores 0).
+  const before = pearlOyster.stages.slice(0, pearlOyster.stages.findIndex((s) => s.id === "fruiting")).reduce((sum, s) => sum + s.duration_days, 0);
+  assert.equal(p.grow_day, before + 1);
 });
 
 test("light from the site: white % becomes lux, a lit light never goes out with 0 hours", async () => {

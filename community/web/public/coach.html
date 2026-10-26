@@ -40,6 +40,7 @@
   </header>
   <!--/CHROME_HEADER-->
   <main id="main">
+    <p id="coach-error" class="notice hidden" role="alert"></p>
     <div id="coach-skeleton" class="device-skeleton" aria-hidden="true"><div class="sk sk-identity"></div><div class="sk-row"><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div><div class="sk sk-card"></div></div>
     <section id="coach-hero" class="hero coach-hero hidden" aria-label="Grow Coach">
       <div class="hero-copy">
@@ -48,7 +49,6 @@
         <p class="lede">Grow Coach uses your device's readings and your past grows to tailor humidity and temperature advice for culinary Profiles. Photo checks come later.</p>
         <p class="muted">Sold for general home cultivation only.</p>
         <p id="coach-status" class="muted"></p>
-        <p id="coach-error" class="notice hidden" role="alert"></p>
         <div id="subscribe-panel" class="coach-sales hidden">
           <fieldset id="coach-plans" class="coach-plans hidden">
             <legend>Pick a plan</legend>
@@ -65,7 +65,30 @@
       </div>
     </section>
 
-    <div id="gated" class="hidden">
+    <div id="gated" class="hidden coach-page">
+      <header class="coach-head">
+        <h1>Grow Coach</h1>
+        <p id="coach-head-status" class="muted"></p>
+      </header>
+
+      <section id="coach-recs" class="coach-section" aria-labelledby="recs-title">
+        <h2 id="recs-title">Recommendations</h2>
+        <div id="recs-list" class="coach-stack" aria-busy="true"><div class="sk sk-card"></div></div>
+      </section>
+
+      <section id="coach-feed" class="card coach-panel coach-section" aria-labelledby="feed-title">
+        <h2 id="feed-title">Decisions</h2>
+        <p class="muted">What Coach changed, who decided, and why. Newest first.</p>
+        <ul id="decision-list" class="action-list coach-feed-list" aria-live="polite"></ul>
+        <p class="row"><button type="button" class="secondary hidden" id="decisions-more">Load more</button></p>
+      </section>
+
+      <section id="coach-chambers" class="coach-section" aria-labelledby="chambers-title">
+        <h2 id="chambers-title">Chambers</h2>
+        <div id="chamber-list" class="coach-stack"></div>
+      </section>
+
+      <div id="coach-tools" class="hidden">
       <div class="coach-toolbar card">
         <label>Chamber
           <select id="device" disabled><option>Loading chambers…</option></select>
@@ -80,43 +103,17 @@
         <p id="usage" class="muted"></p>
       </div>
 
-      <section id="mode-panel" class="card coach-panel hidden" aria-labelledby="mode-title">
-        <h2 id="mode-title">Coach mode</h2>
-        <div class="mode-toggle" role="group" aria-label="Coach mode">
-          <button type="button" id="mode-advisor" aria-pressed="true">I approve changes</button>
-          <button type="button" id="mode-autopilot" aria-pressed="false">Coach adjusts it for me</button>
-        </div>
-        <p id="mode-status" class="muted">Coach suggests changes. You tap Apply.</p>
-        <p class="row">
-          <button type="button" class="secondary hidden" id="run-autopilot">Adjust now</button>
-        </p>
-        <ul id="autopilot-actions" class="action-list"></ul>
+      <section class="card coach-panel" aria-labelledby="chat-title">
+        <h2 id="chat-title">Ask the coach</h2>
+        <p class="muted">Answers use this chamber’s readings and the selected profile’s stage targets. Plain prose, culinary only.</p>
+        <div id="chat-log" class="chat-log" aria-live="polite"></div>
+        <form id="chat-form">
+          <label>Message
+            <textarea id="chat-message" rows="3" maxlength="800" placeholder="Why is humidity below the target?"></textarea>
+          </label>
+          <button type="submit">Send</button>
+        </form>
       </section>
-
-      <div class="coach-grid">
-        <section class="card coach-panel" aria-labelledby="model-title">
-          <h2 id="model-title">This chamber</h2>
-          <div id="stats" class="stat-grid" aria-busy="true"><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div>
-          <ul id="alerts" class="alert-list"></ul>
-          <div id="suggestion"></div>
-          <p class="row">
-            <button type="button" class="secondary" id="refresh-model">Refresh</button>
-            <button type="button" id="approve">Approve and send to chamber</button>
-          </p>
-        </section>
-
-        <section class="card coach-panel" aria-labelledby="chat-title">
-          <h2 id="chat-title">Ask the coach</h2>
-          <p class="muted">Answers use this chamber’s readings and the selected profile’s stage targets. Plain prose, culinary only.</p>
-          <div id="chat-log" class="chat-log" aria-live="polite"></div>
-          <form id="chat-form">
-            <label>Message
-              <textarea id="chat-message" rows="3" maxlength="800" placeholder="Why is humidity below the target?"></textarea>
-            </label>
-            <button type="submit">Send</button>
-          </form>
-        </section>
-      </div>
 
       <section id="photo-panel" class="card coach-panel hidden" aria-labelledby="photo-title">
         <h2 id="photo-title">Photo check</h2>
@@ -132,13 +129,14 @@
         </form>
         <div id="photo-result"></div>
       </section>
+      </div>
     </div>
   </main>
   <!--CHROME_FOOTER-->
   <footer class="site-footer" data-chrome="footer">
     <p>Works with Shrooly devices running OpenShrooly.</p>
     <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a></nav>
-    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <nav class="footer-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>

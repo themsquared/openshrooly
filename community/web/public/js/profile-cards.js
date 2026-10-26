@@ -28,7 +28,11 @@ export function renderProfileCard(p, index = 0) {
   return `<a class="profile-card" href="${profileHref(p.id)}">
       ${art ? `<div class="profile-art">${art}</div>` : ""}
       <div class="profile-body">
-        <p><span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>${
+        <p>${
+          (p.tags || []).includes("chef")
+            ? `<span class="chip chip-chef">Chef's line</span>`
+            : `<span class="chip">${escapeHtml(p.pack_label || packLabel(p.pack))}</span>`
+        }${
           p.pricing?.kind === "paid"
             ? `<span class="price">$${(p.pricing.amount_cents / 100).toFixed(2)}</span>`
             : `<span class="chip">free</span>`
