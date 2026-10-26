@@ -233,9 +233,10 @@ export async function handleAuth(method, path, url, request, env) {
     const link = `${env.SITE_ORIGIN || "https://shroomlabs.io"}/auth/callback.html?token=${token}`;
     const sent = await sendEmail(
       env,
-      { to: email, ...renderSignInEmail(link, MAGIC_MS / 60000) },
+      { to: email, ...renderSignInEmail(link, MAGIC_MS / 60000), priority: "login" },
       request
     );
+    if (sent.capped) return json({ error: sent.error }, 429);
     if (!sent.ok) return json({ error: sent.error || "Email sign-in is not configured yet.", coming_soon: true }, 503);
     await audit(db, null, "magic_start", email, request);
     const payload = { ok: true, message: "Check your email for a sign-in link." };
