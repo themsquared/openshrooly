@@ -17,8 +17,13 @@
 /profile.html /profile 301!
 /legacy-preview.html /legacy-preview 301!
 /account/feedback.html /account/feedback 301!
+/privacy.html /privacy 301!
+/tos.html /tos 301!
+/contact.html /contact 301!
 /auth/callback.html /auth/callback 301!
 /grow.html /grow 301!
+/terms /tos 301!
+/terms.html /tos 301!
 /what-happened-to-shrooly.html /what-happened-to-shrooly 301!
 /reuse-your-shrooly.html /reuse-your-shrooly 301!
 /shrooly-faq.html /shrooly-faq 301!
