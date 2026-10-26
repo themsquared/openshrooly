@@ -5,6 +5,7 @@ Disallow: /profile?
 Disallow: /account
 Disallow: /publish
 Disallow: /moderate
+Disallow: /admin
 Disallow: /device$
 Disallow: /device?
 Disallow: /devices
