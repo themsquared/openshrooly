@@ -19,6 +19,7 @@ import { handleAuth, requireVerified, userFromRequest } from "./auth.js";
 import { handleDevices } from "./devices.js";
 import { handleFleet } from "./fleet.js";
 import { handleAccount } from "./account.js";
+import { handleAdmin } from "./admin.js";
 import { coachBetaAccess, coachPlans, coachVisible, handleCoach, hasGrowCoach } from "./coach.js";
 import { COACH_ITEM, COACH_PRICE_CENTS } from "./coach-learn.js";
 import { applyStripeEvent, coachCustomerFor, openBillingPortal, parseStripeEvent, startCheckout } from "./payments.js";
@@ -297,6 +298,8 @@ async function route(method, path, url, request, env) {
   }
   const authResponse = await handleAuth(method, path, url, request, env);
   if (authResponse) return authResponse;
+  const adminResponse = await handleAdmin(method, path, url, request, env);
+  if (adminResponse) return adminResponse;
   const liveResponse = await handleLive(method, path, url, request, env);
   if (liveResponse) return liveResponse;
   const deviceResponse = await handleDevices(method, path, url, request, env);

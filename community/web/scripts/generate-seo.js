@@ -1375,6 +1375,7 @@ export const PAGES = {
   "fleet.html": { active: "", path: "/fleet", robots: PRIVATE, title: "Chambers · Shroom Labs", description: "Bulk tools for the chambers linked to your Shroom Labs account." },
   "alerts-unsub.html": { active: "", path: "/alerts-unsub", robots: PRIVATE, analytics: false, title: "Alert emails · Shroom Labs", description: "Turn off Shroom Labs alert emails with one click. Alerts still show in your account." },
   "publish.html": { active: "", path: "/publish", robots: PRIVATE, title: "Publish · Shroom Labs", description: "Build a mushroom grow profile for your chambers, or send it to the Shroom Labs library." },
+  "admin.html": { active: "", path: "/admin", robots: "noindex,nofollow", title: "Admin · Shroom Labs", description: "Private Shroom Labs admin page for accounts, chambers, activations, and spend." },
   "moderate.html": { active: "", path: "/moderate", robots: "noindex,nofollow", title: "Review queue · Shroom Labs", description: "Moderator queue for community mushroom grow profiles." },
   "profile.html": { active: "profiles", path: "/profile", robots: PRIVATE, analytics: false, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
   "legacy-preview.html": { active: "", path: "/legacy-preview", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
@@ -1388,7 +1389,7 @@ export const PAGES = {
 
 /** App pages that need sign-in stay out of crawls. Public pages marked noindex stay crawlable so search engines can read the noindex. */
 export function renderRobots() {
-  const blocked = ["/profile$", "/profile?", "/account", "/publish", "/moderate", "/device$", "/device?", "/devices", "/fleet", "/coach", "/alerts-unsub", "/auth/"];
+  const blocked = ["/profile$", "/profile?", "/account", "/publish", "/moderate", "/admin", "/device$", "/device?", "/devices", "/fleet", "/coach", "/alerts-unsub", "/auth/"];
   return `User-agent: *\nAllow: /\n${blocked.map((p) => `Disallow: ${p}`).join("\n")}\nSitemap: ${SITE}/sitemap.xml\n`;
 }
 
