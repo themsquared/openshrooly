@@ -207,6 +207,42 @@ function renderSpend(s) {
     .join("");
 }
 
+const pct = (n) => (n == null ? "n/a" : `${Math.round(n * 1000) / 10}%`);
+
+function renderFunnel(f) {
+  const w = state.win;
+  const live = f.live[w];
+  const t = live.total;
+  stats($("#funnel-stats"), [
+    ["Started", t.started],
+    ["Completed", t.completed],
+    ["Abandoned", t.abandoned],
+    ["Still open", t.open],
+    ["Conversion", pct(t.conversion)],
+    ["Revenue", cents(t.revenue_cents)],
+  ]);
+  table($("#funnel-table"), "funnel", [
+    { key: "item_id", label: "Item", html: (i) => `${escapeHtml(i.item_id)}${i.plan ? ` <span class="muted">${escapeHtml(i.plan)}</span>` : ""}` },
+    { key: "started", label: "Started", num: true },
+    { key: "completed", label: "Completed", num: true },
+    { key: "expired", label: "Expired", num: true },
+    { key: "failed", label: "Failed", num: true },
+    { key: "abandoned", label: "Abandoned", num: true },
+    { key: "open", label: "Open", num: true },
+    { key: "conversion", label: "Conversion", num: true, value: (i) => i.conversion ?? -1, html: (i) => pct(i.conversion) },
+    { key: "revenue_cents", label: "Revenue", num: true, html: (i) => cents(i.revenue_cents) },
+  ], live.items, { key: "started", dir: -1 });
+  const test = f.test[w].total;
+  $("#funnel-notes").innerHTML = [
+    f.notes.abandoned,
+    f.notes.conversion,
+    f.notes.ga,
+    `Test mode in this window: ${test.started} started, ${test.completed} completed.`,
+  ]
+    .map((n) => `<li>${escapeHtml(n)}</li>`)
+    .join("");
+}
+
 const UNTRACKED = [
   "Feedback count per user. Feedback goes to Netlify Forms, not the database. Needs the form to also post to the API, or a feedback table.",
   "Jev calls older than two days that changed nothing. Needs a small per-day usage table (device, day, calls, tokens) kept for 30 days.",
@@ -223,16 +259,17 @@ function render() {
   renderDevices(d.devices.devices);
   renderActivations(d.activations);
   renderSpend(d.spend);
+  renderFunnel(d.funnel);
   $("#untracked-list").innerHTML = UNTRACKED.map((n) => `<li>${escapeHtml(n)}</li>`).join("");
 }
 
 async function load() {
   const status = $("#admin-status");
   try {
-    const [overview, users, devices, activations, spend] = await Promise.all(
-      ["overview", "users", "devices", "activations", "spend"].map((p) => api(`/api/admin/${p}`))
+    const [overview, users, devices, activations, spend, funnel] = await Promise.all(
+      ["overview", "users", "devices", "activations", "spend", "funnel"].map((p) => api(`/api/admin/${p}`))
     );
-    state.data = { overview, users, devices, activations, spend };
+    state.data = { overview, users, devices, activations, spend, funnel };
     status.textContent = `Updated ${when(overview.generated_at)}.`;
     $("#admin-body").classList.remove("hidden");
     render();

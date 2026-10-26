@@ -1,6 +1,7 @@
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { renderProfileCards } from "./profile-cards.js";
+import { INDEXED_PROFILES } from "./indexed-profiles.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav, setCoachNav } from "./chrome.js";
 import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
@@ -40,6 +41,17 @@ import { lightRecipeLine } from "./light-line.js";
 import { accessText, coachView, NO_DECISIONS, priceText, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
 import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
+import {
+  blockedReason,
+  COACH_ITEM,
+  enableProfileAnalytics,
+  profileItem,
+  reportCancel,
+  reportPurchase,
+  savePendingCheckout,
+  track,
+  trackNext,
+} from "./track.js";
 
 function cfg() {
   return window.SHROOM_LABS || {};
@@ -262,6 +274,14 @@ async function renderHome() {
         <p>No profiles match that search. Try oyster, lion’s mane, or clear the query.</p>
         <a class="button ghost" href="/?pack=${encodeURIComponent(pack)}#library">Clear search</a>
       </div>`;
+  // js/ga.js reads the list name for select_item. Off-menu cards carry no item data and the list has no name.
+  const cards = $("#cards");
+  if (off) delete cards.dataset.slList;
+  else cards.dataset.slList = chef ? "chefs_line_filter" : q ? "search" : "library";
+  if (chef) {
+    cards.dataset.slListName = "Chef's line filter";
+    track("view_item_list", { item_list_id: "chefs_line_filter", item_list_name: "Chef's line filter", items: profiles.slice(0, 25).map((p, index) => ({ ...profileItem(p), index })) });
+  } else delete cards.dataset.slListName;
   const row = $("#see-all-row");
   const btn = $("#see-all");
   if (row && btn) {
@@ -331,6 +351,7 @@ async function renderGrowThis(profile) {
       const result = applied.results?.[0];
       if (!result || result.status === "failed") throw new Error(resultMessage(result));
       confirmRow.classList.add("hidden");
+      if (!isOffMenu(profile)) track("profile_apply", { item_id: profile.id, item_category: profileItem(profile).item_category, source: "profile" });
       const when = result.status === "queued" ? "Your chamber picks it up in about 15 minutes." : "Your chamber has it.";
       msg.innerHTML = `Sent. ${when} <a href="/device?id=${encodeURIComponent(deviceId)}">Open the chamber</a>`;
     } catch (err) {
@@ -349,6 +370,13 @@ async function renderProfile() {
   const p = data.profile;
   const off = isOffMenu(p);
   const label = p.pack_label || packLabel(p.pack);
+  // GA on /profile only for public culinary profiles: never Off-menu, never a community upload's page.
+  const item = profileItem(p);
+  if (!off && (INDEXED_PROFILES.has(p.id) || p.pricing?.kind === "paid")) {
+    enableProfileAnalytics();
+    track("view_item", { currency: "USD", value: item.price, items: [item] });
+  }
+  const sale = { items: [item], value: item.price };
   $("#title").textContent = p.name;
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
@@ -396,12 +424,18 @@ async function renderProfile() {
     if (result === "success") {
       if (notice) notice.textContent = "Payment received. Unlocking your recipe...";
       $("#buy")?.classList.add("hidden");
-      waitForUnlock(() => api(`/api/profiles/${id}`).then((d) => d.unlocked), notice);
+      waitForUnlock(() => api(`/api/profiles/${id}`).then((d) => d.unlocked), notice, {
+        onConfirmed: () => reportPurchase(checkoutSessionId(), sale),
+      });
       return;
     }
-    if (result === "cancel" && notice) notice.textContent = "Checkout canceled. Nothing was charged.";
-    $("#buy")?.addEventListener("click", () =>
-      goToCheckout($("#buy"), () => api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} }), (err) => {
+    if (result === "cancel") {
+      if (notice) notice.textContent = "Checkout canceled. Nothing was charged.";
+      reportCancel(sale);
+    }
+    $("#buy")?.addEventListener("click", () => {
+      if (!getToken()) return checkoutNeedsSignIn(sale, `/profile?id=${encodeURIComponent(id)}`);
+      return goToCheckout($("#buy"), () => api(`/api/profiles/${id}/checkout`, { method: "POST", jsonBody: {} }), (err) => {
         if (err.status === 409) {
           // Bought in another tab or device. Show the recipe instead of a second charge.
           $("#buy")?.classList.add("hidden");
@@ -410,10 +444,12 @@ async function renderProfile() {
           return;
         }
         if (notice) notice.textContent = err.message;
-      })
-    );
+      }, sale);
+    });
     return;
   }
+  // The webhook can land before the buyer is back from Stripe: the recipe is already unlocked here.
+  if (checkoutResult() === "success" && p.pricing?.kind === "paid") reportPurchase(checkoutSessionId(), sale).catch(() => {});
   $("#full").classList.remove("hidden");
   if (p.pricing?.kind === "paid") $("#owned")?.classList.remove("hidden");
   renderGrowThis(p).catch(() => $("#grow-this")?.classList.add("hidden"));
@@ -566,6 +602,10 @@ async function renderAuth(mode) {
     $(`#${provider}`)?.addEventListener("click", (ev) => {
       ev.preventDefault();
       if (!caps[provider]) return;
+      // The callback page reads this to label the GA sign_up or login event.
+      try {
+        sessionStorage.setItem("sl_auth_method", provider);
+      } catch {}
       location.href = oidcStart(provider, oidcNext);
     });
   }
@@ -599,6 +639,22 @@ async function renderAuth(mode) {
   });
 }
 
+function authMethodHint() {
+  try {
+    const m = sessionStorage.getItem("sl_auth_method");
+    sessionStorage.removeItem("sl_auth_method");
+    return m === "apple" ? "apple" : "google";
+  } catch {
+    return "google";
+  }
+}
+
+/** The callback page has no analytics. Queue sign_up or login for the next page that does. */
+function queueSignInEvent(data, method) {
+  if (!data?.access_token) return;
+  trackNext(data.new_account ? "sign_up" : "login", { method });
+}
+
 async function renderCallback() {
   const token = params().get("token");
   const hash = new URLSearchParams(location.hash.slice(1));
@@ -609,12 +665,14 @@ async function renderCallback() {
       history.replaceState(null, "", location.pathname);
       const data = await api("/api/auth/oidc/complete", { method: "POST", jsonBody: { token: handoff } });
       if (data.access_token) setToken(data.access_token);
+      queueSignInEvent(data, authMethodHint());
       location.replace(safeNext(hash.get("next")));
       return;
     }
     if (token) {
       const data = await api("/api/auth/magic/complete", { method: "POST", jsonBody: { token } });
       if (data.access_token) setToken(data.access_token);
+      queueSignInEvent(data, "email");
       location.href = safeNext(params().get("next"));
       return;
     }
@@ -693,7 +751,9 @@ async function renderAccount() {
     const status = $("#billing-status");
     status.textContent = "Payment received. Turning on Grow Coach...";
     status.classList.remove("hidden");
-    waitForUnlock(() => api("/api/me").then((d) => Boolean(d.grow_coach?.entitled)), status);
+    waitForUnlock(() => api("/api/me").then((d) => Boolean(d.grow_coach?.entitled)), status, {
+      onConfirmed: () => reportPurchase(checkoutSessionId(), { items: [COACH_ITEM] }),
+    });
   }
   if (me.sessions) {
     $("#sessions").innerHTML = me.sessions
@@ -1100,6 +1160,12 @@ function checkoutResult() {
   return new URLSearchParams(location.search).get("checkout") || "";
 }
 
+/** Stripe fills {CHECKOUT_SESSION_ID} into the success URL. Used only as the GA transaction_id. */
+function checkoutSessionId() {
+  const id = new URLSearchParams(location.search).get("session_id") || "";
+  return /^cs_(live|test)_[A-Za-z0-9]{8,200}$/.test(id) ? id : "";
+}
+
 // Only Stripe's own checkout page or a same-site path. Never an arbitrary URL from a response.
 function safeCheckoutUrl(url) {
   const value = String(url || "");
@@ -1112,29 +1178,47 @@ function safeCheckoutUrl(url) {
   }
 }
 
-async function goToCheckout(button, start, onError) {
+/**
+ * sale = { items, value, plan } for a purchase (not the billing portal). It sends begin_checkout, saves the
+ * session for the return page, and sends checkout_blocked with a reason when the click never reaches Stripe.
+ */
+async function goToCheckout(button, start, onError, sale = null) {
   if (!button || button.disabled) return;
   const label = button.textContent;
+  const ga = sale ? { currency: "USD", value: sale.value, items: sale.items, plan: sale.plan } : null;
+  if (ga) track("begin_checkout", ga);
   button.disabled = true;
   button.textContent = "Opening checkout...";
   try {
     const session = await start();
     const target = safeCheckoutUrl(session.checkout_url || session.url);
     if (!target) throw new Error("Checkout could not start. Try again in a minute.");
+    if (sale && session.id) savePendingCheckout({ id: String(session.id), items: sale.items, value: sale.value, plan: sale.plan });
     location.assign(target);
   } catch (err) {
     button.disabled = false;
     button.textContent = label;
+    if (ga) track("checkout_blocked", { ...ga, reason: blockedReason(err) });
     onError(err);
   }
 }
 
+/** A signed-out buy or subscribe click: count it, then send the visitor to sign in and come back. */
+function checkoutNeedsSignIn(sale, next) {
+  const ga = { currency: "USD", value: sale.value, items: sale.items, plan: sale.plan };
+  track("begin_checkout", ga);
+  track("checkout_blocked", { ...ga, reason: "signed_out" }, { done: () => (location.href = `/login?next=${encodeURIComponent(next)}`) });
+}
+
 // Stripe tells us about the payment a few seconds after the redirect. Poll briefly, then reload.
-async function waitForUnlock(check, notice, { tries = 15, delayMs = 2000 } = {}) {
+// onConfirmed runs once the server confirms (the GA purchase event), before the reload.
+async function waitForUnlock(check, notice, { tries = 15, delayMs = 2000, onConfirmed = null } = {}) {
   for (let i = 0; i < tries; i += 1) {
     if (await check().catch(() => false)) {
+      if (onConfirmed) await onConfirmed().catch(() => {});
       const clean = new URL(location.href);
       clean.searchParams.delete("checkout");
+      clean.searchParams.delete("session_id");
       location.replace(clean.href);
       return true;
     }
@@ -1197,6 +1281,13 @@ function coachPlanShort(plan) {
   return plan.period === "year" ? `${price}/yr` : `${price}/mo`;
 }
 
+/** GA item, value and plan for a Coach plan id. */
+function coachSale(product, planId) {
+  const plan = coachPlanList(product).find((p) => p.id === planId) || coachPlanList(product)[0];
+  const value = Number(plan?.amount_cents || 0) / 100;
+  return { items: [{ ...COACH_ITEM, price: value }], value, plan: plan?.period === "year" ? "yearly" : "monthly" };
+}
+
 /** Draw the plan radios and keep the button text in step. Returns a getter for the picked plan id. */
 function renderCoachPlans(product) {
   const plans = coachPlanList(product);
@@ -1254,6 +1345,9 @@ async function renderCoach() {
     await renderCoachDashboard(catalog);
     return;
   }
+  const monthly = coachSale(catalog.product, "monthly");
+  track("view_item", { currency: "USD", value: monthly.value, items: monthly.items });
+  if (checkoutResult() === "cancel") reportCancel({ items: monthly.items });
   $("#coach-hero")?.classList.remove("hidden");
   $("#gated")?.classList.add("hidden");
   $("#coach-status").textContent = view === "waitlist" ? catalog.marketing : "";
@@ -1284,9 +1378,7 @@ async function renderCoach() {
       $("#coach-beta-note").textContent = `${betaLine} Sign in to check.`;
       $("#coach-beta-note").classList.remove("hidden");
     }
-    $("#subscribe").addEventListener("click", () => {
-      location.href = `/login?next=${encodeURIComponent("/coach")}`;
-    });
+    $("#subscribe").addEventListener("click", () => checkoutNeedsSignIn(coachSale(catalog.product, pickedPlan()), "/coach"));
     return;
   }
   if (catalog.beta_active && $("#coach-beta-note")) {
@@ -1294,9 +1386,10 @@ async function renderCoach() {
     $("#coach-beta-note").classList.remove("hidden");
   }
   if (checkoutResult() === "cancel") showCoachError(new Error("Checkout canceled. Nothing was charged."));
-  $("#subscribe").addEventListener("click", () =>
-    goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan: pickedPlan() } }), showCoachError)
-  );
+  $("#subscribe").addEventListener("click", () => {
+    const plan = pickedPlan();
+    goToCheckout($("#subscribe"), () => api("/api/coach/subscribe", { method: "POST", jsonBody: { plan } }), showCoachError, coachSale(catalog.product, plan));
+  });
 }
 
 /** Recommendations, then the decision feed, then chamber status. Chat and photo checks sit below for accounts with AI turned on. */
@@ -1305,6 +1398,12 @@ async function renderCoachDashboard(catalog) {
   $("#gated").classList.remove("hidden");
   // Where the paywall would be: "Free during the beta" plus the price after it, or the paid-through date.
   $("#coach-head-status").textContent = accessText(catalog, catalog.period_end ? fmtDate(catalog.period_end) : "");
+  if (catalog.access === "beta") {
+    // Free beta access counts as a subscription at $0, once per browser.
+    const free = { currency: "USD", value: 0, items: [{ ...COACH_ITEM, price: 0 }] };
+    track("subscribe", { ...free, plan: "beta_free" }, { once: "subscribe:beta_free" });
+    track("beta_join", { method: "chamber" }, { once: "beta_join:chamber" });
+  }
 
   let chambers = [];
   const chamberFor = (id) => chambers.find((c) => c.device.id === id);
@@ -1373,6 +1472,7 @@ async function renderCoachDashboard(catalog) {
         const result = applied.results?.[0];
         if (!result || result.status === "failed") throw new Error(resultMessage(result));
         cardMsg(btn, resultMessage(result));
+        track("coach_suggestion_applied", { source: "coach", type: result.status === "queued" ? "queued" : "sent" });
         btn.closest("p")?.remove();
         return;
       }
@@ -1543,10 +1643,15 @@ async function renderClaim() {
     }
     try {
       const code = $("#code").value.trim().toUpperCase();
+      const method = preset ? "qr" : "code";
+      track("chamber_link_started", { method });
       const data = await api("/api/devices/claim", { method: "POST", jsonBody: { code } });
+      // Sent from the chamber page, which has analytics. Never the code or the chamber id.
+      trackNext("chamber_linked", { method });
       location.href = `/device?id=${encodeURIComponent(data.device.id)}`;
     } catch (err) {
       if (err.status === 403 && err.data?.code === "beta_full") {
+        track("chamber_link_blocked", { reason: "beta_full" });
         $("#claim-code-panel")?.classList.add("hidden");
         $("#beta-full")?.classList.remove("hidden");
         return;
@@ -2235,6 +2340,8 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         // Keep this one up: the grower needs to know it is on its way, not just that a click happened.
         clearTimeout(msg._t);
         msg.textContent = resultMessage(result);
+        // No profile id here: the picker can hold an Off-menu Profile. Only that a profile was sent.
+        if (action === "profile" && !device.off_menu) track("profile_apply", { source: "device" });
         onSent();
       } catch (err) {
         flash(msg, err.message);
@@ -2694,7 +2801,9 @@ async function renderFeedback() {
     button.disabled = true;
     button.textContent = "Sending...";
     try {
+      const type = String(new FormData(form).get("type") || "other");
       await postNetlifyForm(form);
+      track("feedback_sent", { source: "beta_form", type: /^[a-z_]{1,20}$/.test(type) ? type : "other" });
       form.reset();
       form.classList.add("hidden");
       thanks.classList.remove("hidden");
