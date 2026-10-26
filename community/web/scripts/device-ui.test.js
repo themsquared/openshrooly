@@ -294,3 +294,17 @@ test("a new grow's phase list defaults to the first stage", async () => {
   assert.match(same, /value="fruiting" selected/);
   assert.equal(phaseLine({ grow: { phase: "Colonization", day: 0, total_days: 29 } }), "Colonization · day 1 of 29");
 });
+
+test("legal pages exist, are linked from the footer, and stay plain", () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "../public");
+  for (const name of ["privacy.html", "terms.html", "affiliates.html", "contact.html"]) {
+    const html = readFileSync(join(root, name), "utf8");
+    const text = html.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ");
+    assert.doesNotMatch(text, DASH, name);
+    assert.match(html, /<!--CHROME_FOOTER-->/, name);
+  }
+  const home = readFileSync(join(root, "index.html"), "utf8");
+  for (const href of ["/privacy.html", "/terms.html", "/affiliates.html", "/contact.html"]) assert.match(home, new RegExp(`href="${href}"`), href);
+  assert.match(readFileSync(join(root, "affiliates.html"), "utf8"), /Never on Off-menu Profiles/);
+  assert.match(readFileSync(join(root, "privacy.html"), "utf8"), /href="\/account.html#your-data"/);
+});

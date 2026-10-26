@@ -1059,3 +1059,8 @@ button.nav-toggle {
 .live-badge[data-state="live"]::before { content: ""; display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.35rem; border-radius: 50%; background: #2f9e44; vertical-align: middle; }
 .gauge-missing { font-size: 1rem; font-weight: 600; opacity: 0.7; }
 .device-reading-when { margin-top: 0.4rem; font-size: 0.85rem; }
+
+/* Legal pages: readable lists and a quieter second footer row. */
+.legal-page ul { padding-left: 1.2rem; display: grid; gap: 0.5rem; }
+.legal-page li { line-height: 1.55; }
+.site-footer .footer-legal a { font-size: 0.9rem; color: var(--sl-muted, inherit); }

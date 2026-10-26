@@ -500,6 +500,17 @@ export function stampHead(html, head) {
 
 const PRIVATE = "noindex,follow";
 
+function legalPage(file, name, description) {
+  return {
+    active: "",
+    sitemap: true,
+    path: `/${file}`,
+    title: `${name} · Shroom Labs`,
+    description,
+    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], [name, `${SITE}/${file}`]]) },
+  };
+}
+
 /** Every hand written page: nav highlight, head tags, and whether it belongs in the sitemap. */
 export const PAGES = {
   "index.html": {
@@ -536,6 +547,10 @@ export const PAGES = {
     description: "What Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Docs", `${SITE}/docs.html`]]) },
   },
+  "privacy.html": legalPage("privacy.html", "Privacy", "What Shroom Labs keeps, why, who helps run it, and how to download or delete your data."),
+  "terms.html": legalPage("terms.html", "Terms", "The plain terms for using Shroom Labs, paid Profiles, Grow Coach, and Off-menu Profiles."),
+  "affiliates.html": legalPage("affiliates.html", "Affiliate disclosure", "Where Shroom Labs uses affiliate links, how we pick them, and where we never do."),
+  "contact.html": legalPage("contact.html", "Contact", "Email a real person at Shroom Labs about your account, a chamber, or a grow."),
   // Grow Coach is a private beta. Keep it out of search and the sitemap; the page itself sends anyone the API does not allow back home.
   "coach.html": {
     active: "coach",

@@ -15,6 +15,13 @@ export const NAV_ITEMS = [
   { id: "docs", href: "/docs.html", label: "Docs" },
 ];
 
+export const LEGAL_ITEMS = [
+  { href: "/privacy.html", label: "Privacy" },
+  { href: "/terms.html", label: "Terms" },
+  { href: "/affiliates.html", label: "Affiliate disclosure" },
+  { href: "/contact.html", label: "Contact" },
+];
+
 export function brandSvg() {
   return `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
 }
@@ -45,6 +52,7 @@ export function renderFooter() {
   return `<footer class="site-footer" data-chrome="footer">
     <p>${POSITIONING}</p>
     <nav class="footer-nav" aria-label="Footer">${navLinks("", { idPrefix: "footer-nav-" })}</nav>
+    <nav class="footer-nav footer-legal" aria-label="Legal">${LEGAL_ITEMS.map((item) => `<a href="${item.href}">${item.label}</a>`).join("")}</nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
   </footer>`;
