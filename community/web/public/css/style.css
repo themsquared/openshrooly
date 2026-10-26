@@ -1020,5 +1020,37 @@ button.nav-toggle {
 .gauge-missing { font-size: 1rem; font-weight: 600; opacity: 0.7; }
 .device-reading-when { margin-top: 0.4rem; font-size: 0.85rem; }
 
+/* S7: every tap target is at least 44px tall on every page. Links in running lists keep their
+   line height: padding grows the hit area and the matching negative margin keeps the layout. */
+input, select, button, .button { min-height: 44px; }
+input[type="checkbox"], input[type="radio"] { min-height: 0; }
+.site-nav a, .site-nav button.link, .footer-nav a, nav a, nav button.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+}
+.brand { min-height: 44px; }
+.skip { min-height: 44px; display: inline-flex; align-items: center; }
+main li a:not(.button), .back-link a, .small-link, .empty-devices .small-link, main dd a:not(.button) {
+  display: inline-block;
+  padding: 12px;
+  margin: -12px;
+}
+/* Links inside running text stay inline (so they wrap); vertical padding on an inline box widens
+   the hit area without moving any line. */
+main p a:not(.button), main .muted a:not(.button) { padding-block: 12px; }
+.empty-devices .small-link { margin-top: calc(0.9rem - 12px); margin-bottom: -12px; }
+.back-link { margin-bottom: 0.6rem; }
+td a:not(.button) { display: inline-flex; align-items: center; min-height: 44px; }
+.toggle, .alert-form .toggle, .coach-toolbar .toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.toggle input[type="checkbox"] { width: 20px; height: 20px; padding: 0; flex: none; margin: 0; accent-color: var(--sl-spore-deep); }
+.cell-check { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; margin: 0; cursor: pointer; }
+.cell-check input { width: 20px; height: 20px; padding: 0; margin: 0; accent-color: var(--sl-spore-deep); }
+#group-form { align-items: flex-end; }
+#group-form label { margin-bottom: 0; }
+#group-form button { flex: 0 0 auto; min-width: 120px; }
+
 /* U14: a new chamber shows one plain line instead of a grid of zeros. */
 .stat-grid .stat-empty { grid-column: 1 / -1; margin: 0; }

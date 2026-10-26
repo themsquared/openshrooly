@@ -2193,7 +2193,7 @@ async function renderFleet() {
       shown
         .map(
           (d) => `<tr>
-            <td><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></td>
+            <td><label class="cell-check"><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></label></td>
             <td><a href="/fleet.html?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
             <td>${d.online ? "Online" : "Offline"}<br><span class="muted">${escapeHtml(lastSeenLine(d))}</span></td>
             <td>${d.reading ? `${safeDisplay(d.reading.temperature, "not reported")} °C · ${safeDisplay(d.reading.humidity, "not reported")}%` : "No reading"}</td>
