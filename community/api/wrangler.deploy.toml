@@ -58,6 +58,14 @@ GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 COACH_AUTOPILOT_ENABLED = "1"
 COACH_BETA_USER_IDS = "82"
 
+# Workers Logs: keep what the code logs (errors carry a request id and are redacted).
+# Invocation logs stay off so request URLs and headers (magic links, tokens) are never stored.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
+
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
 [triggers]
 crons = ["*/5 * * * *"]
