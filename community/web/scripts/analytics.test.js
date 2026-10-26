@@ -159,7 +159,7 @@ test("slTrack drops PII: unknown keys, emails, MAC addresses", () => {
     items: [{ item_id: "shiitake", email: "x@y.z", user_id: 1 }],
   });
   const sent = events().at(-1).params;
-  assert.deepEqual(sent, { method: "google", items: [{ item_id: "shiitake" }] });
+  assert.deepEqual(sent, { method: "google", items: [{ item_id: "shiitake" }], item_id: "shiitake" });
   for (const k of ["email", "user_id", "username", "name", "mac"]) assert.ok(!(k in sent), k);
 });
 
@@ -179,6 +179,16 @@ test("purchase and subscribe count once per Stripe session, even after a reload"
   // A custom once key works for any event.
   assert.equal(again.win.slTrack("checkout_cancel", {}, { once: "cancel:1" }), true);
   assert.equal(again.win.slTrack("checkout_cancel", {}, { once: "cancel:1" }), false);
+});
+
+test("custom events carry the first item's id and category as plain params", () => {
+  const { win, events } = loadGa("https://shroomlabs.io/coach");
+  const items = [{ item_id: "grow-coach", item_category: "coach", price: 4.99 }];
+  win.slTrack("checkout_cancel", { currency: "USD", value: 4.99, items });
+  assert.equal(events().at(-1).params.item_id, "grow-coach");
+  assert.equal(events().at(-1).params.item_category, "coach");
+  win.slTrack("begin_checkout", { currency: "USD", value: 4.99, items });
+  assert.ok(!("item_id" in events().at(-1).params));
 });
 
 test("done waits for the hit: event_callback, with a timeout fallback", () => {
@@ -326,6 +336,10 @@ test("track.js: profile items, checkout reasons, purchase from the saved checkou
       price: 2.99,
     });
     assert.equal(t.profileItem({ id: "shiitake", name: "Shiitake", pricing: { kind: "free" } }).item_category, "free");
+    // The profile API has no tags: paid seed profiles still count as the Chef's line, community uploads as paid.
+    assert.equal(t.detailItem({ id: "king-oyster-thick-stem", name: "King", pricing: { kind: "paid", amount_cents: 299 } }).item_category, "chef");
+    assert.equal(t.detailItem({ id: "someones-upload", name: "Mine", pricing: { kind: "paid", amount_cents: 299 } }).item_category, "paid");
+    assert.equal(t.detailItem({ id: "shiitake", name: "Shiitake", pricing: { kind: "free" } }).item_category, "free");
     assert.equal(t.blockedReason({ status: 401 }), "signed_out");
     assert.equal(t.blockedReason({ status: 409 }), "already_owned");
     assert.equal(t.blockedReason(new Error("x")), "error");

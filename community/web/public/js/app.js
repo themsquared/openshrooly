@@ -45,6 +45,7 @@ import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from
 import {
   blockedReason,
   COACH_ITEM,
+  detailItem,
   enableProfileAnalytics,
   profileItem,
   reportCancel,
@@ -352,7 +353,7 @@ async function renderGrowThis(profile) {
       const result = applied.results?.[0];
       if (!result || result.status === "failed") throw new Error(resultMessage(result));
       confirmRow.classList.add("hidden");
-      if (!isOffMenu(profile)) track("profile_apply", { item_id: profile.id, item_category: profileItem(profile).item_category, source: "profile" });
+      if (!isOffMenu(profile)) track("profile_apply", { item_id: profile.id, item_category: detailItem(profile).item_category, source: "profile" });
       const when = result.status === "queued" ? "Your chamber picks it up in about 15 minutes." : "Your chamber has it.";
       msg.innerHTML = `Sent. ${when} <a href="/device?id=${encodeURIComponent(deviceId)}">Open the chamber</a>`;
     } catch (err) {
@@ -372,7 +373,7 @@ async function renderProfile() {
   const off = isOffMenu(p);
   const label = p.pack_label || packLabel(p.pack);
   // GA on /profile only for public culinary profiles: never Off-menu, never a community upload's page.
-  const item = profileItem(p);
+  const item = detailItem(p);
   if (!off && (INDEXED_PROFILES.has(p.id) || p.pricing?.kind === "paid")) {
     enableProfileAnalytics();
     track("view_item", { currency: "USD", value: item.price, items: [item] });
@@ -1353,7 +1354,7 @@ async function renderCoach() {
   }
   const monthly = coachSale(catalog.product, "monthly");
   track("view_item", { currency: "USD", value: monthly.value, items: monthly.items });
-  if (checkoutResult() === "cancel") reportCancel({ items: monthly.items });
+  if (checkoutResult() === "cancel") reportCancel({ items: monthly.items, value: monthly.value });
   for (const id of ["#coach-hero", "#coach-pitch"]) $(id)?.classList.remove("hidden");
   $("#gated")?.classList.add("hidden");
   $("#coach-status").textContent = view === "waitlist" ? catalog.marketing : "";

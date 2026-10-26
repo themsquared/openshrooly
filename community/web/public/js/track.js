@@ -6,7 +6,20 @@
 
 export const GA_ID = "G-RKQ4CBEZWY";
 export const COACH_ITEM = Object.freeze({ item_id: "grow-coach", item_name: "Grow Coach", item_category: "coach" });
-export { profileItem } from "./profile-cards.js";
+import { profileItem } from "./profile-cards.js";
+import { INDEXED_PROFILES } from "./indexed-profiles.js";
+
+export { profileItem };
+
+/**
+ * GA item for a profile from /api/profiles/:id, which has no tags. Paid seed profiles are the Chef's line,
+ * so the category matches the static profile pages and the library cards.
+ */
+export function detailItem(p) {
+  const item = profileItem(p);
+  if (item.item_category === "paid" && INDEXED_PROFILES.has(item.item_id)) item.item_category = "chef";
+  return item;
+}
 const PENDING_KEY = "sl_checkout_pending";
 
 /** Send an event now. opts: { done, once } (see ga.js). */

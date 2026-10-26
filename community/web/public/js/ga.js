@@ -91,12 +91,21 @@
     return out;
   }
 
-  function cleanParams(params) {
+  // GA keeps the items array only on its ecommerce events. Custom events (checkout_cancel, checkout_blocked,
+  // subscribe) get the first item's id and category as plain params, so reports can still split them by item.
+  var ECOMMERCE = { view_item: 1, view_item_list: 1, select_item: 1, add_to_cart: 1, begin_checkout: 1, purchase: 1, refund: 1 };
+
+  function cleanParams(params, name) {
     var out = pick(params, PARAMS);
     if (Array.isArray(params && params.items)) {
       out.items = params.items.slice(0, 25).map(function (item) {
         return pick(item, ITEM_PARAMS);
       });
+      var first = out.items[0];
+      if (first && !ECOMMERCE[name]) {
+        if (first.item_id !== undefined && out.item_id === undefined) out.item_id = first.item_id;
+        if (first.item_category !== undefined && out.item_category === undefined) out.item_category = first.item_category;
+      }
     }
     return out;
   }
@@ -147,7 +156,7 @@
       done();
       return false;
     }
-    var p = cleanParams(params);
+    var p = cleanParams(params, name);
     var once = opts.once || ((name === "purchase" || name === "subscribe") && p.transaction_id ? name + ":" + p.transaction_id : "");
     if (once && sentBefore(once)) {
       done();
