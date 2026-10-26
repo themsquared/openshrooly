@@ -58,6 +58,9 @@ GROW_COACH_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 COACH_AUTOPILOT_ENABLED = "1"
 COACH_BETA_USER_IDS = "82"
 
+# Email send caps per UTC day default in code (src/email.js): 300 total, 200 for anything that is not a
+# sign-in link. Override with EMAIL_DAILY_CAP and EMAIL_DAILY_BULK_CAP vars if the Resend plan changes.
+
 # Grow alerts: evaluate chambers every 5 minutes (src/alerts/cron.js). Runs are idempotent.
 [triggers]
 crons = ["*/5 * * * *"]
