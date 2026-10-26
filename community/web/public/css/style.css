@@ -1073,3 +1073,20 @@ td a:not(.button) { display: inline-flex; align-items: center; min-height: 44px;
 
 /* U14: a new chamber shows one plain line instead of a grid of zeros. */
 .stat-grid .stat-empty { grid-column: 1 / -1; margin: 0; }
+
+/* Collapsed light details and sources on profile pages. */
+.light-details,
+.sources-block {
+  margin: 0.8rem 0 1.2rem;
+  border-top: 1px solid var(--sl-line);
+  padding-top: 0.6rem;
+}
+.light-details > summary,
+.sources-block > summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.sources-block ul { font-size: 0.92rem; }

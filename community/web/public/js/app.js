@@ -32,6 +32,7 @@ import {
   stageOptionsHtml,
 } from "./device-ui.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
+import { lightRecipeLine } from "./light-line.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
 
 function cfg() {
@@ -327,12 +328,20 @@ async function renderProfile() {
   if (!caps.photos) {
     document.querySelector('input[name="photo"]')?.closest("label")?.classList.add("hidden");
   }
+  // Ratings and reports are public even before a paid recipe unlocks, so never leave an empty heading.
+  $("#ratings").innerHTML =
+    (data.ratings || []).map((r) => `<li>${escapeHtml(r.username)} · ${r.stars}/5 · ${escapeHtml(r.comment || "")}</li>`).join("") ||
+    "<li class='muted'>No ratings yet. Grow it and be the first.</li>";
+  $("#reports").innerHTML =
+    (data.reports || []).map((r) => `<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}</li>`).join("") ||
+    "<li class='muted'>No grow reports yet.</li>";
   if (!data.unlocked) {
     $("#locked").classList.remove("hidden");
-    $("#price").textContent = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
+    const price = `$${(p.pricing.amount_cents / 100).toFixed(2)}`;
+    $("#buy").textContent = `Buy for ${price}`;
     if (!caps.payments) {
       const notice = $("#locked")?.querySelector("p");
-      if (notice) notice.textContent = "Paid culinary recipe. Checkout is coming soon.";
+      if (notice) notice.textContent = `Paid recipe, ${price}. Checkout opens soon.`;
       $("#buy")?.classList.add("hidden");
       return;
     }
@@ -370,6 +379,7 @@ async function renderProfile() {
     )
     .join("");
   const recipeBox = $("#light-recipe");
+  const sourceItems = (p.source_notes || []).map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`);
   if (recipeBox && p.light_recipe) {
     const recipe = p.light_recipe;
     const rows = Object.entries(recipe.phases || {})
@@ -378,33 +388,31 @@ async function renderProfile() {
           `<tr><th scope="row">${escapeHtml(id)}</th><td>${phase.photoperiod_hours} h on</td><td>white ${phase.white_brightness_percent}%</td><td>RGB ${phase.red_percent} / ${phase.green_percent} / ${phase.blue_percent}</td></tr>`
       )
       .join("");
-    const sources = (recipe.sources || [])
-      .map((note) => {
-        const title = escapeHtml(note.title);
-        const detail = escapeHtml(note.detail);
-        const href = httpsSourceHref(note.url);
-        if (href) {
-          const rel = off ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
-          return `<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`;
-        }
-        return `<li><strong>${title}.</strong> ${detail}</li>`;
-      })
-      .join("");
+    for (const note of recipe.sources || []) {
+      const title = escapeHtml(note.title);
+      const detail = escapeHtml(note.detail);
+      const href = httpsSourceHref(note.url);
+      if (href) {
+        const rel = off ? ' rel="nofollow noopener" target="_blank"' : ' rel="noopener" target="_blank"';
+        sourceItems.push(`<li><a href="${escapeHtml(href)}"${rel}>${title}</a>. ${detail}</li>`);
+      } else sourceItems.push(`<li><strong>${title}.</strong> ${detail}</li>`);
+    }
     recipeBox.classList.remove("hidden");
     recipeBox.innerHTML = `<h2 id="light-recipe-heading">Light recipe</h2>
-      <p>${escapeHtml(recipe.why)}</p>
-      <p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p>
-      <table class="light-recipe-table">
-        <caption>Photoperiod and mix for this chamber</caption>
-        <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <h3>Recipe sources</h3>
-      <ul>${sources}</ul>`;
+      <p>${escapeHtml(lightRecipeLine(recipe))}</p>
+      <details class="light-details">
+        <summary>Light details</summary>
+        <p>${escapeHtml(recipe.why)}</p>
+        <p class="muted">${escapeHtml(recipe.wavelength_note || "")}</p>
+        <table class="light-recipe-table">
+          <caption>Photoperiod and mix for this chamber</caption>
+          <thead><tr><th scope="col">Phase</th><th scope="col">Hours on</th><th scope="col">White</th><th scope="col">RGB mix</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </details>`;
   }
-  $("#sources").innerHTML = (p.source_notes || [])
-    .map((n) => `<li><strong>${escapeHtml(n.title)}.</strong> ${escapeHtml(n.detail)}</li>`)
-    .join("");
+  $("#sources").innerHTML = sourceItems.join("");
+  $("#sources-block")?.classList.toggle("hidden", !sourceItems.length);
   if (!off && data.links?.length) {
     $("#affiliates").innerHTML =
       `<p class="muted">${escapeHtml(data.disclosure)}</p><ul>` +
@@ -415,7 +423,7 @@ async function renderProfile() {
   }
   $("#ratings").innerHTML =
     data.ratings.map((r) => `<li>${escapeHtml(r.username)} · ${r.stars}/5 · ${escapeHtml(r.comment || "")}</li>`).join("") ||
-    "<li class='muted'>No ratings yet.</li>";
+    "<li class='muted'>No ratings yet. Grow it and be the first.</li>";
   const reportItems = [];
   for (const r of data.reports) {
     let photo = "";
@@ -429,7 +437,7 @@ async function renderProfile() {
     }
     reportItems.push(`<li>${escapeHtml(r.outcome)} · ${escapeHtml(r.notes || "")}${photo}</li>`);
   }
-  $("#reports").innerHTML = reportItems.join("") || "<li class='muted'>No community reports yet.</li>";
+  $("#reports").innerHTML = reportItems.join("") || "<li class='muted'>No grow reports yet.</li>";
 
   $("#rate")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();

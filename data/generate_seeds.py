@@ -339,7 +339,7 @@ def build_profiles() -> list[MushroomProfile]:
             strain="King",
             variety_group="oyster",
             tags=["culinary", "intermediate", "oyster", "premium"],
-            summary="Paid example recipe: cooler, drier fruiting to favor thick stems.",
+            summary="Cooler, drier fruiting to favor thick stems.",
             notes="Demo premium profile for the community store. Same species as the free king oyster card.",
             chamber_notes="Top-fruit in a shallow tray or restrict side pins. Top-dress with a thin casing if stems stay skinny.",
             pricing=Pricing(kind="paid", amount_cents=299, currency="USD", creator_share_percent=70),

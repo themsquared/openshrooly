@@ -46,8 +46,8 @@
     <p id="summary"></p>
     <section id="grow-this" class="grow-this card hidden" aria-live="polite"></section>
     <section id="locked" class="hidden card" style="padding:1.2rem">
-      <p class="notice">Paid culinary recipe: <span id="price"></span>. Sign in with a verified email to buy. It unlocks as soon as payment goes through.</p>
-      <button type="button" id="buy">Buy recipe</button>
+      <p class="notice">Paid recipe. It unlocks as soon as payment goes through.</p>
+      <button type="button" id="buy">Buy</button>
     </section>
     <section id="full" class="hidden">
       <p><a id="json-link" href="#">Download profile</a></p>
@@ -58,8 +58,6 @@
       <ol id="stages" class="grow-timeline"></ol>
       <section id="light-recipe" class="light-recipe hidden" aria-labelledby="light-recipe-heading"></section>
       <section id="resources" class="resources hidden" aria-labelledby="microscopy-heading" hidden></section>
-      <h2>Sources</h2>
-      <ul id="sources"></ul>
       <div id="affiliates"></div>
       <p><button type="button" id="fork" class="secondary">Fork</button></p>
       <h2>Rate</h2>
@@ -83,6 +81,10 @@
         <label>Photo <input name="photo" type="file" accept="image/*"></label>
         <button type="submit">Publish report</button>
       </form>
+      <details id="sources-block" class="sources-block hidden">
+        <summary>Sources</summary>
+        <ul id="sources"></ul>
+      </details>
     </section>
     <section id="flag-box" class="card hidden" style="padding:1.2rem;margin:1.2rem 0">
       <h2>Report this profile</h2>
