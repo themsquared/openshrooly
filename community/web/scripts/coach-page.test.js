@@ -25,7 +25,7 @@ const chamber = (over = {}) => ({
     controllable: true,
     controls: { temperature: { supported: true }, fan: { supported: true } },
     profile: { id: "lions-mane", name: "Lion's Mane", species: "Hericium erinaceus" },
-    grow: { phase: "Fruiting", day: 1 },
+    grow: { phase: "Fruiting", grow_day: 23, stage_day: 2, stage_days: 12, total_days: 33 },
     reading: { temperature: 20.3, humidity: 91.46, fan_speed: 25, reading_at: new Date().toISOString() },
     setpoints: { temperature_c: 17, humidity_percent: 90, fan_speed_percent: 25 },
     targets: { temperature_min: 15, temperature_max: 18, humidity_min: 85, humidity_max: 95, fan_speed_percent: 30 },
@@ -106,7 +106,8 @@ test("chamber cards show status, growing, readings against targets, check-in, an
   assert.match(html, /Thing One/);
   assert.match(html, /Online/);
   assert.match(html, /Lion&#39;s Mane|Lion's Mane/);
-  assert.match(html, /Fruiting · day 2/);
+  assert.match(html, /Fruiting, day 2 of 12/);
+  assert.match(html, /Grow day 23 of 33/);
   assert.match(html, /20.3 °C/);
   assert.match(html, /set 17 °C, recipe 15 to 18 °C/);
   assert.match(html, /Fan/);

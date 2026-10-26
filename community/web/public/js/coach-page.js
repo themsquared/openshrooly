@@ -1,6 +1,6 @@
 /** Grow Coach page for people who can use Coach: recommendations, the decision feed, and chamber status. */
 
-import { chamberStatus, identityArt, MUSHROOM_ICON, phaseLine, readingWhenLine, renderChamberStatus } from "./device-ui.js";
+import { chamberStatus, growDayLine, identityArt, MUSHROOM_ICON, phaseLine, readingWhenLine, renderChamberStatus } from "./device-ui.js";
 import { escapeHtml } from "./safe-markdown.js";
 
 const GLUED_UNITS = new Set(["%", ":00"]);
@@ -273,6 +273,7 @@ export function renderChamberCard(chamber, { now = Date.now() } = {}) {
   const st = chamberStatus(device, now);
   const art = identityArt(device);
   const phase = phaseLine(device);
+  const growDay = growDayLine(device);
   const growing = device.profile
     ? `<div class="coach-growing">
         <div class="coach-growing-art">${art || MUSHROOM_ICON}</div>
@@ -280,6 +281,7 @@ export function renderChamberCard(chamber, { now = Date.now() } = {}) {
           <p class="device-card-kicker">What is growing</p>
           <p class="device-card-species">${escapeHtml(device.profile.name || device.profile.species || "")}</p>
           ${phase ? `<p class="muted">${escapeHtml(phase)}</p>` : ""}
+          ${growDay ? `<p class="muted">${escapeHtml(growDay)}</p>` : ""}
         </div>
       </div>`
     : `<p class="muted">Nothing picked yet. <a href="${link}#grow">Pick what you're growing</a></p>`;
