@@ -40,7 +40,7 @@ test("key file is generated at the site root with the key from the one config pl
   assert.match(INDEXNOW_KEY, /^[a-f0-9]{32}$/);
 });
 
-test("blocked paths, Off-menu, queries and other hosts are never submittable", () => {
+test("blocked paths, queries and other hosts are never submittable", () => {
   for (const u of [
     "https://shroomlabs.io/admin",
     "https://shroomlabs.io/moderate",
@@ -52,12 +52,12 @@ test("blocked paths, Off-menu, queries and other hosts are never submittable", (
     "https://shroomlabs.io/alerts-unsub",
     "https://shroomlabs.io/login",
     "https://shroomlabs.io/?pack=psilocybin",
-    "https://shroomlabs.io/profiles/psilocybe-cubensis-golden-teacher",
-    "https://shroomlabs.io/off-menu",
     "http://shroomlabs.io/coach",
     "https://www.shroomlabs.io/coach",
     "https://example.com/coach",
   ]) assert.equal(isSubmittableUrl(u), false, u);
+  // Off-menu pages are indexable since 2026-10-27, so they go to IndexNow like any public page.
+  assert.equal(isSubmittableUrl("https://shroomlabs.io/profiles/golden-teacher"), true);
   for (const u of ["https://shroomlabs.io/", "https://shroomlabs.io/coach", "https://shroomlabs.io/profiles/king-oyster", "https://shroomlabs.io/guides/mushroom-contamination"]) {
     assert.equal(isSubmittableUrl(u), true, u);
   }

@@ -206,11 +206,17 @@ async function listProfiles(db, env, pack, q) {
   return out;
 }
 
+export const API_ROBOTS = "# api.shroomlabs.io serves data for the Shroom Labs site. The pages live at https://shroomlabs.io.\nUser-agent: *\nDisallow: /\n\nSitemap: https://shroomlabs.io/sitemap.xml\n";
+
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
   if (method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env, request) });
+  // api.shroomlabs.io is JSON for the site, not pages. Crawlers should index shroomlabs.io instead.
+  if ((method === "GET" || method === "HEAD") && path === "/robots.txt") {
+    return new Response(API_ROBOTS, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
+  }
 
   try {
     if (!env._seeded) {
