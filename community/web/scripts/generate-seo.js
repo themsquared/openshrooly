@@ -1309,7 +1309,7 @@ ${offMenuLlms(profiles)}## Help
 
 ## Optional
 
-- [Full text of every guide and profile](${SITE}/llms-full.txt)
+- [Full text of the grow guides and culinary profiles](${SITE}/llms-full.txt)
 - [OpenShrooly source code](https://github.com/themsquared/openshrooly)
 - [Privacy policy](${SITE}/privacy)
 - [Terms of Service](${SITE}/tos)

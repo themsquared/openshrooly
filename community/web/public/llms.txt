@@ -97,7 +97,7 @@ Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and
 
 ## Optional
 
-- [Full text of every guide and profile](https://shroomlabs.io/llms-full.txt)
+- [Full text of the grow guides and culinary profiles](https://shroomlabs.io/llms-full.txt)
 - [OpenShrooly source code](https://github.com/themsquared/openshrooly)
 - [Privacy policy](https://shroomlabs.io/privacy)
 - [Terms of Service](https://shroomlabs.io/tos)
