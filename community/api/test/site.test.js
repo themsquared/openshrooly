@@ -7,6 +7,7 @@ import { NAV_ITEMS, POSITIONING, SITE } from "../../web/public/js/chrome.js";
 import { PAGES, isPaid, isPsi, loadProfiles, writeSeoFiles } from "../../web/scripts/generate-seo.js";
 import { GUIDES } from "../../web/scripts/guides/index.js";
 import { OWNER_PAGES } from "../../web/scripts/owners/index.js";
+import { publishedPosts } from "../../web/scripts/blog/index.js";
 
 const PUBLIC = join(import.meta.dirname, "../../web/public");
 const profiles = loadProfiles();
@@ -16,7 +17,7 @@ function read(file) {
 }
 
 function allPages() {
-  return [...Object.keys(PAGES), "grow.html", "chefs-line.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
+  return [...Object.keys(PAGES), "grow.html", "chefs-line.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`), "blog.html", ...publishedPosts().map((p) => `blog/${p.slug}.html`)];
 }
 
 /** Clean public URL path for a page file: no .html anywhere. */
@@ -123,7 +124,7 @@ test("every page has one title, description, canonical, Open Graph, and Twitter 
     assert.deepEqual(meta(html, "name", "twitter:card"), ["summary_large_image"]);
     const [image] = meta(html, "property", "og:image");
     assert.deepEqual(meta(html, "name", "twitter:image"), [image]);
-    assert.match(image, new RegExp(`^${SITE}/og/[a-z0-9-]+\\.jpg$`));
+    assert.match(image, new RegExp(`^${SITE}/og/(blog/)?[a-z0-9-]+\\.jpg$`));
     assert.ok(existsSync(join(PUBLIC, image.slice(SITE.length))), `${file} og image missing`);
     assert.equal(meta(html, "name", "robots").length, 1, `${file} robots`);
   }
@@ -140,6 +141,8 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     BreadcrumbList: ["itemListElement"],
     SoftwareApplication: ["name", "url", "applicationCategory", "offers", "publisher"],
     Product: ["name", "url", "offers", "brand"],
+    Blog: ["name", "url", "publisher"],
+    BlogPosting: ["headline", "datePublished", "dateModified", "author", "publisher"],
   };
   const seen = new Set();
   for (const file of allPages()) {
@@ -148,9 +151,11 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     for (const block of jsonLdBlocks(html)) {
       assert.equal(block["@context"], "https://schema.org");
       for (const node of nodes(block)) {
-        assert.ok(required[node["@type"]], `${file} unexpected type ${node["@type"]}`);
-        for (const field of required[node["@type"]]) assert.ok(node[field], `${file} ${node["@type"]} needs ${field}`);
-        seen.add(node["@type"]);
+        for (const type of [].concat(node["@type"])) {
+          assert.ok(required[type], `${file} unexpected type ${type}`);
+          for (const field of required[type]) assert.ok(node[field], `${file} ${type} needs ${field}`);
+          seen.add(type);
+        }
         if (node["@type"] === "BreadcrumbList") {
           node.itemListElement.forEach((item, i) => {
             assert.equal(item.position, i + 1);
@@ -307,7 +312,7 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
       '<main id="main"',
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
     // Guide and profile pages are static reading pages: the small lite.js runs the menu. App pages load app.js.
-    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "chefs-line.html" || file === "faq.html" || LEGAL_PAGES.includes(file) || OWNER_PAGES.some((p) => file === `${p.slug}.html`);
+    const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "chefs-line.html" || file === "faq.html" || LEGAL_PAGES.includes(file) || OWNER_PAGES.some((p) => file === `${p.slug}.html`) || file === "blog.html" || file.startsWith("blog/");
     assert.ok(html.includes(`<script type="module" src="/js/${lite ? "lite" : "app"}.js"></script>`), `${file} script`);
   }
 });

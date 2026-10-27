@@ -2,7 +2,7 @@
 /** Build prerendered profile pages (culinary and Off-menu), sitemap, robots, llms.txt, FAQ, OG cards, and stamp shared head and chrome. */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NAV_ITEMS, POSITIONING, PRODUCT, SITE, TAGLINE, renderFooter, renderHeader } from "../public/js/chrome.js";
@@ -13,6 +13,7 @@ import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.
 import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
 import { INDEXNOW_KEY } from "../../api/src/indexnow.js";
 import { GUIDES } from "./guides/index.js";
+import { blogLlms, blogLlmsFull, blogRedirects, blogSitemapEntries, publishedPosts, writeBlogFiles } from "./blog/index.js";
 import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -1218,6 +1219,7 @@ export function sitemapEntries(profiles) {
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
     ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
     ...profiles.filter((p) => isPsi(p) && isIndexableProfile(p)).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
+    ...blogSitemapEntries(publishedPosts()),
   ];
 }
 
@@ -1301,7 +1303,7 @@ ${GUIDES.map((g) => `- [${g.h1}](${SITE}/guides/${g.slug}): ${g.answer}`).join("
 
 ${culinary.map(line).join("\n")}
 
-${offMenuLlms(profiles)}## Help
+${offMenuLlms(profiles)}${blogLlms(publishedPosts(), SITE)}## Help
 
 - [FAQ](${SITE}/faq): plain answers about growing mushrooms at home, grow profiles, the Hub, and running OpenShrooly on a Shrooly.
 - [Docs](${SITE}/docs): what Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.
@@ -1363,6 +1365,7 @@ export function renderLlmsFull(profiles) {
       }\n\n### FAQ\n\n${profileFaq(p).map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}`
     );
   }
+  out.push(...blogLlmsFull(publishedPosts(), SITE));
   return `${out.join("\n\n---\n\n")}\n`;
 }
 
@@ -1378,6 +1381,7 @@ export function renderRedirects(profiles) {
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
   for (const p of profiles) lines.push(`/profiles/${p.id}.html /profiles/${p.id} 301!`);
   lines.push("/profiles /grow 301!", "/profiles/ /grow 301!", "/guides /grow 301!", "/guides/ /grow 301!");
+  lines.push(...blogRedirects(publishedPosts()));
   return `${lines.join("\n")}\n`;
 }
 
@@ -1602,6 +1606,18 @@ Sitemap: ${SITE}/sitemap.xml
 `;
 }
 
+/** Blog pages go last, so an internal link in a post can be checked against every page already written. */
+/** Write blog pages and feed into dir. Links are checked against files in siteDir (public/ by default). */
+export function writeBlog(dir, profiles, posts = publishedPosts(), siteDir = dir) {
+  const known = new Set(["/", ...sitemapEntries(profiles).map((e) => e.path), ...Object.values(PAGES).map((p) => p.path)]);
+  const exists = (path) => {
+    const clean = path.replace(/\/$/, "") || "/";
+    if (known.has(clean)) return true;
+    return [`${clean}.html`, `${clean}/index.html`, clean].some((f) => existsSync(join(siteDir, f)) && statSync(join(siteDir, f)).isFile());
+  };
+  return writeBlogFiles(dir, { SITE, shell, crumbsHtml, breadcrumbs, ORG_REF, profiles, exists, legalNotice: PSI_LEGAL_NOTICE }, posts);
+}
+
 export function writeSeoFiles(dir = PUBLIC) {
   const profiles = loadProfiles();
   HUB_UPDATED.value = profiles.filter(isSearchProfile).map((p) => lastUpdated(p)).sort().pop() || TODAY;
@@ -1630,11 +1646,13 @@ export function writeSeoFiles(dir = PUBLIC) {
     if (!html.includes("<!--SEO_HEAD-->") || !html.includes("<!--CHROME_HEADER-->")) throw new Error(`${file} is missing SEO_HEAD or CHROME_HEADER markers`);
     writeFileSync(path, stampChrome(stampHead(html, page), page.active));
   }
-  return { profiles: profiles.length, nav: NAV_ITEMS.map((n) => n.label) };
+  const blogWarnings = writeBlog(dir, profiles);
+  return { profiles: profiles.length, nav: NAV_ITEMS.map((n) => n.label), blogWarnings };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const { profiles } = writeSeoFiles();
+  const { profiles, blogWarnings } = writeSeoFiles();
+  for (const w of blogWarnings) console.warn(`blog: ${w}`);
   if (savePageDates()) console.log("updated scripts/page-dates.json");
   console.log(`wrote SEO files for ${profiles} profiles`);
 }

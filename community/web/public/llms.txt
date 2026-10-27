@@ -89,6 +89,11 @@ Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and
 - [Psilocybe natalensis](https://shroomlabs.io/profiles/p-natalensis): fruits at 23 °C (73 °F) and 90% humidity, about 29 days from start to fruit.
 - [Treasure Coast (Psilocybe cubensis)](https://shroomlabs.io/profiles/treasure-coast): fruits at 22 °C (72 °F) and 90% humidity, about 32 days from start to fruit.
 
+## Blog
+
+- [Shroom Labs blog](https://shroomlabs.io/blog): Mushroom growing notes from Shroom Labs: species guides, fixes for common problems, chamber builds and harvest tips, with cited numbers. RSS: https://shroomlabs.io/blog/feed.xml
+- [Do mushrooms need light to grow?](https://shroomlabs.io/blog/do-mushrooms-need-light): Most mushrooms need some light to fruit, but not much and not for energy. Keep colonization dark, then give about 12 hours a day of low light once pins should form. About 50 to 500 lux of cool white or blue light is enough for oysters, lion's mane, maitake and reishi. Button mushrooms need none, and enoki grown dark makes long white stems.
+
 ## Help
 
 - [FAQ](https://shroomlabs.io/faq): plain answers about growing mushrooms at home, grow profiles, the Hub, and running OpenShrooly on a Shrooly.
