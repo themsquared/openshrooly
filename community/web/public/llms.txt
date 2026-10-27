@@ -1,23 +1,35 @@
 # Shroom Labs
 
-> Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.
+> Shroom Labs keeps Shrooly mushroom chambers growing after the Shrooly app stopped working. It offers free OpenShrooly firmware that installs from a browser, free culinary grow profiles, paid Chef's line profiles, and Grow Coach with Autopilot.
 
-Site: https://shroomlabs.io
-Full text for every guide and profile: https://shroomlabs.io/llms-full.txt
+Shrooly is a smart mushroom fruiting chamber. Since August 2025 many owners report the Shrooly app will not sign in, support does not answer, and orders did not arrive. The chamber itself still works.
 
-All numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
+OpenShrooly is free, open source software that replaces the stock Shrooly software, so the chamber runs on your own Wi-Fi with no Shrooly app. It was started by Graham Stewart (grahamsz). Shroom Labs builds on his work, signs each release, and offers a browser installer: Chrome or Edge on a computer, a USB-C data cable, about 5 minutes. Updates then install over Wi-Fi. An account is optional; it adds a phone dashboard and email alerts.
 
-## For Shrooly owners
+Shroom Labs also publishes researched grow profiles for culinary and functional mushrooms, with temperature, humidity, fresh air, and light for every stage. The basic profiles are free. The Chef's line adds paid specialty methods for a better harvest, $2.99 to $3.99 each, as one-time purchases.
 
+Grow Coach reads a linked chamber's live readings and recommends humidity and temperature changes for the culinary profile being grown. Autopilot can make those changes itself, inside the profile's safe range, and logs every decision with the reason. Grow Coach is $4.99 a month or $49 a year.
+
+Shroom Labs is not made by or affiliated with the company behind Shrooly.
+
+All grow numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
+
+## Bring a Shrooly back
+
+- [Install on your Shrooly](https://shroomlabs.io/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C data cable in about 5 minutes. Signed releases only.
 - [What happened to Shrooly?](https://shroomlabs.io/what-happened-to-shrooly): We could not find a public shutdown notice from the company that made Shrooly. Its last customer update was July 31, 2025. Since August 2025 many owners report the app will not sign in, support does not answer, and orders did not arrive. Your chamber can still run on free community software.
 - [Reuse your Shrooly](https://shroomlabs.io/reuse-your-shrooly): Yes, you can reuse your Shrooly. Free, open source software called OpenShrooly replaces the stock software, so the chamber runs on your own Wi-Fi with no Shrooly app. You install it from Chrome or Edge with a USB-C cable in about 5 minutes. Shroom Labs adds grow profiles and an optional phone dashboard.
 - [Shrooly FAQ](https://shroomlabs.io/shrooly-faq): Short version: many Shrooly owners lost the app in 2025, and the company has not said why. The chamber itself still works. Free OpenShrooly firmware runs it on your own Wi-Fi with no Shrooly app, and you can install it from Chrome or Edge in about 5 minutes. Answers to the questions owners ask most are below.
 - [Shrooly pods: how to refill or replace one](https://shroomlabs.io/shrooly-pods): Owners report that new Shrooly pods are hard or impossible to get. You have three ways forward: get a second flush from the pod you have, refill a pod with your own substrate if you can work clean, or, easiest of all, replace it with a ready to fruit grow block or all in one bag that fits the chamber. With free OpenShrooly software, the chamber runs any block, no pod needed.
 - [Shrooly shut down? Your options](https://shroomlabs.io/shrooly-alternatives): We could not find a public shutdown notice, but many owners report the Shrooly app no longer signs in and pods are hard to get. You still have four good options: revive the chamber with free software, run it by hand, build a simple chamber of your own, or grow in a plastic tub. The first keeps the hardware you paid for working.
-- [Install on your Shrooly](https://shroomlabs.io/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C cable.
 - [Join the Shroom Labs beta](https://shroomlabs.io/beta): If your Shrooly sits unused because the app stopped working, this beta puts it back to work. It is free. Spots are limited to the first 50 linked chambers.
+- [Link a chamber](https://shroomlabs.io/claim): link a chamber to your account to see it on your phone and get grow alerts by email. Optional. It works fully on your Wi-Fi without it.
 
-## Start here
+## Grow Coach and Autopilot
+
+- [Grow Coach](https://shroomlabs.io/coach): reads your chamber's live readings and recommends humidity and temperature changes for the culinary profile you are growing. Autopilot makes those changes for you inside the profile's safe range. $4.99 a month or $49 a year. Cancel anytime.
+
+## Grow guides
 
 - [Mushroom growing conditions for every species](https://shroomlabs.io/grow): one table with fruiting temperature, humidity, light, and days for each species.
 - [Chef's line](https://shroomlabs.io/chefs-line): paid specialty grow profiles for a better harvest. Each is a one-time purchase.
@@ -39,7 +51,7 @@ All numbers on this site come from the published grow profiles. Temperatures are
 - [Mushroom grow timeline calculator](https://shroomlabs.io/tools/grow-timeline): Pick a mushroom and the day you start, and this calculator lists the date each stage begins, the temperature, humidity, fresh air, and light to use, and your first harvest window. Totals run from 20 days for pink oyster to 78 days for turkey tail. You can save every stage to your calendar as an .ics file.
 - [Mushroom fresh air and humidity planner](https://shroomlabs.io/tools/fresh-air-planner): Enter your chamber size and fan flow, and this planner works out how many times an hour your fan replaces the air in the chamber, next to the humidity and fan cycle your mushroom's profile uses. Oyster growing rooms are commonly run at about 4 to 6 fresh air changes an hour while fruiting, so you get a number to compare against.
 
-## Grow guides by species
+## Grow profiles by species
 
 - [How to grow Beech / Buna Shimeji](https://shroomlabs.io/profiles/beech-shimeji): Beech / Buna Shimeji (Hypsizygus tessulatus), also called brown beech mushroom or buna shimeji, takes about 40 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 90% humidity with moderate fresh air and 12 h of light a day.
 - [How to grow Beech Shimeji: tight bouquet](https://shroomlabs.io/profiles/beech-shimeji-bouquet): Paid culinary Profile, $2.99. About 40 days from start to fruit.
@@ -74,9 +86,27 @@ All numbers on this site come from the published grow profiles. Temperatures are
 - [How to grow Wood Ear](https://shroomlabs.io/profiles/wood-ear): Wood Ear (Auricularia auricula-judae), also called jelly ear or black fungus, takes about 38 days to grow at home, from spawn to the end of the first harvest. Colonize at 26 °C (79 °F) in the dark, then fruit at 24 °C (75 °F) and 92% humidity with moderate fresh air and 12 h of light a day.
 - [How to grow Wood Ear: deep black](https://shroomlabs.io/profiles/wood-ear-dark): Paid culinary Profile, $2.99. About 38 days from start to fruit.
 
-## Product
+## Off-menu research profiles
 
-- Chamber profiles for OpenShrooly.
-- Works with Shrooly devices running OpenShrooly.
-- [FAQ](https://shroomlabs.io/faq)
-- [Docs](https://shroomlabs.io/docs)
+Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products. Spore laws vary by state and country, and some US states ban spores outright. Where they are sold, spores are sold for microscopy only.
+
+- [Acadian Coast (Psilocybe cubensis)](https://shroomlabs.io/profiles/acadian-coast): fruits at 22 °C (72 °F) and 90% humidity, about 32 days from start to fruit.
+- [B+ (Psilocybe cubensis)](https://shroomlabs.io/profiles/b-plus): fruits at 21 °C (70 °F) and 89% humidity, about 32 days from start to fruit.
+- [Golden Teacher (Psilocybe cubensis)](https://shroomlabs.io/profiles/golden-teacher): fruits at 22 °C (72 °F) and 90% humidity, about 32 days from start to fruit.
+- [Penis Envy (Psilocybe cubensis)](https://shroomlabs.io/profiles/penis-envy): fruits at 22 °C (72 °F) and 90% humidity, about 50 days from start to fruit.
+- [Psilocybe cyanescens](https://shroomlabs.io/profiles/p-cyanescens): fruits at 15 °C (59 °F) and 90% humidity, about 52 days from start to fruit.
+- [Psilocybe natalensis](https://shroomlabs.io/profiles/p-natalensis): fruits at 23 °C (73 °F) and 90% humidity, about 29 days from start to fruit.
+- [Treasure Coast (Psilocybe cubensis)](https://shroomlabs.io/profiles/treasure-coast): fruits at 22 °C (72 °F) and 90% humidity, about 32 days from start to fruit.
+
+## Help
+
+- [FAQ](https://shroomlabs.io/faq): plain answers about growing mushrooms at home, grow profiles, the Hub, and running OpenShrooly on a Shrooly.
+- [Docs](https://shroomlabs.io/docs): what Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.
+- [Contact](https://shroomlabs.io/contact): questions about an account, billing, a refund, a chamber, or your data.
+
+## Optional
+
+- [Full text of the grow guides and culinary profiles](https://shroomlabs.io/llms-full.txt)
+- [OpenShrooly source code](https://github.com/themsquared/openshrooly)
+- [Privacy policy](https://shroomlabs.io/privacy)
+- [Terms of Service](https://shroomlabs.io/tos)

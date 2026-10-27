@@ -3,7 +3,7 @@
  * Submit changed shroomlabs.io pages to IndexNow (Bing, Yandex and the other IndexNow engines).
  *
  * Reads the live sitemap, fetches each page, and keeps only pages that are 200, canonical to
- * themselves, not noindex and not on the blocked list (Off-menu, staff, sign-in, /install, app
+ * themselves, not noindex and not on the blocked list (staff, sign-in, /install, app
  * pages). A page counts as changed when its HTML hash differs from the state file. Changed pages
  * go in one IndexNow call, capped by --cap. The state file is updated only for pages IndexNow
  * accepted, so anything over the cap or rejected is retried next time.

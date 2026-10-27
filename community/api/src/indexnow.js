@@ -35,9 +35,6 @@ const BLOCKED_PATHS = [
   /^\/api(\/|$)/,
 ];
 
-/** Off-menu never goes to search engines, whatever the page says about itself. */
-const OFF_MENU = /psilocybin|psilocybe|off-?menu|magic|cubensis/i;
-
 /** True for a URL that may be submitted at all. Liveness and noindex are checked separately. */
 export function isSubmittableUrl(raw) {
   let url;
@@ -49,7 +46,6 @@ export function isSubmittableUrl(raw) {
   if (url.protocol !== "https:" || url.host !== INDEXNOW_HOST) return false;
   if (url.search || url.hash || url.username || url.password) return false;
   if (BLOCKED_PATHS.some((re) => re.test(url.pathname))) return false;
-  if (OFF_MENU.test(url.pathname)) return false;
   return true;
 }
 

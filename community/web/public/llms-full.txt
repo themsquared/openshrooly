@@ -1,8 +1,32 @@
-# Shroom Labs: full grow guides
+# Shroom Labs: full text
 
-> Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.
+> Shroom Labs keeps Shrooly mushroom chambers growing after the Shrooly app stopped working. It offers free OpenShrooly firmware that installs from a browser, free culinary grow profiles, paid Chef's line profiles, and Grow Coach with Autopilot.
 
-Every number below comes from the published Shroom Labs grow profiles. Source: https://shroomlabs.io/grow
+Every grow number below comes from the published Shroom Labs grow profiles. Source: https://shroomlabs.io/grow
+
+---
+
+## About Shroom Labs
+
+URL: https://shroomlabs.io/
+
+Shrooly is a smart mushroom fruiting chamber. Since August 2025 many owners report the Shrooly app will not sign in, support does not answer, and orders did not arrive. The chamber itself still works.
+
+OpenShrooly is free, open source software that replaces the stock Shrooly software, so the chamber runs on your own Wi-Fi with no Shrooly app. It was started by Graham Stewart (grahamsz). Shroom Labs builds on his work, signs each release, and offers a browser installer: Chrome or Edge on a computer, a USB-C data cable, about 5 minutes. Updates then install over Wi-Fi. An account is optional; it adds a phone dashboard and email alerts.
+
+Shroom Labs also publishes researched grow profiles for culinary and functional mushrooms, with temperature, humidity, fresh air, and light for every stage. The basic profiles are free. The Chef's line adds paid specialty methods for a better harvest, $2.99 to $3.99 each, as one-time purchases.
+
+Grow Coach reads a linked chamber's live readings and recommends humidity and temperature changes for the culinary profile being grown. Autopilot can make those changes itself, inside the profile's safe range, and logs every decision with the reason. Grow Coach is $4.99 a month or $49 a year.
+
+Shroom Labs is not made by or affiliated with the company behind Shrooly.
+
+### Key pages
+
+- Install OpenShrooly: https://shroomlabs.io/install
+- Grow Coach and Autopilot: https://shroomlabs.io/coach
+- Grow guides for every species: https://shroomlabs.io/grow
+- Chef's line: https://shroomlabs.io/chefs-line
+- FAQ: https://shroomlabs.io/faq
 
 ---
 

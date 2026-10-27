@@ -1,7 +1,11 @@
 {
+  "acadian-coast": {
+    "hash": "c7b6567934cfaeb2",
+    "date": "2026-10-27"
+  },
   "b-plus": {
-    "hash": "2e14543711b0a416",
-    "date": "2026-10-26"
+    "hash": "85bf93f1f8defe31",
+    "date": "2026-10-27"
   },
   "beech-shimeji": {
     "hash": "b014dc381a3d06dc",
@@ -52,8 +56,8 @@
     "date": "2026-10-27"
   },
   "golden-teacher": {
-    "hash": "48f7f419e908f3c8",
-    "date": "2026-10-26"
+    "hash": "e03bf75868659a1b",
+    "date": "2026-10-27"
   },
   "king-oyster": {
     "hash": "8d6c16b2a891e545",
@@ -80,12 +84,12 @@
     "date": "2026-10-27"
   },
   "p-cyanescens": {
-    "hash": "b12c02f67426693d",
-    "date": "2026-10-26"
+    "hash": "deeec4388152a302",
+    "date": "2026-10-27"
   },
   "p-natalensis": {
-    "hash": "a0a977c18506260e",
-    "date": "2026-10-26"
+    "hash": "85c98236d98f3651",
+    "date": "2026-10-27"
   },
   "pearl-oyster": {
     "hash": "d8a7d1f29e9f8184",
@@ -100,8 +104,8 @@
     "date": "2026-10-27"
   },
   "penis-envy": {
-    "hash": "a3e1652491b2f698",
-    "date": "2026-10-26"
+    "hash": "1365c50cf58bf3e4",
+    "date": "2026-10-27"
   },
   "pink-oyster": {
     "hash": "9f917defc1751975",
@@ -129,6 +133,10 @@
   },
   "shiitake-flower-cap": {
     "hash": "a9b918fec4d4ccd9",
+    "date": "2026-10-27"
+  },
+  "treasure-coast": {
+    "hash": "def1b90d64724b93",
     "date": "2026-10-27"
   },
   "turkey-tail": {

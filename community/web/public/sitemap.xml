@@ -1,19 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://shroomlabs.io/</loc><lastmod>2026-10-26</lastmod></url>
-  <url><loc>https://shroomlabs.io/faq</loc><lastmod>2026-10-26</lastmod></url>
-  <url><loc>https://shroomlabs.io/docs</loc><lastmod>2026-10-26</lastmod></url>
-  <url><loc>https://shroomlabs.io/coach</loc><lastmod>2026-10-26</lastmod></url>
-  <url><loc>https://shroomlabs.io/claim</loc><lastmod>2026-10-26</lastmod></url>
-  <url><loc>https://shroomlabs.io/beta</loc><lastmod>2026-10-26</lastmod></url>
-  <url><loc>https://shroomlabs.io/install</loc><lastmod>2026-10-26</lastmod></url>
+  <url><loc>https://shroomlabs.io/</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/faq</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/docs</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/coach</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/claim</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/beta</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/install</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/privacy</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/tos</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/contact</loc><lastmod>2026-10-27</lastmod></url>
   <url><loc>https://shroomlabs.io/what-happened-to-shrooly</loc><lastmod>2026-10-26</lastmod></url>
   <url><loc>https://shroomlabs.io/reuse-your-shrooly</loc><lastmod>2026-10-26</lastmod></url>
   <url><loc>https://shroomlabs.io/shrooly-faq</loc><lastmod>2026-10-26</lastmod></url>
   <url><loc>https://shroomlabs.io/shrooly-pods</loc><lastmod>2026-10-27</lastmod></url>
   <url><loc>https://shroomlabs.io/shrooly-alternatives</loc><lastmod>2026-10-27</lastmod></url>
   <url><loc>https://shroomlabs.io/grow</loc><lastmod>2026-10-27</lastmod></url>
-  <url><loc>https://shroomlabs.io/chefs-line</loc><lastmod>2026-10-26</lastmod></url>
+  <url><loc>https://shroomlabs.io/chefs-line</loc><lastmod>2026-10-27</lastmod></url>
   <url><loc>https://shroomlabs.io/guides/grow-mushrooms-at-home</loc><lastmod>2026-10-26</lastmod></url>
   <url><loc>https://shroomlabs.io/guides/easiest-mushrooms-to-grow</loc><lastmod>2026-10-26</lastmod></url>
   <url><loc>https://shroomlabs.io/guides/grow-kit-vs-monotub-vs-smart-chamber</loc><lastmod>2026-10-26</lastmod></url>
@@ -60,4 +63,11 @@
   <url><loc>https://shroomlabs.io/profiles/wine-cap</loc><lastmod>2026-10-27</lastmod></url>
   <url><loc>https://shroomlabs.io/profiles/wood-ear</loc><lastmod>2026-10-27</lastmod></url>
   <url><loc>https://shroomlabs.io/profiles/wood-ear-dark</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/profiles/acadian-coast</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/profiles/b-plus</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/profiles/golden-teacher</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/profiles/penis-envy</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/profiles/p-cyanescens</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/profiles/p-natalensis</loc><lastmod>2026-10-27</lastmod></url>
+  <url><loc>https://shroomlabs.io/profiles/treasure-coast</loc><lastmod>2026-10-27</lastmod></url>
 </urlset>
