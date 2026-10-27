@@ -569,33 +569,6 @@ export function chartReady(points) {
   return (points || []).filter((p) => p && (p.temperature != null || p.humidity != null)).length >= 2;
 }
 
-export function drawHistoryChart(svg, points) {
-  if (!svg) return;
-  const temps = (points || []).map((p) => p.temperature).filter((v) => v != null);
-  const hums = (points || []).map((p) => p.humidity).filter((v) => v != null);
-  if (!points?.length || (!temps.length && !hums.length)) {
-    svg.innerHTML = `<text x="12" y="72" fill="currentColor">Need a few readings to draw this.</text>`;
-    return;
-  }
-  const minT = Math.min(...temps, 10);
-  const maxT = Math.max(...temps, 32);
-  const minH = Math.min(...hums, 60);
-  const maxH = Math.max(...hums, 100);
-  function series(field, lo, hi, color) {
-    const pts = points
-      .map((p, i) => {
-        const v = p[field];
-        if (v == null) return null;
-        const x = 10 + (i / Math.max(1, points.length - 1)) * 340;
-        const y = 120 - ((v - lo) / Math.max(0.1, hi - lo)) * 100;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .filter(Boolean);
-    return `<polyline fill="none" stroke="${color}" stroke-width="2" points="${pts.join(" ")}" />`;
-  }
-  svg.innerHTML = series("temperature", minT, maxT, "#7dffb3") + series("humidity", minH, maxH, "#5ee4ff");
-}
-
 export function demoDevices() {
   return [
     {

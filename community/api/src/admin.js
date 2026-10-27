@@ -96,6 +96,13 @@ function stripeMode(checkoutId) {
   return "stub";
 }
 
+/** Refunds saved on a checkout by the charge.refunded webhook (payments.js refundCharge). */
+export function refundsOf(checkout) {
+  const refunds = parse(checkout?.details, {})?.refunds;
+  if (!refunds || typeof refunds !== "object") return [];
+  return Object.values(refunds).filter((r) => r && typeof r === "object" && Number(r.refunded_cents) > 0);
+}
+
 function paymentsMode(env) {
   const key = String(env.STRIPE_SECRET_KEY || "");
   if (/^(sk|rk)_live_/.test(key)) return "live";
@@ -152,6 +159,10 @@ async function overview(env, { now }) {
     subscriptions: { active: subs.filter((s) => subActive(s, now)).length, total: subs.length },
     coach_access: { beta_active: betaActive(env), beta: countVia("beta"), paid: countVia("paid"), comp: countVia("comp") },
     profile_purchases: { paid: paid.filter((c) => c.item_id !== COACH_ITEM).length },
+    refunds: {
+      count: checkouts.reduce((n, c) => n + refundsOf(c).length, 0),
+      unlocks_revoked: checkouts.reduce((n, c) => n + refundsOf(c).filter((r) => r.revoked).length, 0),
+    },
     payments_mode: paymentsMode(env),
   };
 }
@@ -399,6 +410,8 @@ async function spend(env, { now }) {
     if (c.status !== "paid") continue;
     const field = stripeMode(c.id) === "live" ? "revenue_cents" : "revenue_test_cents";
     add(Number(c.user_id), field, c.created_at, Number(c.amount_cents) || 0);
+    // Refunds come off revenue on the day they happened.
+    for (const r of refundsOf(c)) add(Number(c.user_id), field, r.at || c.created_at, -(Number(r.refunded_cents) || 0));
   }
 
   const userBy = new Map(userRows.map((u) => [Number(u.id), u]));
@@ -436,7 +449,7 @@ async function spend(env, { now }) {
     notes: {
       jev: "Today and yesterday count every Jev call. Older days count only decisions that changed a setting, so they are a lower bound.",
       emails: "Alert emails and sign-in links per user. Other sends (Autopilot pause notices, account notices) are in the all-sends total for today only.",
-      revenue: "First payments from checkouts. Subscription renewals are not tracked yet.",
+      revenue: "First payments from checkouts, minus refunds on the day they were refunded. Subscription renewals are not tracked yet.",
       photos: "Photo checks use real Workers AI neuron counts. Their cost is already part of Coach AI.",
     },
     emails_sent_today_all: capCount("all"),
@@ -452,7 +465,7 @@ async function spend(env, { now }) {
 const CHECKOUT_OPEN_MS = DAY_MS;
 
 function emptyFunnel() {
-  return { started: 0, completed: 0, expired: 0, failed: 0, abandoned: 0, open: 0, revenue_cents: 0, conversion: null };
+  return { started: 0, completed: 0, expired: 0, failed: 0, abandoned: 0, open: 0, revenue_cents: 0, refunded_cents: 0, refunds: 0, conversion: null };
 }
 
 /** started = completed + open + abandoned; abandoned = expired + failed + unpaid sessions past 24 h. */
@@ -461,6 +474,10 @@ function addToFunnel(f, c, now) {
   if (c.status === "paid") {
     f.completed += 1;
     f.revenue_cents += Number(c.amount_cents) || 0;
+    for (const r of refundsOf(c)) {
+      f.refunds += 1;
+      f.refunded_cents += Number(r.refunded_cents) || 0;
+    }
   } else if (c.status === "expired" || c.status === "failed") {
     f[c.status] += 1;
     f.abandoned += 1;
@@ -480,7 +497,29 @@ function finishFunnel(f) {
 
 /** Checkouts per product and plan, live and test apart. Dev stub sessions are left out. */
 async function funnel(env, { now }) {
-  const checkouts = await env.db.all(ADMIN_SQL.checkouts);
+  const [checkouts, userRows] = await Promise.all([env.db.all(ADMIN_SQL.checkouts), env.db.all(ADMIN_SQL.users)]);
+  const userBy = new Map(userRows.map((u) => [Number(u.id), u]));
+  const refunds = [];
+  for (const c of checkouts) {
+    for (const r of refundsOf(c)) {
+      const u = userBy.get(Number(c.user_id));
+      refunds.push({
+        mode: stripeMode(c.id),
+        checkout_id: c.id,
+        user_id: Number(c.user_id),
+        username: u?.username || null,
+        email: u?.email || null,
+        item_id: c.item_id,
+        charge: r.charge || null,
+        amount_cents: Number(r.amount_cents) || Number(c.amount_cents) || 0,
+        refunded_cents: Number(r.refunded_cents) || 0,
+        full: Boolean(r.full),
+        revoked: Boolean(r.revoked),
+        at: r.at || null,
+      });
+    }
+  }
+  refunds.sort((a, b) => String(b.at).localeCompare(String(a.at)));
   const out = {};
   for (const mode of ["live", "test"]) {
     out[mode] = {};
@@ -505,7 +544,10 @@ async function funnel(env, { now }) {
     generated_at: new Date(now).toISOString(),
     payments_mode: paymentsMode(env),
     ...out,
+    refunds,
     notes: {
+      refunds:
+        "A full refund of a Chef's line profile takes the unlock away. A partial refund keeps it. Coach access ends when the subscription is canceled in Stripe, not on the refund alone.",
       abandoned: "Abandoned is expired, failed, or unpaid for more than 24 hours (Stripe ends a Checkout session after 24 hours).",
       conversion: "Conversion is completed out of started, leaving out checkouts still open.",
       ga: "Clicks that never reach Stripe (signed out, already owned) are only in Google Analytics as checkout_blocked.",

@@ -7,6 +7,7 @@ import { NAV_ITEMS, POSITIONING, SITE } from "../../web/public/js/chrome.js";
 import { PAGES, isPaid, isPsi, loadProfiles, writeSeoFiles } from "../../web/scripts/generate-seo.js";
 import { GUIDES } from "../../web/scripts/guides/index.js";
 import { OWNER_PAGES } from "../../web/scripts/owners/index.js";
+import { TOOL_PAGES } from "../../web/scripts/tools/index.js";
 
 const PUBLIC = join(import.meta.dirname, "../../web/public");
 const profiles = loadProfiles();
@@ -16,7 +17,7 @@ function read(file) {
 }
 
 function allPages() {
-  return [...Object.keys(PAGES), "grow.html", "chefs-line.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
+  return [...Object.keys(PAGES), "grow.html", "chefs-line.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...TOOL_PAGES.map((t) => `tools/${t.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`)];
 }
 
 /** Clean public URL path for a page file: no .html anywhere. */
@@ -138,6 +139,9 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     HowTo: ["name", "step"],
     CollectionPage: ["name", "url", "mainEntity"],
     BreadcrumbList: ["itemListElement"],
+    WebPage: ["name", "url", "description"],
+    SoftwareApplication: ["name", "url", "applicationCategory", "offers", "publisher"],
+    Product: ["name", "url", "offers", "brand"],
   };
   const seen = new Set();
   for (const file of allPages()) {
@@ -160,6 +164,11 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
           assert.match(node.potentialAction.target.urlTemplate, /\{search_term_string\}/);
           assert.equal(node.potentialAction["query-input"], "required name=search_term_string");
         }
+        if (node["@type"] === "Product") {
+          assert.ok(!file.includes("golden-teacher"), `${file} Off-menu has no Product`);
+          assert.match(String(node.offers.price), /^\d+\.\d\d$/);
+          assert.equal(node.offers.priceCurrency, "USD");
+        }
         if (node["@type"] === "HowTo") node.step.forEach((step, i) => assert.equal(step.position, i + 1));
       }
     }
@@ -172,17 +181,14 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
   for (const q of faq.mainEntity) assert.ok(read("faq.html").includes(q.name.replaceAll("'", "&#39;")) || read("faq.html").includes(q.name), q.name);
 });
 
-test("sitemap lists every culinary profile with lastmod, leaves Off-menu out, and uses clean URLs", () => {
+test("sitemap lists every public profile with lastmod, Off-menu included, and uses clean URLs", () => {
   const sitemap = read("sitemap.xml");
   const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   assert.equal([...sitemap.matchAll(/<lastmod>\d{4}-\d\d-\d\d<\/lastmod>/g)].length, locs.length, "every url has lastmod");
   assert.ok(profiles.some(isPsi));
   for (const profile of profiles) {
     const loc = `${SITE}/profiles/${profile.id}`;
-    if (isPsi(profile)) {
-      assert.ok(!locs.includes(loc), `${profile.id} is Off-menu and must stay out of the sitemap`);
-      assert.match(meta(read(`profiles/${profile.id}.html`), "name", "robots")[0], /noindex/);
-    } else assert.ok(locs.includes(loc), profile.id);
+    assert.ok(locs.includes(loc), profile.id);
   }
   assert.ok(locs.includes(`${SITE}/grow`));
   const byPath = Object.fromEntries(allPages().map((f) => [`${SITE}${cleanPath(f)}`, f]));
@@ -252,7 +258,12 @@ test("Grow Coach stays off every static page except /coach, which is public and 
   // account.html keeps an empty slot; app.js fills it only for users the API says can use Coach.
   assert.match(read("account.html"), /<div id="coach-billing" hidden><\/div>/);
   assert.match(readFileSync(join(PUBLIC, "js/app.js"), "utf8"), /const show = Boolean\(me\.grow_coach\?\.available\);\s*coachBilling\.hidden = !show;/);
-  for (const file of ["llms.txt", "llms-full.txt"]) assert.doesNotMatch(read(file), /Grow Coach|\/coach\b/, file);
+  // llms.txt describes Grow Coach and links /coach, but its Off-menu research section never does.
+  const llms = read("llms.txt");
+  assert.match(llms, /\[Grow Coach\]\(https:\/\/shroomlabs\.io\/coach\)/);
+  const research = llms.slice(llms.indexOf("## Off-menu research profiles"), llms.indexOf("## Help"));
+  assert.ok(research.length > 0);
+  assert.doesNotMatch(research, /Coach|\/coach\b|\$/);
   // /coach is the one Coach URL in the sitemap.
   assert.deepEqual(read("sitemap.xml").match(/<loc>[^<]*\/coach[^<]*<\/loc>/g), ["<loc>https://shroomlabs.io/coach</loc>"]);
   for (const file of ["faq.html", "docs.html"]) {
@@ -299,7 +310,9 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
     // Guide and profile pages are static reading pages: the small lite.js runs the menu. App pages load app.js.
     const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "chefs-line.html" || file === "faq.html" || LEGAL_PAGES.includes(file) || OWNER_PAGES.some((p) => file === `${p.slug}.html`);
-    assert.ok(html.includes(`<script type="module" src="/js/${lite ? "lite" : "app"}.js"></script>`), `${file} script`);
+    // Tool pages load tools.js, which imports lite.js for the menu.
+    const script = file.startsWith("tools/") ? "tools" : lite ? "lite" : "app";
+    assert.ok(html.includes(`<script type="module" src="/js/${script}.js"></script>`), `${file} script`);
   }
 });
 

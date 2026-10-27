@@ -782,6 +782,18 @@ function dispatch(mode, tables, ids, sql, params) {
       .filter((c) => Number(c.user_id) === Number(params[0]) && c.item_id === params[1] && c.status === params[2])
       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
   }
+  if (q.startsWith("SELECT * FROM checkouts WHERE user_id=? AND item_id=? ORDER BY")) {
+    return tables.checkouts
+      .filter((c) => Number(c.user_id) === Number(params[0]) && c.item_id === params[1])
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  }
+  if (q.startsWith("SELECT * FROM checkouts WHERE status=? ORDER BY")) {
+    return tables.checkouts.filter((c) => c.status === params[0]).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  }
+  if (q.startsWith("DELETE FROM entitlements WHERE user_id=? AND item_id=? AND item_type=")) {
+    tables.entitlements = tables.entitlements.filter((e) => !(Number(e.user_id) === Number(params[0]) && e.item_id === params[1] && e.item_type === params[2]));
+    return {};
+  }
   if (q.startsWith("UPDATE checkouts SET status=")) {
     const row = tables.checkouts.find((c) => c.id === params[1]);
     if (row) row.status = params[0];

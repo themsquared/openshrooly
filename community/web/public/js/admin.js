@@ -102,6 +102,7 @@ function renderOverview(o) {
     ["Coach via payment", o.coach_access?.paid ?? "?"],
     ["Coach comp", o.coach_access?.comp ?? "?"],
     ["Paid profiles", o.profile_purchases.paid],
+    ["Refunds", o.refunds ? `${o.refunds.count}${o.refunds.unlocks_revoked ? ` (${o.refunds.unlocks_revoked} unlock${o.refunds.unlocks_revoked === 1 ? "" : "s"} revoked)` : ""}` : "?"],
     ["Payments", o.payments_mode],
   ]);
 }
@@ -224,6 +225,7 @@ function renderFunnel(f) {
     ["Still open", t.open],
     ["Conversion", pct(t.conversion)],
     ["Revenue", cents(t.revenue_cents)],
+    ["Refunded", cents(t.refunded_cents || 0)],
   ]);
   table($("#funnel-table"), "funnel", [
     { key: "item_id", label: "Item", html: (i) => `${escapeHtml(i.item_id)}${i.plan ? ` <span class="muted">${escapeHtml(i.plan)}</span>` : ""}` },
@@ -235,7 +237,9 @@ function renderFunnel(f) {
     { key: "open", label: "Open", num: true },
     { key: "conversion", label: "Conversion", num: true, value: (i) => i.conversion ?? -1, html: (i) => pct(i.conversion) },
     { key: "revenue_cents", label: "Revenue", num: true, html: (i) => cents(i.revenue_cents) },
+    { key: "refunded_cents", label: "Refunded", num: true, html: (i) => cents(i.refunded_cents || 0) },
   ], live.items, { key: "started", dir: -1 });
+  renderRefunds(f.refunds || [], f.notes.refunds);
   const test = f.test[w].total;
   $("#funnel-notes").innerHTML = [
     f.notes.abandoned,
@@ -245,6 +249,21 @@ function renderFunnel(f) {
   ]
     .map((n) => `<li>${escapeHtml(n)}</li>`)
     .join("");
+}
+
+function renderRefunds(list, note) {
+  const rows = list.filter((r) => matches(r.user_id, r.email, r.username, r.item_id, r.charge));
+  $("#refunds-empty").classList.toggle("hidden", rows.length > 0);
+  table($("#refunds-table"), "refunds", [
+    { key: "at", label: "When", html: (r) => escapeHtml(when(r.at)) },
+    { key: "email", label: "Account", value: (r) => r.email || r.username || "", html: (r) => who(r.user_id ? { id: r.user_id, email: r.email, username: r.username || "" } : null) },
+    { key: "item_id", label: "Item", html: (r) => `${escapeHtml(r.item_id)}${r.mode === "live" ? "" : ` ${pill(r.mode)}`}` },
+    { key: "amount_cents", label: "Paid", num: true, html: (r) => cents(r.amount_cents) },
+    { key: "refunded_cents", label: "Refunded", num: true, html: (r) => cents(r.refunded_cents) },
+    { key: "full", label: "Type", value: (r) => (r.full ? 1 : 0), html: (r) => (r.full ? pill("full") : pill("partial")) },
+    { key: "revoked", label: "Unlock", value: (r) => (r.revoked ? 1 : 0), html: (r) => (r.revoked ? pill("revoked", "is-warn") : '<span class="muted">kept</span>') },
+  ], rows, { key: "at", dir: -1 });
+  $("#refunds-note").textContent = note || "";
 }
 
 const UNTRACKED = [

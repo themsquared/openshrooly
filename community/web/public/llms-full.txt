@@ -1,8 +1,32 @@
-# Shroom Labs: full grow guides
+# Shroom Labs: full text
 
-> Shroom Labs is a library of researched mushroom grow profiles. Apply them from a Hub to a chamber running OpenShrooly.
+> Shroom Labs keeps Shrooly mushroom chambers growing after the Shrooly app stopped working. It offers free OpenShrooly firmware that installs from a browser, free culinary grow profiles, paid Chef's line profiles, and Grow Coach with Autopilot.
 
-Every number below comes from the published Shroom Labs grow profiles. Source: https://shroomlabs.io/grow
+Every grow number below comes from the published Shroom Labs grow profiles. Source: https://shroomlabs.io/grow
+
+---
+
+## About Shroom Labs
+
+URL: https://shroomlabs.io/
+
+Shrooly is a smart mushroom fruiting chamber. Since August 2025 many owners report the Shrooly app will not sign in, support does not answer, and orders did not arrive. The chamber itself still works.
+
+OpenShrooly is free, open source software that replaces the stock Shrooly software, so the chamber runs on your own Wi-Fi with no Shrooly app. It was started by Graham Stewart (grahamsz). Shroom Labs builds on his work, signs each release, and offers a browser installer: Chrome or Edge on a computer, a USB-C data cable, about 5 minutes. Updates then install over Wi-Fi. An account is optional; it adds a phone dashboard and email alerts.
+
+Shroom Labs also publishes researched grow profiles for culinary and functional mushrooms, with temperature, humidity, fresh air, and light for every stage. The basic profiles are free. The Chef's line adds paid specialty methods for a better harvest, $2.99 to $3.99 each, as one-time purchases.
+
+Grow Coach reads a linked chamber's live readings and recommends humidity and temperature changes for the culinary profile being grown. Autopilot can make those changes itself, inside the profile's safe range, and logs every decision with the reason. Grow Coach is $4.99 a month or $49 a year.
+
+Shroom Labs is not made by or affiliated with the company behind Shrooly.
+
+### Key pages
+
+- Install OpenShrooly: https://shroomlabs.io/install
+- Grow Coach and Autopilot: https://shroomlabs.io/coach
+- Grow guides for every species: https://shroomlabs.io/grow
+- Chef's line: https://shroomlabs.io/chefs-line
+- FAQ: https://shroomlabs.io/faq
 
 ---
 
@@ -304,6 +328,130 @@ We build free tools for owners on top of OpenShrooly.
 - r/shrooly: Got an email from support (2025): https://www.reddit.com/r/shrooly/comments/1nj2dgv/
 - r/shrooly: Class Action lawsuit (September 2025): https://www.reddit.com/r/shrooly/comments/1n5whkl/
 - OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+
+---
+
+## Shrooly pods: how to refill or replace one
+
+URL: https://shroomlabs.io/shrooly-pods
+Updated: 2026-10-27
+
+Owners report that new Shrooly pods are hard or impossible to get. You have three ways forward: get a second flush from the pod you have, refill a pod with your own substrate if you can work clean, or, easiest of all, replace it with a ready to fruit grow block or all in one bag that fits the chamber. With free OpenShrooly software, the chamber runs any block, no pod needed.
+
+### What is in a Shrooly pod?
+
+A pod is a sterilized block of sawdust, wheat bran, and water, colonized by one mushroom culture, in a bag sized for the chamber.
+
+The Shrooly product page says you need pods to use Shrooly, and describes the substrate as sawdust, wheat bran, and water, sterilized before the culture goes in. The Shrooly Pods page sells them as ready to grow and lists one to two harvests per pod. The AnyMush pod is different: it comes with no culture in it, and its substrate is mostly coconut coir in a bag made for clean injection.
+
+### Can I get a second flush from a used pod?
+
+Yes, many pods give a second, smaller harvest, oysters most often.
+
+The Shrooly support article: Second flush article says pods give up to two harvests and that oysters often give a second. After you pick the first flush, spray the cut face two or three times, set the pod back cut side up, and start a new program. If you are not ready to grow it again, seal the opening with a sticker or tape and keep it in the fridge. A short rest and a few hours in cold water before the second run often helps. See grow kit not growing for what to do if it stays quiet.
+
+### Can I refill a Shrooly pod myself?
+
+You can, but it is an advanced step, because the new substrate has to be sterilized and the culture added without letting mold in.
+
+A spent pod bag is not reusable as is. To refill one, you mix a new sawdust and bran substrate at the right moisture, sterilize it in a pressure cooker, let it cool, and add grain spawn or liquid culture in a clean space. Owners on r/shrooly: making your own pods have tried it. For most people it is less work, and more reliable, to buy a block that is already colonized and drop it in. If you want to try the full process, start with how to grow mushrooms at home.
+
+### What can I use instead of a Shrooly pod?
+
+Any ready to fruit grow block or all in one grow bag of about 1 to 2 lb that fits inside the chamber.
+
+Owners on r/shrooly: making your own pods report that any 1 or 2 lb all in one bag works, and that a 2.5 to 3 lb bag might fit. In a thread on r/shrooly: bags and blocks that fit, an owner found a 9 × 5 × 4 inch bag almost perfect, a 10 × 5 × 5 inch bag a little too big, and 1 lb bags a perfect fit. Measure the inside of your chamber first, and see r/shrooly: pod dimensions for what owners measured. Fold the top of a tall bag down rather than cramming it in.
+
+- Pick a colonized block. It should be white all the way through. A block still colonizing needs a few more weeks in the dark first.
+
+- Open it the way the seller says. Usually an X or a slit on one face, facing the open side of the chamber.
+
+- Pick species that like the chamber. Oysters, lion's mane, and other fast species do well in a small space. See how long each mushroom takes.
+
+### Can I use an AnyMush pod with my own culture?
+
+Yes, AnyMush pods were made for that: you inject liquid culture through the port, let it colonize, then grow it on a manual program.
+
+The Shrooly support article: AnyMush guide says to inject 25 to 30 ml of liquid culture through the injection port, wait 5 to 10 days, shake the bag to spread the growth, then wait about 7 to 14 more days until it is fully colonized before you fruit it. If you still have AnyMush pods, they are the closest thing to a refill.
+
+### What settings should I use without a pod?
+
+Use the conditions for the species in the block, stage by stage, from a free grow profile.
+
+A pod told the stock app which program to run. Without one, you set the temperature, humidity, fresh air, and light yourself. Each grow profile lists them for every stage. With free OpenShrooly software on the chamber, you can pick a profile and it runs the stages for you. Plan the dates with the grow timeline calculator.
+
+### Sources
+
+- Shrooly product page: https://shrooly.com/pages/product-sh
+- Shrooly Pods page: https://shrooly.com/pages/pods
+- Shrooly support article: Second flush: https://support.shrooly.com/en/articles/9453273-second-flush
+- Shrooly support article: AnyMush guide: https://support.shrooly.com/en/articles/9362290-anymush-guide
+- r/shrooly: making your own pods (2025): https://www.reddit.com/r/shrooly/comments/1n2stod/
+- r/shrooly: bags and blocks that fit (2025): https://www.reddit.com/r/shrooly/comments/1n66ih9/
+- r/shrooly: pod dimensions (2025): https://www.reddit.com/r/shrooly/comments/1momylo/
+
+---
+
+## Shrooly shut down? Your options
+
+URL: https://shroomlabs.io/shrooly-alternatives
+Updated: 2026-10-27
+
+We could not find a public shutdown notice, but many owners report the Shrooly app no longer signs in and pods are hard to get. You still have four good options: revive the chamber with free software, run it by hand, build a simple chamber of your own, or grow in a plastic tub. The first keeps the hardware you paid for working.
+
+### Did Shrooly shut down?
+
+The company has not said so in public, but its last customer update was July 31, 2025, and owners report the app and support stopped working after that.
+
+The Shrooly customer update, July 31, 2025 is the last one posted. Since August 2025 owners report sign in errors and unanswered support. Read what happened to Shrooly for the dated details and sources.
+
+### Can I revive my Shrooly with free software?
+
+Yes, free open source software called OpenShrooly replaces the stock software and runs the chamber on your own Wi-Fi with no Shrooly app.
+
+It was created by Graham Stewart (OpenShrooly.com, project page by Graham Stewart) and installs from Chrome or Edge with a USB-C cable in about 5 minutes. You set temperature, humidity, fresh air, and light from the chamber's own web page, or pick a stage by stage grow profile. Shroom Labs adds an optional phone dashboard. Read reuse your Shrooly for the steps and what to back up first.
+
+### Can I run a Shrooly by hand without the app?
+
+Owners report the chamber can run stock manual programs from its own buttons, but we could not confirm how well that works without the app.
+
+The Shrooly support article: Connection issues article says the chamber needs internet and Bluetooth to start a new guided cultivation, so a new guided grow may not start. If your chamber still runs, keep the lid closed, mist the block two or three times a day if the humidity reading drops, and open it for fresh air several times a day. Use the fresh air planner and the species grow profiles to know what to aim for. Without a pod, put in any ready to fruit block that fits, as in Shrooly pods: how to refill or replace one.
+
+### Can I build my own mushroom chamber instead?
+
+Yes, a clear storage box or small shelf tent with a humidifier, a small fan on a timer, and a light on a timer does the same job.
+
+- Box. A clear plastic box or a small grow tent, big enough for one or two blocks.
+
+- Humidity. A small ultrasonic humidifier on a humidity controller, or a layer of damp perlite and misting.
+
+- Fresh air. A small fan on a cycle timer, sized with the fresh air planner. Oyster rooms are run at 4 to 6 air changes an hour.
+
+- Light. Room light or a small LED on a timer for about 12 hours a day.
+
+- A thermometer and humidity meter. So you can match the numbers in the profile.
+
+      Start with how much humidity and fresh air mushrooms need.
+
+### Can I just grow mushrooms in a tub?
+
+Yes, a clear plastic tub with holes for air, misted a few times a day, grows oysters and most other kits well.
+
+Drill or cut a few holes in the sides, set the opened block inside on a rack or a layer of damp perlite, and fan the lid a few times a day. Keep it in indirect light at room temperature. It is the cheapest option and works for most beginner species. Read how to grow mushrooms at home, and use grow kit not growing if it stalls.
+
+### Which option should I choose?
+
+If you have a Shrooly, revive it with free software first, since it keeps the chamber you paid for working and costs nothing.
+
+If you would rather not install anything, run it by hand with a ready to fruit block. If the chamber is broken, a simple box or tub grows the same mushrooms with a little more daily care. Whatever you choose, the free grow profiles give you the conditions for each species, and the grow timeline calculator gives you the dates.
+
+### Sources
+
+- Shrooly customer update, July 31, 2025 (the latest posted): https://shrooly.com/blogs/customer-updates/july-update-2025
+- OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+- grahamsz/openshrooly on GitHub: https://github.com/grahamsz/openshrooly
+- Shrooly support article: Connection issues: https://support.shrooly.com/en/articles/9675290-connection-issues
+- r/shrooly: Out of business? (August 19, 2025): https://www.reddit.com/r/shrooly/comments/1mupwan/out_of_business/
 
 ---
 
@@ -1116,13 +1264,327 @@ A: Many owners have installed it, but it is experimental and could leave the cha
 
 ---
 
+## How long does it take to grow mushrooms?
+
+URL: https://shroomlabs.io/guides/how-long-to-grow-mushrooms
+Updated: 2026-10-27
+
+Most culinary mushrooms take 20 to 78 days at home, from the start of colonization to the end of the first harvest. Oysters are fastest: pink oyster takes about 20 days and pearl oyster about 29. Shiitake and reishi take 74 to 77 days. From a fully colonized kit, most species fruit in one to three weeks.
+
+### How long does each mushroom take to grow?
+
+These are the stage lengths in each free grow profile, in days, sorted from fastest to slowest. The total runs from the day you start colonization to the end of the first harvest window. The last column skips colonization, for a kit or block that arrives fully colonized.
+
+Days per stage for each species, from their profiles |  | Mushroom | Colonization | To pins | Fruiting | Total | From a colonized kit
+ | Pink Oyster | 10 | 3 | 7 | 20 | 10
+ | Golden Oyster | 12 | 4 | 8 | 24 | 12
+ | Blue Oyster | 12 | 4 | 9 | 25 | 13
+ | Pearl Oyster | 14 | 5 | 10 | 29 | 15
+ | Elm Oyster | 16 | 5 | 10 | 31 | 15
+ | Pioppino | 16 | 5 | 10 | 31 | 15
+ | Lion's Mane | 16 | 5 | 12 | 33 | 17
+ | Chestnut Mushroom | 18 | 6 | 10 | 34 | 16
+ | Button / Cremini | 16 | 8 | 12 | 36 | 20
+ | King Oyster | 18 | 6 | 14 | 38 | 20
+ | Wood Ear | 18 | 6 | 14 | 38 | 20
+ | Nameko | 20 | 7 | 12 | 39 | 19
+ | Beech / Buna Shimeji | 21 | 7 | 12 | 40 | 19
+ | Wine Cap | 21 | 7 | 12 | 40 | 19
+ | Enoki | 18 | 7 | 18 | 43 | 25
+ | Maitake | 28 | 10 | 16 | 54 | 26
+ | Cordyceps militaris | 12 | 10 | 35 | 57 | 45
+ | Shiitake | 42 | 22 (browning and cold shock) | 10 | 74 | 32
+ | Reishi | 21 | 21 | 35 | 77 | 56
+ | Turkey Tail | 28 | 10 | 40 | 78 | 50
+
+Plug in your own start date with the grow timeline calculator to get calendar dates for every stage, and save them to your calendar.
+
+### What are the stages of growing mushrooms?
+
+- Colonization (10 to 42 days in the profiles). Mycelium spreads through the grain, sawdust, or straw. It is warm and dark, and nothing shows on the outside except white growth.
+
+- Pinning. Cooler air, more fresh air, high humidity, and light tell the block to fruit. Tiny pins appear, usually where the bag is cut open.
+
+- Fruiting (7 to 40 days). Pins grow into mushrooms ready to pick. Most clusters double in size every day or so near the end.
+
+Shiitake is the exception. After colonization it spends about 21 days forming a brown skin, then needs a cold shock before it pins. That is most of the reason it is one of the slowest.
+
+### How long does a mushroom grow kit take?
+
+A store bought kit is usually fully colonized when it arrives, so you start at pinning. Pins usually show within a week or two of opening the kit in good conditions, and the first harvest comes a week or so after that. Pink Oyster takes about 10 days, Golden Oyster takes about 12 days, Blue Oyster takes about 13 days, Pearl Oyster takes about 15 days from a colonized block in their profiles.
+
+A pre browned Shiitake block skips browning too. It starts at the cold shock, then fruits for about 10 days.
+
+If a kit has done nothing after two weeks open, go through grow kit not growing.
+
+### How long after pinning can you harvest mushrooms?
+
+From the first pins to the end of the first harvest is the fruiting stage, 7 to 40 days in the profiles. Fast oysters are usually ready to pick within a week of pinning. Pink Oyster fruits for about 7 days and Pearl Oyster for about 10. Slow species such as Turkey Tail and Reishi take five weeks or more.
+
+Pick oysters when the cap edges are still curled under, just before they flatten. A grower guide from the University of California puts the oyster harvest point directly before the curled cap margins turn flat (UC ANR). Pick Lion's Mane when the spines are about a centimeter long and before it turns yellow.
+
+### What makes mushrooms grow faster or slower?
+
+- Temperature. Colonization slows a lot in a cool room. Most profiles colonize at about 24 °C (75 °F).
+
+- Spawn rate. More spawn in the block means more starting points and faster colonization.
+
+- Fresh air. Too little and pins stall or stretch. Oyster rooms are commonly run at 4 to 6 fresh air changes an hour while cropping (UC ANR). Check yours with the fresh air planner.
+
+- Humidity. The profiles fruit at 82 to 93% humidity. Dry air stalls pins.
+
+- Strain. Two cultures of the same species can differ by a week or more.
+
+### How long until the second flush?
+
+After the first harvest, most blocks rest for one to two weeks before a second flush. Soaking the block in cold water for a few hours after the rest often helps it pin again. The second flush is usually smaller than the first, and most blocks give two or three before they run out of food. Oysters are the most reliable for repeat flushes.
+
+### FAQ
+
+Q: What is the fastest mushroom to grow at home?
+A: Pink Oyster. Its profile runs about 20 days from the start of colonization to the end of the first harvest, and about 10 days from a colonized kit.
+
+Q: How long does it take to grow mushrooms from a kit?
+A: Most kits arrive fully colonized, so pins usually show within one to two weeks of opening, and the first harvest comes about a week after pins.
+
+Q: How long after pinning are mushrooms ready?
+A: Usually about a week for oysters. The fruiting stage runs 7 to 40 days across the profiles, longer for slow species such as reishi and turkey tail.
+
+Q: Why does shiitake take so long?
+A: Shiitake colonizes for about 42 days, then needs about 21 days to form a brown skin and a cold shock before it fruits.
+
+---
+
+## Mushroom grow kit not growing? Check these causes
+
+URL: https://shroomlabs.io/guides/mushroom-grow-kit-not-growing
+Updated: 2026-10-27
+
+Most grow kits that do nothing have one of five problems: the block is not fully colonized, the room is too warm or too cold, the air is too dry, there is too little fresh air, or the kit was not opened where it needs to be. Work through the checklist below in order. A healthy kit usually pins within one to two weeks once all five are right.
+
+### How long should a kit take before you worry?
+
+Give a kit two weeks from the day you open it before you worry. Most kits arrive fully colonized and pin in one to two weeks. Slow species take longer: Lion's Mane pins in about 5 days in its profile, Maitake in about 10, and Shiitake needs a cold shock first. See how long mushrooms take to grow for every species.
+
+### Is the block fully colonized?
+
+A ready block is white all the way through and firm. Brown patches of sawdust mean the mycelium is still working. Keep it closed, warm, and out of direct sun for another week. Yellow or amber drops on the surface are normal and often show up when it is nearly done. A shiitake block should be brown on the outside before it fruits.
+
+### Is it too warm or too cold?
+
+The profiles pin at 15 °C (59 °F) to 24 °C (75 °F). Above about 24 °C (75 °F), most species other than Pink Oyster slow down or stall, and warm, still air invites mold. Cold rooms slow everything. Blue Oyster and Enoki like it cool, Pink Oyster and Golden Oyster like it warm.
+
+### Is the air too dry?
+
+Pins form on a damp surface. In a heated or air conditioned room the cut face of a kit dries out within hours. Mist the opening two or three times a day, never so much that water pools, or cover the kit with a loose plastic tent with holes. The profiles fruit at 82 to 93% humidity. Dry, cracked, or yellow pins are the sign. See dry or cracked mushroom caps.
+
+### Is there enough fresh air?
+
+A kit sealed in a bag, a cupboard, or a closed box builds up carbon dioxide, which tells the block to wait. Pins that do form grow long stems and tiny caps. Give the opening room air several times a day. In its fruiting stage Pearl Oyster runs a fan run of 40 s every 10 min. Commercial oyster growers aim for 4 to 6 fresh air changes an hour (UC ANR) and keep carbon dioxide under 800 ppm (SARE and FungiAlly). Check a chamber with the fresh air planner, and read leggy mushroom stems.
+
+### Is there enough light?
+
+Most species need light to know which way to grow. Indirect daylight or room light for about 12 hours a day is enough. A dark closet can stall pins for weeks. Direct sun is too much and dries the block. Enoki and Button / Cremini are the exceptions that fruit with little or no light.
+
+### Was the kit opened in the right place?
+
+Pins grow where the block meets air. Most kits want an X or a slit cut in the side of the bag, about 5 cm (2 in) each way. A kit left closed can sit for weeks, or pin inside the plastic. If pins are forming inside the bag, cut it open right at that spot. Some kits need soaking in cold water first. Follow the instructions that came with it.
+
+### Is the kit old or contaminated?
+
+Kits keep for a few weeks in the fridge, less on a warm shelf. An old kit shrinks away from the bag and may be slow to wake up. Green, blue, black, or pink patches, a slimy surface, or a sour smell mean contamination. Do not eat from a moldy kit. Read mushroom contamination to tell mold from healthy mycelium.
+
+### Why did my kit stop growing after the first harvest?
+
+That is normal. A block needs one to two weeks of rest after a flush to build up for the next one. After the rest, soak it in cold water for a few hours to replace the water the first flush used, drain it, and set it back up in fruiting conditions. Expect a smaller second flush. Most kits give two or three flushes before they run out of food. When a block stops pinning after that, break it up into garden soil or compost.
+
+### When should you give up on a kit?
+
+If a fully white kit has had two to three weeks of the right temperature, damp air, fresh air, and light, and a cold soak, with no pins, it is probably spent or the culture is weak. Contact the seller, since many replace kits that never fruit. If it is contaminated, bag it and throw it out away from your other blocks.
+
+Still stuck? See why mushrooms are not pinning for more on fruiting triggers, or find your species in the conditions for every species.
+
+### FAQ
+
+Q: Why is my mushroom grow kit not growing?
+A: Usually the block is not fully colonized, the room is too warm or cold, the opening is too dry, there is too little fresh air, or the kit was not cut open where it needs to be.
+
+Q: How long should I wait for a mushroom kit to grow?
+A: About two weeks after opening. Most kits pin in one to two weeks. Slow species such as lion's mane, maitake, and shiitake can take longer.
+
+Q: Why did my mushroom kit stop growing?
+A: After a harvest a block rests for one to two weeks. Soak it in cold water for a few hours after the rest and it usually pins again, with a smaller flush.
+
+Q: Can a mushroom kit grow again?
+A: Yes. Most kits give two or three flushes with a rest and a cold soak between them, each smaller than the last.
+
+---
+
+## Mushroom grow timeline calculator
+
+URL: https://shroomlabs.io/tools/grow-timeline
+Updated: 2026-10-27
+
+Pick a mushroom and the day you start, and this calculator lists the date each stage begins, the temperature, humidity, fresh air, and light to use, and your first harvest window. Totals run from 20 days for pink oyster to 78 days for turkey tail. You can save every stage to your calendar as an .ics file.
+
+### Example
+
+Pearl Oyster: about 29 days. First harvest window: day 20 to day 29.
+
+Pearl Oyster grow timeline |  | Stage | Days | Length (days) | Temperature | Humidity | Fresh air | Light
+ | Colonization | Day 1 to 14 | 14 | 24 °C (75 °F) | 90% | fan 15 s every 60 min | dark
+ | Pinning | Day 15 to 19 | 5 | 18 °C (64 °F) | 93% | fan 35 s every 15 min | 12 h light a day
+ | Fruiting | Day 20 to 29 | 10 | 16 °C (61 °F) | 88% | fan 40 s every 10 min | 12 h light a day
+
+Numbers from the free Pearl Oyster grow profile. Mushrooms run on their own clock, so move to the next stage when you see the signs, not only when the date comes.
+
+### How does the grow timeline calculator work?
+
+Each free grow profile lists its stages and how many days each one lasts. The calculator adds those days to your start date. Day 1 is the day you start. For most species the stages are colonization, pinning, and fruiting. Shiitake adds browning and a cold shock, which is why it takes longer than the rest.
+
+The fruiting stage is your first harvest window. Pick each cluster when it is ready, which is often before the stage ends.
+
+### What if my kit is already colonized?
+
+Choose "A fully colonized kit or block". The calculator skips colonization and starts at pinning. Most store bought kits arrive fully colonized, so pins usually show within a week or two of opening them in good conditions. A pre browned Shiitake block also skips browning and starts at the cold shock.
+
+### How long does each mushroom take to grow?
+
+Days from the start of colonization to the end of the first harvest |  | Mushroom | Total days
+ | Pink Oyster | 20
+ | Golden Oyster | 24
+ | Blue Oyster | 25
+ | Pearl Oyster | 29
+ | Elm Oyster | 31
+ | Pioppino | 31
+ | Lion's Mane | 33
+ | Chestnut Mushroom | 34
+ | Button / Cremini | 36
+ | King Oyster | 38
+ | Wood Ear | 38
+ | Nameko | 39
+ | Beech / Buna Shimeji | 40
+ | Wine Cap | 40
+ | Enoki | 43
+ | Maitake | 54
+ | Cordyceps militaris | 57
+ | Shiitake | 74
+ | Reishi | 77
+ | Turkey Tail | 78
+
+See how long mushrooms take to grow for each stage, and the time from a kit.
+
+### Why might my dates be different?
+
+Colonization speed depends on temperature, how much spawn went into the block, and the strain. A cool room can add a week or more. Pins need humidity, fresh air, and light at the same time, and they stall without them. If nothing has happened by the end of a stage, read grow kit not growing or mushrooms not pinning.
+
+### How do I add the dates to my calendar?
+
+Press "Add to calendar". Your browser saves an .ics file with one all day event per stage. Open it with Google Calendar, Apple Calendar, or Outlook to import the events. Each event lists that stage's temperature, humidity, fresh air, and light.
+
+### FAQ
+
+Q: How long does it take to grow mushrooms at home?
+A: From the start of colonization to the end of the first harvest, the free profiles run from 20 days for pink oyster to 78 days for turkey tail. Most oysters finish in under five weeks.
+
+Q: Does the calculator work for a grow kit?
+A: Yes. Choose a fully colonized kit or block and the timeline starts at pinning instead of colonization.
+
+Q: Can I save the timeline to my calendar?
+A: Yes. The Add to calendar button downloads an .ics file with one all day event per stage, which Google Calendar, Apple Calendar, and Outlook can import.
+
+Q: Where do the numbers come from?
+A: From the free Shroom Labs grow profiles, the same stage lengths, temperatures, humidity, fan cycles, and light hours shown on each species page.
+
+---
+
+## Mushroom fresh air and humidity planner
+
+URL: https://shroomlabs.io/tools/fresh-air-planner
+Updated: 2026-10-27
+
+Enter your chamber size and fan flow, and this planner works out how many times an hour your fan replaces the air in the chamber, next to the humidity and fan cycle your mushroom's profile uses. Oyster growing rooms are commonly run at about 4 to 6 fresh air changes an hour while fruiting, so you get a number to compare against.
+
+### Example
+
+Chamber volume36 L
+Air changes per hour15.7
+Air changes per fan run2.62
+Fan on6.7% of the time
+Humidity target88%
+Profile fan cycle40 s every 10 min
+
+15.7 air changes an hour, above the 4 to 6 air changes an hour that oyster growing rooms are run at. Pearl Oyster fruiting runs at 88% humidity and 16 °C (61 °F) in its profile.
+
+More air than that dries the surface faster. Watch for dry or cracked caps, and raise misting or humidity before cutting the air.
+
+### How do you work out air changes per hour?
+
+One air change moves as much air as the chamber holds. Multiply the fan's flow by the share of each hour it runs, then divide by the chamber volume.
+
+Air changes per hour = fan flow per hour × (seconds on ÷ seconds in each cycle) ÷ chamber volume
+
+Worked example: a 40 × 30 × 30 cm chamber holds 36 L. A fan rated at 5 CFM moves 142 L a minute. Running 40 s every 10 min, the Pearl Oyster fruiting cycle, it moves 94 L per run, about 15.7 air changes an hour.
+
+A fan rarely moves its full rated flow once it pushes through a filter or a small vent, and air does not mix perfectly, so treat the result as the most fresh air you could be getting.
+
+### How many air changes an hour do mushrooms need?
+
+The University of California grower guide lists 4 fresh air exchanges an hour while oyster pins form and 4 to 6 an hour while they crop, with carbon dioxide under 600 ppm, and none during spawn run (UC ANR). A SARE funded oyster guide says to keep carbon dioxide under 800 ppm and to replace all the air at least every 10 minutes in a fruiting room, and that above about 1,200 ppm oysters may not fruit at all (SARE and FungiAlly).
+
+Those numbers are for rooms full of blocks. A small chamber with one block makes far less carbon dioxide, so it can do well with fewer changes. Use the reference as a starting point and let the mushrooms tell you the rest: long stems and small caps mean more air, dry or cracked caps mean more humidity.
+
+### Does more fresh air lower humidity?
+
+Yes. Fresh air from a room is almost always drier than the air in a fruiting chamber, so every air change pulls humidity down for a while. That is why the profiles run the fan in short bursts and give humidity time to recover. If more air leaves caps dry, mist more often or add a humidifier instead of cutting the air. Read how much humidity and fresh air mushrooms need for the signs of each.
+
+### What humidity and fan cycle does each mushroom use?
+
+Fruiting humidity and fan cycle from each profile |  | Mushroom | Fruiting humidity | Fan cycle
+ | Beech / Buna Shimeji | 90% | 25 s every 18 min
+ | Blue Oyster | 87% | 40 s every 10 min
+ | Button / Cremini | 88% | 25 s every 20 min
+ | Chestnut Mushroom | 92% | 30 s every 15 min
+ | Cordyceps militaris | 84% | 20 s every 25 min
+ | Elm Oyster | 86% | 30 s every 14 min
+ | Enoki | 93% | 15 s every 90 min
+ | Golden Oyster | 87% | 40 s every 10 min
+ | King Oyster | 82% | 25 s every 25 min
+ | Lion's Mane | 90% | 25 s every 18 min
+ | Maitake | 88% | 25 s every 20 min
+ | Nameko | 93% | 25 s every 18 min
+ | Pearl Oyster | 88% | 40 s every 10 min
+ | Pink Oyster | 86% | 40 s every 10 min
+ | Pioppino | 86% | 30 s every 15 min
+ | Reishi | 85% | 30 s every 20 min
+ | Shiitake | 85% | 35 s every 12 min
+ | Turkey Tail | 86% | 30 s every 12 min
+ | Wine Cap | 85% | 30 s every 15 min
+ | Wood Ear | 92% | 25 s every 16 min
+
+### FAQ
+
+Q: How do you calculate air changes per hour for a grow chamber?
+A: Multiply the fan flow per hour by the share of time the fan runs, then divide by the chamber volume. One air change moves as much air as the chamber holds.
+
+Q: How many fresh air changes do oyster mushrooms need?
+A: A University of California grower guide lists 4 an hour while pins form and 4 to 6 an hour while fruiting, with carbon dioxide under 600 ppm.
+
+Q: Does fresh air lower humidity in a mushroom chamber?
+A: Yes. Room air is drier than fruiting air, so each air change lowers humidity for a while. Short fan bursts give humidity time to recover.
+
+Q: What are signs of too little fresh air?
+A: Long stems, small caps, and oyster clusters that look like coral or trumpets. More fresh air fixes it.
+
+---
+
 ## How to grow Beech / Buna Shimeji at home
 
 URL: https://shroomlabs.io/profiles/beech-shimeji
 Species: Hypsizygus tessulatus
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Beech / Buna Shimeji at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window. Clustered beech mushroom. Cool, humid, and a little less fresh air than oysters.
+Beech / Buna Shimeji (Hypsizygus tessulatus), also called brown beech mushroom or buna shimeji, takes about 40 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 90% humidity with moderate fresh air and 12 h of light a day. Clustered beech mushroom. Cool, humid, and a little less fresh air than oysters.
 
 ### Conditions by stage
 
@@ -1153,9 +1615,9 @@ A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/blue-oyster
 Species: Pleurotus ostreatus var. columbinus
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Blue Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 25 days from the start of colonization to the end of the first harvest window. Cool-preferring oyster. Deep color holds better below 18 °C.
+Blue Oyster (Pleurotus ostreatus var. columbinus), also called Pleurotus columbinus, takes about 25 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Cool-preferring oyster. Deep color holds better below 18 °C.
 
 ### Conditions by stage
 
@@ -1193,9 +1655,9 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/button-cremini
 Species: Agaricus bisporus
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Button / Cremini at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and no light. This profile runs about 36 days from the start of colonization to the end of the first harvest window. Compost + casing species. Low light, cool fruiting, casing required.
+Button / Cremini (Agaricus bisporus), also called white button or cremini, takes about 36 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and no light. Compost + casing species. Low light, cool fruiting, casing required.
 
 ### Conditions by stage
 
@@ -1233,9 +1695,9 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/chestnut
 Species: Pholiota adiposa
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Chestnut Mushroom at home, colonize at 23 °C (73 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 34 days from the start of colonization to the end of the first harvest window. Clustered woodlover. Cool fruiting and high humidity keep caps glossy.
+Chestnut Mushroom (Pholiota adiposa), also called fat Pholiota, takes about 34 days to grow at home, from spawn to the end of the first harvest. Colonize at 23 °C (73 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. Clustered woodlover. Cool fruiting and high humidity keep caps glossy.
 
 ### Conditions by stage
 
@@ -1266,9 +1728,9 @@ A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/cordyceps-militaris
 Species: Cordyceps militaris
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Cordyceps militaris at home, colonize at 20 °C (68 °F) in the dark, then fruit at 18 °C (64 °F) and 84% humidity with moderate fresh air and 12 h of light a day. This profile runs about 57 days from the start of colonization to the end of the first harvest window. Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.
+Cordyceps militaris, also called scarlet caterpillar club, takes about 57 days to grow at home, from spawn to the end of the first harvest. Colonize at 20 °C (68 °F) in the dark, then fruit at 18 °C (64 °F) and 84% humidity with moderate fresh air and 12 h of light a day. Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.
 
 ### Conditions by stage
 
@@ -1306,9 +1768,9 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/elm-oyster
 Species: Hypsizygus ulmarius
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Elm Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window. Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.
+Elm Oyster (Hypsizygus ulmarius), also called elm leech, takes about 31 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 86% humidity with moderate fresh air and 12 h of light a day. Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.
 
 ### Conditions by stage
 
@@ -1342,9 +1804,9 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/enoki
 Species: Flammulina velutipes
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Enoki at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 93% humidity with little fresh air and no light. This profile runs about 43 days from the start of colonization to the end of the first harvest window. Needs cold fruiting and little fresh air for supermarket-long stems.
+Enoki (Flammulina velutipes), also called enokitake or golden needle mushroom, takes about 43 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 93% humidity with little fresh air and no light. Needs cold fruiting and little fresh air for supermarket-long stems.
 
 ### Conditions by stage
 
@@ -1382,9 +1844,9 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/golden-oyster
 Species: Pleurotus citrinopileatus
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Golden Oyster at home, colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 24 days from the start of colonization to the end of the first harvest window. Warm oyster with dense golden clusters. Needs plenty of fresh air to keep stems short.
+Golden Oyster (Pleurotus citrinopileatus), also called yellow oyster or tamogitake, takes about 24 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Warm oyster with dense golden clusters. Needs plenty of fresh air to keep stems short.
 
 ### Conditions by stage
 
@@ -1415,9 +1877,9 @@ A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization 
 
 URL: https://shroomlabs.io/profiles/king-oyster
 Species: Pleurotus eryngii
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow King Oyster at home, colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 82% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window. Thick-stem oyster. Cooler, slightly drier, and less fresh air than cluster oysters.
+King Oyster (Pleurotus eryngii), also called king trumpet or French horn mushroom, takes about 38 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 82% humidity with moderate fresh air and 12 h of light a day. Thick-stem oyster. Cooler, slightly drier, and less fresh air than cluster oysters.
 
 ### Conditions by stage
 
@@ -1452,9 +1914,9 @@ A: Moderate fresh air: fan runs 25 s every 25 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/lions-mane
 Species: Hericium erinaceus
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Lion's Mane at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 90% humidity with moderate fresh air and 12 h of light a day. This profile runs about 33 days from the start of colonization to the end of the first harvest window. Tooth fungus. Moderate fresh air, since too much air yellows the spines.
+Lion's Mane (Hericium erinaceus), also called bearded tooth or pom pom mushroom, takes about 33 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 90% humidity with moderate fresh air and 12 h of light a day. Tooth fungus. Moderate fresh air, since too much air yellows the spines.
 
 ### Conditions by stage
 
@@ -1492,9 +1954,9 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/maitake
 Species: Grifola frondosa
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Maitake at home, colonize at 22 °C (72 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 54 days from the start of colonization to the end of the first harvest window. Slow woodlover. Primordia look like brains; do not dry them out.
+Maitake (Grifola frondosa), also called hen of the woods or sheep's head, takes about 54 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. Slow woodlover. Primordia look like brains; do not dry them out.
 
 ### Conditions by stage
 
@@ -1528,9 +1990,9 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/nameko
 Species: Pholiota microspora
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Nameko at home, colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 93% humidity with moderate fresh air and 12 h of light a day. This profile runs about 39 days from the start of colonization to the end of the first harvest window. Cool, very wet fruiting. The slime coat is normal.
+Nameko (Pholiota microspora), also called butterscotch mushroom, takes about 39 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 93% humidity with moderate fresh air and 12 h of light a day. Cool, very wet fruiting. The slime coat is normal.
 
 ### Conditions by stage
 
@@ -1561,9 +2023,9 @@ A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/pearl-oyster
 Species: Pleurotus ostreatus
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Pearl Oyster at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. This profile runs about 29 days from the start of colonization to the end of the first harvest window. Forgiving beginner oyster. Fast, lots of fresh air, cool-to-room fruiting.
+Pearl Oyster (Pleurotus ostreatus), also called oyster mushroom or hiratake, takes about 29 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. Forgiving beginner oyster. Fast, lots of fresh air, cool-to-room fruiting.
 
 ### Conditions by stage
 
@@ -1601,9 +2063,9 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/pink-oyster
 Species: Pleurotus djamor
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Pink Oyster at home, colonize at 27 °C (81 °F) in the dark, then fruit at 24 °C (75 °F) and 86% humidity with plenty of fresh air and 12 h of light a day. This profile runs about 20 days from the start of colonization to the end of the first harvest window. Tropical oyster. Wants warmth; stalls and fades in a cold room.
+Pink Oyster (Pleurotus djamor), also called flamingo oyster or salmon oyster, takes about 20 days to grow at home, from spawn to the end of the first harvest. Colonize at 27 °C (81 °F) in the dark, then fruit at 24 °C (75 °F) and 86% humidity with plenty of fresh air and 12 h of light a day. Tropical oyster. Wants warmth; stalls and fades in a cold room.
 
 ### Conditions by stage
 
@@ -1641,9 +2103,9 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/pioppino
 Species: Cyclocybe aegerita
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Pioppino at home, colonize at 25 °C (77 °F) in the dark, then fruit at 16 °C (61 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 31 days from the start of colonization to the end of the first harvest window. Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.
+Pioppino (Cyclocybe aegerita), also called black poplar mushroom or Agrocybe aegerita, takes about 31 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 16 °C (61 °F) and 86% humidity with moderate fresh air and 12 h of light a day. Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.
 
 ### Conditions by stage
 
@@ -1674,9 +2136,9 @@ A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/reishi
 Species: Ganoderma lucidum
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Reishi at home, colonize at 27 °C (81 °F) in the dark, then fruit at 23 °C (73 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 77 days from the start of colonization to the end of the first harvest window. Antlers under high CO2, then consoles when fresh air increases.
+Reishi (Ganoderma lucidum), also called lingzhi or varnished conk, takes about 77 days to grow at home, from spawn to the end of the first harvest. Colonize at 27 °C (81 °F) in the dark, then fruit at 23 °C (73 °F) and 85% humidity with moderate fresh air and 12 h of light a day. Antlers under high CO2, then consoles when fresh air increases.
 
 ### Conditions by stage
 
@@ -1714,9 +2176,9 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/shiitake
 Species: Lentinula edodes
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Shiitake at home, colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 74 days from the start of colonization to the end of the first harvest window. Needs a full colonize + browning rest, then a cold shock before fruiting.
+Shiitake (Lentinula edodes), also called black forest mushroom or xiang gu, takes about 74 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 85% humidity with moderate fresh air and 12 h of light a day. Needs a full colonize + browning rest, then a cold shock before fruiting.
 
 ### Conditions by stage
 
@@ -1752,9 +2214,9 @@ A: Moderate fresh air: fan runs 35 s every 12 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/turkey-tail
 Species: Trametes versicolor
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Turkey Tail at home, colonize at 24 °C (75 °F) in the dark, then fruit at 20 °C (68 °F) and 86% humidity with moderate fresh air and 12 h of light a day. This profile runs about 78 days from the start of colonization to the end of the first harvest window. Thin polypore. Long fruiting, lots of fresh air, not a thick-fleshed edible.
+Turkey Tail (Trametes versicolor), also called Coriolus versicolor or yun zhi, takes about 78 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 20 °C (68 °F) and 86% humidity with moderate fresh air and 12 h of light a day. Thin polypore. Long fruiting, lots of fresh air, not a thick-fleshed edible.
 
 ### Conditions by stage
 
@@ -1785,9 +2247,9 @@ A: Moderate fresh air: fan runs 30 s every 12 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/wine-cap
 Species: Stropharia rugosoannulata
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Wine Cap at home, colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 85% humidity with moderate fresh air and 12 h of light a day. This profile runs about 40 days from the start of colonization to the end of the first harvest window. Best as an outdoor bed mushroom. Indoor profile is a climate approximation only.
+Wine Cap (Stropharia rugosoannulata), also called garden giant or king stropharia, takes about 40 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 85% humidity with moderate fresh air and 12 h of light a day. Best as an outdoor bed mushroom. Indoor profile is a climate approximation only.
 
 ### Conditions by stage
 
@@ -1825,9 +2287,9 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/wood-ear
 Species: Auricularia auricula-judae
-Updated: 2026-10-26
+Updated: 2026-10-27
 
-To grow Wood Ear at home, colonize at 26 °C (79 °F) in the dark, then fruit at 24 °C (75 °F) and 92% humidity with moderate fresh air and 12 h of light a day. This profile runs about 38 days from the start of colonization to the end of the first harvest window. Warm, wet jelly fungus. High humidity matters more than light intensity.
+Wood Ear (Auricularia auricula-judae), also called jelly ear or black fungus, takes about 38 days to grow at home, from spawn to the end of the first harvest. Colonize at 26 °C (79 °F) in the dark, then fruit at 24 °C (75 °F) and 92% humidity with moderate fresh air and 12 h of light a day. Warm, wet jelly fungus. High humidity matters more than light intensity.
 
 ### Conditions by stage
 

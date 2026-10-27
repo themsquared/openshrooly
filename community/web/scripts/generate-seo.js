@@ -14,6 +14,8 @@ import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PS
 import { INDEXNOW_KEY } from "../../api/src/indexnow.js";
 import { GUIDES } from "./guides/index.js";
 import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
+import { latinName, orList, otherNames, speciesTitle } from "./species-names.js";
+import { SPECIES as TOOL_SPECIES, TOOL_PAGES, TOOL_SOURCES } from "./tools/index.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
@@ -169,7 +171,11 @@ export function answerFirst(profile) {
 }
 
 export function seoTitle(profile) {
-  if (isGuideProfile(profile)) return `How to grow ${profile.name} at home: temps, humidity, light by stage`;
+  if (isPsi(profile)) {
+    const sp = profile.species && profile.species !== profile.name ? ` (${profile.species})` : "";
+    return `${profile.name}${sp} grow conditions for research · Shroom Labs`;
+  }
+  if (isGuideProfile(profile)) return speciesTitle(profile);
   // Chef's line names already say the species and the method, so the Latin name would push past 80 characters.
   const species = profile.species && !isChef(profile) ? ` (${profile.species})` : "";
   return `${profile.name}${species} grow profile · Shroom Labs`;
@@ -180,7 +186,7 @@ export function isGuideProfile(profile) {
   return !isPsi(profile) && !isPaid(profile);
 }
 
-/** Profiles that belong in search, the sitemap, llms.txt, and the hub. Off-menu never does. */
+/** Culinary profiles: the hub, related links, and the main llms.txt list. Off-menu pages are indexed but listed on their own. */
 export function isSearchProfile(profile) {
   return !isPsi(profile) && isIndexableProfile(profile);
 }
@@ -193,7 +199,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
  * copy changes. It is a literal on purpose: these files are regenerated, so their own git date
  * would move on every commit and the generated output would never settle.
  */
-export const PAGES_UPDATED = "2026-10-26";
+export const PAGES_UPDATED = "2026-10-27";
 
 /**
  * Profile page dates live in scripts/page-dates.json, keyed by profile id with a hash of the
@@ -201,7 +207,7 @@ export const PAGES_UPDATED = "2026-10-26";
  * build gives the same output on any machine and in a shallow CI checkout.
  * Bump PAGE_LAYOUT when the profile page layout changes enough to count as an update.
  */
-const PAGE_LAYOUT = "guide-v1";
+const PAGE_LAYOUT = "guide-v2";
 const DATES_FILE = join(ROOT, "scripts", "page-dates.json");
 const PAGE_DATES = existsSync(DATES_FILE) ? JSON.parse(readFileSync(DATES_FILE, "utf8")) : {};
 let datesChanged = false;
@@ -290,7 +296,9 @@ export function directAnswer(profile) {
   const hours = lightHours(profile, fruit);
   const lightPart = hours ? `${hours} h of light a day` : "no light";
   const dark = lightHours(profile, col) ? "" : " in the dark";
-  return `To grow ${profile.name} at home, colonize at ${tempText(col.temperature_c)}${dark}, then fruit at ${tempText(fruit.temperature_c)} and ${fruit.humidity_percent}% humidity with ${freshAirLabel(fruit)} and ${lightPart}. This profile runs about ${daysToFruit(profile)} days from the start of colonization to the end of the first harvest window.`;
+  const names = otherNames(profile.id).slice(0, 2);
+  const who = `${profile.name}${latinName(profile) ? ` (${latinName(profile)})` : ""}${names.length ? `, also called ${orList(names)},` : ""}`;
+  return `${who} takes about ${daysToFruit(profile)} days to grow at home, from spawn to the end of the first harvest. Colonize at ${tempText(col.temperature_c)}${dark}, then fruit at ${tempText(fruit.temperature_c)} and ${fruit.humidity_percent}% humidity with ${freshAirLabel(fruit)} and ${lightPart}.`;
 }
 
 function stageRows(profile) {
@@ -420,6 +428,13 @@ export function fitDescription(text, max = 160) {
 }
 
 export function seoDescription(profile) {
+  if (isPsi(profile)) {
+    const stage = fruiting(profile);
+    const sp = profile.species && profile.species !== profile.name ? ` (${profile.species})` : "";
+    return fitDescription(
+      `${profile.name}${sp}: fruits at ${tempText(stage.temperature_c)} and ${stage.humidity_percent}% humidity, about ${daysToFruit(profile)} days from start to fruit. For research and education only. Check the laws where you live.`
+    );
+  }
   return fitDescription(answerFirst(profile));
 }
 
@@ -432,6 +447,52 @@ export function profileUrl(profile) {
 }
 
 const ORG_REF = { "@type": "Organization", "@id": `${SITE}/#org`, name: "Shroom Labs", url: `${SITE}/` };
+
+/** Plain description of Shroom Labs for schema and llms.txt. Every claim here is on a public page. */
+export const ABOUT =
+  "Shroom Labs keeps Shrooly mushroom chambers growing after the Shrooly app stopped working. It offers free OpenShrooly firmware that installs from a browser, free culinary grow profiles, paid Chef's line profiles, and Grow Coach with Autopilot.";
+
+/** OpenShrooly on /install. Free firmware; Shroom Labs builds on Graham Stewart's open source project and signs each release. */
+export function openShroolyJsonLd() {
+  return {
+    "@type": "SoftwareApplication",
+    "@id": `${SITE}/install#openshrooly`,
+    name: "OpenShrooly",
+    description:
+      "Free, open source software that runs a Shrooly mushroom chamber on your own Wi-Fi with no Shrooly app. Install it from Chrome or Edge with a USB-C data cable in about 5 minutes. This page only offers releases signed by Shroom Labs.",
+    url: `${SITE}/install`,
+    applicationCategory: "UtilitiesApplication",
+    operatingSystem: "Shrooly chamber",
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD", url: `${SITE}/install` },
+    author: { "@type": "Person", name: "Graham Stewart", alternateName: "grahamsz" },
+    publisher: ORG_REF,
+  };
+}
+
+/** Grow Coach on /coach. Prices match the visible plan text on public/coach.html. */
+export function growCoachJsonLd() {
+  const plan = (name, amount, duration) => ({
+    "@type": "Offer",
+    name,
+    price: amount,
+    priceCurrency: "USD",
+    url: `${SITE}/coach`,
+    priceSpecification: { "@type": "UnitPriceSpecification", price: amount, priceCurrency: "USD", billingDuration: duration },
+  });
+  return {
+    "@type": "SoftwareApplication",
+    "@id": `${SITE}/coach#grow-coach`,
+    name: "Grow Coach",
+    description:
+      "Grow Coach reads a Shrooly chamber's live readings and recommends humidity and temperature changes for the culinary Profile you are growing. Autopilot makes those changes for you, inside the Profile's safe range, and logs every decision with the reason. Needs a Shrooly running OpenShrooly linked to a Shroom Labs account.",
+    url: `${SITE}/coach`,
+    applicationCategory: "LifestyleApplication",
+    operatingSystem: "Web",
+    offers: [plan("Monthly", "4.99", "P1M"), plan("Yearly", "49.00", "P1Y")],
+    publisher: ORG_REF,
+  };
+}
 
 /** The /beta landing page. FAQ answers match the visible text on public/beta.html word for word. */
 const BETA = {
@@ -494,6 +555,26 @@ export function profileJsonLd(profile) {
     };
     if (photo) howto.image = image;
     graph.push(howto);
+  }
+  if (isPaid(profile) && !isPsi(profile)) {
+    graph.push({
+      "@type": "Product",
+      "@id": `${url}#product`,
+      name: `${profile.name} grow profile`,
+      url,
+      description: answerFirst(profile),
+      image,
+      category: "Mushroom grow profile (digital)",
+      brand: ORG_REF,
+      offers: {
+        "@type": "Offer",
+        price: (Number(profile.pricing?.amount_cents || 0) / 100).toFixed(2),
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+        url,
+        seller: ORG_REF,
+      },
+    });
   }
   if (guide) {
     graph.push({
@@ -575,16 +656,17 @@ export function siteJsonLd() {
     "@graph": [
       {
         ...ORG_REF,
-        description: PRODUCT,
+        description: ABOUT,
         logo: `${SITE}/apple-touch-icon.png`,
         sameAs: ["https://github.com/themsquared/openshrooly"],
+        contactPoint: { "@type": "ContactPoint", contactType: "customer support", url: `${SITE}/contact`, availableLanguage: "en" },
       },
       {
         "@type": "WebSite",
         "@id": `${SITE}/#website`,
         url: `${SITE}/`,
         name: "Shroom Labs",
-        description: PRODUCT,
+        description: ABOUT,
         inLanguage: "en",
         publisher: { "@id": `${SITE}/#org` },
         potentialAction: {
@@ -714,9 +796,11 @@ export function renderGuideProfilePage(profile, profiles = []) {
       <h2>How long does ${name} take to grow?</h2>
       <p>About ${daysToFruit(profile)} days from the start of colonization to the end of the first harvest window.</p>
       <ol class="grow-timeline">${timeline}</ol>
+      <p>Get dates for each stage from your own start day with the <a href="/tools/grow-timeline?species=${escapeHtml(profile.id)}">grow timeline calculator</a>, or compare every species in <a href="/guides/how-long-to-grow-mushrooms">how long mushrooms take to grow</a>.</p>
       ${renderLightRecipe(profile)}
       <h2>What goes wrong when growing ${name}?</h2>
       ${problems}
+      <p>Kit or block doing nothing? Work through <a href="/guides/mushroom-grow-kit-not-growing">grow kit not growing</a>. To check your fresh air, put your chamber size and fan into the <a href="/tools/fresh-air-planner?species=${escapeHtml(profile.id)}">fresh air planner</a>.</p>
       <h2>${name} growing FAQ</h2>
       ${faqHtml(profileFaq(profile))}
       ${
@@ -789,10 +873,10 @@ export function renderProfilePage(profile, profiles = []) {
       title: seoTitle(profile),
       description: seoDescription(profile),
       path: `/profiles/${profile.id}`,
-      robots: psi ? PRIVATE : "index,follow",
+      // Off-menu pages are indexable (Mike, 2026-10-27) but carry no structured data, analytics, paid items, or Coach.
+      robots: "index,follow",
       image: ogImage(profile),
       type: "article",
-      // Off-menu pages stay out of structured data and analytics.
       jsonLd: psi ? undefined : profileJsonLd(profile),
       analytics: !psi,
     },
@@ -1054,6 +1138,54 @@ export function renderGuidePage(guide) {
   });
 }
 
+/** Free tool page: answer first, a working form with a server rendered example result, then how it works and an FAQ. */
+export function renderToolPage(tool) {
+  const url = `${SITE}${tool.path}`;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": `${url}#page`,
+        name: tool.h1,
+        description: tool.answer,
+        url,
+        inLanguage: "en",
+        dateModified: tool.updated,
+        isAccessibleForFree: true,
+        publisher: ORG_REF,
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${url}#faq`,
+        mainEntity: tool.faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+      },
+      breadcrumbs([["Home", `${SITE}/`], ["Grow guides", `${SITE}/grow`], [tool.h1, url]]),
+    ],
+  };
+  const sections = tool.sections.map((sec) => `<h2>${escapeHtml(sec.h2)}</h2>${sec.html}`).join("\n      ");
+  const body = `
+    <article class="profile-page guide-page tool-page">
+      ${crumbsHtml([["Home", "/"], ["Grow guides", "/grow"], [tool.h1, ""]])}
+      <p class="eyebrow">Free grow tool</p>
+      <h1>${escapeHtml(tool.h1)}</h1>
+      ${updatedHtml(tool.updated)}
+      <p class="lede answer-first">${escapeHtml(tool.answer)}</p>
+      ${tool.form()}
+      <div id="tool-result" class="tool-result" aria-live="polite">${tool.result()}</div>
+      ${sections}
+      <h2>FAQ</h2>${faqHtml(tool.faq)}
+      <h2>Sources</h2><ul class="faq-links">${TOOL_SOURCES.map(([label, href]) => `<li><a href="${href}" rel="nofollow noopener">${escapeHtml(label)}</a></li>`).join("")}<li><a href="/grow">Shroom Labs grow profiles</a></li></ul>
+      <h2>Keep reading</h2><ul class="faq-links">${tool.related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>
+    </article>`;
+  return shell({
+    head: { title: tool.title, description: tool.description, path: tool.path, type: "website", modified: tool.updated, jsonLd },
+    activeId: "grow",
+    body,
+    script: tool.script,
+  });
+}
+
 /** The one call to action every Shrooly owner page ends with. */
 export function installCta(secondary = ["What happened to Shrooly?", "/what-happened-to-shrooly"]) {
   return `<div class="owner-cta"><a class="button hero-cta" href="/install">Install on your Shrooly</a>${
@@ -1138,7 +1270,9 @@ export function sitemapEntries(profiles) {
     { path: "/grow", lastmod: HUB_UPDATED.value },
     { path: "/chefs-line", lastmod: PAGES_UPDATED },
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
+    ...TOOL_PAGES.map((t) => ({ path: t.path, lastmod: t.updated })),
     ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
+    ...profiles.filter((p) => isPsi(p) && isIndexableProfile(p)).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
   ];
 }
 
@@ -1152,40 +1286,92 @@ ${sitemapEntries(profiles)
 `;
 }
 
+/** Price range of the Chef's line, from the profile data, for plain text summaries. */
+function chefPriceRange(profiles) {
+  const cents = profiles.filter((p) => isChef(p) && !isPsi(p)).map((p) => Number(p.pricing?.amount_cents || 0)).sort((a, b) => a - b);
+  if (!cents.length) return "";
+  const fmt = (c) => `$${(c / 100).toFixed(2)}`;
+  return cents[0] === cents[cents.length - 1] ? fmt(cents[0]) : `${fmt(cents[0])} to ${fmt(cents[cents.length - 1])}`;
+}
+
+/** The "what is Shroom Labs" paragraphs shared by llms.txt and llms-full.txt. Facts only from public pages. */
+export function llmsAbout(profiles) {
+  const range = chefPriceRange(profiles);
+  return [
+    "Shrooly is a smart mushroom fruiting chamber. Since August 2025 many owners report the Shrooly app will not sign in, support does not answer, and orders did not arrive. The chamber itself still works.",
+    "OpenShrooly is free, open source software that replaces the stock Shrooly software, so the chamber runs on your own Wi-Fi with no Shrooly app. It was started by Graham Stewart (grahamsz). Shroom Labs builds on his work, signs each release, and offers a browser installer: Chrome or Edge on a computer, a USB-C data cable, about 5 minutes. Updates then install over Wi-Fi. An account is optional; it adds a phone dashboard and email alerts.",
+    "Shroom Labs also publishes researched grow profiles for culinary and functional mushrooms, with temperature, humidity, fresh air, and light for every stage. The basic profiles are free. The Chef's line adds paid specialty methods for a better harvest" + (range ? `, ${range} each` : "") + ", as one-time purchases.",
+    "Grow Coach reads a linked chamber's live readings and recommends humidity and temperature changes for the culinary profile being grown. Autopilot can make those changes itself, inside the profile's safe range, and logs every decision with the reason. Grow Coach is $4.99 a month or $49 a year.",
+    "Shroom Labs is not made by or affiliated with the company behind Shrooly.",
+  ];
+}
+
+/** Short research section for the Off-menu profiles in llms.txt. Free pages only, no prices, no Coach. */
+function offMenuLlms(profiles) {
+  const psi = profiles.filter((p) => isPsi(p) && isIndexableProfile(p) && !isPaid(p));
+  if (!psi.length) return "";
+  const row = (p) => {
+    const stage = fruiting(p);
+    const sp = p.species && p.species !== p.name ? ` (${p.species})` : "";
+    return `- [${p.name}${sp}](${SITE}/profiles/${p.id}): fruits at ${tempText(stage.temperature_c)} and ${stage.humidity_percent}% humidity, about ${daysToFruit(p)} days from start to fruit.`;
+  };
+  return `## Off-menu research profiles
+
+${PSI_LEGAL_NOTICE} ${PSI_SPORE_LAW}
+
+${psi.map(row).join("\n")}
+
+`;
+}
+
 export function renderLlms(profiles) {
   const culinary = profiles.filter(isSearchProfile);
   const line = (p) => `- [How to grow ${p.name}](${SITE}/profiles/${p.id}): ${isGuideProfile(p) ? directAnswer(p) : setpointLine(p)}`;
   return `# Shroom Labs
 
-> ${PRODUCT}
+> ${ABOUT}
 
-Site: ${SITE}
-Full text for every guide and profile: ${SITE}/llms-full.txt
+${llmsAbout(profiles).join("\n\n")}
 
-All numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
+All grow numbers on this site come from the published grow profiles. Temperatures are in °C with °F in brackets.
 
-## For Shrooly owners
+## Bring a Shrooly back
 
+- [Install on your Shrooly](${SITE}/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C data cable in about 5 minutes. Signed releases only.
 ${OWNER_PAGES.map((p) => `- [${p.h1}](${SITE}/${p.slug}): ${p.answer}`).join("\n")}
-- [Install on your Shrooly](${SITE}/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C cable.
 - [Join the Shroom Labs beta](${SITE}/beta): ${BETA.answer}
+- [Link a chamber](${SITE}/claim): link a chamber to your account to see it on your phone and get grow alerts by email. Optional. It works fully on your Wi-Fi without it.
 
-## Start here
+## Grow Coach and Autopilot
+
+- [Grow Coach](${SITE}/coach): reads your chamber's live readings and recommends humidity and temperature changes for the culinary profile you are growing. Autopilot makes those changes for you inside the profile's safe range. $4.99 a month or $49 a year. Cancel anytime.
+
+## Grow guides
 
 - [Mushroom growing conditions for every species](${SITE}/grow): one table with fruiting temperature, humidity, light, and days for each species.
 - [Chef's line](${SITE}/chefs-line): paid specialty grow profiles for a better harvest. Each is a one-time purchase.
 ${GUIDES.map((g) => `- [${g.h1}](${SITE}/guides/${g.slug}): ${g.answer}`).join("\n")}
 
-## Grow guides by species
+## Free grow tools
+
+${TOOL_PAGES.map((t) => `- [${t.h1}](${SITE}${t.path}): ${t.answer}`).join("\n")}
+
+## Grow profiles by species
 
 ${culinary.map(line).join("\n")}
 
-## Product
+${offMenuLlms(profiles)}## Help
 
-- ${TAGLINE}
-- ${POSITIONING}
-- [FAQ](${SITE}/faq)
-- [Docs](${SITE}/docs)
+- [FAQ](${SITE}/faq): plain answers about growing mushrooms at home, grow profiles, the Hub, and running OpenShrooly on a Shrooly.
+- [Docs](${SITE}/docs): what Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.
+- [Contact](${SITE}/contact): questions about an account, billing, a refund, a chamber, or your data.
+
+## Optional
+
+- [Full text of the grow guides and culinary profiles](${SITE}/llms-full.txt)
+- [OpenShrooly source code](https://github.com/themsquared/openshrooly)
+- [Privacy policy](${SITE}/privacy)
+- [Terms of Service](${SITE}/tos)
 `;
 }
 
@@ -1205,7 +1391,10 @@ function stripHtml(html) {
 }
 
 export function renderLlmsFull(profiles) {
-  const out = [`# Shroom Labs: full grow guides\n\n> ${PRODUCT}\n\nEvery number below comes from the published Shroom Labs grow profiles. Source: ${SITE}/grow`];
+  const out = [
+    `# Shroom Labs: full text\n\n> ${ABOUT}\n\nEvery grow number below comes from the published Shroom Labs grow profiles. Source: ${SITE}/grow`,
+    `## About Shroom Labs\n\nURL: ${SITE}/\n\n${llmsAbout(profiles).join("\n\n")}\n\n### Key pages\n\n- Install OpenShrooly: ${SITE}/install\n- Grow Coach and Autopilot: ${SITE}/coach\n- Grow guides for every species: ${SITE}/grow\n- Chef's line: ${SITE}/chefs-line\n- FAQ: ${SITE}/faq`,
+  ];
   for (const p of OWNER_PAGES) {
     out.push(
       `## ${p.h1}\n\nURL: ${SITE}/${p.slug}\nUpdated: ${p.updated}\n\n${p.answer}\n\n${p.sections
@@ -1221,6 +1410,13 @@ export function renderLlmsFull(profiles) {
       `## ${g.h1}\n\nURL: ${SITE}/guides/${g.slug}\nUpdated: ${g.updated}\n\n${g.answer}\n\n${g.sections.map((sec) => `### ${sec.h2}\n\n${stripHtml(sec.html)}`).join("\n\n")}${
         g.faq?.length ? `\n\n### FAQ\n\n${g.faq.map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}` : ""
       }`
+    );
+  }
+  for (const t of TOOL_PAGES) {
+    out.push(
+      `## ${t.h1}\n\nURL: ${SITE}${t.path}\nUpdated: ${t.updated}\n\n${t.answer}\n\n### Example\n\n${stripHtml(t.result())}\n\n${t.sections
+        .map((sec) => `### ${sec.h2}\n\n${stripHtml(sec.html)}`)
+        .join("\n\n")}\n\n### FAQ\n\n${t.faq.map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}`
     );
   }
   for (const p of profiles.filter(isGuideProfile)) {
@@ -1246,6 +1442,8 @@ export function renderRedirects(profiles) {
   lines.push("/chefs-line.html /chefs-line 301!", "/grow.html /grow 301!", "/terms /tos 301!", "/terms.html /tos 301!");
   for (const p of OWNER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
+  for (const t of TOOL_PAGES) lines.push(`${t.path}.html ${t.path} 301!`);
+  lines.push("/tools /grow 301!", "/tools/ /grow 301!");
   for (const p of profiles) lines.push(`/profiles/${p.id}.html /profiles/${p.id} 301!`);
   lines.push("/profiles /grow 301!", "/profiles/ /grow 301!", "/guides /grow 301!", "/guides/ /grow 301!");
   return `${lines.join("\n")}\n`;
@@ -1325,7 +1523,7 @@ export const PAGES = {
     path: "/coach",
     title: "Grow Coach: automatic grow control for your Shrooly · Shroom Labs",
     description: "Grow Coach reads your Shrooly chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.",
-    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach`]]) },
+    jsonLd: { "@context": "https://schema.org", "@graph": [growCoachJsonLd(), breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach`]])] },
   },
   "claim.html": {
     active: "",
@@ -1368,7 +1566,7 @@ export const PAGES = {
     path: "/install",
     title: "Install on your Shrooly: free OpenShrooly software over USB",
     description: "Shrooly app not working? Put free OpenShrooly software on your Shrooly from Chrome or Edge with a USB-C cable in about 5 minutes. Signed releases only.",
-    jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Install over USB", `${SITE}/install`]]) },
+    jsonLd: { "@context": "https://schema.org", "@graph": [openShroolyJsonLd(), breadcrumbs([["Home", `${SITE}/`], ["Install over USB", `${SITE}/install`]])] },
   },
   "login.html": { active: "", path: "/login", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and link a chamber. No password." },
   "register.html": { active: "", path: "/register", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and link a chamber. No password." },
@@ -1384,17 +1582,92 @@ export const PAGES = {
   "profile.html": { active: "profiles", path: "/profile", robots: PRIVATE, analytics: false, title: "Profile · Shroom Labs", description: "Mushroom grow profile with stages, growing conditions, and grow reports." },
   "legacy-preview.html": { active: "", path: "/legacy-preview", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
   "account/feedback.html": { active: "", path: "/account/feedback", robots: "noindex,nofollow", title: "Beta feedback · Shroom Labs", description: "Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one." },
-  // Legal pages: public, no sign-in, linked from every footer. Not in the sitemap.
-  "privacy.html": { active: "", path: "/privacy", title: "Privacy policy · Shroom Labs", description: "What Shroom Labs collects, how it's used, who else sees it, how it's kept safe, and how to download or delete it." },
-  "tos.html": { active: "", path: "/tos", title: "Terms of Service · Shroom Labs", description: "The rules for using Shroom Labs and Grow Coach: billing, renewals, refunds, the beta, and installing on your Shrooly at your own risk." },
-  "contact.html": { active: "", path: "/contact", title: "Contact · Shroom Labs", description: "Send Shroom Labs a message about your account, billing, a refund, a chamber, or your data." },
+  // Legal and contact pages: public, no sign-in, linked from every footer. Indexable, so they are in the sitemap.
+  "privacy.html": { active: "", sitemap: true, path: "/privacy", title: "Privacy policy · Shroom Labs", description: "What Shroom Labs collects, how it's used, who else sees it, how it's kept safe, and how to download or delete it." },
+  "tos.html": { active: "", sitemap: true, path: "/tos", title: "Terms of Service · Shroom Labs", description: "The rules for using Shroom Labs and Grow Coach: billing, renewals, refunds, the beta, and installing on your Shrooly at your own risk." },
+  "contact.html": { active: "", sitemap: true, path: "/contact", title: "Contact · Shroom Labs", description: "Send Shroom Labs a message about your account, billing, a refund, a chamber, or your data." },
   "auth/callback.html": { active: "", path: "/auth/callback", robots: "noindex,nofollow", analytics: false, title: "Finishing sign in · Shroom Labs", description: "Finishing your Shroom Labs sign in. This page moves on by itself in a moment." },
 };
 
-/** App pages that need sign-in stay out of crawls. Public pages marked noindex stay crawlable so search engines can read the noindex. */
+/**
+ * Paths no crawler needs: sign-in app pages, staff pages, the API, and query string copies of
+ * public pages (checkout returns, search and filter links, sign-in redirects). Public pages
+ * marked noindex (feed, login) stay crawlable for search engines so they can read the noindex.
+ * Nothing here blocks CSS, JS, fonts, or images.
+ */
+export const ROBOTS_DISALLOW = [
+  "/admin",
+  "/moderate",
+  "/account",
+  "/publish",
+  "/profile$",
+  "/profile?",
+  "/device$",
+  "/device?",
+  "/devices",
+  "/fleet",
+  "/alerts-unsub",
+  "/auth/",
+  "/api/",
+  "/legacy-preview",
+  "/login?",
+  "/register?",
+  "/contact?",
+  "/*?checkout=",
+  "/*&checkout=",
+  "/*?session_id=",
+  "/*&session_id=",
+  "/*?pack=",
+  "/*?q=",
+];
+
+/** Search engine crawlers, named so none of them reads the site as closed. They follow the same rules as everyone. */
+export const SEARCH_BOTS = ["Googlebot", "Googlebot-Image", "Bingbot", "Applebot", "DuckDuckBot", "YandexBot", "Slurp", "Qwantbot"];
+
+/** AI search, assistant, and training crawlers. Allowed everywhere public, so Shroom Labs can be read and cited in AI answers. */
+export const AI_BOTS = [
+  "GPTBot",
+  "OAI-SearchBot",
+  "ChatGPT-User",
+  "PerplexityBot",
+  "Perplexity-User",
+  "ClaudeBot",
+  "Claude-SearchBot",
+  "Claude-User",
+  "anthropic-ai",
+  "Google-Extended",
+  "Applebot-Extended",
+  "Meta-ExternalAgent",
+  "Meta-ExternalFetcher",
+  "FacebookBot",
+  "Amazonbot",
+  "DuckAssistBot",
+  "YouBot",
+  "MistralAI-User",
+  "cohere-ai",
+  "CCBot",
+];
+
 export function renderRobots() {
-  const blocked = ["/profile$", "/profile?", "/account", "/publish", "/moderate", "/admin", "/device$", "/device?", "/devices", "/fleet", "/alerts-unsub", "/auth/"];
-  return `User-agent: *\nAllow: /\n${blocked.map((p) => `Disallow: ${p}`).join("\n")}\nSitemap: ${SITE}/sitemap.xml\n`;
+  const group = (agents, extra = []) =>
+    [...agents.map((a) => `User-agent: ${a}`), "Allow: /", ...[...ROBOTS_DISALLOW, ...extra].map((p) => `Disallow: ${p}`)].join("\n");
+  return `# robots.txt for shroomlabs.io. Generated by scripts/generate-seo.js.
+# Search engines and AI assistants are welcome to read, index, and cite every public page:
+# Shrooly owner help, the OpenShrooly installer, Grow Coach, grow guides, and grow profiles.
+# Summary for AI assistants: ${SITE}/llms.txt
+# Full text of the grow guides and culinary profiles: ${SITE}/llms-full.txt
+# Account, staff, checkout, and app pages need sign-in, so they are not worth crawling.
+
+${group(["*"])}
+
+# Search engines: same rules as everyone.
+${group(SEARCH_BOTS)}
+
+# AI search, assistants, and training: same rules as everyone.
+${group(AI_BOTS)}
+
+Sitemap: ${SITE}/sitemap.xml
+`;
 }
 
 export function writeSeoFiles(dir = PUBLIC) {
@@ -1402,6 +1675,7 @@ export function writeSeoFiles(dir = PUBLIC) {
   HUB_UPDATED.value = profiles.filter(isSearchProfile).map((p) => lastUpdated(p)).sort().pop() || TODAY;
   mkdirSync(join(dir, "profiles"), { recursive: true });
   mkdirSync(join(dir, "guides"), { recursive: true });
+  mkdirSync(join(dir, "tools"), { recursive: true });
   writeFileSync(join(dir, "sitemap.xml"), renderSitemap(profiles));
   writeFileSync(join(dir, "llms.txt"), renderLlms(profiles));
   writeFileSync(join(dir, "llms-full.txt"), renderLlmsFull(profiles));
@@ -1414,6 +1688,8 @@ export function writeSeoFiles(dir = PUBLIC) {
   writeFileSync(join(dir, "chefs-line.html"), renderChefsLinePage(profiles));
   for (const guide of GUIDES) writeFileSync(join(dir, "guides", `${guide.slug}.html`), renderGuidePage(guide));
   for (const page of OWNER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderOwnerPage(page));
+  for (const tool of TOOL_PAGES) writeFileSync(join(dir, "tools", `${tool.slug}.html`), renderToolPage(tool));
+  writeFileSync(join(dir, "js", "tool-species.js"), `/** Generated by scripts/generate-seo.js from the free culinary profiles. Used by js/tools.js. */\nexport const SPECIES = ${JSON.stringify(TOOL_SPECIES)};\n`);
   writeFileSync(join(dir, "js", "indexed-profiles.js"), `/** Generated by scripts/generate-seo.js. Profiles with a static page under /profiles/. */\nexport const INDEXED_PROFILES = new Set(${JSON.stringify(profiles.map((p) => p.id))});\n`);
   for (const profile of profiles) {
     writeFileSync(join(dir, "profiles", `${profile.id}.html`), renderProfilePage(profile, profiles));

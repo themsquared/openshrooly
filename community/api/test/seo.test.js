@@ -44,7 +44,8 @@ test("visitor label is Off-menu and pages stay indexable", () => {
   const gt = loadProfiles().find((p) => p.id === "golden-teacher");
   assert.equal(packLabel("psilocybin"), "Off-menu");
   assert.equal(isOffMenu(gt), true);
-  assert.equal(seoTitle(gt), "Golden Teacher (Psilocybe cubensis) grow profile · Shroom Labs");
+  assert.equal(seoTitle(gt), "Golden Teacher (Psilocybe cubensis) grow conditions for research · Shroom Labs");
+  assert.match(seoDescription(gt), /research and education/);
   assert.doesNotMatch(seoTitle(gt), /Restricted/i);
   assert.doesNotMatch(seoDescription(gt), DASH);
   assert.equal(gt.legal_notice, PSI_LEGAL_NOTICE, "data legal notice matches the shared constant");
@@ -115,7 +116,7 @@ test("generated Off-menu HTML carries legal notice, microscopy, and no commerce"
   }
 });
 
-test("Off-menu profiles stay out of the sitemap, llms.txt, llms-full.txt, FAQ, and hub", () => {
+test("Off-menu profiles are indexed, in the sitemap and a research section of llms.txt, and stay out of FAQ, hub, and llms-full", () => {
   const profiles = loadProfiles();
   const sitemap = renderSitemap(profiles);
   const llms = renderLlms(profiles);
@@ -123,22 +124,27 @@ test("Off-menu profiles stay out of the sitemap, llms.txt, llms-full.txt, FAQ, a
   const faq = renderFaqPage(profiles);
   const hub = renderHubPage(profiles);
   assert.match(sitemap, /\/profiles\/pearl-oyster</);
+  const research = llms.slice(llms.indexOf("## Off-menu research profiles"), llms.indexOf("## Help"));
+  assert.ok(research.includes(PSI_LEGAL_NOTICE));
+  assert.doesNotMatch(research, /\$|Coach|Chef|buy|price/i);
   for (const p of profiles.filter(isOffMenu)) {
-    for (const [name, text] of Object.entries({ sitemap, llms, full, faq, hub })) assert.ok(!text.includes(`/profiles/${p.id}`), `${p.id} in ${name}`);
+    assert.match(sitemap, new RegExp(`/profiles/${p.id}</loc><lastmod>\\d{4}-\\d{2}-\\d{2}</lastmod>`), `${p.id} in sitemap`);
+    assert.ok(research.includes(`/profiles/${p.id})`), `${p.id} in llms research section`);
+    for (const [name, text] of Object.entries({ full, faq, hub })) assert.ok(!text.includes(`/profiles/${p.id}`), `${p.id} in ${name}`);
+    const page = renderProfilePage(p, profiles);
+    assert.match(page, /<meta name="robots" content="index,follow">/);
+    assert.match(page, new RegExp(`<link rel="canonical" href="https://shroomlabs\\.io/profiles/${p.id}">`));
+    assert.doesNotMatch(page, /application\/ld\+json|googletagmanager|data-sl-view-item/);
   }
-  for (const text of [llms, full, faq, hub]) {
-    assert.doesNotMatch(text, /Off-menu|psilocyb|Golden Teacher/i);
-    assert.doesNotMatch(text, DASH);
-  }
-  const gt = renderProfilePage(profiles.find((p) => p.id === "golden-teacher"));
-  assert.match(gt, /<meta name="robots" content="noindex,follow">/);
+  for (const text of [full, faq, hub]) assert.doesNotMatch(text, /Off-menu|psilocyb|Golden Teacher/i);
+  for (const text of [llms, full, faq, hub]) assert.doesNotMatch(text, DASH);
 });
 
 test("free profile pages are full grow guides built only from profile data", () => {
   const profiles = loadProfiles();
   const lion = profiles.find((p) => p.id === "lions-mane");
   const html = renderProfilePage(lion, profiles);
-  assert.match(html, /<title>How to grow Lion&#39;s Mane at home: temps, humidity, light by stage<\/title>|<title>How to grow Lion's Mane at home: temps, humidity, light by stage<\/title>/);
+  assert.match(html, /<title>How to grow Lion(&#39;|')s Mane \(Hericium erinaceus, bearded tooth\) at home<\/title>/);
   assert.match(html, /<h1>How to grow Lion's Mane at home<\/h1>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/shroomlabs\.io\/profiles\/lions-mane">/);
   for (const stage of lion.stages) {
