@@ -42,7 +42,7 @@
     <h1>Admin</h1>
     <p id="admin-status" class="muted">Loading.</p>
     <div id="admin-body" class="hidden">
-      <nav class="admin-jump" aria-label="Sections"><a href="#overview">Overview</a><a href="#users">Users</a><a href="#devices">Devices</a><a href="#activations">Activations</a><a href="#spend">Spend</a><a href="#funnel">Checkout funnel</a><a href="#untracked">Not tracked</a></nav>
+      <nav class="admin-jump" aria-label="Sections"><a href="#overview">Overview</a><a href="#users">Users</a><a href="#devices">Devices</a><a href="#activations">Activations</a><a href="#spend">Spend</a><a href="#funnel">Checkout funnel</a><a href="#refunds">Refunds</a><a href="#untracked">Not tracked</a></nav>
       <section id="overview" aria-labelledby="overview-h"><h2 id="overview-h">Overview</h2><div id="overview-stats" class="stat-grid"></div></section>
       <label class="admin-search">Search users and devices <input id="admin-q" type="search" autocomplete="off" placeholder="email, name, device id"></label>
       <section id="users" aria-labelledby="users-h"><h2 id="users-h">Users</h2><div class="table-wrap"><table class="fleet-table admin-table" id="users-table"></table></div></section>
@@ -64,6 +64,13 @@
         <div id="funnel-stats" class="stat-grid"></div>
         <div class="table-wrap"><table class="fleet-table admin-table" id="funnel-table"></table></div>
         <ul id="funnel-notes" class="muted admin-notes"></ul>
+      </section>
+      <section id="refunds" aria-labelledby="refunds-h">
+        <h2 id="refunds-h">Refunds</h2>
+        <p class="muted">Every refund Stripe has sent us, live and test, newest first.</p>
+        <p id="refunds-empty" class="muted">No refunds yet.</p>
+        <div class="table-wrap"><table class="fleet-table admin-table" id="refunds-table"></table></div>
+        <p id="refunds-note" class="muted"></p>
       </section>
       <section id="untracked" aria-labelledby="untracked-h"><h2 id="untracked-h">Not tracked yet</h2><ul id="untracked-list" class="admin-notes"></ul></section>
     </div>
