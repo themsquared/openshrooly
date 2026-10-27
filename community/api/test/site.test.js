@@ -7,6 +7,7 @@ import { NAV_ITEMS, POSITIONING, SITE } from "../../web/public/js/chrome.js";
 import { PAGES, isPaid, isPsi, loadProfiles, writeSeoFiles } from "../../web/scripts/generate-seo.js";
 import { GUIDES } from "../../web/scripts/guides/index.js";
 import { OWNER_PAGES } from "../../web/scripts/owners/index.js";
+import { TOOL_PAGES } from "../../web/scripts/tools/index.js";
 import { publishedPosts } from "../../web/scripts/blog/index.js";
 
 const PUBLIC = join(import.meta.dirname, "../../web/public");
@@ -17,7 +18,7 @@ function read(file) {
 }
 
 function allPages() {
-  return [...Object.keys(PAGES), "grow.html", "chefs-line.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`), "blog.html", ...publishedPosts().map((p) => `blog/${p.slug}.html`)];
+  return [...Object.keys(PAGES), "grow.html", "chefs-line.html", ...OWNER_PAGES.map((p) => `${p.slug}.html`), ...TOOL_PAGES.map((t) => `tools/${t.slug}.html`), ...GUIDES.map((g) => `guides/${g.slug}.html`), ...profiles.map((p) => `profiles/${p.id}.html`), "blog.html", ...publishedPosts().map((p) => `blog/${p.slug}.html`)];
 }
 
 /** Clean public URL path for a page file: no .html anywhere. */
@@ -139,6 +140,7 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     HowTo: ["name", "step"],
     CollectionPage: ["name", "url", "mainEntity"],
     BreadcrumbList: ["itemListElement"],
+    WebPage: ["name", "url", "description"],
     SoftwareApplication: ["name", "url", "applicationCategory", "offers", "publisher"],
     Product: ["name", "url", "offers", "brand"],
     Blog: ["name", "url", "publisher"],
@@ -313,7 +315,9 @@ test("every page loads the stylesheet, icons, and the script that runs the mobil
     ]) assert.ok(html.includes(tag), `${file} missing ${tag}`);
     // Guide and profile pages are static reading pages: the small lite.js runs the menu. App pages load app.js.
     const lite = file.startsWith("profiles/") || file.startsWith("guides/") || file === "grow.html" || file === "chefs-line.html" || file === "faq.html" || LEGAL_PAGES.includes(file) || OWNER_PAGES.some((p) => file === `${p.slug}.html`) || file === "blog.html" || file.startsWith("blog/");
-    assert.ok(html.includes(`<script type="module" src="/js/${lite ? "lite" : "app"}.js"></script>`), `${file} script`);
+    // Tool pages load tools.js, which imports lite.js for the menu.
+    const script = file.startsWith("tools/") ? "tools" : lite ? "lite" : "app";
+    assert.ok(html.includes(`<script type="module" src="/js/${script}.js"></script>`), `${file} script`);
   }
 });
 

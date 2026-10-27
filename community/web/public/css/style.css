@@ -1429,3 +1429,26 @@ button.small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 .blog-item p.eyebrow { margin: 0; }
 .blog-note { border-left: 3px solid var(--sl-mycelium); padding: 0.4rem 0 0.4rem 0.9rem; color: var(--sl-ink-dim); }
 .blog-post code { overflow-wrap: anywhere; }
+
+/* Free tools: /tools/grow-timeline and /tools/fresh-air-planner. Mobile first, one column at 390px. */
+.tool-form { margin: 1.25rem 0; padding: 1rem; border: 1px solid var(--sl-line); border-radius: 16px; background: rgba(7, 17, 14, 0.45); }
+.tool-form fieldset { border: 0; margin: 0.6rem 0 0; padding: 0; min-width: 0; }
+.tool-form legend { font-weight: 700; font-size: 13px; color: var(--sl-ink-dim); padding: 0; margin: 0.55rem 0 0.2rem; }
+.tool-form .toggle { display: flex; gap: 0.6rem; align-items: center; font-weight: 400; font-size: 15px; color: inherit; }
+.tool-form input[type="radio"] { width: 20px; height: 20px; padding: 0; flex: none; margin: 0; accent-color: var(--sl-spore-deep); }
+.tool-form input[type="date"] { color-scheme: dark; }
+.tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 0.75rem; }
+.tool-grid.three { grid-template-columns: repeat(3, 1fr); }
+.tool-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.9rem; }
+.tool-actions .button { flex: 1 1 12rem; width: auto; }
+.tool-note { font-size: 13px; margin: 0.6rem 0 0; }
+.tool-result { margin: 1rem 0 1.5rem; }
+.tool-summary { font-size: 1.05rem; }
+.tool-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0 0 1rem; }
+.tool-stats div { border: 1px solid var(--sl-line); border-radius: 12px; padding: 0.6rem 0.75rem; }
+.tool-stats dt { font-size: 12px; color: var(--sl-ink-dim); }
+.tool-stats dd { margin: 0.15rem 0 0; font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tool-page .formula { padding: 0.75rem 0.9rem; border-left: 3px solid var(--sl-spore); background: rgba(125, 255, 179, 0.06); border-radius: 8px; }
+@media (min-width: 720px) { .tool-stats { grid-template-columns: repeat(3, 1fr); } }
+.home-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: -0.6rem 0 1.6rem; color: var(--sl-ink-dim); }
+.home-tools a { color: var(--sl-ink); text-decoration: underline; text-underline-offset: 3px; display: inline-flex; min-height: 44px; align-items: center; }

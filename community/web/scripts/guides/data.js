@@ -61,3 +61,36 @@ export function range(stageId, field) {
   const values = FREE_IDS.map((id) => profile(id).stages.find((s) => s.id === stageId)).filter(Boolean).map((s) => Number(s[field]));
   return [Math.min(...values), Math.max(...values)];
 }
+
+const FRUITING_LIKE = new Set(["pinning", "fruiting", "flush"]);
+
+/** Hours of light for a stage, from the light recipe when there is one. Same rule as lightHours in generate-seo.js. */
+export function lightHoursFor(p, s) {
+  const phases = p.light_recipe?.phases;
+  if (phases) {
+    const phase = phases[s.id] || (FRUITING_LIKE.has(s.id) ? phases.fruiting : phases.colonization) || {};
+    return Number(phase.photoperiod_hours ?? 0);
+  }
+  return Number(s.light?.duration_hours ?? 0);
+}
+
+/** The free species in the compact shape the two tools use in the browser. */
+export function toolSpecies() {
+  return FREE_IDS.map((id) => {
+    const p = profile(id);
+    return {
+      id,
+      name: p.name,
+      latin: p.species || "",
+      stages: p.stages.map((s) => ({
+        id: s.id,
+        name: s.name,
+        days: Number(s.duration_days || 0),
+        c: Number(s.temperature_c),
+        rh: Number(s.humidity_percent),
+        fan: { run: Number(s.fan?.run_duration_s || 0), every: Number(s.fan?.period_min || 0), speed: Number(s.fan?.speed_percent || 0) },
+        light: lightHoursFor(p, s),
+      })),
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
