@@ -447,3 +447,160 @@ test("webhook events for an unknown user or checkout are skipped with a 200, so 
     console.log = orig;
   }
 });
+
+async function buyProfile(ctx, token, user, n) {
+  const opened = await call(ctx, "POST", "/api/profiles/king-oyster-thick-stem/checkout", { token, body: {} });
+  assert.equal(opened.status, 200, JSON.stringify(opened.data));
+  const done = await signedWebhook(
+    ctx,
+    event(`evt_buy_${n}`, "checkout.session.completed", {
+      id: opened.data.id,
+      object: "checkout.session",
+      payment_status: "paid",
+      client_reference_id: String(user.id),
+      payment_intent: `pi_buy_${n}`,
+      metadata: { user_id: String(user.id), item_id: "king-oyster-thick-stem" },
+    })
+  );
+  assert.equal(done.status, 200, JSON.stringify(done.data));
+  return opened.data.id;
+}
+
+function chargeRefunded(id, n, { amount = 299, refunded, metadata, payment_intent = `pi_buy_${n}` } = {}) {
+  return event(id, "charge.refunded", {
+    id: `ch_buy_${n}`,
+    object: "charge",
+    amount,
+    amount_refunded: refunded,
+    refunded: refunded >= amount,
+    livemode: false,
+    payment_intent,
+    metadata,
+  });
+}
+
+async function unlocked(ctx, token) {
+  const res = await call(ctx, "GET", "/api/profiles/king-oyster-thick-stem", { token });
+  return res.data.unlocked;
+}
+
+test("a partial refund keeps the profile unlock; the full refund after it revokes it once", async () => {
+  const { ctx } = liveEnv();
+  const { token, user } = await register(ctx, "refund-partial@example.com");
+  await buyProfile(ctx, token, user, 1);
+  assert.equal(await unlocked(ctx, token), true);
+  const meta = { user_id: String(user.id), item_id: "king-oyster-thick-stem" };
+
+  const partial = await signedWebhook(ctx, chargeRefunded("evt_ref_p1", 1, { refunded: 100, metadata: meta }));
+  assert.equal(partial.status, 200, JSON.stringify(partial.data));
+  assert.equal(await unlocked(ctx, token), true, "partial refund keeps the unlock");
+
+  const full = await signedWebhook(ctx, chargeRefunded("evt_ref_f1", 1, { refunded: 299, metadata: meta }));
+  assert.equal(full.status, 200, JSON.stringify(full.data));
+  assert.equal(await unlocked(ctx, token), false, "full refund takes it away");
+
+  // A late, older partial event must not undo or double count anything.
+  const late = await signedWebhook(ctx, chargeRefunded("evt_ref_p0", 1, { refunded: 50, metadata: meta }));
+  assert.equal(late.status, 200);
+  const again = await signedWebhook(ctx, chargeRefunded("evt_ref_f1", 1, { refunded: 299, metadata: meta }));
+  assert.equal(again.data.replayed, true);
+
+  const row = await ctx.db.one("SELECT * FROM checkouts WHERE user_id=? AND item_id=? ORDER BY created_at DESC", [user.id, "king-oyster-thick-stem"]);
+  assert.equal(row.status, "paid", "status stays paid so the funnel still counts the sale");
+  const saved = JSON.parse(row.details).refunds.ch_buy_1;
+  assert.equal(saved.refunded_cents, 299);
+  assert.equal(saved.full, true);
+  assert.equal(saved.revoked, true);
+
+  // They can buy it again after a full refund.
+  await buyProfile(ctx, token, user, 2);
+  assert.equal(await unlocked(ctx, token), true);
+});
+
+test("a refund matched only by payment intent (no metadata) still revokes the unlock", async () => {
+  const { ctx } = liveEnv();
+  const { token, user } = await register(ctx, "refund-pi@example.com");
+  await buyProfile(ctx, token, user, 3);
+  const res = await signedWebhook(ctx, chargeRefunded("evt_ref_pi", 3, { refunded: 299 }));
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.equal(await unlocked(ctx, token), false);
+});
+
+test("a full refund of an old charge does not revoke a newer purchase of the same profile", async () => {
+  const { ctx } = liveEnv();
+  const { token, user } = await register(ctx, "refund-rebuy@example.com");
+  const meta = { user_id: String(user.id), item_id: "king-oyster-thick-stem" };
+  await buyProfile(ctx, token, user, 4);
+  await signedWebhook(ctx, chargeRefunded("evt_ref_r1", 4, { refunded: 299, metadata: meta }));
+  assert.equal(await unlocked(ctx, token), false);
+  await buyProfile(ctx, token, user, 5);
+  assert.equal(await unlocked(ctx, token), true);
+  // Stripe sends one more refund event on the first charge (say a refund update). The new unlock stays.
+  const res = await signedWebhook(ctx, chargeRefunded("evt_ref_r1b", 4, { refunded: 299, metadata: meta }));
+  assert.equal(res.status, 200);
+  assert.equal(await unlocked(ctx, token), true);
+});
+
+test("a refund for a charge we never sold is skipped with a 200", async () => {
+  const { ctx } = liveEnv();
+  const logs = [];
+  const orig = console.log;
+  console.log = (line) => logs.push(String(line));
+  try {
+    const res = await signedWebhook(ctx, chargeRefunded("evt_ref_ghost", 99, { refunded: 500, amount: 500, metadata: { user_id: "999999", item_id: "king-oyster-thick-stem" } }));
+    assert.equal(res.status, 200);
+    assert.equal(res.data.ignored, true);
+    assert.equal(res.data.reason, "unknown charge");
+  } finally {
+    console.log = orig;
+  }
+});
+
+test("a Coach refund is logged; access ends on the subscription cancel event, and /admin shows refunds", async () => {
+  const { ctx } = liveEnv();
+  const { token, user } = await register(ctx, "refund-coach@example.com");
+  ctx.ADMIN_USER_IDS = String(user.id);
+  const session = await call(ctx, "POST", "/api/coach/subscribe", { token, body: {} });
+  assert.equal(session.status, 200, JSON.stringify(session.data));
+  const metadata = { user_id: String(user.id), item_id: "grow-coach" };
+  await signedWebhook(
+    ctx,
+    event("evt_cc_done", "checkout.session.completed", {
+      id: session.data.id,
+      object: "checkout.session",
+      mode: "subscription",
+      payment_status: "paid",
+      client_reference_id: String(user.id),
+      customer: "cus_refund_1",
+      subscription: "sub_refund_1",
+      metadata,
+    })
+  );
+  assert.equal(await hasCoach(ctx, token), true);
+  // Invoice charges carry no checkout metadata; match by customer.
+  const refund = await signedWebhook(
+    ctx,
+    event("evt_cc_ref", "charge.refunded", { id: "ch_coach_1", object: "charge", amount: 900, amount_refunded: 900, refunded: true, customer: "cus_refund_1", metadata: {} })
+  );
+  assert.equal(refund.status, 200, JSON.stringify(refund.data));
+  assert.equal(refund.data.ignored, undefined, JSON.stringify(refund.data));
+  assert.equal(await hasCoach(ctx, token), true, "the refund alone does not cut Coach");
+  await signedWebhook(ctx, event("evt_cc_del", "customer.subscription.deleted", { id: "sub_refund_1", object: "subscription", status: "canceled", customer: "cus_refund_1", metadata }));
+  assert.equal(await hasCoach(ctx, token), false, "cancel with refund ends access");
+
+  // Plus a profile refund, so admin shows both kinds.
+  await buyProfile(ctx, token, user, 6);
+  await signedWebhook(ctx, chargeRefunded("evt_ref_admin", 6, { refunded: 299, metadata: { user_id: String(user.id), item_id: "king-oyster-thick-stem" } }));
+  const funnel = await call(ctx, "GET", "/api/admin/funnel", { token });
+  assert.equal(funnel.status, 200, JSON.stringify(funnel.data));
+  assert.equal(funnel.data.refunds.length, 2);
+  const prof = funnel.data.refunds.find((r) => r.item_id === "king-oyster-thick-stem");
+  assert.equal(prof.revoked, true);
+  assert.equal(prof.refunded_cents, 299);
+  assert.equal(prof.email, "refund-coach@example.com");
+  const coach = funnel.data.refunds.find((r) => r.item_id === "grow-coach");
+  assert.equal(coach.revoked, false);
+  assert.ok(funnel.data.notes.refunds);
+  const overview = await call(ctx, "GET", "/api/admin/overview", { token });
+  assert.deepEqual(overview.data.refunds, { count: 2, unlocks_revoked: 1 });
+});

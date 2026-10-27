@@ -152,7 +152,7 @@ test("checkout funnel counts started, completed and abandoned per item, live and
   }
   const f = (await call(ctx, "GET", "/api/admin/funnel", { token: admin.token })).data;
   const week = f.live["7d"];
-  assert.deepEqual(week.total, { started: 6, completed: 2, expired: 1, failed: 1, abandoned: 3, open: 1, revenue_cents: 5199, conversion: 0.4 });
+  assert.deepEqual(week.total, { started: 6, completed: 2, expired: 1, failed: 1, abandoned: 3, open: 1, revenue_cents: 5199, refunded_cents: 0, refunds: 0, conversion: 0.4 });
   const king = week.items.find((i) => i.item_id === "king-oyster-thick-stem");
   assert.deepEqual([king.started, king.completed, king.expired, king.abandoned, king.open, king.conversion], [4, 1, 1, 2, 1, 0.333]);
   const yearly = week.items.find((i) => i.plan === "yearly");

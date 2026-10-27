@@ -22,6 +22,9 @@ export const SQL = {
   setCoachSub: "UPDATE coach_subs SET status=?, period_end=? WHERE user_id=?",
   seenEvent: "SELECT * FROM payment_events WHERE event_id=?",
   recordEvent: "INSERT OR IGNORE INTO payment_events (event_id, checkout_id, type, created_at) VALUES (?, ?, ?, ?)",
+  checkoutsFor: "SELECT * FROM checkouts WHERE user_id=? AND item_id=? ORDER BY created_at DESC",
+  checkoutsByStatus: "SELECT * FROM checkouts WHERE status=? ORDER BY created_at DESC",
+  revokeProfile: "DELETE FROM entitlements WHERE user_id=? AND item_id=? AND item_type=?",
 };
 
 function parseDetails(row) {
@@ -142,6 +145,8 @@ async function routeEvent(db, event) {
       return updateCoach(db, obj);
     case "customer.subscription.deleted":
       return cancelCoach(db, obj);
+    case "charge.refunded":
+      return refundCharge(db, obj, event.id);
     default:
       // Stripe retries anything that isn't a 2xx for days. Say thanks and move on.
       return IGNORE;
@@ -159,8 +164,9 @@ async function completeCheckout(db, event) {
   if (checkout.status === "paid") return { ok: true, replayed: true, ...base };
   if (!(await db.one(SQL.userById, [Number(checkout.user_id)]))) return skip("unknown user");
   const obj = event.object;
-  if (obj.customer || obj.subscription) {
-    const details = { ...parseDetails(checkout), customer: obj.customer || undefined, subscription: obj.subscription || undefined };
+  if (obj.customer || obj.subscription || obj.payment_intent) {
+    // payment_intent lets a later refund find this checkout.
+    const details = { ...parseDetails(checkout), customer: obj.customer || undefined, subscription: obj.subscription || undefined, payment_intent: obj.payment_intent || undefined };
     await db.run(SQL.setCheckoutDetails, [JSON.stringify(details), checkout.id]);
   }
   await db.run(SQL.setCheckoutStatus, ["paid", checkout.id]);
@@ -238,4 +244,90 @@ async function cancelCoach(db, sub) {
   if (!existing) return skip((await db.one(SQL.userById, [userId])) ? "no coach plan" : "unknown user");
   await db.run(SQL.setCoachSub, ["canceled", nowIso(), userId]);
   return { ok: true, item_id: COACH_ITEM, item_type: "subscription", user_id: userId, status: "canceled" };
+}
+
+/**
+ * Find the checkout a charge paid for. Profile charges carry our checkout metadata (copied from the
+ * PaymentIntent). Older ones match on the PaymentIntent id we saved at checkout. Coach renewals carry
+ * no metadata, so they match the customer on the first Coach checkout.
+ */
+async function checkoutForCharge(db, charge) {
+  const meta = metadataOf(charge);
+  const pi = String(charge.payment_intent || "");
+  const userId = Number(meta.user_id || 0);
+  if (userId > 0 && meta.item_id) {
+    const rows = await db.all(SQL.checkoutsFor, [userId, String(meta.item_id)]);
+    const hit =
+      rows.find((r) => meta.ref && parseDetails(r).ref === meta.ref) ||
+      rows.find((r) => pi && parseDetails(r).payment_intent === pi) ||
+      rows.find((r) => r.status === "paid");
+    if (hit) return hit;
+  }
+  if (!pi && !charge.customer) return null;
+  const all = await db.all(SQL.checkoutsByStatus, ["paid"]);
+  if (pi) {
+    const hit = all.find((r) => parseDetails(r).payment_intent === pi);
+    if (hit) return hit;
+  }
+  const customer = String(charge.customer || "");
+  if (customer) return all.find((r) => r.item_id === COACH_ITEM && parseDetails(r).customer === customer) || null;
+  return null;
+}
+
+function fullyRefunded(row) {
+  const refunds = parseDetails(row).refunds;
+  return Boolean(refunds && typeof refunds === "object" && Object.values(refunds).some((r) => r && r.full));
+}
+
+/**
+ * A refund in the Stripe dashboard. Stripe sends charge.refunded on every refund with the running
+ * total, so this is safe to repeat. A full refund of a profile purchase takes the unlock away.
+ * A partial one keeps it. Either way the refund is saved on the checkout for the admin page.
+ * Coach access is not touched here: it ends when the subscription is canceled
+ * (customer.subscription.deleted), which is what "cancel and refund" in Stripe sends.
+ */
+async function refundCharge(db, charge, eventId) {
+  const chargeId = String(charge.id || "");
+  if (!chargeId) throw new ValidationError("charge id required");
+  const checkout = await checkoutForCharge(db, charge);
+  if (!checkout) return skip("unknown charge");
+  const amount = Number(charge.amount) || 0;
+  const refunded = Number(charge.amount_refunded) || 0;
+  const full = Boolean(charge.refunded) || (amount > 0 && refunded >= amount);
+  const isCoach = checkout.item_id === COACH_ITEM;
+  const details = parseDetails(checkout);
+  const refunds = details.refunds && typeof details.refunds === "object" ? details.refunds : {};
+  const prior = refunds[chargeId] || {};
+  // Revoke once. If they bought the profile again later, that newer purchase keeps the unlock.
+  let revoke = full && !isCoach && !prior.revoked;
+  if (revoke) {
+    const rows = await db.all(SQL.checkoutsFor, [Number(checkout.user_id), checkout.item_id]);
+    if (rows.some((r) => r.id !== checkout.id && r.status === "paid" && !fullyRefunded(r))) revoke = false;
+  }
+  // Events can arrive out of order. Keep the biggest running total.
+  const total = Math.max(refunded, Number(prior.refunded_cents) || 0);
+  refunds[chargeId] = {
+    charge: chargeId,
+    amount_cents: amount,
+    refunded_cents: total,
+    full: full || Boolean(prior.full),
+    livemode: Boolean(charge.livemode),
+    revoked: Boolean(prior.revoked) || revoke,
+    first_at: prior.first_at || nowIso(),
+    at: nowIso(),
+    event_id: eventId || prior.event_id || null,
+  };
+  await db.run(SQL.setCheckoutDetails, [JSON.stringify({ ...details, refunds }), checkout.id]);
+  if (revoke) await db.run(SQL.revokeProfile, [Number(checkout.user_id), checkout.item_id, "profile"]);
+  const kind = revoke ? "unlock revoked" : full && !isCoach ? "full refund logged, unlock already revoked or rebought" : isCoach ? "coach refund logged (access ends on subscription cancel)" : "partial refund logged, unlock kept";
+  console.log(JSON.stringify({ msg: "stripe refund", event_id: eventId, checkout_id: checkout.id, item_id: checkout.item_id, refunded_cents: total, amount_cents: amount, full, result: kind }));
+  return {
+    ok: true,
+    checkout_id: checkout.id,
+    item_id: checkout.item_id,
+    user_id: checkout.user_id,
+    refunded_cents: total,
+    full,
+    revoked: revoke,
+  };
 }
