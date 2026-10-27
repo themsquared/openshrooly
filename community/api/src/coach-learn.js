@@ -110,6 +110,9 @@ export function downsampleHistory(samples = [], { hours = 24, maxPoints = HISTOR
       humidity: s.humidity,
       temperature_setpoint: s.temperature_setpoint,
       humidity_setpoint: s.humidity_setpoint,
+      fan_speed: s.fan_speed,
+      water_level: s.water_level,
+      co2: s.co2,
     }));
   if (rows.length <= maxPoints) return rows;
   const spanMs = Math.max(60_000, Number(hours) * 3600 * 1000);
@@ -136,6 +139,9 @@ export function downsampleHistory(samples = [], { hours = 24, maxPoints = HISTOR
       humidity: avg(acc.rows.map((r) => r.humidity)),
       temperature_setpoint: avg(acc.rows.map((r) => r.temperature_setpoint)),
       humidity_setpoint: avg(acc.rows.map((r) => r.humidity_setpoint)),
+      fan_speed: avg(acc.rows.map((r) => r.fan_speed)),
+      water_level: avg(acc.rows.map((r) => r.water_level)),
+      co2: avg(acc.rows.map((r) => r.co2)),
       bucket_n: acc.rows.length,
     }));
 }
@@ -255,6 +261,7 @@ export function parseTelemetry(rows = []) {
         temperature_setpoint: num(doc.temperature_setpoint ?? doc.target_temperature ?? doc.temperature_target),
         fan_speed: num(doc.fan_speed ?? doc.fan_speed_percent ?? doc.air_exchange_speed),
         water_level: num(doc.water_level ?? doc.water ?? doc.water_level_percent),
+        co2: num(doc.co2 ?? doc.co2_ppm),
         temperature_calibration: num(
           doc.temperature_calibration ?? doc.temp_calibration_c ?? doc.calibration_c
         ),

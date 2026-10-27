@@ -184,7 +184,7 @@ export async function loadDeviceSnapshot(id) {
       api(`/api/fleet/devices/${enc}`),
       api(`/api/devices/${enc}/alerts`).catch(() => null),
     ]);
-    return { device: detail.device, history: detail.history, alerts, coach_available: null, source: "legacy" };
+    return { device: detail.device, history: detail.history, events: detail.events || [], range: detail.range || null, alerts, coach_available: null, source: "legacy" };
   }
 }
 

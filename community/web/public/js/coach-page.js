@@ -293,6 +293,7 @@ export function renderChamberCard(chamber, { now = Date.now() } = {}) {
     ${renderChamberStatus(device, now)}
     ${growing}
     ${readings}
+    ${device.reading ? `<div class="coach-chart" data-chart-device="${escapeHtml(device.id)}"></div>` : ""}
     ${when ? `<p class="muted device-reading-when">${escapeHtml(when)}</p>` : ""}
     ${chamber.autopilot ? `<p class="coach-mode-line"><strong>Mode:</strong> ${escapeHtml(modeText(chamber.autopilot))}</p>` : ""}
     ${renderModeToggle(chamber)}
