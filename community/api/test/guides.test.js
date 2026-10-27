@@ -60,14 +60,14 @@ test("guide links resolve: profiles are free and indexed, guides exist, affiliat
     const html = main(page(g.slug));
     for (const [, href] of html.matchAll(/href="([^"]+)"/g)) {
       if (href.startsWith("http")) {
-        assert.match(href, /^https:\/\/(northspore\.com|pnwspore\.com|openshrooly\.com)\//, `${g.slug} external ${href}`);
+        assert.match(href, /^https:\/\/(northspore\.com|pnwspore\.com|openshrooly\.com|ucanr\.edu|projects\.sare\.org)\//, `${g.slug} external ${href}`);
         continue;
       }
       assert.doesNotMatch(href, /\.html/, `${g.slug} ${href}`);
       const profile = href.match(/^\/profiles\/([a-z0-9-]+)$/);
       if (profile) assert.ok(indexed.has(profile[1]), `${g.slug} links free profile ${href}`);
       else if (href.startsWith("/guides/")) assert.ok(existsSync(join(PUBLIC, `${href}.html`)), `${g.slug} ${href}`);
-      else assert.ok(["/", "/grow", "/install", "/docs", "/faq", "/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq"].includes(href), `${g.slug} ${href}`);
+      else assert.ok(["/", "/grow", "/install", "/docs", "/faq", "/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq", "/shrooly-pods", "/shrooly-alternatives", "/tools/grow-timeline", "/tools/fresh-air-planner"].includes(href), `${g.slug} ${href}`);
     }
     // The affiliate note shows only when the page holds a tagged affiliate link, and then it must.
     if (/\sdata-affiliate[\s>]/.test(html)) assert.match(text(html), /commission/, `${g.slug} discloses affiliate links`);
