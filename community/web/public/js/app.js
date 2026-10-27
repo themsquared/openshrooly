@@ -1,3 +1,4 @@
+import { mountReadingChart } from "./reading-chart.js";
 import { api, apiBase, capabilities, getToken, isSignedIn, oidcStart, setToken } from "./api.js";
 import { speciesArt } from "./species-art.js";
 import { renderProfileCards } from "./profile-cards.js";
@@ -12,7 +13,6 @@ import {
   coachLine,
   deviceMetaLine,
   chartReady,
-  drawHistoryChart,
   growLine,
   growingLabels,
   lastSeenLine,
@@ -1438,6 +1438,26 @@ async function renderCoachDashboard(catalog) {
     $("#recs-list").removeAttribute("aria-busy");
     $("#recs-list").innerHTML = renderRecommendations(chambers);
     $("#chamber-list").innerHTML = renderChamberCards(chambers);
+    mountCoachCharts();
+  }
+
+  // Each chamber card gets the same readings chart as the device page, from the live snapshot.
+  const coachSnaps = new Map();
+  function mountCoachCharts() {
+    for (const box of document.querySelectorAll("#chamber-list [data-chart-device]")) {
+      const deviceId = box.dataset.chartDevice;
+      const enc = encodeURIComponent(deviceId);
+      const hit = coachSnaps.get(deviceId);
+      const fresh = hit && Date.now() - hit.at < 60 * 1000 ? Promise.resolve(hit.snap) : loadDeviceSnapshot(deviceId);
+      fresh
+        .then((snap) => {
+          coachSnaps.set(deviceId, { at: hit?.snap === snap ? hit.at : Date.now(), snap });
+          if (!box.isConnected || !chartReady(snap.history)) return;
+          const chart = mountReadingChart(box, { title: "Readings", loadRange: (hours) => api(`/api/fleet/devices/${enc}?hours=${hours}`) });
+          chart.update({ history: snap.history || [], events: snap.events || [], range: snap.range || null, device: snap.device });
+        })
+        .catch(() => {});
+    }
   }
 
   let before = null;
@@ -2048,10 +2068,9 @@ async function renderDevice() {
     dash.innerHTML = `
       <div id="dev-identity"></div>
       <div id="dev-gauges"></div>
-      <figure class="fleet-chart card hidden" id="reading-chart-box">
-        <figcaption>Readings, last 24 hours</figcaption>
-        <svg id="reading-chart" viewBox="0 0 360 140" role="img" aria-label="Temperature and humidity over time"></svg>
-      </figure>
+      <section class="fleet-chart card hidden" id="reading-chart-box" aria-label="Readings chart">
+        <div id="reading-chart"></div>
+      </section>
       <p class="muted hidden" id="reading-chart-wait">A chart of the last 24 hours shows up here after a couple of readings.</p>
       <div id="dev-controls"></div>
       <div id="dev-commands"></div>
@@ -2114,12 +2133,19 @@ async function renderDevice() {
     buildDash();
     swap("#dev-identity", renderIdentity(device));
     swap("#dev-gauges", renderGauges(device));
-    if ($("#reading-chart")._history !== JSON.stringify(snap.history || [])) {
-      $("#reading-chart")._history = JSON.stringify(snap.history || []);
+    const chartKey = JSON.stringify([snap.history || [], snap.events || [], device.targets || null]);
+    if ($("#reading-chart")._history !== chartKey) {
+      $("#reading-chart")._history = chartKey;
       const ready = chartReady(snap.history);
       $("#reading-chart-box").classList.toggle("hidden", !ready);
       $("#reading-chart-wait").classList.toggle("hidden", ready);
-      if (ready) drawHistoryChart($("#reading-chart"), snap.history || []);
+      if (ready) {
+        view.chart ||= mountReadingChart($("#reading-chart"), {
+          title: "Readings",
+          loadRange: (hours) => api(`/api/fleet/devices/${encodeURIComponent(id)}?hours=${hours}`),
+        });
+        view.chart.update({ history: snap.history || [], events: snap.events || [], range: snap.range || null, device });
+      }
     }
     paintControls();
     // A card or link with #grow lands on the profile picker once it exists.
@@ -2372,6 +2398,7 @@ async function renderFleet() {
     $("#fleet-detail").classList.remove("hidden");
     const cacheKey = `device:${detailId}`;
     let d = null;
+    let fleetChart = null;
     const paintDetail = (data, { cached = false } = {}) => {
       if (!data?.device) return;
       d = data.device;
@@ -2397,7 +2424,11 @@ async function renderFleet() {
         .map(([label, value, unit]) => `<div class="stat"><strong>${value == null || value === "" ? "Not reported" : `${safeDisplay(value)}${escapeHtml(unit)}`}</strong><span>${escapeHtml(label)}</span></div>`)
         .join("");
       $("#detail-when").textContent = readingWhenLine(d);
-      drawHistoryChart($("#reading-chart"), data.history || []);
+      fleetChart ||= mountReadingChart($("#reading-chart"), {
+        title: "Readings",
+        loadRange: (hours) => api(`/api/fleet/devices/${encodeURIComponent(detailId)}?hours=${hours}`),
+      });
+      fleetChart.update({ history: data.history || [], events: data.events || [], range: data.range || null, device: d });
       if (!cached) liveCache.set(cacheKey, data);
     };
     const cachedDetail = liveCache.get(cacheKey);

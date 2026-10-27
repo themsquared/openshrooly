@@ -1,5 +1,6 @@
 /** Cloud chamber list, groups, and central apply. Users only see their own devices. */
 
+import { loadChartEvents } from "./chart-events.js";
 import { laterIso, nowIso } from "./crypto.js";
 import { requireVerified, userFromRequest } from "./auth.js";
 import { isPsilocybin, normalizeStoredProfileLight, ValidationError, validateStageLight } from "./profile.js";
@@ -418,11 +419,10 @@ export async function deviceDetail(db, env, user, device, { hours = 24, now = Da
     loadRecentTelemetry(db, device.id, { now, windowMs: hours * 3600 * 1000, limit: TELEMETRY_HISTORY_LIMIT }),
     enrichDevice(db, env, user, device, { now, coachAvailable }),
   ]);
-  const history = downsampleHistory(
-    samples.filter((s) => !s.created_at || s.created_at >= since),
-    { hours }
-  );
-  return { device: enriched, history };
+  const inRange = samples.filter((s) => !s.created_at || s.created_at >= since);
+  const history = downsampleHistory(inRange, { hours });
+  const events = await loadChartEvents(db, device, { samples: inRange, since, now });
+  return { device: enriched, history, events, range: { hours, since, until: new Date(now).toISOString() } };
 }
 
 /** Cloud controls with whether this chamber's firmware can take each one. */

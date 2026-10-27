@@ -66,7 +66,7 @@ async function buildChamberSnapshot(env, device, owner, now) {
     // The alerts panel needs a verified email, same as GET /api/devices/:id/alerts.
     Number(owner.email_verified) ? deviceAlertsView(db, env, owner, device) : null,
   ]);
-  return { device: detail.device, history: detail.history, alerts, coach_available: coachAvailable };
+  return { device: detail.device, history: detail.history, events: detail.events, range: detail.range, alerts, coach_available: coachAvailable };
 }
 
 export async function buildSnapshot(env, deviceId, { now = Date.now() } = {}) {
