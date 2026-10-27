@@ -138,6 +138,8 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     HowTo: ["name", "step"],
     CollectionPage: ["name", "url", "mainEntity"],
     BreadcrumbList: ["itemListElement"],
+    SoftwareApplication: ["name", "url", "applicationCategory", "offers", "publisher"],
+    Product: ["name", "url", "offers", "brand"],
   };
   const seen = new Set();
   for (const file of allPages()) {
@@ -160,6 +162,11 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
           assert.match(node.potentialAction.target.urlTemplate, /\{search_term_string\}/);
           assert.equal(node.potentialAction["query-input"], "required name=search_term_string");
         }
+        if (node["@type"] === "Product") {
+          assert.ok(!file.includes("golden-teacher"), `${file} Off-menu has no Product`);
+          assert.match(String(node.offers.price), /^\d+\.\d\d$/);
+          assert.equal(node.offers.priceCurrency, "USD");
+        }
         if (node["@type"] === "HowTo") node.step.forEach((step, i) => assert.equal(step.position, i + 1));
       }
     }
@@ -172,17 +179,14 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
   for (const q of faq.mainEntity) assert.ok(read("faq.html").includes(q.name.replaceAll("'", "&#39;")) || read("faq.html").includes(q.name), q.name);
 });
 
-test("sitemap lists every culinary profile with lastmod, leaves Off-menu out, and uses clean URLs", () => {
+test("sitemap lists every public profile with lastmod, Off-menu included, and uses clean URLs", () => {
   const sitemap = read("sitemap.xml");
   const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   assert.equal([...sitemap.matchAll(/<lastmod>\d{4}-\d\d-\d\d<\/lastmod>/g)].length, locs.length, "every url has lastmod");
   assert.ok(profiles.some(isPsi));
   for (const profile of profiles) {
     const loc = `${SITE}/profiles/${profile.id}`;
-    if (isPsi(profile)) {
-      assert.ok(!locs.includes(loc), `${profile.id} is Off-menu and must stay out of the sitemap`);
-      assert.match(meta(read(`profiles/${profile.id}.html`), "name", "robots")[0], /noindex/);
-    } else assert.ok(locs.includes(loc), profile.id);
+    assert.ok(locs.includes(loc), profile.id);
   }
   assert.ok(locs.includes(`${SITE}/grow`));
   const byPath = Object.fromEntries(allPages().map((f) => [`${SITE}${cleanPath(f)}`, f]));
@@ -252,7 +256,12 @@ test("Grow Coach stays off every static page except /coach, which is public and 
   // account.html keeps an empty slot; app.js fills it only for users the API says can use Coach.
   assert.match(read("account.html"), /<div id="coach-billing" hidden><\/div>/);
   assert.match(readFileSync(join(PUBLIC, "js/app.js"), "utf8"), /const show = Boolean\(me\.grow_coach\?\.available\);\s*coachBilling\.hidden = !show;/);
-  for (const file of ["llms.txt", "llms-full.txt"]) assert.doesNotMatch(read(file), /Grow Coach|\/coach\b/, file);
+  // llms.txt describes Grow Coach and links /coach, but its Off-menu research section never does.
+  const llms = read("llms.txt");
+  assert.match(llms, /\[Grow Coach\]\(https:\/\/shroomlabs\.io\/coach\)/);
+  const research = llms.slice(llms.indexOf("## Off-menu research profiles"), llms.indexOf("## Help"));
+  assert.ok(research.length > 0);
+  assert.doesNotMatch(research, /Coach|\/coach\b|\$/);
   // /coach is the one Coach URL in the sitemap.
   assert.deepEqual(read("sitemap.xml").match(/<loc>[^<]*\/coach[^<]*<\/loc>/g), ["<loc>https://shroomlabs.io/coach</loc>"]);
   for (const file of ["faq.html", "docs.html"]) {
