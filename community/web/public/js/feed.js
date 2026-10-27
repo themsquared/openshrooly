@@ -2,6 +2,7 @@
 
 import { escapeHtml } from "./safe-markdown.js";
 import { resolveMediaUrl } from "./photo-upload.js";
+import { shareButtonHtml, shareUrl, signupCtaHtml } from "./share.js";
 
 export const FEED_MAX_EDGE = 1600;
 export const FEED_QUALITY = 0.85;
@@ -33,6 +34,10 @@ export function postHtml(post, { moderator = false, showProfile = true, now = Da
   const status = moderator && post.status && post.status !== "visible" ? `<span class="chip feed-status">${escapeHtml(post.status)}</span>` : "";
   const reports = moderator && post.report_count ? `<span class="muted"> ${Number(post.report_count)} reports</span>` : "";
   const actions = [];
+  if (!post.status || post.status === "visible") {
+    const title = post.profile?.name ? `Grow progress: ${post.profile.name}` : "Grow progress on Shroom Labs";
+    actions.push(shareButtonHtml({ url: shareUrl(`/feed#post-${encodeURIComponent(String(post.id))}`), title, type: "feed_post", itemId: post.profile?.id || "", className: "btn-ghost" }));
+  }
   if (post.mine) actions.push(`<button type="button" class="btn-ghost" data-feed="delete" data-id="${id}">Delete</button>`);
   else actions.push(`<button type="button" class="btn-ghost" data-feed="report" data-id="${id}">Report</button>`);
   if (moderator) {
@@ -40,7 +45,7 @@ export function postHtml(post, { moderator = false, showProfile = true, now = Da
     else actions.push(`<button type="button" class="btn-ghost" data-feed="hide" data-id="${id}">Hide</button>`);
     actions.push(`<button type="button" class="btn-ghost danger" data-feed="remove" data-id="${id}">Remove</button>`);
   }
-  return `<article class="feed-post card" data-post="${id}">
+  return `<article class="feed-post card" id="post-${id}" data-post="${id}">
     <img class="feed-photo" src="${escapeHtml(post.photo_url)}" alt="Grow photo${post.profile?.name ? `, ${escapeHtml(post.profile.name)}` : ""}" loading="lazy" decoding="async"${size}>
     <div class="feed-body">
       ${profile}${status}
@@ -147,9 +152,27 @@ export async function mountFeed({ root, api, encodePhoto, signedIn = false, prof
     }
   });
 
+  // A shared post link lands on /feed#post-<id>. Bring it into view once the list is in.
+  const hash = typeof location !== "undefined" ? location.hash : "";
+  if (/^#post-[\w-]+$/.test(hash)) {
+    const target = root.querySelector(hash);
+    if (target) {
+      target.classList.add("is-linked");
+      target.scrollIntoView({ block: "start" });
+    }
+  }
+
   const slot = root.querySelector("#feed-form-slot");
   if (!signedIn) {
-    slot.innerHTML = `<p class="muted"><a href="/login?next=${encodeURIComponent(location.pathname + location.search)}">Sign in</a> to share photos of your grow.</p>`;
+    const next = location.pathname + location.search;
+    slot.innerHTML = profileId
+      ? `<p class="muted"><a href="/login?next=${encodeURIComponent(next)}">Sign in</a> to share photos of your grow.</p>`
+      : signupCtaHtml({
+          next,
+          where: "feed",
+          heading: "Post your own grow",
+          body: "Make a free account to post progress photos. Link your Shrooly and you can send it any profile in the library.",
+        });
     return true;
   }
   if (!first.can_post) {
