@@ -144,7 +144,7 @@ test("free profile pages are full grow guides built only from profile data", () 
   const profiles = loadProfiles();
   const lion = profiles.find((p) => p.id === "lions-mane");
   const html = renderProfilePage(lion, profiles);
-  assert.match(html, /<title>How to grow Lion&#39;s Mane at home: temps, humidity, light by stage<\/title>|<title>How to grow Lion's Mane at home: temps, humidity, light by stage<\/title>/);
+  assert.match(html, /<title>How to grow Lion(&#39;|')s Mane \(Hericium erinaceus, bearded tooth\) at home<\/title>/);
   assert.match(html, /<h1>How to grow Lion's Mane at home<\/h1>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/shroomlabs\.io\/profiles\/lions-mane">/);
   for (const stage of lion.stages) {

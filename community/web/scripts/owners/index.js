@@ -37,6 +37,13 @@ export const SOURCES = {
   classAction: { label: "r/shrooly: Class Action lawsuit (September 2025)", url: "https://www.reddit.com/r/shrooly/comments/1n5whkl/" },
   workable: { label: "r/shrooly: Workable OpenShrooly release! (August 30, 2025)", url: "https://www.reddit.com/r/shrooly/comments/1n4d9ib/" },
   open10: { label: "r/shrooly: OpenShrooly 1.0 (July 28, 2026)", url: "https://www.reddit.com/r/shrooly/comments/1v8lh50/openshrooly_10/" },
+  podsPage: { label: "Shrooly Pods page", url: "https://shrooly.com/pages/pods" },
+  product: { label: "Shrooly product page", url: "https://shrooly.com/pages/product-sh" },
+  anymush: { label: "Shrooly support article: AnyMush guide", url: "https://support.shrooly.com/en/articles/9362290-anymush-guide" },
+  secondFlush: { label: "Shrooly support article: Second flush", url: "https://support.shrooly.com/en/articles/9453273-second-flush" },
+  diyPod: { label: "r/shrooly: making your own pods (2025)", url: "https://www.reddit.com/r/shrooly/comments/1n2stod/" },
+  altSupplies: { label: "r/shrooly: bags and blocks that fit (2025)", url: "https://www.reddit.com/r/shrooly/comments/1n66ih9/" },
+  podDimensions: { label: "r/shrooly: pod dimensions (2025)", url: "https://www.reddit.com/r/shrooly/comments/1momylo/" },
 };
 
 const cite = (key) => a(SOURCES[key].url, SOURCES[key].label.split(" (")[0]);
@@ -289,7 +296,116 @@ const faq = {
   ],
 };
 
-export const OWNER_PAGES = [whatHappened, reuse, faq];
+
+const pods = {
+  slug: "shrooly-pods",
+  title: "Shrooly pods: how to refill or replace one",
+  h1: "Shrooly pods: how to refill or replace one",
+  eyebrow: "For Shrooly owners",
+  updated: "2026-10-27",
+  description: "Shrooly pods are hard to get now. What is in a pod, how to get a second flush, how to refill one, and which grow blocks and bags fit the chamber instead.",
+  answer:
+    "Owners report that new Shrooly pods are hard or impossible to get. You have three ways forward: get a second flush from the pod you have, refill a pod with your own substrate if you can work clean, or, easiest of all, replace it with a ready to fruit grow block or all in one bag that fits the chamber. With free OpenShrooly software, the chamber runs any block, no pod needed.",
+  sections: [
+    {
+      h2: "What is in a Shrooly pod?",
+      answer: "A pod is a sterilized block of sawdust, wheat bran, and water, colonized by one mushroom culture, in a bag sized for the chamber.",
+      html: `<p>The ${cite("product")} says you need pods to use Shrooly, and describes the substrate as sawdust, wheat bran, and water, sterilized before the culture goes in. The ${cite("podsPage")} sells them as ready to grow and lists one to two harvests per pod. The AnyMush pod is different: it comes with no culture in it, and its substrate is mostly coconut coir in a bag made for clean injection.</p>`,
+    },
+    {
+      h2: "Can I get a second flush from a used pod?",
+      answer: "Yes, many pods give a second, smaller harvest, oysters most often.",
+      html: `<p>The ${cite("secondFlush")} article says pods give up to two harvests and that oysters often give a second. After you pick the first flush, spray the cut face two or three times, set the pod back cut side up, and start a new program. If you are not ready to grow it again, seal the opening with a sticker or tape and keep it in the fridge. A short rest and a few hours in cold water before the second run often helps. See <a href="/guides/mushroom-grow-kit-not-growing">grow kit not growing</a> for what to do if it stays quiet.</p>`,
+    },
+    {
+      h2: "Can I refill a Shrooly pod myself?",
+      answer: "You can, but it is an advanced step, because the new substrate has to be sterilized and the culture added without letting mold in.",
+      html: `<p>A spent pod bag is not reusable as is. To refill one, you mix a new sawdust and bran substrate at the right moisture, sterilize it in a pressure cooker, let it cool, and add grain spawn or liquid culture in a clean space. Owners on ${cite("diyPod")} have tried it. For most people it is less work, and more reliable, to buy a block that is already colonized and drop it in. If you want to try the full process, start with <a href="/guides/grow-mushrooms-at-home">how to grow mushrooms at home</a>.</p>`,
+    },
+    {
+      h2: "What can I use instead of a Shrooly pod?",
+      answer: "Any ready to fruit grow block or all in one grow bag of about 1 to 2 lb that fits inside the chamber.",
+      html: `<p>Owners on ${cite("diyPod")} report that any 1 or 2 lb all in one bag works, and that a 2.5 to 3 lb bag might fit. In a thread on ${cite("altSupplies")}, an owner found a 9 × 5 × 4 inch bag almost perfect, a 10 × 5 × 5 inch bag a little too big, and 1 lb bags a perfect fit. Measure the inside of your chamber first, and see ${cite("podDimensions")} for what owners measured. Fold the top of a tall bag down rather than cramming it in.</p>
+      <ul>
+        <li><strong>Pick a colonized block.</strong> It should be white all the way through. A block still colonizing needs a few more weeks in the dark first.</li>
+        <li><strong>Open it the way the seller says.</strong> Usually an X or a slit on one face, facing the open side of the chamber.</li>
+        <li><strong>Pick species that like the chamber.</strong> Oysters, lion's mane, and other fast species do well in a small space. See <a href="/guides/how-long-to-grow-mushrooms">how long each mushroom takes</a>.</li>
+      </ul>`,
+    },
+    {
+      h2: "Can I use an AnyMush pod with my own culture?",
+      answer: "Yes, AnyMush pods were made for that: you inject liquid culture through the port, let it colonize, then grow it on a manual program.",
+      html: `<p>The ${cite("anymush")} says to inject 25 to 30 ml of liquid culture through the injection port, wait 5 to 10 days, shake the bag to spread the growth, then wait about 7 to 14 more days until it is fully colonized before you fruit it. If you still have AnyMush pods, they are the closest thing to a refill.</p>`,
+    },
+    {
+      h2: "What settings should I use without a pod?",
+      answer: "Use the conditions for the species in the block, stage by stage, from a free grow profile.",
+      html: `<p>A pod told the stock app which program to run. Without one, you set the temperature, humidity, fresh air, and light yourself. Each <a href="/grow">grow profile</a> lists them for every stage. With free OpenShrooly software on the chamber, you can pick a profile and it runs the stages for you. Plan the dates with the <a href="/tools/grow-timeline">grow timeline calculator</a>.</p>`,
+    },
+  ],
+  sources: ["product", "podsPage", "secondFlush", "anymush", "diyPod", "altSupplies", "podDimensions"],
+  related: [
+    ["Mushroom grow kit not growing", "/guides/mushroom-grow-kit-not-growing"],
+    ["Conditions for every species", "/grow"],
+  ],
+};
+
+const alternatives = {
+  slug: "shrooly-alternatives",
+  title: "Shrooly shut down? Your options and alternatives for the chamber",
+  h1: "Shrooly shut down? Your options",
+  eyebrow: "For Shrooly owners",
+  updated: "2026-10-27",
+  description: "Shrooly app and pods gone quiet? Your four options: revive the chamber with free software, run it by hand, build a simple chamber, or grow in a tub.",
+  answer:
+    "We could not find a public shutdown notice, but many owners report the Shrooly app no longer signs in and pods are hard to get. You still have four good options: revive the chamber with free software, run it by hand, build a simple chamber of your own, or grow in a plastic tub. The first keeps the hardware you paid for working.",
+  sections: [
+    {
+      h2: "Did Shrooly shut down?",
+      answer: "The company has not said so in public, but its last customer update was July 31, 2025, and owners report the app and support stopped working after that.",
+      html: `<p>The ${cite("july2025")} is the last one posted. Since August 2025 owners report sign in errors and unanswered support. Read <a href="/what-happened-to-shrooly">what happened to Shrooly</a> for the dated details and sources.</p>`,
+    },
+    {
+      h2: "Can I revive my Shrooly with free software?",
+      answer: "Yes, free open source software called OpenShrooly replaces the stock software and runs the chamber on your own Wi-Fi with no Shrooly app.",
+      html: `<p>It was created by Graham Stewart (${cite("openshrooly")}) and installs from Chrome or Edge with a USB-C cable in about 5 minutes. You set temperature, humidity, fresh air, and light from the chamber's own web page, or pick a stage by stage <a href="/grow">grow profile</a>. Shroom Labs adds an optional phone dashboard. Read <a href="/reuse-your-shrooly">reuse your Shrooly</a> for the steps and what to back up first.</p>`,
+    },
+    {
+      h2: "Can I run a Shrooly by hand without the app?",
+      answer: "Owners report the chamber can run stock manual programs from its own buttons, but we could not confirm how well that works without the app.",
+      html: `<p>The ${cite("connection")} article says the chamber needs internet and Bluetooth to start a new guided cultivation, so a new guided grow may not start. If your chamber still runs, keep the lid closed, mist the block two or three times a day if the humidity reading drops, and open it for fresh air several times a day. Use the <a href="/tools/fresh-air-planner">fresh air planner</a> and the species <a href="/grow">grow profiles</a> to know what to aim for. Without a pod, put in any ready to fruit block that fits, as in <a href="/shrooly-pods">Shrooly pods: how to refill or replace one</a>.</p>`,
+    },
+    {
+      h2: "Can I build my own mushroom chamber instead?",
+      answer: "Yes, a clear storage box or small shelf tent with a humidifier, a small fan on a timer, and a light on a timer does the same job.",
+      html: `<ul>
+        <li><strong>Box.</strong> A clear plastic box or a small grow tent, big enough for one or two blocks.</li>
+        <li><strong>Humidity.</strong> A small ultrasonic humidifier on a humidity controller, or a layer of damp perlite and misting.</li>
+        <li><strong>Fresh air.</strong> A small fan on a cycle timer, sized with the <a href="/tools/fresh-air-planner">fresh air planner</a>. Oyster rooms are run at 4 to 6 air changes an hour.</li>
+        <li><strong>Light.</strong> Room light or a small LED on a timer for about 12 hours a day.</li>
+        <li><strong>A thermometer and humidity meter.</strong> So you can match the numbers in the profile.</li>
+      </ul>
+      <p>Start with <a href="/guides/humidity-and-fresh-air">how much humidity and fresh air mushrooms need</a>.</p>`,
+    },
+    {
+      h2: "Can I just grow mushrooms in a tub?",
+      answer: "Yes, a clear plastic tub with holes for air, misted a few times a day, grows oysters and most other kits well.",
+      html: `<p>Drill or cut a few holes in the sides, set the opened block inside on a rack or a layer of damp perlite, and fan the lid a few times a day. Keep it in indirect light at room temperature. It is the cheapest option and works for most beginner species. Read <a href="/guides/grow-mushrooms-at-home">how to grow mushrooms at home</a>, and use <a href="/guides/mushroom-grow-kit-not-growing">grow kit not growing</a> if it stalls.</p>`,
+    },
+    {
+      h2: "Which option should I choose?",
+      answer: "If you have a Shrooly, revive it with free software first, since it keeps the chamber you paid for working and costs nothing.",
+      html: `<p>If you would rather not install anything, run it by hand with a ready to fruit block. If the chamber is broken, a simple box or tub grows the same mushrooms with a little more daily care. Whatever you choose, the free <a href="/grow">grow profiles</a> give you the conditions for each species, and the <a href="/tools/grow-timeline">grow timeline calculator</a> gives you the dates.</p>`,
+    },
+  ],
+  sources: ["july2025", "openshrooly", "openshroolyRepo", "connection", "outOfBusiness"],
+  related: [
+    ["Conditions for every species", "/grow"],
+    ["How long does it take to grow mushrooms?", "/guides/how-long-to-grow-mushrooms"],
+  ],
+};
+
+export const OWNER_PAGES = [whatHappened, reuse, faq, pods, alternatives];
 
 /** The searches these pages answer. Each one maps to a question h2 above. */
 export const TARGET_QUERIES = [
@@ -312,4 +428,12 @@ export const TARGET_QUERIES = [
   "shrooly class action lawsuit",
   "is shrooly worth it",
   "what happened to shrooly",
+  "shrooly pods",
+  "shrooly pod refill",
+  "shrooly pods replacement",
+  "shrooly anymush",
+  "shrooly second flush",
+  "shrooly shut down",
+  "shrooly alternative",
+  "shrooly without app",
 ];

@@ -14,6 +14,8 @@ import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PS
 import { INDEXNOW_KEY } from "../../api/src/indexnow.js";
 import { GUIDES } from "./guides/index.js";
 import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
+import { latinName, orList, otherNames, speciesTitle } from "./species-names.js";
+import { SPECIES as TOOL_SPECIES, TOOL_PAGES, TOOL_SOURCES } from "./tools/index.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
@@ -173,7 +175,7 @@ export function seoTitle(profile) {
     const sp = profile.species && profile.species !== profile.name ? ` (${profile.species})` : "";
     return `${profile.name}${sp} grow conditions for research · Shroom Labs`;
   }
-  if (isGuideProfile(profile)) return `How to grow ${profile.name} at home: temps, humidity, light by stage`;
+  if (isGuideProfile(profile)) return speciesTitle(profile);
   // Chef's line names already say the species and the method, so the Latin name would push past 80 characters.
   const species = profile.species && !isChef(profile) ? ` (${profile.species})` : "";
   return `${profile.name}${species} grow profile · Shroom Labs`;
@@ -205,7 +207,7 @@ export const PAGES_UPDATED = "2026-10-27";
  * build gives the same output on any machine and in a shallow CI checkout.
  * Bump PAGE_LAYOUT when the profile page layout changes enough to count as an update.
  */
-const PAGE_LAYOUT = "guide-v1";
+const PAGE_LAYOUT = "guide-v2";
 const DATES_FILE = join(ROOT, "scripts", "page-dates.json");
 const PAGE_DATES = existsSync(DATES_FILE) ? JSON.parse(readFileSync(DATES_FILE, "utf8")) : {};
 let datesChanged = false;
@@ -294,7 +296,9 @@ export function directAnswer(profile) {
   const hours = lightHours(profile, fruit);
   const lightPart = hours ? `${hours} h of light a day` : "no light";
   const dark = lightHours(profile, col) ? "" : " in the dark";
-  return `To grow ${profile.name} at home, colonize at ${tempText(col.temperature_c)}${dark}, then fruit at ${tempText(fruit.temperature_c)} and ${fruit.humidity_percent}% humidity with ${freshAirLabel(fruit)} and ${lightPart}. This profile runs about ${daysToFruit(profile)} days from the start of colonization to the end of the first harvest window.`;
+  const names = otherNames(profile.id).slice(0, 2);
+  const who = `${profile.name}${latinName(profile) ? ` (${latinName(profile)})` : ""}${names.length ? `, also called ${orList(names)},` : ""}`;
+  return `${who} takes about ${daysToFruit(profile)} days to grow at home, from spawn to the end of the first harvest. Colonize at ${tempText(col.temperature_c)}${dark}, then fruit at ${tempText(fruit.temperature_c)} and ${fruit.humidity_percent}% humidity with ${freshAirLabel(fruit)} and ${lightPart}.`;
 }
 
 function stageRows(profile) {
@@ -792,9 +796,11 @@ export function renderGuideProfilePage(profile, profiles = []) {
       <h2>How long does ${name} take to grow?</h2>
       <p>About ${daysToFruit(profile)} days from the start of colonization to the end of the first harvest window.</p>
       <ol class="grow-timeline">${timeline}</ol>
+      <p>Get dates for each stage from your own start day with the <a href="/tools/grow-timeline?species=${escapeHtml(profile.id)}">grow timeline calculator</a>, or compare every species in <a href="/guides/how-long-to-grow-mushrooms">how long mushrooms take to grow</a>.</p>
       ${renderLightRecipe(profile)}
       <h2>What goes wrong when growing ${name}?</h2>
       ${problems}
+      <p>Kit or block doing nothing? Work through <a href="/guides/mushroom-grow-kit-not-growing">grow kit not growing</a>. To check your fresh air, put your chamber size and fan into the <a href="/tools/fresh-air-planner?species=${escapeHtml(profile.id)}">fresh air planner</a>.</p>
       <h2>${name} growing FAQ</h2>
       ${faqHtml(profileFaq(profile))}
       ${
@@ -1132,6 +1138,54 @@ export function renderGuidePage(guide) {
   });
 }
 
+/** Free tool page: answer first, a working form with a server rendered example result, then how it works and an FAQ. */
+export function renderToolPage(tool) {
+  const url = `${SITE}${tool.path}`;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": `${url}#page`,
+        name: tool.h1,
+        description: tool.answer,
+        url,
+        inLanguage: "en",
+        dateModified: tool.updated,
+        isAccessibleForFree: true,
+        publisher: ORG_REF,
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${url}#faq`,
+        mainEntity: tool.faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+      },
+      breadcrumbs([["Home", `${SITE}/`], ["Grow guides", `${SITE}/grow`], [tool.h1, url]]),
+    ],
+  };
+  const sections = tool.sections.map((sec) => `<h2>${escapeHtml(sec.h2)}</h2>${sec.html}`).join("\n      ");
+  const body = `
+    <article class="profile-page guide-page tool-page">
+      ${crumbsHtml([["Home", "/"], ["Grow guides", "/grow"], [tool.h1, ""]])}
+      <p class="eyebrow">Free grow tool</p>
+      <h1>${escapeHtml(tool.h1)}</h1>
+      ${updatedHtml(tool.updated)}
+      <p class="lede answer-first">${escapeHtml(tool.answer)}</p>
+      ${tool.form()}
+      <div id="tool-result" class="tool-result" aria-live="polite">${tool.result()}</div>
+      ${sections}
+      <h2>FAQ</h2>${faqHtml(tool.faq)}
+      <h2>Sources</h2><ul class="faq-links">${TOOL_SOURCES.map(([label, href]) => `<li><a href="${href}" rel="nofollow noopener">${escapeHtml(label)}</a></li>`).join("")}<li><a href="/grow">Shroom Labs grow profiles</a></li></ul>
+      <h2>Keep reading</h2><ul class="faq-links">${tool.related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>
+    </article>`;
+  return shell({
+    head: { title: tool.title, description: tool.description, path: tool.path, type: "website", modified: tool.updated, jsonLd },
+    activeId: "grow",
+    body,
+    script: tool.script,
+  });
+}
+
 /** The one call to action every Shrooly owner page ends with. */
 export function installCta(secondary = ["What happened to Shrooly?", "/what-happened-to-shrooly"]) {
   return `<div class="owner-cta"><a class="button hero-cta" href="/install">Install on your Shrooly</a>${
@@ -1216,6 +1270,7 @@ export function sitemapEntries(profiles) {
     { path: "/grow", lastmod: HUB_UPDATED.value },
     { path: "/chefs-line", lastmod: PAGES_UPDATED },
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
+    ...TOOL_PAGES.map((t) => ({ path: t.path, lastmod: t.updated })),
     ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
     ...profiles.filter((p) => isPsi(p) && isIndexableProfile(p)).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
   ];
@@ -1297,6 +1352,10 @@ ${OWNER_PAGES.map((p) => `- [${p.h1}](${SITE}/${p.slug}): ${p.answer}`).join("\n
 - [Chef's line](${SITE}/chefs-line): paid specialty grow profiles for a better harvest. Each is a one-time purchase.
 ${GUIDES.map((g) => `- [${g.h1}](${SITE}/guides/${g.slug}): ${g.answer}`).join("\n")}
 
+## Free grow tools
+
+${TOOL_PAGES.map((t) => `- [${t.h1}](${SITE}${t.path}): ${t.answer}`).join("\n")}
+
 ## Grow profiles by species
 
 ${culinary.map(line).join("\n")}
@@ -1353,6 +1412,13 @@ export function renderLlmsFull(profiles) {
       }`
     );
   }
+  for (const t of TOOL_PAGES) {
+    out.push(
+      `## ${t.h1}\n\nURL: ${SITE}${t.path}\nUpdated: ${t.updated}\n\n${t.answer}\n\n### Example\n\n${stripHtml(t.result())}\n\n${t.sections
+        .map((sec) => `### ${sec.h2}\n\n${stripHtml(sec.html)}`)
+        .join("\n\n")}\n\n### FAQ\n\n${t.faq.map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}`
+    );
+  }
   for (const p of profiles.filter(isGuideProfile)) {
     const stages = (p.stages || [])
       .map((s) => `- ${s.name}: ${s.duration_days} days, ${tempText(s.temperature_c)}, ${s.humidity_percent}% humidity, ${fanText(s)}, light ${lightText(p, s).toLowerCase()}.${s.notes ? ` ${s.notes}` : ""}`)
@@ -1376,6 +1442,8 @@ export function renderRedirects(profiles) {
   lines.push("/chefs-line.html /chefs-line 301!", "/grow.html /grow 301!", "/terms /tos 301!", "/terms.html /tos 301!");
   for (const p of OWNER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
+  for (const t of TOOL_PAGES) lines.push(`${t.path}.html ${t.path} 301!`);
+  lines.push("/tools /grow 301!", "/tools/ /grow 301!");
   for (const p of profiles) lines.push(`/profiles/${p.id}.html /profiles/${p.id} 301!`);
   lines.push("/profiles /grow 301!", "/profiles/ /grow 301!", "/guides /grow 301!", "/guides/ /grow 301!");
   return `${lines.join("\n")}\n`;
@@ -1607,6 +1675,7 @@ export function writeSeoFiles(dir = PUBLIC) {
   HUB_UPDATED.value = profiles.filter(isSearchProfile).map((p) => lastUpdated(p)).sort().pop() || TODAY;
   mkdirSync(join(dir, "profiles"), { recursive: true });
   mkdirSync(join(dir, "guides"), { recursive: true });
+  mkdirSync(join(dir, "tools"), { recursive: true });
   writeFileSync(join(dir, "sitemap.xml"), renderSitemap(profiles));
   writeFileSync(join(dir, "llms.txt"), renderLlms(profiles));
   writeFileSync(join(dir, "llms-full.txt"), renderLlmsFull(profiles));
@@ -1619,6 +1688,8 @@ export function writeSeoFiles(dir = PUBLIC) {
   writeFileSync(join(dir, "chefs-line.html"), renderChefsLinePage(profiles));
   for (const guide of GUIDES) writeFileSync(join(dir, "guides", `${guide.slug}.html`), renderGuidePage(guide));
   for (const page of OWNER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderOwnerPage(page));
+  for (const tool of TOOL_PAGES) writeFileSync(join(dir, "tools", `${tool.slug}.html`), renderToolPage(tool));
+  writeFileSync(join(dir, "js", "tool-species.js"), `/** Generated by scripts/generate-seo.js from the free culinary profiles. Used by js/tools.js. */\nexport const SPECIES = ${JSON.stringify(TOOL_SPECIES)};\n`);
   writeFileSync(join(dir, "js", "indexed-profiles.js"), `/** Generated by scripts/generate-seo.js. Profiles with a static page under /profiles/. */\nexport const INDEXED_PROFILES = new Set(${JSON.stringify(profiles.map((p) => p.id))});\n`);
   for (const profile of profiles) {
     writeFileSync(join(dir, "profiles", `${profile.id}.html`), renderProfilePage(profile, profiles));
