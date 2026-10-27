@@ -1406,3 +1406,16 @@ button.small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 .rc-ev-item time { color: var(--sl-muted); font-size: 0.8rem; margin-left: 0.25rem; }
 .rc-ev-item .muted { font-size: 0.82rem; }
 .coach-chart:not(:empty) { margin: 0.8rem 0; padding-top: 0.7rem; border-top: 1px solid var(--sl-line); }
+
+/* Signed-out sign-up card and share buttons (js/share.js). Mobile first. */
+.signup-cta { padding: 1.1rem 1.2rem; margin: 1.2rem 0; display: grid; gap: 0.5rem; }
+.signup-cta h2 { margin: 0; font-size: 1.15rem; }
+.signup-cta p { margin: 0; }
+.signup-cta-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.2rem; }
+.signup-cta-actions .button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; flex: 1 1 10rem; }
+.share-row { margin: 0.4rem 0 1rem; }
+.share-btn { min-height: 40px; }
+.profile-page .actions:has(.share-btn) { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.feed-post.is-linked { outline: 2px solid var(--sl-ok, #9fd3a8); outline-offset: 2px; }
+.credits { text-align: center; margin: 2rem auto 0; max-width: 40rem; font-size: 0.9rem; }
+.feed-post { scroll-margin-top: 5rem; }

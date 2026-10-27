@@ -40,6 +40,7 @@ import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./pr
 import { lightRecipeLine } from "./light-line.js";
 import { mountPhotoCheck } from "./coach-photo.js";
 import { mountFeed } from "./feed.js";
+import { bindShareButtons, shareButtonHtml, shareUrl, signupCtaHtml } from "./share.js";
 import { accessText, coachView, NO_DECISIONS, priceText, renderChamberCards, renderDecisions, renderRecommendations } from "./coach-page.js";
 import { deviceOptions, fillHidden, linkedDevices, screenshotProblem } from "./feedback.js";
 import { ageText, keepLive, liveCache, loadDeviceList, loadDeviceSnapshot } from "./live.js";
@@ -320,6 +321,11 @@ async function renderGrowThis(profile) {
   if (!box) return;
   const next = location.pathname + location.search;
   if (!getToken()) {
+    // Culinary profiles get the full sign-up card. Off-menu and community uploads keep the plain sign-in button.
+    if (!isOffMenu(profile) && !profile.restricted) {
+      box.insertAdjacentHTML("afterend", signupCtaHtml({ next, where: "profile" }));
+      return;
+    }
     box.innerHTML = growThisHtml({ signedIn: false, next });
     box.classList.remove("hidden");
     return;
@@ -393,6 +399,10 @@ async function renderProfile() {
   $("#title").textContent = p.name;
   $("#meta").textContent = `${p.species || ""} ${p.strain ? "· " + p.strain : ""} · ${label}`;
   $("#summary").textContent = p.summary || "";
+  if (!off && !p.restricted && !$("#share-row")) {
+    $("#summary").insertAdjacentHTML("afterend", `<p id="share-row" class="share-row">${shareButtonHtml({ url: shareUrl(`/profile?id=${encodeURIComponent(p.id)}`), title: p.name, type: "profile", itemId: p.id })}</p>`);
+    bindShareButtons();
+  }
   $("#chips").innerHTML = `<span class="chip">${escapeHtml(label)}</span>`;
   const art = speciesArt(p.species, p.strain, p.name, p.pack, { id: p.id });
   const artEl = $("#art");
@@ -1133,6 +1143,7 @@ if (page === "devices") renderDevices().catch((err) => {
 });
 if (page === "publish") renderPublish();
 if (page === "moderate") renderModerate();
+if (page === "feed") bindShareButtons();
 if (page === "feed") mountFeed({ root: $("#feed"), api, encodePhoto: encodePhotoForUpload, signedIn: isSignedIn(), apiBase: apiBase() });
 if (page === "device") renderDevice().catch((err) => {
   if (err.status === 401) {
