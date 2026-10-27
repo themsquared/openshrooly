@@ -2313,3 +2313,132 @@ A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h 
 
 Q: How much fresh air does Wood Ear need?
 A: Moderate fresh air: fan runs 25 s every 16 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## Do mushrooms need light to grow?
+
+URL: https://shroomlabs.io/blog/do-mushrooms-need-light
+Published: 2026-10-27
+Updated: 2026-10-27
+
+Most mushrooms need some light to fruit, but not much and not for energy. Keep colonization dark, then give about 12 hours a day of low light once pins should form. About 50 to 500 lux of cool white or blue light is enough for oysters, lion's mane, maitake and reishi. Button mushrooms need none, and enoki grown dark makes long white stems.
+
+### Why do mushrooms need light if they do not photosynthesize?
+
+Mushrooms get their energy from the substrate, not from light. Light is a signal. For many species it tells the mycelium it has reached open air, which is where a mushroom should grow. A 2018 review of fruiting triggers lists light as a fruiting cue for many mushroom forming fungi, with blue light as the usual signal (Sakamoto 2018).
+
+That is why the amount needed is small. You are not feeding the mushroom. You are telling it which way is up and that it is time to fruit.
+
+### How much light do mushrooms need?
+
+Less than most people think. These are the numbers that show up in published work:
+
+- Oysters: Penn State's oyster production guide says the spawn run can go without light. After it, 50 to 300 lux of cool white light is enough (Royse, Penn State).
+- Lion's mane: white fruit bodies at 200 lux on a 12 hour cycle. The same study ran 500 lux for 24 hours a day and got pink stress coloring (Jozifek et al. 2025).
+- Maitake: primordia formed best at 200 lux and yield was best at 500 lux (Chi et al. 2008).
+- Reishi: 200 to 500 lux early in fruiting and 500 to 1000 lux later, from a literature table in a reishi cultivation thesis (Maszlaver 2011).
+- Cordyceps militaris: the brightest of the group. Highest dry yield at about 1750 lux and highest cordycepin at about 1250 lux, on 12 hours a day (Wu et al. 2016).
+
+A free phone light meter app gives a rough lux reading at the spot where your block sits. That is close enough for these ranges.
+
+### How many hours of light a day?
+
+12 hours on and 12 hours off is the schedule used in most of the studies above and in every lit stage of our profiles. More is not better. The lion's mane study above is the clearest example: 24 hours of light at 500 lux stressed the fruit bodies pink, and 12 hours at 200 lux did not.
+
+A plug-in outlet timer is all you need to hold that schedule.
+
+### Does the color of light matter?
+
+Yes. Blue does the signaling for most species, and red does very little.
+
+- In oyster mushrooms, the first step of fruiting responds most to light at 370 nm and 440 to 450 nm, and wavelengths longer than 530 nm gave no response (Richartz and MacLellan 1987).
+- Blue LED light at 430 to 470 nm improved oyster cap growth and red light did not (Wang et al. 2020). A 2024 trial found the same for cap size at 450 nm against 610 nm (De Bonis et al. 2024).
+- Blue light also triggered king oyster primordia to turn into fruit bodies (Xie et al. 2018).
+- Maitake is the exception. White light outyielded blue and green in the 2008 trial, so our maitake profile uses white only (Chi et al. 2008).
+
+In practice, a cool white LED (5000 to 6500 K) has plenty of blue in it. You do not need a special grow light. A red or warm 2700 K bulb is the one choice to avoid.
+
+### Light for each species we grow
+
+This is what each of our 20 free culinary grow profiles runs. Every lit stage is 12 hours a day. Where no study gave a number for that species, the profile uses a labeled low light default of about 90 lux with a blue bias, inside the Penn State 50 to 300 lux range.
+
+| Species | Colonization | Fruiting light | Where the number comes from |
+| Pearl oyster | Dark | 12 h, about 90 lux, blue | Penn State range, blue action spectrum |
+| Blue oyster | Dark | 12 h, about 90 lux, blue | Penn State range, blue action spectrum |
+| Pink oyster | Dark | 12 h, about 90 lux, blue | Oyster default |
+| Golden oyster | Dark | 12 h, about 90 lux, blue | Oyster default |
+| King oyster | Dark | 12 h, about 90 lux, blue | Oyster default, blue triggers primordia |
+| Lion's mane | Dark | 12 h, about 200 lux | Jozifek et al. 2025 |
+| Maitake | Dark | 12 h, about 500 lux, white only | Chi et al. 2008 |
+| Reishi | Dark | 12 h, about 500 lux | Maszlaver 2011 |
+| Cordyceps militaris | Dark | 12 h, about 1250 lux | Wu et al. 2016 |
+| Shiitake | Dark | 12 h, about 200 lux while the block browns, dark cold shock, then 12 h low light | Kim et al. 2024, Leatham and Stahmann 1987 |
+| Button and cremini | Dark | None | Baars et al. 2020, Penn State |
+| Enoki | Dark | None, for long white stems | Sakamoto 2004 |
+| Beech shimeji | Dark | 12 h, about 90 lux, blue | General default |
+| Chestnut | Dark | 12 h, about 90 lux, blue | General default |
+| Elm oyster | Dark | 12 h, about 90 lux, blue | General default |
+| Nameko | Dark | 12 h, about 90 lux, blue | General default |
+| Pioppino | Dark | 12 h, about 90 lux, blue | General default |
+| Turkey tail | Dark | 12 h, about 90 lux, blue | General default |
+| Wine cap | Dark | 12 h, about 90 lux, blue | General default |
+| Wood ear | Dark | 12 h, about 90 lux, blue | General default |
+
+### Which mushrooms grow without light?
+
+Two common ones.
+
+- Button and cremini (Agaricus bisporus) do not need light to fruit. Their triggers are temperature, carbon dioxide, the casing layer and volatiles (Baars et al. 2020). Penn State's Agaricus guide grows them without light too (Penn State Extension).
+- Enoki (Flammulina velutipes) fruits in the dark after a temperature drop, and the dark fruit bodies are long, pale and pinhead sized. Light is what forms a proper cap (Sakamoto 2004). The thin white enoki in stores are grown this way on purpose.
+
+### Should mycelium be kept dark while it colonizes?
+
+Yes, or close to it. Every one of our profiles runs colonization dark. Penn State's oyster guide runs the spawn run without artificial light. Since light is a fruiting cue, light during colonization can start pins early, which is why our lion's mane profile keeps that stage dark.
+
+Shiitake is the one to watch. After colonization the block needs a lit rest to brown its skin, since that brown coat is light induced (Yoo et al. 2019). Our shiitake profile browns the block under 12 hours a day at about 200 lux, based on the work reviewed in a 2024 blue light study (Kim et al. 2024). Light is also needed for normal shiitake fruiting (Leatham and Stahmann 1987).
+
+### Signs your mushrooms need more or less light
+
+- No pins on a fully colonized block: light may be missing, but check fresh air and humidity first. Our not pinning guide walks through the order.
+- Long stems with small caps: usually too much carbon dioxide, and sometimes too little light. See long stems and small caps.
+- Pale maitake: maitake grown in the dark kept pale caps (Kurahashi et al. 2015).
+- Lion's mane turning pink: the 2025 study above got pink coloring from 24 hour light at 500 lux. Try a 12 hour window at lower light.
+
+### FAQ
+
+#### Can mushrooms grow in complete darkness?
+
+Button, cremini and enoki can. Most other species will try to fruit in the dark but make pale, stretched or misshapen mushrooms, because light is the cue that shapes the cap.
+
+#### Is sunlight good for mushrooms?
+
+Indirect daylight is fine for most species. Direct sun is not, because it heats and dries the block fast.
+
+#### Do mushrooms need a grow light?
+
+No. Any cool white LED or a bright room is enough for most species. A dedicated light helps only in a closed box or closet with no other light, and then a small LED strip on a timer does the job.
+
+#### What color light is best for mushrooms?
+
+Blue or cool white. Studies on oysters and king oysters found blue light drives fruiting and red light does little. Maitake did best under white.
+
+### Sources
+
+- Sakamoto 2018, Influences of environmental factors on fruiting body induction, development and maturation in mushroom forming fungi, Fungal Biology Reviews 32
+- Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences
+- Richartz and MacLellan 1987, Action spectra for hyphal aggregation in Pleurotus ostreatus, Photochemistry and Photobiology 45
+- Wang et al. 2020, Blue light and red light response of oyster mushroom, AMB Express 10
+- De Bonis et al. 2024, LED light wavelengths and Pleurotus ostreatus, Horticulturae 10
+- Xie et al. 2018, Blue light regulation in Pleurotus eryngii primordia, Genomics 110
+- Jozifek et al. 2025, Selenium uptake by Hericium erinaceus basidiocarps, Agriculture 15
+- Chi et al. 2008, Favorable light condition for cultivation of Grifola frondosa, Korean Journal of Mycology 36
+- Kurahashi et al. 2015, Gf.BMR1 in Grifola frondosa induced by near UV and blue light, Mycoscience 56
+- Maszlaver 2011, Cultivation possibilities for reishi, Corvinus University of Budapest
+- Wu et al. 2016, Illumination pattern and Cordyceps militaris fruiting body production, International Journal of Medicinal Mushrooms 18
+- Baars et al. 2020, Critical factors in primordia building in Agaricus bisporus, Molecules 25
+- Penn State Extension, Basic Procedures for Agaricus Mushroom Growing
+- Sakamoto 2004, Light and Flammulina velutipes fruit body development, Mycoscience 45
+- Yoo et al. 2019, Mycelium browning in Lentinula edodes, BMC Genomics 20
+- Kim et al. 2024, Blue light and shiitake sawdust cultivation, Mycobiology
+- Leatham and Stahmann 1987, Light and aeration on fruiting of Lentinula edodes, Transactions of the British Mycological Society 88
