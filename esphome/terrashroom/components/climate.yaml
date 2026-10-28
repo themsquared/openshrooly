@@ -1,0 +1,196 @@
+# Climate loop for the Terrashroom. Plain on/off control with hard limits.
+# Nothing here has been run on a real Terrashroom yet.
+
+# Raw water probe. Only meaningful while GPIO15 powers the probe, so it is
+# internal and the public "Water Low" value is set by water_check below.
+# Polarity follows the community port (pull-down, wet probe reads high);
+# not confirmed on a board.
+binary_sensor:
+  - platform: gpio
+    id: water_probe_raw
+    internal: true
+    pin:
+      number: GPIO23
+      mode:
+        input: true
+        pulldown: true
+  - platform: template
+    id: water_low_state
+    name: "Water Low"
+    device_class: problem
+
+script:
+  # Power the probe briefly, take three reads, power it off. Keeping the probe
+  # off between reads avoids running current through the tank all day.
+  - id: water_check
+    mode: single
+    then:
+      - switch.turn_on: water_read_enable
+      - delay: 100ms
+      - lambda: |-
+          int wet = 0;
+          for (int i = 0; i < 3; i++) {
+            if (id(water_probe_raw).state) wet++;
+            delay(5);
+          }
+          const bool low = wet < 2;
+          if (!id(water_low_state).has_state() || id(water_low_state).state != low) {
+            ESP_LOGI("water", "Water %s", low ? "LOW" : "OK");
+          }
+          id(water_low_state).publish_state(low);
+      - switch.turn_off: water_read_enable
+
+  - id: heater_off
+    mode: restart
+    then:
+      - output.turn_off: heater_pwm
+      - lambda: |-
+          id(heater_running) = false;
+          id(heater_on_since_ms) = 0;
+
+  # One mist burst: blower on full to spread the mist, atomizer for the burst
+  # length, then the blower runs a few more seconds.
+  - id: spritz
+    mode: single
+    then:
+      - script.execute: water_check
+      - script.wait: water_check
+      - if:
+          condition:
+            binary_sensor.is_on: water_low_state
+          then:
+            - logger.log:
+                level: WARN
+                tag: climate
+                format: "Skipping mist burst: water is low"
+          else:
+            - lambda: 'id(last_spritz_ms) = millis();'
+            - output.set_level:
+                id: blower_pwm
+                level: 100%
+            - output.turn_on: atomizer_pwm
+            - delay: !lambda 'return (uint32_t) (id(spritz_seconds).state * 1000);'
+            - output.turn_off: atomizer_pwm
+            - delay: 5s
+            - output.turn_off: blower_pwm
+
+  - id: air_exchange
+    mode: single
+    parameters:
+      speed: float
+      seconds: int
+    then:
+      - lambda: |-
+          id(last_air_ms) = millis();
+          id(fan1_pwm).set_level(speed);
+          id(fan2_pwm).set_level(speed);
+      - delay: !lambda 'return (uint32_t) seconds * 1000;'
+      - output.turn_off: fan1_pwm
+      - output.turn_off: fan2_pwm
+
+interval:
+  # Heater: on below target minus 0.5 C, off at target. Hard limits:
+  # never above 32 C, never on a missing or stale reading (2 min), at most
+  # 10 minutes on, then 5 minutes off. Power is capped by Heater Max Power.
+  # The community port's board stopped booting after heavy heater use, so
+  # these limits are deliberately tight.
+  - interval: 5s
+    then:
+      - lambda: |-
+          const uint32_t now = millis();
+          const float t = id(temperature).state;
+          const bool stale = id(last_reading_ms) == 0 || (now - id(last_reading_ms)) > 120000;
+          if (id(heater_cooling_down) && (now - id(heater_cooldown_until_ms)) > 300000) {
+            id(heater_cooling_down) = false;
+          }
+          bool want = false;
+          if (id(heater_auto).state && !isnan(t) && !stale && !id(heater_cooling_down)) {
+            const float target = id(target_temperature).state;
+            if (t < target - 0.5f) want = true;
+            else if (t < target) want = id(heater_running);
+          }
+          if (!isnan(t) && t > 32.0f) want = false;
+          if (want && id(heater_running) && (now - id(heater_on_since_ms)) > 600000) {
+            ESP_LOGW("heater", "10 minutes on, cooling down for 5 minutes");
+            want = false;
+            id(heater_cooling_down) = true;
+            id(heater_cooldown_until_ms) = now;  // start of the cooldown
+          }
+          if (want) {
+            if (!id(heater_running)) {
+              id(heater_running) = true;
+              id(heater_on_since_ms) = now;
+              ESP_LOGI("heater", "On at %.0f%% (%.1f C, target %.1f C)",
+                       id(heater_max_duty).state, t, id(target_temperature).state);
+            }
+            id(heater_pwm).set_level(id(heater_max_duty).state / 100.0f);
+          } else if (id(heater_running)) {
+            ESP_LOGI("heater", "Off (%.1f C)", t);
+            id(heater_pwm).turn_off();
+            id(heater_running) = false;
+            id(heater_on_since_ms) = 0;
+          }
+
+  # Humidity and fresh air.
+  - interval: 10s
+    then:
+      - if:
+          condition:
+            switch.is_on: climate_auto
+          then:
+            - lambda: |-
+                const uint32_t now = millis();
+                const float rh = id(humidity).state;
+                if (isnan(rh)) return;
+                // Too wet for the electronics: full fresh air.
+                if (rh > 96.0f) {
+                  if (!id(air_exchange).is_running()) {
+                    ESP_LOGW("climate", "Humidity %.0f%%, purging with fans at 100%%", rh);
+                    id(air_exchange)->execute(1.0f, 60);
+                  }
+                  return;
+                }
+                // Mist when 2 points under target, at most once a minute.
+                if (rh < id(target_humidity).state - 2.0f &&
+                    !id(spritz).is_running() &&
+                    (id(last_spritz_ms) == 0 || now - id(last_spritz_ms) > 60000)) {
+                  ESP_LOGI("climate", "Humidity %.0f%% under target %.0f%%, mist burst",
+                           rh, id(target_humidity).state);
+                  id(spritz)->execute();
+                }
+                // Scheduled fresh air.
+                const uint32_t every = (uint32_t) id(fresh_air_every_min).state * 60000UL;
+                if (!id(air_exchange).is_running() && !id(spritz).is_running() &&
+                    (id(last_air_ms) == 0 || now - id(last_air_ms) > every)) {
+                  id(air_exchange)->execute(id(fresh_air_speed).state / 100.0f,
+                                            (int) id(fresh_air_run_sec).state);
+                }
+
+  # Water check every 5 minutes, whatever mode you are in.
+  - interval: 5min
+    then:
+      - script.execute: water_check
+
+  # Light schedule on the canopy strip.
+  - interval: 30s
+    then:
+      - if:
+          condition:
+            switch.is_on: light_schedule
+          then:
+            - lambda: |-
+                auto now = id(sntp_time).now();
+                if (!now.is_valid()) return;
+                const int start = (int) id(sunrise_hour).state;
+                const int hours = (int) id(light_hours).state;
+                const int since = (now.hour - start + 24) % 24;
+                const int on = (hours > 0 && since < hours) ? 1 : 0;
+                if (on == id(schedule_lights_on)) return;
+                id(schedule_lights_on) = on;
+                auto call = on ? id(canopy_lights).turn_on() : id(canopy_lights).turn_off();
+                if (on) {
+                  call.set_brightness(id(light_brightness).state / 100.0f);
+                  call.set_rgb(1.0f, 1.0f, 1.0f);
+                }
+                call.perform();
+                ESP_LOGI("lights", "Schedule: lights %s", on ? "on" : "off");

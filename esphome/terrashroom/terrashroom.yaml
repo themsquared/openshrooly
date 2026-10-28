@@ -1,0 +1,101 @@
+# Shroom Labs firmware for the Terrashroom chamber.
+#
+# STATUS: community profile, UNTESTED ON REAL HARDWARE. It compiles and passes
+# ESPHome config checks in CI, but nobody at Shroom Labs has flashed it onto a
+# Terrashroom yet. Read README.md before you flash, especially the GPIO12 notes.
+#
+# Pin map comes from the community port at
+# https://github.com/aparkerryan27/terrashroomPublic (hardware/pinout.md and
+# esphome/terrashroom.yaml, Nov 2025). This file is our own config written from
+# that pin map; see README.md for the full source list.
+#
+# Safe defaults: every load (heater, atomizer, fans, blower, UV, camera) boots
+# OFF, and the automatic climate loop and the heater loop each start disabled.
+# You turn them on from the local web page once the readings look right.
+
+substitutions:
+  device_version: "0.1.0-community"
+  # POSIX TZ string for the light schedule. Change it to your zone.
+  timezone: "PST8PDT,M3.2.0,M11.1.0"
+
+esphome:
+  name: terrashroom
+  name_add_mac_suffix: true
+  friendly_name: Terrashroom (Shroom Labs)
+  project:
+    name: shroomlabs.terrashroom
+    version: ${device_version}
+  on_boot:
+    # Priority 800 runs before Wi-Fi and before most components set up. The
+    # ESP32 already sampled GPIO12 (the flash voltage strap) at reset, so this
+    # cannot fix a bad strap; it makes sure our firmware never leaves the
+    # heater gate high afterwards, so the next reset (watchdog, brownout, OTA)
+    # samples GPIO12 low again. See README.md, "The heater pin and booting".
+    - priority: 800
+      then:
+        - output.turn_off: heater_pwm
+        - output.turn_off: atomizer_pwm
+        - output.turn_off: blower_pwm
+        - output.turn_off: fan1_pwm
+        - output.turn_off: fan2_pwm
+        - lambda: |-
+            id(heater_on_since_ms) = 0;
+            id(heater_cooldown_until_ms) = 0;
+            ESP_LOGI("boot", "Terrashroom %s: all loads off at boot", "${device_version}");
+    - priority: -100
+      then:
+        - lambda: |-
+            ESP_LOGW("boot", "Community firmware, untested on real hardware. Climate and heater loops start disabled.");
+  on_shutdown:
+    # Drive the heater low before any software restart so GPIO12 is low when
+    # the chip samples its straps again.
+    - priority: 900
+      then:
+        - output.turn_off: heater_pwm
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  reboot_timeout: 0s
+  encryption: {}
+
+# Password protected OTA so you only need the serial adapter once.
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+safe_mode:
+
+# Wi-Fi is set over USB serial (web.esphome.io) or the fallback setup network.
+improv_serial:
+
+wifi:
+  ap:
+    ssid: "Terrashroom Setup"
+    password: !secret setup_ap_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+  auth:
+    type: digest
+    username: admin
+    password: !secret web_password
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: ${timezone}
+
+packages:
+  hardware: !include components/hardware.yaml
+  controls: !include components/controls.yaml
+  climate: !include components/climate.yaml

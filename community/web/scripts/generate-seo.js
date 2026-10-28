@@ -15,6 +15,7 @@ import { INDEXNOW_KEY } from "../../api/src/indexnow.js";
 import { GUIDES } from "./guides/index.js";
 import { blogLlms, blogLlmsFull, blogRedirects, blogSitemapEntries, publishedPosts, writeBlogFiles } from "./blog/index.js";
 import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
+import { CHAMBER_PAGES, SOURCES as CHAMBER_SOURCES, CHECKED as CHAMBER_CHECKED } from "./chambers/index.js";
 import { latinName, orList, otherNames, speciesTitle } from "./species-names.js";
 import { SPECIES as TOOL_SPECIES, TOOL_PAGES, TOOL_SOURCES } from "./tools/index.js";
 
@@ -1261,6 +1262,75 @@ export function renderOwnerPage(page) {
   });
 }
 
+/** Chamber pages (/chambers hub and /terrashroom): answer first, question sections, sources, and the page's own buttons. */
+export function chamberFaq(page) {
+  return page.sections.filter((sec) => sec.faq !== false && sec.h2.endsWith("?")).map((sec) => ({ q: sec.h2, a: sec.answer }));
+}
+
+function chamberCta(cta) {
+  return `<div class="owner-cta">${cta
+    .map(([label, href], i) => (i === 0 ? `<a class="button hero-cta" href="${href}">${escapeHtml(label)}</a>` : `<a class="text-link" href="${href}"${href.startsWith("http") ? ' rel="noopener"' : ""}>${escapeHtml(label)}</a>`))
+    .join("")}</div>`;
+}
+
+export function renderChamberPage(page) {
+  const path = `/${page.slug}`;
+  const url = `${SITE}${path}`;
+  const faq = chamberFaq(page);
+  const crumbs = page.slug === "chambers" ? [["Home", "/"], [page.crumb, ""]] : [["Home", "/"], ["Chambers", "/chambers"], [page.crumb, ""]];
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `${url}#article`,
+        headline: page.h1,
+        description: page.answer,
+        url,
+        mainEntityOfPage: url,
+        image: ogImage(),
+        inLanguage: "en",
+        dateModified: page.updated,
+        author: ORG_REF,
+        publisher: ORG_REF,
+        citation: page.sources.map((key) => CHAMBER_SOURCES[key].url),
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${url}#faq`,
+        mainEntity: faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+      },
+      breadcrumbs(crumbs.map(([name, href]) => [name, href ? `${SITE}${href}` : url])),
+    ],
+  };
+  const sections = page.sections
+    .map((sec) => `<section class="owner-section"><h2>${escapeHtml(sec.h2)}</h2><p class="answer-first">${escapeHtml(sec.answer)}</p>${sec.html || ""}</section>`)
+    .join("\n      ");
+  const others = CHAMBER_PAGES.filter((p) => p.slug !== page.slug).map((p) => [p.h1, `/${p.slug}`]);
+  const related = [...others, ...page.related.filter(([, h]) => !others.some(([, o]) => o === h))];
+  const body = `
+    <article class="profile-page guide-page owner-page chamber-page">
+      ${crumbsHtml(crumbs)}
+      <p class="eyebrow">${escapeHtml(page.eyebrow)}</p>
+      <h1>${escapeHtml(page.h1)}</h1>
+      ${updatedHtml(page.updated)}
+      <p class="lede answer-first">${escapeHtml(page.answer)}</p>
+      ${chamberCta(page.cta)}
+      ${sections}
+      <h2>Sources</h2>
+      <p class="muted">Every page below was checked on ${CHAMBER_CHECKED}.</p>
+      <ol class="sources">${page.sources.map((key) => `<li><a href="${CHAMBER_SOURCES[key].url}" rel="noopener">${escapeHtml(CHAMBER_SOURCES[key].label)}</a></li>`).join("")}</ol>
+      <h2>Keep reading</h2>
+      <ul class="faq-links">${related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>
+      ${chamberCta(page.cta)}
+    </article>`;
+  return shell({
+    head: { title: page.title, description: page.description, path, type: "article", modified: page.updated, jsonLd },
+    activeId: "",
+    body,
+  });
+}
+
 export function sitemapEntries(profiles) {
   const pages = Object.entries(PAGES)
     .filter(([, p]) => p.sitemap)
@@ -1268,6 +1338,7 @@ export function sitemapEntries(profiles) {
   return [
     ...pages,
     ...OWNER_PAGES.map((p) => ({ path: `/${p.slug}`, lastmod: p.updated })),
+    ...CHAMBER_PAGES.map((p) => ({ path: `/${p.slug}`, lastmod: p.updated })),
     { path: "/grow", lastmod: HUB_UPDATED.value },
     { path: "/chefs-line", lastmod: PAGES_UPDATED },
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
@@ -1342,6 +1413,10 @@ All grow numbers on this site come from the published grow profiles. Temperature
 - [Install on your Shrooly](${SITE}/install): put free OpenShrooly firmware on a Shrooly from Chrome or Edge with a USB-C data cable in about 5 minutes. Signed releases only.
 ${OWNER_PAGES.map((p) => `- [${p.h1}](${SITE}/${p.slug}): ${p.answer}`).join("\n")}
 - [Join the Shroom Labs beta](${SITE}/beta): ${BETA.answer}
+
+## Other chambers
+
+${CHAMBER_PAGES.map((p) => `- [${p.h1}](${SITE}/${p.slug}): ${p.answer}`).join("\n")}
 - [Link a chamber](${SITE}/claim): link a chamber to your account to see it on your phone and get grow alerts by email. Optional. It works fully on your Wi-Fi without it.
 
 ## Grow Coach and Autopilot
@@ -1395,13 +1470,20 @@ function stripHtml(html) {
 export function renderLlmsFull(profiles) {
   const out = [
     `# Shroom Labs: full text\n\n> ${ABOUT}\n\nEvery grow number below comes from the published Shroom Labs grow profiles. Source: ${SITE}/grow`,
-    `## About Shroom Labs\n\nURL: ${SITE}/\n\n${llmsAbout(profiles).join("\n\n")}\n\n### Key pages\n\n- Install OpenShrooly: ${SITE}/install\n- Grow Coach and Autopilot: ${SITE}/coach\n- Grow guides for every species: ${SITE}/grow\n- Chef's line: ${SITE}/chefs-line\n- FAQ: ${SITE}/faq`,
+    `## About Shroom Labs\n\nURL: ${SITE}/\n\n${llmsAbout(profiles).join("\n\n")}\n\n### Key pages\n\n- Install OpenShrooly: ${SITE}/install\n- Grow Coach and Autopilot: ${SITE}/coach\n- Grow guides for every species: ${SITE}/grow\n- Chef's line: ${SITE}/chefs-line\n- Chambers that work with Shroom Labs: ${SITE}/chambers\n- Terrashroom after the shutdown: ${SITE}/terrashroom\n- FAQ: ${SITE}/faq`,
   ];
   for (const p of OWNER_PAGES) {
     out.push(
       `## ${p.h1}\n\nURL: ${SITE}/${p.slug}\nUpdated: ${p.updated}\n\n${p.answer}\n\n${p.sections
         .map((sec) => `### ${sec.h2}\n\n${sec.answer}${sec.html ? `\n\n${stripHtml(sec.html)}` : ""}`)
         .join("\n\n")}\n\n### Sources\n\n${p.sources.map((key) => `- ${OWNER_SOURCES[key].label}: ${OWNER_SOURCES[key].url}`).join("\n")}`
+    );
+  }
+  for (const p of CHAMBER_PAGES) {
+    out.push(
+      `## ${p.h1}\n\nURL: ${SITE}/${p.slug}\nUpdated: ${p.updated}\n\n${p.answer}\n\n${p.sections
+        .map((sec) => `### ${sec.h2}\n\n${sec.answer}${sec.html ? `\n\n${stripHtml(sec.html)}` : ""}`)
+        .join("\n\n")}\n\n### Sources\n\n${p.sources.map((key) => `- ${CHAMBER_SOURCES[key].label}: ${CHAMBER_SOURCES[key].url}`).join("\n")}`
     );
   }
   out.push(
@@ -1444,6 +1526,7 @@ export function renderRedirects(profiles) {
   }
   lines.push("/chefs-line.html /chefs-line 301!", "/grow.html /grow 301!", "/terms /tos 301!", "/terms.html /tos 301!");
   for (const p of OWNER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
+  for (const p of CHAMBER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
   for (const t of TOOL_PAGES) lines.push(`${t.path}.html ${t.path} 301!`);
   lines.push("/tools /grow 301!", "/tools/ /grow 301!");
@@ -1704,6 +1787,7 @@ export function writeSeoFiles(dir = PUBLIC) {
   writeFileSync(join(dir, "chefs-line.html"), renderChefsLinePage(profiles));
   for (const guide of GUIDES) writeFileSync(join(dir, "guides", `${guide.slug}.html`), renderGuidePage(guide));
   for (const page of OWNER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderOwnerPage(page));
+  for (const page of CHAMBER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderChamberPage(page));
   for (const tool of TOOL_PAGES) writeFileSync(join(dir, "tools", `${tool.slug}.html`), renderToolPage(tool));
   writeFileSync(join(dir, "js", "tool-species.js"), `/** Generated by scripts/generate-seo.js from the free culinary profiles. Used by js/tools.js. */\nexport const SPECIES = ${JSON.stringify(TOOL_SPECIES)};\n`);
   writeFileSync(join(dir, "js", "indexed-profiles.js"), `/** Generated by scripts/generate-seo.js. Profiles with a static page under /profiles/. */\nexport const INDEXED_PROFILES = new Set(${JSON.stringify(profiles.map((p) => p.id))});\n`);

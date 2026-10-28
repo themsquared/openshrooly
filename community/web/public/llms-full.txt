@@ -26,6 +26,8 @@ Shroom Labs is not made by or affiliated with the company behind Shrooly.
 - Grow Coach and Autopilot: https://shroomlabs.io/coach
 - Grow guides for every species: https://shroomlabs.io/grow
 - Chef's line: https://shroomlabs.io/chefs-line
+- Chambers that work with Shroom Labs: https://shroomlabs.io/chambers
+- Terrashroom after the shutdown: https://shroomlabs.io/terrashroom
 - FAQ: https://shroomlabs.io/faq
 
 ---
@@ -443,7 +445,7 @@ Drill or cut a few holes in the sides, set the opened block inside on a rack or 
 
 If you have a Shrooly, revive it with free software first, since it keeps the chamber you paid for working and costs nothing.
 
-If you would rather not install anything, run it by hand with a ready to fruit block. If the chamber is broken, a simple box or tub grows the same mushrooms with a little more daily care. Whatever you choose, the free grow profiles give you the conditions for each species, and the grow timeline calculator gives you the dates.
+If you would rather not install anything, run it by hand with a ready to fruit block. If the chamber is broken, a simple box or tub grows the same mushrooms with a little more daily care. Whatever you choose, the free grow profiles give you the conditions for each species, and the grow timeline calculator gives you the dates. See which chambers work with Shroom Labs for other hardware.
 
 ### Sources
 
@@ -452,6 +454,201 @@ If you would rather not install anything, run it by hand with a ready to fruit b
 - grahamsz/openshrooly on GitHub: https://github.com/grahamsz/openshrooly
 - Shrooly support article: Connection issues: https://support.shrooly.com/en/articles/9675290-connection-issues
 - r/shrooly: Out of business? (August 19, 2025): https://www.reddit.com/r/shrooly/comments/1mupwan/out_of_business/
+
+---
+
+## Mushroom chambers that work with Shroom Labs
+
+URL: https://shroomlabs.io/chambers
+Updated: 2026-10-27
+
+Shrooly is fully supported. Terrashroom has free community firmware that is untested on real hardware. Inkbird and other Tuya Wi-Fi controllers, and AC Infinity controllers, keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.
+
+### Which chambers are supported?
+
+Here is each one and what works today.
+
+Chambers and controllers, checked October 27, 2026 |  | Chamber | Status | How it works with Shroom Labs
+ | Shrooly | Supported | Free OpenShrooly firmware, installed from Chrome or Edge in about 5 minutes. Grow profiles and the phone dashboard work. Install.
+ | Terrashroom | Community, untested | Free community ESPHome firmware. It builds and passes our checks but has not run on a real unit yet. Read first.
+ | Inkbird and other Tuya Wi-Fi controllers | Use as is | Keep the stock app. Set it to the numbers in a grow profile, or automate it in Home Assistant with tuya-local. Shroom Labs does not control it directly.
+ | AC Infinity controllers | Use as is | Keep the stock app. Set it from a grow profile, or automate it in Home Assistant over Bluetooth with a community integration. Shroom Labs does not control it directly.
+ | A tub, tent, or box you built | Use as is | Use the free grow profiles and grow timeline to run it by hand.
+
+### Does Shroom Labs work with Shrooly?
+
+Yes. Shrooly is fully supported with free OpenShrooly firmware, grow profiles and the phone dashboard.
+
+OpenShrooly.com, project page by Graham Stewart by Graham Stewart replaces the stock software. You install it from the install page with a USB-C cable. Read reuse your Shrooly first.
+
+### Does Shroom Labs work with Terrashroom?
+
+Partly. We have free community firmware for it, but it is untested on real hardware.
+
+It is written from a community pin map and builds cleanly, and we are looking for owners to try it. Read Terrashroom after the shutdown before you open a unit.
+
+### Do Inkbird controllers work with Shroom Labs?
+
+They work as they are. Set the controller to the numbers in a grow profile, and Shroom Labs does not control it directly.
+
+If you use Home Assistant, the community tuya-local for Home Assistant integration runs many Tuya based Wi-Fi controllers on your own network. Its list includes the Inkbird ITC306A and ITC308 plug in thermostats. An owner reported in a tuya-local issue that the IHC-200 humidity controller was detected as another device. We have not tested any of these ourselves.
+
+### Does AC Infinity work with Shroom Labs?
+
+It works as it is. Set the fan and humidity triggers from a grow profile in its own app, and Shroom Labs does not control it directly.
+
+For Home Assistant, ha-ac-infinity-ble is a community integration for local Bluetooth control of Controller 67 and 69 models. The controller takes one Bluetooth connection at a time, so close the phone app first. Wi-Fi models also work with homeassistant-acinfinity, which signs in to your AC Infinity account. We have not tested either.
+
+### What if my chamber is not listed?
+
+Use the free grow profiles. Every one lists the temperature, humidity, fresh air, and light for each stage, so you can set any chamber or tub by hand.
+
+Start with mushroom growing conditions for every species. If your chamber has an ESP32 inside and you want it supported, tell us the model.
+
+### What does each status mean?
+
+Supported means we run it ourselves. Community, untested means the firmware exists but has not run on a real unit. Use as is means you keep the stock software.
+
+We only mark a chamber supported once it has run our firmware on real hardware. When that changes for Terrashroom, this page will say so.
+
+### Sources
+
+- OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+- Terrashroom last company update, June 24, 2025 (Internet Archive copy): https://web.archive.org/web/20250813201948/https://terrashroom.io/blogs/company-updates/terrashroom-last-company-update-june-24th-2025
+- aparkerryan27/terrashroomPublic on GitHub: pin map and ESPHome notes (November 2025): https://github.com/aparkerryan27/terrashroomPublic
+- tuya-local for Home Assistant: supported devices list: https://github.com/make-all/tuya-local/blob/main/DEVICES.md
+- tuya-local issue: Inkbird IHC-200 humidity controller detected as another device (December 2023): https://github.com/make-all/tuya-local/issues/1466
+- ha-ac-infinity-ble: local Bluetooth control of AC Infinity Controller 67 and 69 for Home Assistant: https://github.com/Viss/ha-ac-infinity-ble
+- homeassistant-acinfinity: AC Infinity Wi-Fi controllers in Home Assistant: https://github.com/dalinicus/homeassistant-acinfinity
+
+---
+
+## Terrashroom after the shutdown
+
+URL: https://shroomlabs.io/terrashroom
+Updated: 2026-10-27
+
+Terrashroom closed in June 2025 and said its devices would stop working as its cloud service ended. Shroom Labs now has free community firmware that runs a Terrashroom on your own Wi-Fi with no cloud. It is untested on real hardware, so we are looking for owners to try it first.
+
+### What happened to Terrashroom?
+
+On June 24, 2025 the company posted that it was closing after 3.5 years and that devices would be sunsetted over 30 days because it could no longer run its IoT service.
+
+That is from the Terrashroom last company update, June 24, 2025. The same post said the company was being dissolved, that it could not issue refunds, and that customers could file a claim through a form it linked. terrashroom.io no longer loads, so we read the post in the Internet Archive copy.
+
+### Can I still use my Terrashroom?
+
+Yes, if you are willing to open it and flash new firmware, because the hardware does not need the old cloud.
+
+Inside is an ESP32 board that drives a heater, two fans, a blower, a mister, light strips, and a UV LED, and reads a temperature and humidity sensor. Owners on Reddit asked whether flashing was possible (r/TerrashroomOwners), and one wrote Reddit. Parker Ryan published the pin map in aparkerryan27/terrashroomPublic on GitHub. Our firmware is written from that pin map.
+
+      Terrashroom ESP32 pins, from the community pin map |  | Part | GPIO
+ | Temperature and humidity sensor (HDC1080, I2C) | 21 and 22
+ | Exhaust fan | 32
+ | Intake fan | 33
+ | Blower that carries the mist | 25
+ | Mister (atomizer) | 13
+ | Heater | 12
+ | UV LED | 18
+ | Water level sense | 23, read while 15 is on
+ | Base light strip (24 LEDs) | 5
+ | Canopy light strip (64 LEDs) | 14
+ | Camera power | 26
+
+### What does the Shroom Labs Terrashroom firmware do?
+
+It runs everything except the camera from a local web page: temperature and humidity readings, misting, fresh air, the heater, the lights, and a water check.
+
+- Humidity. Auto Climate mists when humidity drops 2 points under your target, at most once a minute, and runs both fans if it goes over 96%.
+
+- Fresh air. Fans run on a schedule you set, for example 60 seconds every 30 minutes.
+
+- Heat. Heater Control heats toward your target with a power cap, a 10 minute run limit, and a cutoff at 32 °C (90 °F). It is off every time the chamber starts.
+
+- Light. The canopy strip follows a daily schedule.
+
+- Local control. A password protected web page, test buttons for the fans, mister, and heater, and Home Assistant support. No account or cloud.
+
+      Auto Climate and Heater Control both start off, so nothing runs until you turn it on.
+
+### What is untested?
+
+All of it, on a real unit. The firmware builds and passes our automated checks, but nobody at Shroom Labs has run it on a Terrashroom yet.
+
+- Every part on real hardware.
+
+- Which way the water sensor reads. We assume it reads high when there is water.
+
+- How hot the heater gets at a given power.
+
+- The LED counts and colors on both light strips.
+
+- The camera. It is not supported yet.
+
+- Phone pairing. It is not set up for Terrashroom yet.
+
+### Why does the heater matter when you flash it?
+
+The heater is wired to GPIO12, a pin the ESP32 checks when it powers on, and if that pin is high then, the board will not boot or flash.
+
+When GPIO12 is high at reset, the ESP32 sets its flash memory to 1.8 V, which the 3.3 V flash chip cannot run on (Espressif). The serial log then shows flash read err, 1000. The Reddit guide's author reported that his board later stopped booting after running the heater hard, and suspected this pin.
+
+      Our firmware turns the heater off at the earliest step of every start and again before every restart, and never pulls the pin up. If a board still will not boot, there is a last resort: an eFuse that makes the chip ignore GPIO12 and always use 3.3 V (Espressif). It cannot be undone, so only use it after you confirm the module has 3.3 V flash.
+
+### How do I flash a Terrashroom?
+
+Open the unit, connect a 3.3 V USB serial adapter to the flash header, save a backup of the stock firmware, then flash with ESPHome.
+
+- Unplug the chamber from the wall before you open it.
+
+- Find the flash header: EN, GPIO0, GND, TX, and RX.
+
+- Connect a 3.3 V USB serial adapter. Do not connect 5 V. Power the chamber from its own supply.
+
+- Hold GPIO0 to ground while you reset to enter flash mode.
+
+- Save the stock firmware with esptool before you change anything.
+
+- Build the firmware with ESPHome and flash it, or flash the build at web.esphome.io.
+
+- Join the Terrashroom Setup Wi-Fi network and pick your home Wi-Fi.
+
+      The full steps, commands, and pin notes are in the Shroom Labs Terrashroom firmware on GitHub folder.
+
+### Can I go back to the stock Terrashroom firmware?
+
+Only if you saved a backup first, and the stock firmware still depends on a cloud service that has ended.
+
+A backup is one esptool command and takes a few minutes. Keep it somewhere safe. With it you can flash the original back at any time.
+
+### Does a Terrashroom work with Shroom Labs grow profiles?
+
+Yes, you can use the free grow profiles today by setting the targets on the chamber's web page, but phone pairing is not set up for Terrashroom yet.
+
+Pick your species in the grow profiles and copy its humidity, temperature, fresh air, and light numbers into the chamber. Automatic profiles and the phone dashboard come after the firmware is proven on real units.
+
+### Can I help test it?
+
+Yes. If you own a Terrashroom and are comfortable opening it, message us and we will go through a first flash with you.
+
+Message us and pick A chamber. Tell us what your unit does now and whether you have a USB serial adapter. Every report, good or bad, goes into the firmware notes.
+
+### Who made this firmware?
+
+Shroom Labs wrote it from the community pin map. We are not made by or affiliated with the company behind Terrashroom.
+
+The pin facts come from Parker Ryan's aparkerryan27/terrashroomPublic on GitHub. Thank you, Parker. If anything here is wrong, tell us and we will fix it.
+
+### Sources
+
+- Terrashroom last company update, June 24, 2025 (Internet Archive copy): https://web.archive.org/web/20250813201948/https://terrashroom.io/blogs/company-updates/terrashroom-last-company-update-june-24th-2025
+- aparkerryan27/terrashroomPublic on GitHub: pin map and ESPHome notes (November 2025): https://github.com/aparkerryan27/terrashroomPublic
+- terrashroomPublic hardware/pinout.md: https://github.com/aparkerryan27/terrashroomPublic/blob/master/hardware/pinout.md
+- Reddit: an owner's guide to flashing ESPHome on a Terrashroom: https://www.reddit.com/r/terrashroomscam/comments/1pbkpxi/
+- r/TerrashroomOwners: is flashing your own firmware feasible?: https://www.reddit.com/r/TerrashroomOwners/comments/1o2le4a/
+- Espressif: ESP32 boot mode selection and strapping pins: https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/boot-mode-selection.html
+- Espressif: espefuse set_flash_voltage: https://docs.espressif.com/projects/esptool/en/latest/esp32/espefuse/set-flash-voltage-cmd.html
+- Shroom Labs Terrashroom firmware on GitHub: https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom
 
 ---
 
@@ -709,7 +906,7 @@ A monotub is a plastic storage tub with a few holes for air, filled with coloniz
 
 ### What does a smart fruiting chamber do?
 
-A smart chamber is a small box with a humidifier, a fan, lights, and sensors. It reads the air and adjusts on its own. A Shrooly chamber running OpenShrooly loads a grow profile, then moves from colonization to pinning to fruiting on schedule, changing humidity, fan, and light at each stage. Every species profile on this site is free to load.
+A smart chamber is a small box with a humidifier, a fan, lights, and sensors. It reads the air and adjusts on its own. A Shrooly chamber running OpenShrooly loads a grow profile, then moves from colonization to pinning to fruiting on schedule, changing humidity, fan, and light at each stage. Every species profile on this site is free to load. Other chambers and controllers are listed in which chambers work with Shroom Labs, including Terrashroom.
 
 ### What about a grow tent or shelf setup?
 
