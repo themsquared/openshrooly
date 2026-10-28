@@ -1,0 +1,229 @@
+# Settings you can change from the local web page or Home Assistant.
+# Everything that turns a load on by itself starts OFF.
+
+globals:
+  - id: last_reading_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: heater_on_since_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: heater_cooldown_until_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: heater_cooling_down
+    type: bool
+    initial_value: "false"
+  - id: heater_running
+    type: bool
+    initial_value: "false"
+  - id: last_spritz_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: last_air_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: schedule_lights_on
+    type: int
+    initial_value: "-1"
+
+text_sensor:
+  - platform: template
+    id: firmware_status
+    name: "Firmware Status"
+    entity_category: diagnostic
+    update_interval: 300s
+    lambda: 'return {"Shroom Labs community build ${device_version}, untested on real hardware"};'
+  - platform: template
+    id: heater_state
+    name: "Heater State"
+    update_interval: 10s
+    lambda: |-
+      if (id(heater_cooling_down)) return {"Cooling down"};
+      if (id(heater_running)) return {"Heating"};
+      if (!id(heater_auto).state) return {"Off (heater control disabled)"};
+      return {"Idle"};
+
+switch:
+  - platform: template
+    id: climate_auto
+    name: "Auto Climate"
+    icon: mdi:mushroom
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_off:
+      - script.stop: spritz
+      - script.stop: air_exchange
+      - output.turn_off: atomizer_pwm
+      - output.turn_off: blower_pwm
+      - output.turn_off: fan1_pwm
+      - output.turn_off: fan2_pwm
+  - platform: template
+    id: heater_auto
+    name: "Heater Control"
+    icon: mdi:radiator
+    optimistic: true
+    # Always boots off on this untested build. Turn it on by hand after you
+    # have watched the temperature reading for a while.
+    restore_mode: ALWAYS_OFF
+    on_turn_off:
+      - script.execute: heater_off
+  - platform: template
+    id: light_schedule
+    name: "Light Schedule"
+    icon: mdi:white-balance-sunny
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_off:
+      - lambda: 'id(schedule_lights_on) = -1;'
+
+number:
+  - platform: template
+    id: target_humidity
+    name: "Target Humidity"
+    unit_of_measurement: "%"
+    min_value: 70
+    max_value: 95
+    step: 1
+    initial_value: 88
+    optimistic: true
+    restore_value: true
+    mode: slider
+  - platform: template
+    id: target_temperature
+    name: "Target Temperature"
+    unit_of_measurement: "°C"
+    min_value: 15
+    max_value: 28
+    step: 0.5
+    initial_value: 22
+    optimistic: true
+    restore_value: true
+    mode: box
+  - platform: template
+    id: heater_max_duty
+    name: "Heater Max Power"
+    unit_of_measurement: "%"
+    min_value: 10
+    max_value: 60
+    step: 5
+    initial_value: 35
+    optimistic: true
+    restore_value: true
+    mode: slider
+  - platform: template
+    id: spritz_seconds
+    name: "Mist Burst Length"
+    unit_of_measurement: "s"
+    min_value: 1
+    max_value: 20
+    step: 1
+    initial_value: 4
+    optimistic: true
+    restore_value: true
+    mode: box
+  - platform: template
+    id: fresh_air_every_min
+    name: "Fresh Air Every"
+    unit_of_measurement: "min"
+    min_value: 5
+    max_value: 240
+    step: 5
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    mode: box
+  - platform: template
+    id: fresh_air_run_sec
+    name: "Fresh Air Run Time"
+    unit_of_measurement: "s"
+    min_value: 10
+    max_value: 300
+    step: 10
+    initial_value: 60
+    optimistic: true
+    restore_value: true
+    mode: box
+  - platform: template
+    id: fresh_air_speed
+    name: "Fresh Air Fan Speed"
+    unit_of_measurement: "%"
+    min_value: 20
+    max_value: 100
+    step: 5
+    initial_value: 60
+    optimistic: true
+    restore_value: true
+    mode: slider
+  - platform: template
+    id: sunrise_hour
+    name: "Lights On Hour"
+    min_value: 0
+    max_value: 23
+    step: 1
+    initial_value: 8
+    optimistic: true
+    restore_value: true
+    mode: box
+  - platform: template
+    id: light_hours
+    name: "Light Hours"
+    unit_of_measurement: "h"
+    min_value: 0
+    max_value: 18
+    step: 1
+    initial_value: 12
+    optimistic: true
+    restore_value: true
+    mode: box
+  - platform: template
+    id: light_brightness
+    name: "Light Brightness"
+    unit_of_measurement: "%"
+    min_value: 5
+    max_value: 100
+    step: 5
+    initial_value: 60
+    optimistic: true
+    restore_value: true
+    mode: slider
+
+# Short, self-stopping tests for the owner test program. Each one turns its
+# load back off on its own.
+button:
+  - platform: template
+    name: "Test Fans (10 s)"
+    entity_category: config
+    on_press:
+      - script.execute:
+          id: air_exchange
+          speed: 0.6
+          seconds: 10
+  - platform: template
+    name: "Test Mist (3 s)"
+    entity_category: config
+    on_press:
+      - output.set_level:
+          id: blower_pwm
+          level: 100%
+      - output.turn_on: atomizer_pwm
+      - delay: 3s
+      - output.turn_off: atomizer_pwm
+      - delay: 3s
+      - output.turn_off: blower_pwm
+  - platform: template
+    name: "Test Heater (10 s at 20%)"
+    entity_category: config
+    on_press:
+      - output.set_level:
+          id: heater_pwm
+          level: 20%
+      - delay: 10s
+      - output.turn_off: heater_pwm
+  - platform: template
+    name: "Check Water"
+    on_press:
+      - script.execute: water_check
+  - platform: restart
+    name: "Restart"
+    entity_category: config

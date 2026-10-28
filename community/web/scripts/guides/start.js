@@ -237,7 +237,7 @@ const compare = {
     },
     {
       h2: "What does a smart fruiting chamber do?",
-      html: `<p>A smart chamber is a small box with a humidifier, a fan, lights, and sensors. It reads the air and adjusts on its own. A Shrooly chamber running OpenShrooly loads a grow profile, then moves from colonization to pinning to fruiting on schedule, changing humidity, fan, and light at each stage. Every <a href="/grow">species profile</a> on this site is free to load.</p>`,
+      html: `<p>A smart chamber is a small box with a humidifier, a fan, lights, and sensors. It reads the air and adjusts on its own. A Shrooly chamber running OpenShrooly loads a grow profile, then moves from colonization to pinning to fruiting on schedule, changing humidity, fan, and light at each stage. Every <a href="/grow">species profile</a> on this site is free to load. Other chambers and controllers are listed in <a href="/chambers">which chambers work with Shroom Labs</a>, including <a href="/terrashroom">Terrashroom</a>.</p>`,
     },
     {
       h2: "What about a grow tent or shelf setup?",

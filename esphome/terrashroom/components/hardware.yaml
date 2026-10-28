@@ -1,0 +1,127 @@
+# Terrashroom main board: pins, sensors and raw loads.
+# Pin map source: aparkerryan27/terrashroomPublic, hardware/pinout.md and
+# esphome/terrashroom.yaml (community port, Nov 2025). Not checked against a
+# board by Shroom Labs yet.
+#
+#   GPIO21 / GPIO22  I2C SDA / SCL, HDC1080 temperature and humidity
+#   GPIO32           Fan 1 (exhaust), PWM
+#   GPIO33           Fan 2 (intake), PWM
+#   GPIO25           Blower, PWM
+#   GPIO13           Atomizer (humidifier) MOSFET
+#   GPIO12           Heater, high power MOSFET. ESP32 strapping pin (MTDI)
+#   GPIO18           UV LED
+#   GPIO23           Water low sensor input
+#   GPIO15           Water sensor power enable. ESP32 strapping pin (MTDO)
+#   GPIO5            Base WS2812 strip, 24 LEDs. ESP32 strapping pin
+#   GPIO14           Canopy WS2812 strip, 64 LEDs
+#   GPIO26           ESP32-CAM power enable
+#   GPIO17 / GPIO16  Serial2 TX / RX to the camera module (not used yet)
+
+i2c:
+  id: bus_a
+  sda: GPIO21
+  scl: GPIO22
+  scan: true
+  frequency: 100kHz
+
+sensor:
+  - platform: hdc1080
+    i2c_id: bus_a
+    update_interval: 30s
+    temperature:
+      id: temperature
+      name: "Current Temperature"
+      accuracy_decimals: 1
+      filters:
+        # Drop impossible readings from a failing sensor so the heater loop
+        # sees NAN (and stops) instead of a bogus number.
+        - filter_out: nan
+        - lambda: |-
+            if (x < -10.0f || x > 60.0f) return {};
+            return x;
+      on_value:
+        - lambda: 'id(last_reading_ms) = millis();'
+    humidity:
+      id: humidity
+      name: "Current Humidity"
+      accuracy_decimals: 1
+      filters:
+        - lambda: |-
+            if (x < 0.0f || x > 100.0f) return {};
+            return x;
+  - platform: wifi_signal
+    name: "Wi-Fi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: uptime
+    name: "Uptime"
+    entity_category: diagnostic
+
+output:
+  - platform: ledc
+    id: fan1_pwm
+    pin: GPIO32
+    frequency: 20 kHz
+  - platform: ledc
+    id: fan2_pwm
+    pin: GPIO33
+    frequency: 20 kHz
+  - platform: ledc
+    id: blower_pwm
+    pin: GPIO25
+    frequency: 20 kHz
+  - platform: ledc
+    id: atomizer_pwm
+    pin: GPIO13
+    frequency: 20 kHz
+  # Heater. GPIO12 must read LOW when the ESP32 resets or the flash gets 1.8 V
+  # and the board will not boot. Nothing in this config pulls it up, it boots
+  # off, and the climate loop caps its duty. Never add a pull-up here.
+  - platform: ledc
+    id: heater_pwm
+    pin:
+      number: GPIO12
+      ignore_strapping_warning: true
+    frequency: 400 Hz
+
+switch:
+  - platform: gpio
+    id: uv_led
+    name: "UV LED"
+    pin: GPIO18
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: water_read_enable
+    name: "Water Read Enable"
+    internal: true
+    pin:
+      number: GPIO15
+      ignore_strapping_warning: true
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: camera_power
+    name: "Camera Power"
+    pin: GPIO26
+    restore_mode: ALWAYS_OFF
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: base_lights
+    name: "Base Lights"
+    pin:
+      number: GPIO5
+      ignore_strapping_warning: true
+    num_leds: 24
+    rgb_order: GRB
+    chipset: WS2812
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 1s
+  - platform: esp32_rmt_led_strip
+    id: canopy_lights
+    name: "Canopy Lights"
+    pin: GPIO14
+    num_leds: 64
+    rgb_order: GRB
+    chipset: WS2812
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 1s
