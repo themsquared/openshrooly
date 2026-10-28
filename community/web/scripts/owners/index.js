@@ -395,7 +395,7 @@ const alternatives = {
     {
       h2: "Which option should I choose?",
       answer: "If you have a Shrooly, revive it with free software first, since it keeps the chamber you paid for working and costs nothing.",
-      html: `<p>If you would rather not install anything, run it by hand with a ready to fruit block. If the chamber is broken, a simple box or tub grows the same mushrooms with a little more daily care. Whatever you choose, the free <a href="/grow">grow profiles</a> give you the conditions for each species, and the <a href="/tools/grow-timeline">grow timeline calculator</a> gives you the dates.</p>`,
+      html: `<p>If you would rather not install anything, run it by hand with a ready to fruit block. If the chamber is broken, a simple box or tub grows the same mushrooms with a little more daily care. Whatever you choose, the free <a href="/grow">grow profiles</a> give you the conditions for each species, and the <a href="/tools/grow-timeline">grow timeline calculator</a> gives you the dates. See <a href="/chambers">which chambers work with Shroom Labs</a> for other hardware.</p>`,
     },
   ],
   sources: ["july2025", "openshrooly", "openshroolyRepo", "connection", "outOfBusiness"],

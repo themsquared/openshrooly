@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Terrashroom shut down? Free firmware to keep it growing</title>
+  <meta name="description" content="Terrashroom closed in June 2025. Free community ESPHome firmware runs it on your own Wi-Fi with no cloud. Untested on real hardware, and we need testers.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/terrashroom">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Terrashroom shut down? Free firmware to keep it growing">
+  <meta property="og:description" content="Terrashroom closed in June 2025. Free community ESPHome firmware runs it on your own Wi-Fi with no cloud. Untested on real hardware, and we need testers.">
+  <meta property="og:url" content="https://shroomlabs.io/terrashroom">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Terrashroom shut down? Free firmware to keep it growing">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Terrashroom shut down? Free firmware to keep it growing">
+  <meta name="twitter:description" content="Terrashroom closed in June 2025. Free community ESPHome firmware runs it on your own Wi-Fi with no cloud. Untested on real hardware, and we need testers.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="article:modified_time" content="2026-10-27">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","@id":"https://shroomlabs.io/terrashroom#article","headline":"Terrashroom after the shutdown","description":"Terrashroom closed in June 2025 and said its devices would stop working as its cloud service ended. Shroom Labs now has free community firmware that runs a Terrashroom on your own Wi-Fi with no cloud. It is untested on real hardware, so we are looking for owners to try it first.","url":"https://shroomlabs.io/terrashroom","mainEntityOfPage":"https://shroomlabs.io/terrashroom","image":"https://shroomlabs.io/og/default.jpg","inLanguage":"en","dateModified":"2026-10-27","author":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/"},"publisher":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/"},"citation":["https://web.archive.org/web/20250813201948/https://terrashroom.io/blogs/company-updates/terrashroom-last-company-update-june-24th-2025","https://github.com/aparkerryan27/terrashroomPublic","https://github.com/aparkerryan27/terrashroomPublic/blob/master/hardware/pinout.md","https://www.reddit.com/r/terrashroomscam/comments/1pbkpxi/","https://www.reddit.com/r/TerrashroomOwners/comments/1o2le4a/","https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/boot-mode-selection.html","https://docs.espressif.com/projects/esptool/en/latest/esp32/espefuse/set-flash-voltage-cmd.html","https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom"]},{"@type":"FAQPage","@id":"https://shroomlabs.io/terrashroom#faq","mainEntity":[{"@type":"Question","name":"What happened to Terrashroom?","acceptedAnswer":{"@type":"Answer","text":"On June 24, 2025 the company posted that it was closing after 3.5 years and that devices would be sunsetted over 30 days because it could no longer run its IoT service."}},{"@type":"Question","name":"Can I still use my Terrashroom?","acceptedAnswer":{"@type":"Answer","text":"Yes, if you are willing to open it and flash new firmware, because the hardware does not need the old cloud."}},{"@type":"Question","name":"What does the Shroom Labs Terrashroom firmware do?","acceptedAnswer":{"@type":"Answer","text":"It runs everything except the camera from a local web page: temperature and humidity readings, misting, fresh air, the heater, the lights, and a water check."}},{"@type":"Question","name":"What is untested?","acceptedAnswer":{"@type":"Answer","text":"All of it, on a real unit. The firmware builds and passes our automated checks, but nobody at Shroom Labs has run it on a Terrashroom yet."}},{"@type":"Question","name":"Why does the heater matter when you flash it?","acceptedAnswer":{"@type":"Answer","text":"The heater is wired to GPIO12, a pin the ESP32 checks when it powers on, and if that pin is high then, the board will not boot or flash."}},{"@type":"Question","name":"How do I flash a Terrashroom?","acceptedAnswer":{"@type":"Answer","text":"Open the unit, connect a 3.3 V USB serial adapter to the flash header, save a backup of the stock firmware, then flash with ESPHome."}},{"@type":"Question","name":"Can I go back to the stock Terrashroom firmware?","acceptedAnswer":{"@type":"Answer","text":"Only if you saved a backup first, and the stock firmware still depends on a cloud service that has ended."}},{"@type":"Question","name":"Does a Terrashroom work with Shroom Labs grow profiles?","acceptedAnswer":{"@type":"Answer","text":"Yes, you can use the free grow profiles today by setting the targets on the chamber's web page, but phone pairing is not set up for Terrashroom yet."}},{"@type":"Question","name":"Can I help test it?","acceptedAnswer":{"@type":"Answer","text":"Yes. If you own a Terrashroom and are comfortable opening it, message us and we will go through a first flash with you."}}]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Chambers","item":"https://shroomlabs.io/chambers"},{"@type":"ListItem","position":3,"name":"Terrashroom","item":"https://shroomlabs.io/terrashroom"}]}]}</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RKQ4CBEZWY"></script>
+  <script src="/js/ga.js" defer></script>
+  <!--/SEO_HEAD-->
+  <link rel="preload" href="/fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/fraunces-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="page">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <article class="profile-page guide-page owner-page chamber-page">
+      <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><a href="/chambers">Chambers</a></li><li aria-current="page">Terrashroom</li></ol></nav>
+      <p class="eyebrow">For Terrashroom owners</p>
+      <h1>Terrashroom after the shutdown</h1>
+      <p class="updated muted">Updated <time datetime="2026-10-27">2026-10-27</time></p>
+      <p class="lede answer-first">Terrashroom closed in June 2025 and said its devices would stop working as its cloud service ended. Shroom Labs now has free community firmware that runs a Terrashroom on your own Wi-Fi with no cloud. It is untested on real hardware, so we are looking for owners to try it first.</p>
+      <div class="owner-cta"><a class="button hero-cta" href="/contact?topic=chamber">Help test it</a><a class="text-link" href="https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom" rel="noopener">See the firmware</a></div>
+      <section class="owner-section"><h2>What happened to Terrashroom?</h2><p class="answer-first">On June 24, 2025 the company posted that it was closing after 3.5 years and that devices would be sunsetted over 30 days because it could no longer run its IoT service.</p><p>That is from the <a href="https://web.archive.org/web/20250813201948/https://terrashroom.io/blogs/company-updates/terrashroom-last-company-update-june-24th-2025" rel="noopener">Terrashroom last company update, June 24, 2025</a>. The same post said the company was being dissolved, that it could not issue refunds, and that customers could file a claim through a form it linked. terrashroom.io no longer loads, so we read the post in the Internet Archive copy.</p></section>
+      <section class="owner-section"><h2>Can I still use my Terrashroom?</h2><p class="answer-first">Yes, if you are willing to open it and flash new firmware, because the hardware does not need the old cloud.</p><p>Inside is an ESP32 board that drives a heater, two fans, a blower, a mister, light strips, and a UV LED, and reads a temperature and humidity sensor. Owners on Reddit asked whether flashing was possible (<a href="https://www.reddit.com/r/TerrashroomOwners/comments/1o2le4a/" rel="noopener">r/TerrashroomOwners</a>), and one wrote <a href="https://www.reddit.com/r/terrashroomscam/comments/1pbkpxi/" rel="noopener">Reddit</a>. Parker Ryan published the pin map in <a href="https://github.com/aparkerryan27/terrashroomPublic" rel="noopener">aparkerryan27/terrashroomPublic on GitHub</a>. Our firmware is written from that pin map.</p>
+      <div class="table-wrap"><table class="conditions-table"><caption>Terrashroom ESP32 pins, from <a href="https://github.com/aparkerryan27/terrashroomPublic/blob/master/hardware/pinout.md" rel="noopener">the community pin map</a></caption><thead><tr><th scope="col">Part</th><th scope="col">GPIO</th></tr></thead><tbody><tr><th scope="row">Temperature and humidity sensor (HDC1080, I2C)</th><td>21 and 22</td></tr><tr><th scope="row">Exhaust fan</th><td>32</td></tr><tr><th scope="row">Intake fan</th><td>33</td></tr><tr><th scope="row">Blower that carries the mist</th><td>25</td></tr><tr><th scope="row">Mister (atomizer)</th><td>13</td></tr><tr><th scope="row">Heater</th><td>12</td></tr><tr><th scope="row">UV LED</th><td>18</td></tr><tr><th scope="row">Water level sense</th><td>23, read while 15 is on</td></tr><tr><th scope="row">Base light strip (24 LEDs)</th><td>5</td></tr><tr><th scope="row">Canopy light strip (64 LEDs)</th><td>14</td></tr><tr><th scope="row">Camera power</th><td>26</td></tr></tbody></table></div></section>
+      <section class="owner-section"><h2>What does the Shroom Labs Terrashroom firmware do?</h2><p class="answer-first">It runs everything except the camera from a local web page: temperature and humidity readings, misting, fresh air, the heater, the lights, and a water check.</p><ul>
+        <li><strong>Humidity.</strong> Auto Climate mists when humidity drops 2 points under your target, at most once a minute, and runs both fans if it goes over 96%.</li>
+        <li><strong>Fresh air.</strong> Fans run on a schedule you set, for example 60 seconds every 30 minutes.</li>
+        <li><strong>Heat.</strong> Heater Control heats toward your target with a power cap, a 10 minute run limit, and a cutoff at 32 °C (90 °F). It is off every time the chamber starts.</li>
+        <li><strong>Light.</strong> The canopy strip follows a daily schedule.</li>
+        <li><strong>Local control.</strong> A password protected web page, test buttons for the fans, mister, and heater, and Home Assistant support. No account or cloud.</li>
+      </ul>
+      <p>Auto Climate and Heater Control both start off, so nothing runs until you turn it on.</p></section>
+      <section class="owner-section"><h2>What is untested?</h2><p class="answer-first">All of it, on a real unit. The firmware builds and passes our automated checks, but nobody at Shroom Labs has run it on a Terrashroom yet.</p><ul>
+        <li>Every part on real hardware.</li>
+        <li>Which way the water sensor reads. We assume it reads high when there is water.</li>
+        <li>How hot the heater gets at a given power.</li>
+        <li>The LED counts and colors on both light strips.</li>
+        <li>The camera. It is not supported yet.</li>
+        <li>Phone pairing. It is not set up for Terrashroom yet.</li>
+      </ul></section>
+      <section class="owner-section"><h2>Why does the heater matter when you flash it?</h2><p class="answer-first">The heater is wired to GPIO12, a pin the ESP32 checks when it powers on, and if that pin is high then, the board will not boot or flash.</p><p>When GPIO12 is high at reset, the ESP32 sets its flash memory to 1.8 V, which the 3.3 V flash chip cannot run on (<a href="https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/boot-mode-selection.html" rel="noopener">Espressif</a>). The serial log then shows <code>flash read err, 1000</code>. The Reddit guide's author reported that his board later stopped booting after running the heater hard, and suspected this pin.</p>
+      <p>Our firmware turns the heater off at the earliest step of every start and again before every restart, and never pulls the pin up. If a board still will not boot, there is a last resort: an eFuse that makes the chip ignore GPIO12 and always use 3.3 V (<a href="https://docs.espressif.com/projects/esptool/en/latest/esp32/espefuse/set-flash-voltage-cmd.html" rel="noopener">Espressif</a>). It cannot be undone, so only use it after you confirm the module has 3.3 V flash.</p></section>
+      <section class="owner-section"><h2>How do I flash a Terrashroom?</h2><p class="answer-first">Open the unit, connect a 3.3 V USB serial adapter to the flash header, save a backup of the stock firmware, then flash with ESPHome.</p><ol>
+        <li>Unplug the chamber from the wall before you open it.</li>
+        <li>Find the flash header: EN, GPIO0, GND, TX, and RX.</li>
+        <li>Connect a 3.3 V USB serial adapter. Do not connect 5 V. Power the chamber from its own supply.</li>
+        <li>Hold GPIO0 to ground while you reset to enter flash mode.</li>
+        <li>Save the stock firmware with esptool before you change anything.</li>
+        <li>Build the firmware with ESPHome and flash it, or flash the build at web.esphome.io.</li>
+        <li>Join the Terrashroom Setup Wi-Fi network and pick your home Wi-Fi.</li>
+      </ol>
+      <p>The full steps, commands, and pin notes are in the <a href="https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom" rel="noopener">Shroom Labs Terrashroom firmware on GitHub</a> folder.</p></section>
+      <section class="owner-section"><h2>Can I go back to the stock Terrashroom firmware?</h2><p class="answer-first">Only if you saved a backup first, and the stock firmware still depends on a cloud service that has ended.</p><p>A backup is one esptool command and takes a few minutes. Keep it somewhere safe. With it you can flash the original back at any time.</p></section>
+      <section class="owner-section"><h2>Does a Terrashroom work with Shroom Labs grow profiles?</h2><p class="answer-first">Yes, you can use the free grow profiles today by setting the targets on the chamber's web page, but phone pairing is not set up for Terrashroom yet.</p><p>Pick your species in <a href="/grow">the grow profiles</a> and copy its humidity, temperature, fresh air, and light numbers into the chamber. Automatic profiles and the phone dashboard come after the firmware is proven on real units.</p></section>
+      <section class="owner-section"><h2>Can I help test it?</h2><p class="answer-first">Yes. If you own a Terrashroom and are comfortable opening it, message us and we will go through a first flash with you.</p><p><a href="/contact?topic=chamber">Message us</a> and pick A chamber. Tell us what your unit does now and whether you have a USB serial adapter. Every report, good or bad, goes into the firmware notes.</p></section>
+      <section class="owner-section"><h2>Who made this firmware?</h2><p class="answer-first">Shroom Labs wrote it from the community pin map. We are not made by or affiliated with the company behind Terrashroom.</p><p>The pin facts come from Parker Ryan's <a href="https://github.com/aparkerryan27/terrashroomPublic" rel="noopener">aparkerryan27/terrashroomPublic on GitHub</a>. Thank you, Parker. If anything here is wrong, <a href="/contact?topic=chamber">tell us</a> and we will fix it.</p></section>
+      <h2>Sources</h2>
+      <p class="muted">Every page below was checked on October 27, 2026.</p>
+      <ol class="sources"><li><a href="https://web.archive.org/web/20250813201948/https://terrashroom.io/blogs/company-updates/terrashroom-last-company-update-june-24th-2025" rel="noopener">Terrashroom last company update, June 24, 2025 (Internet Archive copy)</a></li><li><a href="https://github.com/aparkerryan27/terrashroomPublic" rel="noopener">aparkerryan27/terrashroomPublic on GitHub: pin map and ESPHome notes (November 2025)</a></li><li><a href="https://github.com/aparkerryan27/terrashroomPublic/blob/master/hardware/pinout.md" rel="noopener">terrashroomPublic hardware/pinout.md</a></li><li><a href="https://www.reddit.com/r/terrashroomscam/comments/1pbkpxi/" rel="noopener">Reddit: an owner's guide to flashing ESPHome on a Terrashroom</a></li><li><a href="https://www.reddit.com/r/TerrashroomOwners/comments/1o2le4a/" rel="noopener">r/TerrashroomOwners: is flashing your own firmware feasible?</a></li><li><a href="https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/boot-mode-selection.html" rel="noopener">Espressif: ESP32 boot mode selection and strapping pins</a></li><li><a href="https://docs.espressif.com/projects/esptool/en/latest/esp32/espefuse/set-flash-voltage-cmd.html" rel="noopener">Espressif: espefuse set_flash_voltage</a></li><li><a href="https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom" rel="noopener">Shroom Labs Terrashroom firmware on GitHub</a></li></ol>
+      <h2>Keep reading</h2>
+      <ul class="faq-links"><li><a href="/chambers">Mushroom chambers that work with Shroom Labs</a></li><li><a href="/grow">Mushroom growing conditions for every species</a></li><li><a href="/guides/humidity-and-fresh-air">How much humidity and fresh air mushrooms need</a></li></ul>
+      <div class="owner-cta"><a class="button hero-cta" href="/contact?topic=chamber">Help test it</a><a class="text-link" href="https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom" rel="noopener">See the firmware</a></div>
+    </article></main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/chambers">Chambers</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <nav class="footer-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/lite.js"></script>
+</body>
+</html>

@@ -23,6 +23,11 @@ All grow numbers on this site come from the published grow profiles. Temperature
 - [Shrooly pods: how to refill or replace one](https://shroomlabs.io/shrooly-pods): Owners report that new Shrooly pods are hard or impossible to get. You have three ways forward: get a second flush from the pod you have, refill a pod with your own substrate if you can work clean, or, easiest of all, replace it with a ready to fruit grow block or all in one bag that fits the chamber. With free OpenShrooly software, the chamber runs any block, no pod needed.
 - [Shrooly shut down? Your options](https://shroomlabs.io/shrooly-alternatives): We could not find a public shutdown notice, but many owners report the Shrooly app no longer signs in and pods are hard to get. You still have four good options: revive the chamber with free software, run it by hand, build a simple chamber of your own, or grow in a plastic tub. The first keeps the hardware you paid for working.
 - [Join the Shroom Labs beta](https://shroomlabs.io/beta): If your Shrooly sits unused because the app stopped working, this beta puts it back to work. It is free. Spots are limited to the first 50 linked chambers.
+
+## Other chambers
+
+- [Mushroom chambers that work with Shroom Labs](https://shroomlabs.io/chambers): Shrooly is fully supported. Terrashroom has free community firmware that is untested on real hardware. Inkbird and other Tuya Wi-Fi controllers, and AC Infinity controllers, keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.
+- [Terrashroom after the shutdown](https://shroomlabs.io/terrashroom): Terrashroom closed in June 2025 and said its devices would stop working as its cloud service ended. Shroom Labs now has free community firmware that runs a Terrashroom on your own Wi-Fi with no cloud. It is untested on real hardware, so we are looking for owners to try it first.
 - [Link a chamber](https://shroomlabs.io/claim): link a chamber to your account to see it on your phone and get grow alerts by email. Optional. It works fully on your Wi-Fi without it.
 
 ## Grow Coach and Autopilot

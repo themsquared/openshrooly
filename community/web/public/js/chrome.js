@@ -80,7 +80,7 @@ export function renderHeader(activeId = "") {
 export function renderFooter() {
   return `<footer class="site-footer" data-chrome="footer">
     <p>${POSITIONING}</p>
-    <nav class="footer-nav" aria-label="Footer">${navLinks("")}<a href="/blog">Blog</a></nav>
+    <nav class="footer-nav" aria-label="Footer">${navLinks("")}<a href="/blog">Blog</a><a href="/chambers">Chambers</a></nav>
     <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span>${OWNER_LINKS.map((l) => `<a href="${l.href}">${l.label}</a>`).join("")}</nav>
     <p class="muted">Shroom Labs. Open source Community and Hub.</p>
     <nav class="footer-legal" aria-label="Legal">${LEGAL_LINKS.map((l) => `<a href="${l.href}">${l.label}</a>`).join("")}</nav>
