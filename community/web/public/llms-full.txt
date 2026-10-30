@@ -1475,7 +1475,9 @@ These are the stage lengths in each free grow profile, in days, sorted from fast
 Days per stage for each species, from their profiles |  | Mushroom | Colonization | To pins | Fruiting | Total | From a colonized kit
  | Pink Oyster | 10 | 3 | 7 | 20 | 10
  | Golden Oyster | 12 | 4 | 8 | 24 | 12
+ | Yellow Oyster | 12 | 4 | 8 | 24 | 12
  | Blue Oyster | 12 | 4 | 9 | 25 | 13
+ | Black Oyster | 14 | 5 | 9 | 28 | 14
  | Pearl Oyster | 14 | 5 | 10 | 29 | 15
  | Elm Oyster | 16 | 5 | 10 | 31 | 15
  | Pioppino | 16 | 5 | 10 | 31 | 15
@@ -1484,10 +1486,12 @@ Days per stage for each species, from their profiles |  | Mushroom | Colonizatio
  | Button / Cremini | 16 | 8 | 12 | 36 | 20
  | King Oyster | 18 | 6 | 14 | 38 | 20
  | Wood Ear | 18 | 6 | 14 | 38 | 20
+ | Golden Enoki | 18 | 7 | 14 | 39 | 21
  | Nameko | 20 | 7 | 12 | 39 | 19
  | Beech / Buna Shimeji | 21 | 7 | 12 | 40 | 19
  | Wine Cap | 21 | 7 | 12 | 40 | 19
  | Enoki | 18 | 7 | 18 | 43 | 25
+ | Morel | 21 | 10 | 14 | 45 | 24
  | Maitake | 28 | 10 | 16 | 54 | 26
  | Cordyceps militaris | 12 | 10 | 35 | 57 | 45
  | Shiitake | 42 | 22 (browning and cold shock) | 10 | 74 | 32
@@ -1569,7 +1573,7 @@ A ready block is white all the way through and firm. Brown patches of sawdust me
 
 ### Is it too warm or too cold?
 
-The profiles pin at 15 °C (59 °F) to 24 °C (75 °F). Above about 24 °C (75 °F), most species other than Pink Oyster slow down or stall, and warm, still air invites mold. Cold rooms slow everything. Blue Oyster and Enoki like it cool, Pink Oyster and Golden Oyster like it warm.
+The profiles pin at 14 °C (57 °F) to 24 °C (75 °F). Above about 24 °C (75 °F), most species other than Pink Oyster slow down or stall, and warm, still air invites mold. Cold rooms slow everything. Blue Oyster and Enoki like it cool, Pink Oyster and Golden Oyster like it warm.
 
 ### Is the air too dry?
 
@@ -1650,7 +1654,9 @@ Choose "A fully colonized kit or block". The calculator skips colonization and s
 Days from the start of colonization to the end of the first harvest |  | Mushroom | Total days
  | Pink Oyster | 20
  | Golden Oyster | 24
+ | Yellow Oyster | 24
  | Blue Oyster | 25
+ | Black Oyster | 28
  | Pearl Oyster | 29
  | Elm Oyster | 31
  | Pioppino | 31
@@ -1659,10 +1665,12 @@ Days from the start of colonization to the end of the first harvest |  | Mushroo
  | Button / Cremini | 36
  | King Oyster | 38
  | Wood Ear | 38
+ | Golden Enoki | 39
  | Nameko | 39
  | Beech / Buna Shimeji | 40
  | Wine Cap | 40
  | Enoki | 43
+ | Morel | 45
  | Maitake | 54
  | Cordyceps militaris | 57
  | Shiitake | 74
@@ -1739,16 +1747,19 @@ Yes. Fresh air from a room is almost always drier than the air in a fruiting cha
 
 Fruiting humidity and fan cycle from each profile |  | Mushroom | Fruiting humidity | Fan cycle
  | Beech / Buna Shimeji | 90% | 25 s every 18 min
+ | Black Oyster | 88% | 40 s every 10 min
  | Blue Oyster | 87% | 40 s every 10 min
  | Button / Cremini | 88% | 25 s every 20 min
  | Chestnut Mushroom | 92% | 30 s every 15 min
  | Cordyceps militaris | 84% | 20 s every 25 min
  | Elm Oyster | 86% | 30 s every 14 min
  | Enoki | 93% | 15 s every 90 min
+ | Golden Enoki | 92% | 20 s every 45 min
  | Golden Oyster | 87% | 40 s every 10 min
  | King Oyster | 82% | 25 s every 25 min
  | Lion's Mane | 90% | 25 s every 18 min
  | Maitake | 88% | 25 s every 20 min
+ | Morel | 88% | 30 s every 20 min
  | Nameko | 93% | 25 s every 18 min
  | Pearl Oyster | 88% | 40 s every 10 min
  | Pink Oyster | 86% | 40 s every 10 min
@@ -1758,6 +1769,7 @@ Fruiting humidity and fan cycle from each profile |  | Mushroom | Fruiting humid
  | Turkey Tail | 86% | 30 s every 12 min
  | Wine Cap | 85% | 30 s every 15 min
  | Wood Ear | 92% | 25 s every 16 min
+ | Yellow Oyster | 87% | 40 s every 10 min
 
 ### FAQ
 
@@ -1805,6 +1817,46 @@ A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h 
 
 Q: How much fresh air does Beech / Buna Shimeji need?
 A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Black Oyster at home
+
+URL: https://shroomlabs.io/profiles/black-oyster
+Species: Pleurotus ostreatus
+Updated: 2026-10-30
+
+Black Oyster (Pleurotus ostreatus) takes about 28 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with plenty of fresh air and 12 h of light a day. Dark-capped oyster strain. Cool fruiting and strong FAE keep caps dark and stems short.
+
+### Conditions by stage
+
+- Colonization: 14 days, 24 °C (75 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 5 days, 17 °C (63 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 9 days, 16 °C (61 °F), 88% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. Cooler fruiting keeps caps darker.
+
+### Notes
+
+Runs like Pearl or Blue Oyster. Warm chambers fade the caps toward grey.
+
+### FAQ
+
+Q: What temperature does Black Oyster grow at?
+A: In this profile Black Oyster colonizes at 24 °C (75 °F) and fruits at 16 °C (61 °F). Colonization: 24 °C (75 °F). Pinning: 17 °C (63 °F). Fruiting: 16 °C (61 °F).
+
+Q: What humidity does Black Oyster need?
+A: 88% while fruiting. Colonization: 90%. Pinning: 93%. Fruiting: 88%.
+
+Q: How long does Black Oyster take to grow?
+A: About 28 days with this profile: 14 days of colonization, 5 days of pinning, 9 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Black Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Black Oyster need?
+A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Black Oyster good for beginners?
+A: Yes. It is tagged beginner in this library, which means it is one of the more forgiving species to start with.
 
 ---
 
@@ -2037,6 +2089,46 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 ---
 
+## How to grow Golden Enoki at home
+
+URL: https://shroomlabs.io/profiles/golden-enoki
+Species: Flammulina velutipes
+Updated: 2026-10-30
+
+Golden Enoki (Flammulina velutipes) takes about 39 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. Golden Enoki is the wild-type, gold-capped form of enoki. Same species as white enoki, grown with more light and air for shorter stems and amber caps.
+
+### Conditions by stage
+
+- Colonization: 18 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 7 days, 16 °C (61 °F), 95% humidity, little fresh air: fan runs 15 s every 60 min, light 12 h a day, white 20%, blue 80%. Keep still and wet to pile up pins.
+- Fruiting: 14 days, 15 °C (59 °F), 92% humidity, moderate fresh air: fan runs 20 s every 45 min, light 12 h a day, white 20%, blue 80%. Light brings out the gold cap color.
+
+### Notes
+
+A Shrooly cannot reach true cold-room enoki temperatures. This uses the coolest firmware target and more light than white enoki so caps color up.
+
+### FAQ
+
+Q: What temperature does Golden Enoki grow at?
+A: In this profile Golden Enoki colonizes at 22 °C (72 °F) and fruits at 15 °C (59 °F). Colonization: 22 °C (72 °F). Pinning: 16 °C (61 °F). Fruiting: 15 °C (59 °F).
+
+Q: What humidity does Golden Enoki need?
+A: 92% while fruiting. Colonization: 90%. Pinning: 95%. Fruiting: 92%.
+
+Q: How long does Golden Enoki take to grow?
+A: About 39 days with this profile: 18 days of colonization, 7 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Golden Enoki need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Golden Enoki need?
+A: Moderate fresh air: fan runs 20 s every 45 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Golden Enoki good for beginners?
+A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
+
+---
+
 ## How to grow Golden Oyster at home
 
 URL: https://shroomlabs.io/profiles/golden-oyster
@@ -2179,6 +2271,46 @@ Q: How much fresh air does Maitake need?
 A: Moderate fresh air: fan runs 25 s every 20 min while fruiting. Colonization runs with little fresh air.
 
 Q: Is Maitake good for beginners?
+A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
+
+---
+
+## How to grow Morel at home
+
+URL: https://shroomlabs.io/profiles/morel
+Species: Morchella importuna
+Updated: 2026-10-30
+
+Morel (Morchella importuna) takes about 45 days to grow at home, from spawn to the end of the first harvest. Colonize at 20 °C (68 °F) in the dark, then fruit at 15 °C (59 °F) and 88% humidity with moderate fresh air and 12 h of light a day. Prized spring mushroom. Usually grown outdoors in beds, so this is a best-effort chamber climate, not a proven indoor recipe.
+
+### Conditions by stage
+
+- Colonization: 21 days, 20 °C (68 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Dark. Soil or casing layer recommended.
+- Pinning: 10 days, 14 °C (57 °F), 92% humidity, moderate fresh air: fan runs 25 s every 30 min, light 12 h a day, white 20%, blue 80%. A cold drop helps trigger primordia.
+- Fruiting: 14 days, 15 °C (59 °F), 88% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 20%, blue 80%.
+
+### Notes
+
+Fruiting morels in a Shrooly or any small chamber is atypical and often fails. Most growers use outdoor or greenhouse beds with a nutrient bag. This card only sets humidity, temperature, light, and fresh air for people who want to try.
+
+### FAQ
+
+Q: What temperature does Morel grow at?
+A: In this profile Morel colonizes at 20 °C (68 °F) and fruits at 15 °C (59 °F). Colonization: 20 °C (68 °F). Pinning: 14 °C (57 °F). Fruiting: 15 °C (59 °F).
+
+Q: What humidity does Morel need?
+A: 88% while fruiting. Colonization: 90%. Pinning: 92%. Fruiting: 88%.
+
+Q: How long does Morel take to grow?
+A: About 45 days with this profile: 21 days of colonization, 10 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Morel need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Morel need?
+A: Moderate fresh air: fan runs 30 s every 20 min while fruiting. Colonization runs with little fresh air.
+
+Q: Is Morel good for beginners?
 A: It is one of the harder species in this library. Try an oyster first if you have never grown before.
 
 ---
@@ -2510,6 +2642,39 @@ A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h 
 
 Q: How much fresh air does Wood Ear need?
 A: Moderate fresh air: fan runs 25 s every 16 min while fruiting. Colonization runs with little fresh air.
+
+---
+
+## How to grow Yellow Oyster at home
+
+URL: https://shroomlabs.io/profiles/yellow-oyster
+Species: Pleurotus citrinopileatus
+Updated: 2026-10-30
+
+Yellow Oyster (Pleurotus citrinopileatus) takes about 24 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Yellow Oyster is the common trade name for Golden Oyster. Same species, same warm climate, needs strong FAE.
+
+### Conditions by stage
+
+- Colonization: 12 days, 25 °C (77 °F), 92% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
+- Pinning: 4 days, 22 °C (72 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 8 days, 21 °C (70 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. More light helps hold yellow color.
+
+### FAQ
+
+Q: What temperature does Yellow Oyster grow at?
+A: In this profile Yellow Oyster colonizes at 25 °C (77 °F) and fruits at 21 °C (70 °F). Colonization: 25 °C (77 °F). Pinning: 22 °C (72 °F). Fruiting: 21 °C (70 °F).
+
+Q: What humidity does Yellow Oyster need?
+A: 87% while fruiting. Colonization: 92%. Pinning: 93%. Fruiting: 87%.
+
+Q: How long does Yellow Oyster take to grow?
+A: About 24 days with this profile: 12 days of colonization, 4 days of pinning, 8 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
+
+Q: How much light does Yellow Oyster need?
+A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+
+Q: How much fresh air does Yellow Oyster need?
+A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
 
 ---
 

@@ -319,6 +319,7 @@ def _king() -> LightRecipe:
 RECIPES: dict[str, LightRecipe] = {
     "pearl-oyster": _oyster(),
     "blue-oyster": _oyster(),
+    "black-oyster": _oyster(),
     "pink-oyster": _recipe(
         "P. djamor has no variety-specific lux in the sources below. The recipe is the "
         "P. ostreatus oyster default (dark colonize, 12 h, 20% white, blue-heavy RGB) "
@@ -327,6 +328,12 @@ RECIPES: dict[str, LightRecipe] = {
         OYSTER_FRUITING,
     ),
     "golden-oyster": _recipe(
+        "P. citrinopileatus has no variety-specific lux in the sources below. The recipe "
+        "is the P. ostreatus oyster default and is labeled as such.",
+        [PENN_STATE_OYSTER, RICHARTZ_1987, DE_BONIS_2024, STAMETS_BOOK, GENERAL_DEFAULT],
+        OYSTER_FRUITING,
+    ),
+    "yellow-oyster": _recipe(
         "P. citrinopileatus has no variety-specific lux in the sources below. The recipe "
         "is the P. ostreatus oyster default and is labeled as such.",
         [PENN_STATE_OYSTER, RICHARTZ_1987, DE_BONIS_2024, STAMETS_BOOK, GENERAL_DEFAULT],
@@ -410,6 +417,18 @@ RECIPES: dict[str, LightRecipe] = {
         [WU_2016_CORDYCEPS, LIN_2024],
         CORDYCEPS_FRUITING,
     ),
+    "golden-enoki": _recipe(
+        "Golden enoki is the wild-type form of F. velutipes. No variety-specific lux was "
+        "found, so this is the labeled general default. Light is what colors the caps.",
+        [GENERAL_DEFAULT, SAKAMOTO_ENOKI, STAMETS_BOOK],
+        GENERAL_FRUITING,
+    ),
+    "morel": _recipe(
+        "Morels are usually an outdoor bed crop. No indoor lux or photoperiod paper was "
+        "found, so this is the labeled general default.",
+        [GENERAL_DEFAULT, SAKAMOTO_2018, STAMETS_BOOK],
+        GENERAL_FRUITING,
+    ),
     "wine-cap": _recipe(
         "Wine cap is usually an outdoor bed crop. No indoor lux or photoperiod paper was "
         "found, so this is the labeled general default.",
@@ -451,6 +470,7 @@ RECIPES: dict[str, LightRecipe] = {
     ),
     "golden-teacher": _off_menu(CUBENSIS_WHY),
     "b-plus": _off_menu(CUBENSIS_WHY),
+    "jedi-mind-fuck": _off_menu(CUBENSIS_WHY),
     "penis-envy": _off_menu(CUBENSIS_WHY),
     "acadian-coast": _off_menu(CUBENSIS_WHY),
     "treasure-coast": _off_menu(CUBENSIS_WHY),
