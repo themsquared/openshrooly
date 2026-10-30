@@ -8,6 +8,8 @@ from __future__ import annotations
 PHOTOS: list[tuple[tuple[str, ...], str]] = [
     (("pink", "oyster"), "/static/img/species/species-pink-oyster.jpg"),
     (("golden", "oyster"), "/static/img/species/species-golden-oyster.jpg"),
+    (("yellow", "oyster"), "/static/img/species/species-golden-oyster.jpg"),
+    (("black", "oyster"), "/static/img/species/species-blue-oyster.jpg"),
     (("king", "oyster"), "/static/img/species/species-king-oyster.jpg"),
     (("blue", "oyster"), "/static/img/species/species-blue-oyster.jpg"),
     (("elm", "oyster"), "/static/img/species/species-elm-oyster.jpg"),

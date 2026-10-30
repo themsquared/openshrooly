@@ -11,6 +11,7 @@ import { isOffMenu, profilePath } from "./pack.js";
 // Profiles with a licensed photo (Off-menu and Chef's line), and the smallest copy the site has of each.
 const LICENSED = {
   "golden-teacher": "/img/species/golden-teacher-640.webp",
+  "jedi-mind-fuck": "/img/species/golden-teacher-640.webp",
   "b-plus": "/img/species/b-plus-640.webp",
   "p-cyanescens": "/img/species/p-cyanescens-640.webp",
   "penis-envy": "/img/species/penis-envy-640.webp",
@@ -35,6 +36,8 @@ const LICENSED = {
 const PHOTOS = [
   [["pink", "oyster"], "pink-oyster"],
   [["golden", "oyster"], "golden-oyster"],
+  [["yellow", "oyster"], "golden-oyster"],
+  [["black", "oyster"], "blue-oyster"],
   [["king", "oyster"], "king-oyster"],
   [["blue", "oyster"], "blue-oyster"],
   [["elm", "oyster"], "elm-oyster"],

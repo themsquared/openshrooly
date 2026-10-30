@@ -7,7 +7,7 @@ import { SPECIES } from "./tools/index.js";
 const pearl = SPECIES.find((s) => s.id === "pearl-oyster");
 
 test("every species has stages with days, temperature, humidity, and a fan cycle", () => {
-  assert.equal(SPECIES.length, 20);
+  assert.equal(SPECIES.length, 24);
   for (const s of SPECIES) {
     assert.ok(s.latin && s.stages.length >= 3, s.id);
     for (const st of s.stages) {

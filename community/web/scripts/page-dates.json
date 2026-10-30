@@ -15,6 +15,10 @@
     "hash": "0a51107b087f00dc",
     "date": "2026-10-27"
   },
+  "black-oyster": {
+    "hash": "428886f693267036",
+    "date": "2026-10-30"
+  },
   "blue-oyster": {
     "hash": "0c13e597ca99e183",
     "date": "2026-10-27"
@@ -47,6 +51,10 @@
     "hash": "6cb5146224af6b40",
     "date": "2026-10-27"
   },
+  "golden-enoki": {
+    "hash": "03d648b9b9df2c1f",
+    "date": "2026-10-30"
+  },
   "golden-oyster": {
     "hash": "8af7d5ba4760dbdf",
     "date": "2026-10-27"
@@ -58,6 +66,10 @@
   "golden-teacher": {
     "hash": "e03bf75868659a1b",
     "date": "2026-10-27"
+  },
+  "jedi-mind-fuck": {
+    "hash": "9d081506f2573a69",
+    "date": "2026-10-30"
   },
   "king-oyster": {
     "hash": "8d6c16b2a891e545",
@@ -78,6 +90,10 @@
   "maitake": {
     "hash": "a20c9691c2e5a234",
     "date": "2026-10-27"
+  },
+  "morel": {
+    "hash": "b7cefdb5c6da383b",
+    "date": "2026-10-30"
   },
   "nameko": {
     "hash": "392e172315207f3d",
@@ -154,5 +170,9 @@
   "wood-ear-dark": {
     "hash": "7b1e411585805581",
     "date": "2026-10-27"
+  },
+  "yellow-oyster": {
+    "hash": "f5f1e5d68bfea6c2",
+    "date": "2026-10-30"
   }
 }

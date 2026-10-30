@@ -62,7 +62,7 @@ test("every Off-menu page has a licensed photo, credit, no citations, and no str
   const profiles = loadProfiles().filter((p) => p.pack === "psilocybin");
   assert.deepEqual(
     profiles.map((p) => p.id).sort(),
-    ["acadian-coast", "b-plus", "golden-teacher", "p-cyanescens", "p-natalensis", "penis-envy", "treasure-coast"]
+    ["acadian-coast", "b-plus", "golden-teacher", "jedi-mind-fuck", "p-cyanescens", "p-natalensis", "penis-envy", "treasure-coast"]
   );
   for (const profile of profiles) {
     const photo = photoRecordFor(profile);
@@ -133,7 +133,7 @@ function nestedAnchor(html) {
 test("rendered cards never nest an <a> inside another <a>", () => {
   const profiles = loadProfiles();
   const offMenu = profiles.filter((p) => p.pack === "psilocybin");
-  assert.equal(offMenu.length, 7);
+  assert.equal(offMenu.length, 8);
   const html = renderProfileCards(profiles);
   assert.match(html, /<a class="profile-card"/);
   assert.match(html, /photo-credit/);

@@ -7,6 +7,8 @@ import { photoRecordFor, renderLicensedPhoto } from "./species-photos.js";
 const PHOTOS = [
   { keys: ["pink", "oyster"], src: "/img/species/species-pink-oyster.jpg" },
   { keys: ["golden", "oyster"], src: "/img/species/species-golden-oyster.jpg" },
+  { keys: ["yellow", "oyster"], src: "/img/species/species-golden-oyster.jpg" },
+  { keys: ["black", "oyster"], src: "/img/species/species-blue-oyster.jpg" },
   { keys: ["king", "oyster"], src: "/img/species/species-king-oyster.jpg" },
   { keys: ["blue", "oyster"], src: "/img/species/species-blue-oyster.jpg" },
   { keys: ["elm", "oyster"], src: "/img/species/species-elm-oyster.jpg" },
