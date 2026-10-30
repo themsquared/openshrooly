@@ -1826,7 +1826,7 @@ URL: https://shroomlabs.io/profiles/black-oyster
 Species: Pleurotus ostreatus
 Updated: 2026-10-30
 
-Black Oyster (Pleurotus ostreatus) takes about 28 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with plenty of fresh air and 12 h of light a day. Dark-capped oyster strain. Cool fruiting and strong FAE keep caps dark and stems short.
+Black Oyster (Pleurotus ostreatus) takes about 28 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with plenty of fresh air and 12 h of light a day. Dark-capped oyster strain. Cool fruiting and plenty of fresh air keep caps dark and stems short.
 
 ### Conditions by stage
 
@@ -2651,7 +2651,7 @@ URL: https://shroomlabs.io/profiles/yellow-oyster
 Species: Pleurotus citrinopileatus
 Updated: 2026-10-30
 
-Yellow Oyster (Pleurotus citrinopileatus) takes about 24 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Yellow Oyster is the common trade name for Golden Oyster. Same species, same warm climate, needs strong FAE.
+Yellow Oyster (Pleurotus citrinopileatus) takes about 24 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Yellow Oyster is the common trade name for Golden Oyster. Same species, same warm climate, needs lots of fresh air.
 
 ### Conditions by stage
 
