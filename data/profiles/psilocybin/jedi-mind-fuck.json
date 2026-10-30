@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "id": "jedi-mind-fuck",
+  "name": "Jedi Mind Fuck",
+  "species": "Psilocybe cubensis",
+  "strain": "Jedi Mind Fuck",
+  "variety_group": "cubensis",
+  "pack": "psilocybin",
+  "tags": [
+    "psilocybin",
+    "cubensis",
+    "beginner"
+  ],
+  "restricted": true,
+  "summary": "Popular cubensis strain. Same climate band as Golden Teacher and B+. Reference conditions for research and education only.",
+  "notes": "Informational climate only. Not a cultivation guide for illegal activity.",
+  "chamber_notes": "Cubensis typically uses a tub/casing workflow the Shrooly does not replace. This only covers humidity, temperature, light, and fresh air.",
+  "legal_notice": "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.",
+  "source_notes": [
+    {
+      "title": "Climate",
+      "detail": "Jedi Mind Fuck is commonly described as a vigorous cubensis that runs in the same climate as Golden Teacher and B+: about 24 to 27 \u00b0C to colonize, then 21 to 24 \u00b0C with high humidity and 12 hours of light a day."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 16,
+      "humidity_percent": 92,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 25,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 20,
+      "temperature_warning_max_c": 30,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": ""
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 6,
+      "humidity_percent": 95,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17,
+      "temperature_warning_max_c": 27,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 20,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": ""
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 10,
+      "humidity_percent": 90,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 22,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 17,
+      "temperature_warning_max_c": 27,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 15,
+        "run_duration_s": 30,
+        "speed_percent": 30
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": false,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "P. cubensis needs light to start pins, and blue light works for that. Colonization is dark. Pinning and fruiting get 12 hours a day at 20% white (92 lux on this chamber) with 80% blue.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "Chamber default",
+        "detail": "Standard light settings mapped to this chamber's white and RGB LEDs. Not a measured value for this variety."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
+  }
+}

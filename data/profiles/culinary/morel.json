@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "id": "morel",
+  "name": "Morel",
+  "species": "Morchella importuna",
+  "strain": "Morel",
+  "variety_group": "morel",
+  "pack": "culinary",
+  "tags": [
+    "culinary",
+    "advanced",
+    "cool",
+    "outdoor"
+  ],
+  "restricted": false,
+  "summary": "Prized spring mushroom. Usually grown outdoors in beds, so this is a best-effort chamber climate, not a proven indoor recipe.",
+  "notes": "Morels form sclerotia and usually need a cold period and a soil bed to fruit. Treat results as an experiment.",
+  "chamber_notes": "Fruiting morels in a Shrooly or any small chamber is atypical and often fails. Most growers use outdoor or greenhouse beds with a nutrient bag. This card only sets humidity, temperature, light, and fresh air for people who want to try.",
+  "legal_notice": null,
+  "source_notes": [
+    {
+      "title": "Stamets",
+      "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms (commonly cited chamber ranges). Morchella fruits in cool, moist spring conditions, often about 10 to 18 \u00b0C."
+    },
+    {
+      "title": "Bed growers",
+      "detail": "Outdoor morel bed kits fruit after a cold snap at high soil moisture with indirect light."
+    }
+  ],
+  "stages": [
+    {
+      "id": "colonization",
+      "name": "Colonization",
+      "duration_days": 21,
+      "humidity_percent": 90,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 20,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 15,
+      "temperature_warning_max_c": 25,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 0,
+        "white_led_lux": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "fan": {
+        "period_min": 60,
+        "run_duration_s": 15,
+        "speed_percent": 20
+      },
+      "notes": "Dark. Soil or casing layer recommended."
+    },
+    {
+      "id": "pinning",
+      "name": "Pinning",
+      "duration_days": 10,
+      "humidity_percent": 92,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 14,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 10,
+      "temperature_warning_max_c": 18,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 30,
+        "run_duration_s": 25,
+        "speed_percent": 25
+      },
+      "notes": "A cold drop helps trigger primordia."
+    },
+    {
+      "id": "fruiting",
+      "name": "Fruiting",
+      "duration_days": 14,
+      "humidity_percent": 88,
+      "humidity_hysteresis": 2.0,
+      "temperature_c": 15,
+      "temperature_hysteresis": 1.0,
+      "temperature_control_enabled": true,
+      "temperature_warning_min_c": 10,
+      "temperature_warning_max_c": 19,
+      "humidifier_speed_percent": 75,
+      "light": {
+        "sunrise_hour": 8,
+        "duration_hours": 12,
+        "white_led_lux": 92,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fan": {
+        "period_min": 20,
+        "run_duration_s": 30,
+        "speed_percent": 30
+      },
+      "notes": ""
+    }
+  ],
+  "pricing": {
+    "kind": "free",
+    "amount_cents": 0,
+    "currency": "USD",
+    "creator_share_percent": 70
+  },
+  "allowed_payment_providers": [],
+  "affiliates_allowed": true,
+  "affiliate_links": [],
+  "fork_of": null,
+  "author": null,
+  "firmware_compat": {
+    "min_version": "1.0.0",
+    "uses_existing_entities_only": true
+  },
+  "light_recipe": {
+    "why": "Morels are usually an outdoor bed crop. No indoor lux or photoperiod paper was found, so this is the labeled general default.",
+    "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
+    "sources": [
+      {
+        "title": "General default",
+        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+      },
+      {
+        "title": "Sakamoto 2018",
+        "detail": "Yuichi Sakamoto, Influences of environmental factors on fruiting body induction, development and maturation in mushroom-forming fungi, Fungal Biology Reviews 32 (2018). Light is a fruiting cue for many basidiomycetes. Blue light is the usual photomorphogenesis signal. Agaricus bisporus is called out as not needing light for a cap. Flammulina velutipes can fruit in the dark as a long stem with a tiny cap.",
+        "url": "https://doi.org/10.1016/j.fbr.2018.02.003"
+      },
+      {
+        "title": "Stamets",
+        "detail": "Paul Stamets, Growing Gourmet and Medicinal Mushrooms, Ten Speed Press. Used here as a general cultivation reference. This recipe does not take a photoperiod or lux number from a cited page in that book."
+      }
+    ],
+    "phases": {
+      "colonization": {
+        "photoperiod_hours": 0,
+        "white_brightness_percent": 0,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 0
+      },
+      "pinning": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      },
+      "fruiting": {
+        "photoperiod_hours": 12,
+        "white_brightness_percent": 20,
+        "red_percent": 0,
+        "green_percent": 0,
+        "blue_percent": 80
+      }
+    }
+  }
+}
