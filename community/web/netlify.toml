@@ -43,3 +43,9 @@
   from = "/profiles/:id"
   to = "/profile.html?id=:id"
   status = 200
+
+[[headers]]
+  for = "/.well-known/google-connected-apps"
+  [headers.values]
+    Content-Type = "application/json"
+    Access-Control-Allow-Origin = "*"

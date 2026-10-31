@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "bundle-seeds": "node scripts/bundle-seeds.js",
+    "bundle-seeds": "node scripts/bundle-seeds.js && node scripts/bundle-mcp-content.js",
     "dev": "npm run bundle-seeds && node server.js",
     "dev:worker": "npm run bundle-seeds && wrangler dev",
     "coach:local": "npm run bundle-seeds && node scripts/coach-local-user.js && wrangler dev -c wrangler.coach-local.toml --persist-to .wrangler/coach-local --ip 127.0.0.1 --port 8787",
