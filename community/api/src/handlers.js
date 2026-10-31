@@ -31,6 +31,7 @@ import { corsAllowlist, originAllowed, rateLimit, rateLimitClient, securityHeade
 import { isOffMenu, packLabel, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
+import { handleMcp } from "./mcp.js";
 import { handleAlerts } from "./alerts/http.js";
 import { handleLive } from "./live.js";
 import { handleReview } from "./review-http.js";
@@ -212,6 +213,9 @@ export async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
+  // Public read-only MCP server and Google Connected Apps file. No DB needed.
+  const mcp = await handleMcp(request, path);
+  if (mcp) return mcp;
   if (method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env, request) });
   // api.shroomlabs.io is JSON for the site, not pages. Crawlers should index shroomlabs.io instead.
   if ((method === "GET" || method === "HEAD") && path === "/robots.txt") {
