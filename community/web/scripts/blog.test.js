@@ -110,3 +110,14 @@ test("built pages carry BlogPosting JSON-LD, GA, a valid feed, sitemap and llms 
     if (!p.offmenu) assert.match(renderLlmsFull(profiles), new RegExp(p.slug));
   }
 });
+
+test("fenced code blocks render as escaped text and keep list and heading lines literal", async () => {
+  const { blocksToHtml, blocksToText } = await import("./blog/markdown.js");
+  const blocks = parseBlocks("Intro.\n```yaml\n# not a heading\n- not: a list\nlambda: 'return x < 1 && y;'\n```\nAfter.\n");
+  assert.deepEqual(blocks.map((b) => b.type), ["p", "code", "p"]);
+  assert.equal(blocks[1].lang, "yaml");
+  const html = blocksToHtml(blocks, (h) => h);
+  assert.match(html, /<pre class="blog-code" data-lang="yaml"><code># not a heading\n- not: a list\nlambda: 'return x &lt; 1 &amp;&amp; y;'<\/code><\/pre>/);
+  assert.match(blocksToText(blocks), /```yaml\n# not a heading/);
+  assert.throws(() => parseBlocks("```\nopen\n"), /not closed/);
+});

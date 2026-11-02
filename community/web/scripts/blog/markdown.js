@@ -1,7 +1,7 @@
 /**
  * Small markdown subset for blog posts. No raw HTML passes through: every text run is escaped.
  * Supports ## and ### headings, paragraphs, - and 1. lists, pipe tables, > notes,
- * **bold**, _italic_, `code` and [label](href) links.
+ * fenced ``` code blocks (shown as escaped text, never run), **bold**, _italic_, `code` and [label](href) links.
  */
 
 export function escapeHtml(value) {
@@ -76,7 +76,8 @@ export function slugify(text) {
 }
 
 /**
- * Parse a markdown body into blocks: { type: "h2"|"h3"|"p"|"ul"|"ol"|"table"|"note", text|items|rows }.
+ * Parse a markdown body into blocks: { type: "h2"|"h3"|"p"|"ul"|"ol"|"table"|"note"|"code", text|items|rows }.
+ * A code block also carries lang, the word after the opening fence.
  * Blocks keep the raw markdown so the caller can render HTML, plain text, or JSON-LD from them.
  */
 export function parseBlocks(body) {
@@ -88,6 +89,16 @@ export function parseBlocks(body) {
     const line = lines[i];
     if (!line.trim()) {
       i++;
+      continue;
+    }
+    const fence = line.match(/^```\s*([a-z0-9-]*)\s*$/i);
+    if (fence) {
+      const code = [];
+      i++;
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) code.push(lines[i++]);
+      if (i >= lines.length) throw new Error("code block is not closed with ```");
+      i++;
+      blocks.push({ type: "code", lang: fence[1].toLowerCase(), text: code.join("\n") });
       continue;
     }
     const h = line.match(/^(#{2,3})\s+(.*)$/);
@@ -126,7 +137,7 @@ export function parseBlocks(body) {
       continue;
     }
     const text = [];
-    while (i < lines.length && lines[i].trim() && !/^(#{1,3}\s|-\s|\d+\.\s|\||>)/.test(lines[i])) text.push(lines[i++].trim());
+    while (i < lines.length && lines[i].trim() && !/^(#{1,3}\s|-\s|\d+\.\s|\||>|```)/.test(lines[i])) text.push(lines[i++].trim());
     blocks.push({ type: "p", text: text.join(" ") });
   }
   return blocks;
@@ -140,6 +151,7 @@ export function blocksToHtml(blocks, linkFor) {
       if (b.type === "h3") return `<h3>${il(b.text)}</h3>`;
       if (b.type === "p") return `<p>${il(b.text)}</p>`;
       if (b.type === "note") return `<p class="blog-note">${il(b.text)}</p>`;
+      if (b.type === "code") return `<pre class="blog-code"${b.lang ? ` data-lang="${escapeHtml(b.lang)}"` : ""}><code>${escapeHtml(b.text)}</code></pre>`;
       if (b.type === "ul" || b.type === "ol") return `<${b.type}>${b.items.map((t) => `<li>${il(t)}</li>`).join("")}</${b.type}>`;
       if (b.type === "table") {
         const [head, ...rows] = b.rows;
@@ -167,6 +179,7 @@ export function blocksToText(blocks) {
       if (b.type === "h2") return `### ${plain(b.text)}`;
       if (b.type === "h3") return `#### ${plain(b.text)}`;
       if (b.type === "p" || b.type === "note") return plain(b.text);
+      if (b.type === "code") return `\`\`\`${b.lang}\n${b.text}\n\`\`\``;
       if (b.type === "ul") return b.items.map((t) => `- ${plain(t)}`).join("\n");
       if (b.type === "ol") return b.items.map((t, n) => `${n + 1}. ${plain(t)}`).join("\n");
       if (b.type === "table") return b.rows.map((r) => `| ${r.map(plain).join(" | ")} |`).join("\n");

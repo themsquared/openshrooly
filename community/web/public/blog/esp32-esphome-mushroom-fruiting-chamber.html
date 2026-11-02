@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Build a mushroom fruiting chamber with an ESP32 and ESPHome | Shroom Labs</title>
+  <meta name="description" content="Build an automated mushroom fruiting chamber with an ESP32 and ESPHome. Parts by role, wiring, an example YAML that runs a grow profile, and tuning.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Build a mushroom fruiting chamber with an ESP32 and ESPHome | Shroom Labs">
+  <meta property="og:description" content="Build an automated mushroom fruiting chamber with an ESP32 and ESPHome. Parts by role, wiring, an example YAML that runs a grow profile, and tuning.">
+  <meta property="og:url" content="https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber">
+  <meta property="og:image" content="https://shroomlabs.io/og/blog/esp32-esphome-mushroom-fruiting-chamber.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Build a mushroom fruiting chamber with an ESP32 and ESPHome | Shroom Labs">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Build a mushroom fruiting chamber with an ESP32 and ESPHome | Shroom Labs">
+  <meta name="twitter:description" content="Build an automated mushroom fruiting chamber with an ESP32 and ESPHome. Parts by role, wiring, an example YAML that runs a grow profile, and tuning.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/blog/esp32-esphome-mushroom-fruiting-chamber.jpg">
+  <meta property="article:published_time" content="2026-11-02">
+  <meta property="article:modified_time" content="2026-11-02">
+  <meta property="article:author" content="Shroom Labs">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":["Article","BlogPosting"],"@id":"https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber#article","headline":"Build an automated mushroom fruiting chamber with an ESP32 and ESPHome","description":"Build an automated mushroom fruiting chamber with an ESP32 and ESPHome. Parts by role, wiring, an example YAML that runs a grow profile, and tuning.","abstract":"You need one ESP32 running ESPHome, a humidity sensor (an SHT40 or SHT41, plus an optional SCD41 for CO2), and three low voltage switches for a humidifier, a fan and an LED light. The firmware turns the humidifier on when humidity drops 1.5 points under target and off at 0.5 over, runs the fan for a set time on a set interval, and keeps the light on for a set number of hours. Our pearl oyster fruiting stage is 88% humidity, 40 seconds of fan every 10 minutes and 12 hours of light. The example YAML below runs that profile and shows up in Home Assistant.","url":"https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber","mainEntityOfPage":"https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber","image":"https://shroomlabs.io/og/blog/esp32-esphome-mushroom-fruiting-chamber.jpg","inLanguage":"en","datePublished":"2026-11-02","dateModified":"2026-11-02","articleSection":"Chamber builds","author":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/"},"publisher":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/"},"isPartOf":{"@type":"Blog","@id":"https://shroomlabs.io/blog#blog","name":"Shroom Labs blog","url":"https://shroomlabs.io/blog"},"citation":["https://shroomlabs.io/profiles/pearl-oyster","https://shroomlabs.io/profiles/lions-mane","https://github.com/themsquared/openshrooly/blob/main/esphome/components/controls.yaml","https://github.com/themsquared/openshrooly/blob/main/esphome/scripts/humidity_control_manager.yaml","https://github.com/themsquared/openshrooly/blob/main/esphome/components/sensors.yaml","https://github.com/themsquared/openshrooly/tree/main/esphome/terrashroom","https://esphome.io/components/sensor/sht4x/","https://esphome.io/components/sensor/scd4x/","https://esphome.io/components/api/","https://esphome.io/components/select/template/","https://www.home-assistant.io/integrations/esphome/","https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html","https://sensirion.com/media/documents/33FD6951/6A7C10A0/HT_DS_Datasheet_SHT4x_V7.3.pdf","https://sensirion.com/media/documents/A88858C9/629626D4/Application_Note_Creep_Mitigation_SHT4x.pdf","https://sensirion.com/media/documents/48C4B7FB/64C134E7/Sensirion_SCD4x_Datasheet.pdf","https://sensirion.com/media/documents/9D6E378D/6AC75EB6/CD_AN_Sensor_Operation_Guide_D1.pdf","https://gml.noaa.gov/ccgg/trends/global.html","https://nvlpubs.nist.gov/nistpubs/jres/81A/jresv81An1p89_A1b.pdf","https://ucanr.edu/sites/default/files/2012-05/144772.pdf","https://projects.sare.org/media/pdf/F/u/n/FungiAlly_Oyster_booklet_Final-1.pdf"]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://shroomlabs.io/blog"},{"@type":"ListItem","position":3,"name":"Build an automated mushroom fruiting chamber with an ESP32 and ESPHome","item":"https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber"}]},{"@type":"FAQPage","@id":"https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber#faq","mainEntity":[{"@type":"Question","name":"What is the best sensor for a mushroom fruiting chamber?","acceptedAnswer":{"@type":"Answer","text":"An SHT40, SHT41 or SHT45 for humidity and temperature, mounted out of the mist. Add an SCD40 or SCD41 if you want to control fresh air by CO2. The SCD41 covers a wider range, 400 to 5,000 ppm against 400 to 2,000 ppm for the SCD40."}},{"@type":"Question","name":"Do I need Home Assistant?","acceptedAnswer":{"@type":"Answer","text":"No. The ESP32 runs the humidity, fan and light loops by itself. Home Assistant adds graphs, alerts and an easy way to change settings."}},{"@type":"Question","name":"Can I control a mains humidifier or heater?","acceptedAnswer":{"@type":"Answer","text":"Not with a hand wired relay board. Plug it into a listed smart plug and let Home Assistant switch it, or pick a 5 V or 12 V mist maker so everything in the box stays low voltage."}},{"@type":"Question","name":"Why does my humidity sensor read 100% all the time?","acceptedAnswer":{"@type":"Answer","text":"It is in the mist path or it has condensation on it. Move it out of the fog stream. The SHT4x heater pulses in the example also help clear the high humidity offset."}},{"@type":"Question","name":"Why turn off CO2 automatic calibration?","acceptedAnswer":{"@type":"Answer","text":"Automatic calibration assumes the sensor sees fresh outdoor air once a week. Inside a closed chamber that may never happen, and the sensor will drift. Calibrating by hand outdoors is more reliable."}}]},{"@type":"HowTo","@id":"https://shroomlabs.io/blog/esp32-esphome-mushroom-fruiting-chamber#howto","name":"How to build the chamber, step by step","step":[{"@type":"HowToStep","position":1,"text":"Drill a fan hole low on one side of the box and an exhaust hole high on the other side, so fresh air sweeps across the block."},{"@type":"HowToStep","position":2,"text":"Mount the humidifier so the mist goes into the open box, not straight onto the block or the sensor."},{"@type":"HowToStep","position":3,"text":"Wire the sensor, the three MOSFET or relay modules and the power as in the wiring table, with all grounds tied together."},{"@type":"HowToStep","position":4,"text":"Copy the example YAML, change pins to match your build, add secrets.yaml, and flash it over USB."},{"@type":"HowToStep","position":5,"text":"Add the device in Home Assistant. It shows up on its own through the ESPHome integration."},{"@type":"HowToStep","position":6,"text":"Run the box empty for a day with Auto mode on and watch the humidity graph."},{"@type":"HowToStep","position":7,"text":"Tune the humidifier and fan until humidity holds near the target, then put the block in and pick the stage."}]}]}</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RKQ4CBEZWY"></script>
+  <script src="/js/ga.js" defer></script>
+  <!--/SEO_HEAD-->
+  <link rel="alternate" type="application/rss+xml" title="Shroom Labs blog" href="https://shroomlabs.io/blog/feed.xml">
+  <link rel="preload" href="/fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/fraunces-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="blog">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <article class="profile-page guide-page blog-post">
+      <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><a href="/blog">Blog</a></li><li aria-current="page">Build an automated mushroom fruiting chamber with an ESP32 and ESPHome</li></ol></nav>
+      <p class="eyebrow">Chamber builds</p>
+      <h1>Build an automated mushroom fruiting chamber with an ESP32 and ESPHome</h1>
+      <p class="updated muted">By Shroom Labs. Published <time datetime="2026-11-02">November 2, 2026</time>.</p>
+      <p class="lede answer-first">You need one ESP32 running ESPHome, a humidity sensor (an SHT40 or SHT41, plus an optional SCD41 for CO2), and three low voltage switches for a humidifier, a fan and an LED light. The firmware turns the humidifier on when humidity drops 1.5 points under target and off at 0.5 over, runs the fan for a set time on a set interval, and keeps the light on for a set number of hours. Our pearl oyster fruiting stage is 88% humidity, 40 seconds of fan every 10 minutes and 12 hours of light. The example YAML below runs that profile and shows up in Home Assistant.</p>
+      
+      <h2 id="what-an-automated-fruiting-chamber-has-to-do">What an automated fruiting chamber has to do</h2>
+      <p>A fruiting chamber holds a colonized block and keeps three things where the mushroom wants them: humidity, fresh air and light. Temperature matters too, but most home builds handle it by putting the box in a room that is already close to the right temperature.</p>
+      <p>An ESP32 running <a href="https://esphome.io/" rel="noopener">ESPHome</a> can do all of that for a few parts. It reads a sensor, switches loads, keeps working with no internet, and shows up in Home Assistant so you can watch graphs and change targets from your phone. It is the same approach our own firmware takes on the chambers we support, so the logic below is the logic we already run, cut down to fit one file.</p>
+      <p>If you own a Shrooly, you do not need to build anything. <a href="/install">Install our free firmware</a> on it instead. This post is for everyone else, and for anyone who wants a chamber that does not depend on one company staying in business. Our <a href="/shrooly-alternatives">Shrooly alternatives</a> page covers the other options.</p>
+      <h2 id="parts-by-role">Parts by role</h2>
+      <p>Buy by role, not by brand. Any part that fills the role works.</p>
+      <div class="table-wrap"><table class="conditions-table"><thead><tr><th scope="col">Role</th><th scope="col">What to use</th><th scope="col">Notes</th></tr></thead><tbody><tr><th scope="row">Controller</th><td>ESP32 dev board (esp32dev)</td><td>Powered from 5 V</td></tr><tr><th scope="row">Humidity and temperature</th><td>SHT40, SHT41 or SHT45 breakout</td><td>I2C, address 0x44</td></tr><tr><th scope="row">CO2 (optional)</th><td>SCD40 or SCD41 breakout</td><td>I2C, address 0x62</td></tr><tr><th scope="row">Humidifier</th><td>5 V or 12 V ultrasonic mist maker, fogger or USB humidifier</td><td>Pick one that mists as soon as it gets power, with no button</td></tr><tr><th scope="row">Humidifier switch</th><td>Logic level MOSFET module or a relay module that triggers at 3.3 V</td><td>One channel</td></tr><tr><th scope="row">Fan</th><td>12 V PC case fan</td><td>Pulls room air in or pushes chamber air out</td></tr><tr><th scope="row">Fan switch</th><td>Logic level MOSFET module</td><td>Lets the ESP32 set the speed</td></tr><tr><th scope="row">Light</th><td>12 V LED strip, white or blue</td><td>Low output is fine</td></tr><tr><th scope="row">Light switch</th><td>Logic level MOSFET module</td><td>One channel</td></tr><tr><th scope="row">Power</th><td>12 V supply plus a 5 V buck converter</td><td>Size it for everything on at once</td></tr><tr><th scope="row">Box</th><td>Clear tote or any sealed box</td><td>Drill holes for the fan and an exhaust</td></tr></tbody></table></div>
+      <p>Keep every load on low voltage. If you want to run a mains heater or a mains humidifier, use a listed smart plug that Home Assistant can switch, not a relay board wired by hand.</p>
+      <p>The SHT4x is the better humidity sensor for this job. Sensirion rates the SHT40 and SHT41 at plus or minus 1.8% RH typical and the SHT45 at 1.0%. The SCD4x also reports humidity, but buy it for CO2. Its datasheet limits it to non condensing air from 0 to 95% RH, so keep it out of the mist.</p>
+      <h2 id="wiring">Wiring</h2>
+      <p>All three sensors share one I2C bus. Every load gets its own switch module. Tie every ground together: the 12 V supply, the buck converter, the ESP32 and each module.</p>
+      <div class="table-wrap"><table class="conditions-table"><thead><tr><th scope="col">Part</th><th scope="col">Connects to</th><th scope="col">ESP32 pin</th></tr></thead><tbody><tr><th scope="row">Sensor SDA</th><td>I2C data</td><td>GPIO21</td></tr><tr><th scope="row">Sensor SCL</th><td>I2C clock</td><td>GPIO22</td></tr><tr><th scope="row">Sensor VCC and GND</th><td>3.3 V and GND</td><td>3V3, GND</td></tr><tr><th scope="row">Humidifier switch input</th><td>On or off</td><td>GPIO26</td></tr><tr><th scope="row">Fan MOSFET input</th><td>PWM</td><td>GPIO25</td></tr><tr><th scope="row">Light MOSFET input</th><td>PWM</td><td>GPIO27</td></tr><tr><th scope="row">ESP32 power</th><td>5 V from the buck converter</td><td>5V (VIN), GND</td></tr></tbody></table></div>
+      <p>These pins were picked to stay clear of trouble. On the ESP32, GPIO0, 2, 5, 12 and 15 are strapping pins that change how the chip boots, GPIO6 to 11 usually connect to the flash chip, and GPIO34 to 39 are inputs only. Avoid all of those for loads.</p>
+      <p>Two things catch people out. Many relay modules switch on when the input goes low. If yours does, add <code>inverted: true</code> under the humidifier pin. And the SCD4x datasheet asks for a steady supply, with a separate regulator recommended, so do not hang it off a rail that also feeds the fogger.</p>
+      <h2 id="mount-the-sensor-in-the-right-place">Mount the sensor in the right place</h2>
+      <p>Put the humidity sensor at the height of the block, out of the direct path of the mist and the fan. A sensor sitting in the fog stream reads 100% and turns the humidifier off while the rest of the box dries out.</p>
+      <p>High humidity is hard on these sensors. Sensirion says SHT4x parts build up a reversible upward offset, called creep, when they sit above about 90% RH for long periods, and that the built in heater clears it. Our firmware runs the heater in short pulses capped at 2% of the time, and the example below does the same. ESPHome does not publish readings while the heater runs, so a reading every 2 seconds still leaves plenty of data.</p>
+      <h2 id="the-example-esphome-yaml">The example ESPHome YAML</h2>
+      <p>This is an example to adapt, not a finished product build. It follows the same rules as our firmware, but it has not been tested on your parts. Check every pin and value against what you bought before you power anything.</p>
+      <p>What it does:</p>
+      <ul><li>Turns every load off at boot. Nothing runs until you turn on the Auto mode switch.</li><li>Humidity: on below target minus 1.5 points, off above target plus 0.5, with at least 90 seconds on and 60 seconds off. Those are our firmware defaults. It shuts the humidifier off if the sensor stops reporting.</li><li>Fresh air: runs the fan for the set seconds every set minutes, and any time CO2 is over the limit or humidity is over 96%.</li><li>Light: on for the set hours starting at the set hour.</li><li>A Stage select that loads the colonization, pinning or fruiting stage of our pearl oyster profile. Every value is also its own number, so you can tune one without editing the file.</li><li>A button to calibrate the CO2 sensor to outdoor air. Delete the scd4x block and that button if you have no CO2 sensor.</li></ul>
+      <p>Put your Wi-Fi details, an API encryption key and an OTA password in <code>secrets.yaml</code> next to it. ESPHome writes the key for you when you create a new device.</p>
+      <pre class="blog-code" data-lang="yaml"><code># Example to adapt, not a finished product build.
+# One ESP32 runs a fruiting chamber from a grow profile:
+# humidifier on/off with a band, fan on a fresh air timer plus a CO2 limit,
+# light on a daily schedule. Pin numbers match the wiring table in the post.
+# Check every value against your parts before you power anything.
+
+esphome:
+  name: fruiting-chamber
+  friendly_name: Fruiting chamber
+  on_boot:
+    priority: 800
+    then:
+      # Every load starts off. The control loops turn things on.
+      - switch.turn_off: humidifier
+      - output.set_level:
+          id: fan_pwm
+          level: 0%
+      - light.turn_off: grow_light
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: America/Los_Angeles
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+
+globals:
+  - id: hum_changed_ms
+    type: uint32_t
+    initial_value: &quot;0&quot;
+  - id: fan_cycle_start_ms
+    type: uint32_t
+    initial_value: &quot;0&quot;
+
+sensor:
+  - platform: sht4x
+    address: 0x44
+    update_interval: 2s
+    # Short heater pulses fight the offset SHT4x sensors pick up above 90% RH.
+    heater_max_duty: 0.02
+    heater_power: Med
+    heater_time: Short
+    temperature:
+      id: temperature
+      name: Temperature
+    humidity:
+      id: humidity
+      name: Humidity
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 1
+
+  # Optional. Delete this block if you have no SCD40 or SCD41.
+  - platform: scd4x
+    id: co2_sensor
+    address: 0x62
+    update_interval: 30s
+    # ASC needs the sensor to see fresh outdoor air once a week.
+    # A sealed chamber may never do that, so calibrate by hand instead.
+    automatic_self_calibration: false
+    co2:
+      id: co2
+      name: CO2
+
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO25
+    frequency: 20000Hz
+  - platform: ledc
+    id: light_pwm
+    pin: GPIO27
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    id: grow_light
+    name: Grow light
+    output: light_pwm
+    restore_mode: ALWAYS_OFF
+
+switch:
+  - platform: gpio
+    id: humidifier
+    name: Humidifier
+    pin: GPIO26
+    restore_mode: ALWAYS_OFF
+  - platform: template
+    id: auto_mode
+    name: Auto mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+number:
+  - platform: template
+    id: target_humidity
+    name: Target humidity
+    unit_of_measurement: &quot;%&quot;
+    min_value: 60
+    max_value: 96
+    step: 1
+    initial_value: 88
+    optimistic: true
+    restore_value: true
+  - platform: template
+    id: fan_every_min
+    name: Fresh air every
+    unit_of_measurement: min
+    min_value: 1
+    max_value: 240
+    step: 1
+    initial_value: 10
+    optimistic: true
+    restore_value: true
+  - platform: template
+    id: fan_run_s
+    name: Fresh air run
+    unit_of_measurement: s
+    min_value: 5
+    max_value: 900
+    step: 5
+    initial_value: 40
+    optimistic: true
+    restore_value: true
+  - platform: template
+    id: fan_speed
+    name: Fan speed
+    unit_of_measurement: &quot;%&quot;
+    min_value: 15
+    max_value: 100
+    step: 5
+    initial_value: 45
+    optimistic: true
+    restore_value: true
+  - platform: template
+    id: co2_limit
+    name: CO2 limit
+    unit_of_measurement: ppm
+    min_value: 500
+    max_value: 2000
+    step: 50
+    initial_value: 800
+    optimistic: true
+    restore_value: true
+  - platform: template
+    id: lights_on_hour
+    name: Lights on at
+    min_value: 0
+    max_value: 23
+    step: 1
+    initial_value: 8
+    optimistic: true
+    restore_value: true
+  - platform: template
+    id: light_hours
+    name: Light hours
+    unit_of_measurement: h
+    min_value: 0
+    max_value: 24
+    step: 1
+    initial_value: 12
+    optimistic: true
+    restore_value: true
+
+# Picking a stage loads that stage of the Pearl Oyster profile.
+select:
+  - platform: template
+    id: stage
+    name: Stage
+    options:
+      - Colonization
+      - Pinning
+      - Fruiting
+    initial_option: Fruiting
+    optimistic: true
+    restore_value: true
+    set_action:
+      - if:
+          condition:
+            lambda: 'return x == &quot;Colonization&quot;;'
+          then:
+            - number.set: {id: target_humidity, value: 90}
+            - number.set: {id: fan_every_min, value: 60}
+            - number.set: {id: fan_run_s, value: 15}
+            - number.set: {id: fan_speed, value: 20}
+            - number.set: {id: light_hours, value: 0}
+      - if:
+          condition:
+            lambda: 'return x == &quot;Pinning&quot;;'
+          then:
+            - number.set: {id: target_humidity, value: 93}
+            - number.set: {id: fan_every_min, value: 15}
+            - number.set: {id: fan_run_s, value: 35}
+            - number.set: {id: fan_speed, value: 35}
+            - number.set: {id: light_hours, value: 12}
+      - if:
+          condition:
+            lambda: 'return x == &quot;Fruiting&quot;;'
+          then:
+            - number.set: {id: target_humidity, value: 88}
+            - number.set: {id: fan_every_min, value: 10}
+            - number.set: {id: fan_run_s, value: 40}
+            - number.set: {id: fan_speed, value: 45}
+            - number.set: {id: light_hours, value: 12}
+
+button:
+  # Run outdoors for at least 3 minutes, then press. 426 ppm is the
+  # NOAA global monthly mean for July 2026.
+  - platform: template
+    name: Calibrate CO2 to outdoor air
+    on_press:
+      - scd4x.perform_forced_calibration:
+          id: co2_sensor
+          value: 426
+
+interval:
+  # Humidity: on below target minus 1.5, off above target plus 0.5,
+  # at least 90 s on and 60 s off. Same defaults as our firmware.
+  - interval: 5s
+    then:
+      - lambda: |-
+          const float rh = id(humidity).state;
+          if (!id(auto_mode).state || isnan(rh) || rh &lt;= 0.0f) {
+            if (id(humidifier).state) id(humidifier).turn_off();
+            return;
+          }
+          const uint32_t now = millis();
+          const uint32_t held = now - id(hum_changed_ms);
+          const float target = id(target_humidity).state;
+          const bool on = id(humidifier).state;
+          if (!on &amp;&amp; rh &lt; target - 1.5f &amp;&amp; held &gt;= 60000) {
+            id(humidifier).turn_on();
+            id(hum_changed_ms) = now;
+          } else if (on &amp;&amp; rh &gt; target + 0.5f &amp;&amp; held &gt;= 90000) {
+            id(humidifier).turn_off();
+            id(hum_changed_ms) = now;
+          }
+
+  # Fresh air: run the fan for fan_run_s every fan_every_min minutes,
+  # and any time CO2 is over the limit.
+  - interval: 5s
+    then:
+      - lambda: |-
+          if (!id(auto_mode).state) {
+            id(fan_pwm).set_level(0.0f);
+            return;
+          }
+          const uint32_t now = millis();
+          const uint32_t every = (uint32_t) (id(fan_every_min).state * 60000.0f);
+          const uint32_t run = (uint32_t) (id(fan_run_s).state * 1000.0f);
+          if (now - id(fan_cycle_start_ms) &gt;= every) id(fan_cycle_start_ms) = now;
+          const bool scheduled = (now - id(fan_cycle_start_ms)) &lt; run;
+          const float ppm = id(co2).state;
+          const bool co2_high = !isnan(ppm) &amp;&amp; ppm &gt; id(co2_limit).state;
+          const bool too_wet = id(humidity).state &gt; 96.0f;
+          const float level = (scheduled || co2_high || too_wet) ? id(fan_speed).state / 100.0f : 0.0f;
+          id(fan_pwm).set_level(level);
+
+  # Light: on for light_hours starting at lights_on_hour.
+  - interval: 30s
+    then:
+      - lambda: |-
+          if (!id(auto_mode).state) return;
+          const auto t = id(sntp_time).now();
+          if (!t.is_valid()) return;
+          const int start = (int) id(lights_on_hour).state;
+          const int hours = (int) id(light_hours).state;
+          const int since = (t.hour - start + 24) % 24;
+          const bool want = hours &gt; 0 &amp;&amp; since &lt; hours;
+          if (want != id(grow_light).current_values.is_on()) {
+            auto call = want ? id(grow_light).turn_on() : id(grow_light).turn_off();
+            call.perform();
+          }</code></pre>
+      <p>Flash it once over USB with <code>esphome run fruiting-chamber.yaml</code>. After that ESPHome updates it over Wi-Fi. The lambdas use <code>id(...).state</code>, which is how ESPHome reads a sensor or number inside C++ code.</p>
+      <h2 id="how-to-build-the-chamber-step-by-step">How to build the chamber, step by step</h2>
+      <ol><li>Drill a fan hole low on one side of the box and an exhaust hole high on the other side, so fresh air sweeps across the block.</li><li>Mount the humidifier so the mist goes into the open box, not straight onto the block or the sensor.</li><li>Wire the sensor, the three MOSFET or relay modules and the power as in the wiring table, with all grounds tied together.</li><li>Copy the example YAML, change pins to match your build, add secrets.yaml, and flash it over USB.</li><li>Add the device in Home Assistant. It shows up on its own through the ESPHome integration.</li><li>Run the box empty for a day with Auto mode on and watch the humidity graph.</li><li>Tune the humidifier and fan until humidity holds near the target, then put the block in and pick the stage.</li></ol>
+      <h2 id="run-a-grow-profile">Run a grow profile</h2>
+      <p>The Stage select loads these values from our <a href="/profiles/pearl-oyster">pearl oyster profile</a>. Change the stage on the day the profile says to.</p>
+      <div class="table-wrap"><table class="conditions-table"><thead><tr><th scope="col">Stage</th><th scope="col">Days</th><th scope="col">Humidity</th><th scope="col">Fresh air</th><th scope="col">Light</th><th scope="col">Room temperature</th></tr></thead><tbody><tr><th scope="row">Colonization</th><td>14</td><td>90%</td><td>15 s every 60 min at 20%</td><td>Dark</td><td>24 °C (75 °F)</td></tr><tr><th scope="row">Pinning</th><td>5</td><td>93%</td><td>35 s every 15 min at 35%</td><td>12 h from 8:00</td><td>18 °C (64 °F)</td></tr><tr><th scope="row">Fruiting</th><td>10</td><td>88%</td><td>40 s every 10 min at 45%</td><td>12 h from 8:00</td><td>16 °C (61 °F)</td></tr></tbody></table></div>
+      <p>For another species, copy the values from its profile into the three <code>if</code> blocks. Our <a href="/profiles/lions-mane">lion's mane profile</a> wants damper air, for example: 94% to pin and 90% to fruit, with 25 seconds of fan every 18 minutes.</p>
+      <p>This build has no heater and no cooler. Our own firmware treats temperature the same way. It only controls temperature when Home Assistant switches an outside heater. Put the chamber somewhere that sits close to the stage temperature.</p>
+      <h2 id="how-to-tune-it">How to tune it</h2>
+      <p><strong>Humidity swings too far.</strong> If humidity runs well past the target before it drops, the mist maker is too strong for the box. Turn it down, move it away from the sensor, or raise the minimum off time. If humidity never reaches the target, the box leaks or the fan runs too long.</p>
+      <p><strong>Check the sensor.</strong> Seal the sensor in a small jar with a damp paste of table salt. Saturated salt holds the air at about 75% RH at 25 °C. If your sensor reads far off that after a few hours, add an offset filter in the YAML.</p>
+      <p><strong>Fresh air.</strong> Fresh air is a trade off. More of it keeps CO2 down but dries the box. The <a href="/tools/fresh-air-planner">fresh air calculator</a> turns your box size and fan into run times for a target number of air changes. University of California extension material suggests about 4 air changes an hour while oyster pins form and 4 to 6 while they crop. Our <a href="/guides/humidity-and-fresh-air">humidity and fresh air guide</a> has the reasons.</p>
+      <p><strong>CO2.</strong> With an SCD41 you can stop guessing. A SARE funded oyster guide says to keep CO2 under 800 ppm, which is the default limit in the example, and says oysters may not fruit above about 1,200 ppm. Long stems and small caps on oysters usually mean the box needs more fresh air.</p>
+      <p><strong>CO2 calibration.</strong> The SCD4x automatic calibration assumes the sensor sees fresh air near 400 ppm for at least 3 minutes once a week. A closed chamber may never see that, so the example turns it off. Instead, take the sensor outside, let it run for at least 3 minutes, and press the calibrate button. The value in the YAML is 426 ppm, the NOAA global monthly mean for July 2026.</p>
+      <h2 id="home-assistant">Home Assistant</h2>
+      <p>The <code>api</code> block with an encryption key is what Home Assistant uses to talk to the ESP32. Home Assistant finds the device on your network and adds every sensor, switch, number and the Stage select as entities. From there you get history graphs, phone alerts if humidity drops, and a way to change stages without a laptop. The chamber keeps running its own loops if Home Assistant or Wi-Fi goes down.</p>
+      <p>Read our <a href="/docs">docs</a> for how our firmware lays out the same controls on the chambers we support.</p>
+      <h2 id="faq">FAQ</h2>
+      <h3>What is the best sensor for a mushroom fruiting chamber?</h3>
+      <p>An SHT40, SHT41 or SHT45 for humidity and temperature, mounted out of the mist. Add an SCD40 or SCD41 if you want to control fresh air by CO2. The SCD41 covers a wider range, 400 to 5,000 ppm against 400 to 2,000 ppm for the SCD40.</p>
+      <h3>Do I need Home Assistant?</h3>
+      <p>No. The ESP32 runs the humidity, fan and light loops by itself. Home Assistant adds graphs, alerts and an easy way to change settings.</p>
+      <h3>Can I control a mains humidifier or heater?</h3>
+      <p>Not with a hand wired relay board. Plug it into a listed smart plug and let Home Assistant switch it, or pick a 5 V or 12 V mist maker so everything in the box stays low voltage.</p>
+      <h3>Why does my humidity sensor read 100% all the time?</h3>
+      <p>It is in the mist path or it has condensation on it. Move it out of the fog stream. The SHT4x heater pulses in the example also help clear the high humidity offset.</p>
+      <h3>Why turn off CO2 automatic calibration?</h3>
+      <p>Automatic calibration assumes the sensor sees fresh outdoor air once a week. Inside a closed chamber that may never happen, and the sensor will drift. Calibrating by hand outdoors is more reliable.</p>
+      <h2 id="sources">Sources</h2>
+      <ul><li><a href="https://shroomlabs.io/profiles/pearl-oyster" rel="noopener">Shroom Labs pearl oyster grow profile</a></li><li><a href="https://shroomlabs.io/profiles/lions-mane" rel="noopener">Shroom Labs lion's mane grow profile</a></li><li><a href="https://github.com/themsquared/openshrooly/blob/main/esphome/components/controls.yaml" rel="noopener">OpenShrooly firmware: humidity controls and defaults (controls.yaml)</a></li><li><a href="https://github.com/themsquared/openshrooly/blob/main/esphome/scripts/humidity_control_manager.yaml" rel="noopener">OpenShrooly firmware: humidity control script</a></li><li><a href="https://github.com/themsquared/openshrooly/blob/main/esphome/components/sensors.yaml" rel="noopener">OpenShrooly firmware: SHT4x sensor settings (sensors.yaml)</a></li><li><a href="https://github.com/themsquared/openshrooly/tree/main/esphome/terrashroom" rel="noopener">Shroom Labs community ESPHome config for the Terrashroom</a></li><li><a href="https://esphome.io/components/sensor/sht4x/" rel="noopener">ESPHome SHT4X sensor</a></li><li><a href="https://esphome.io/components/sensor/scd4x/" rel="noopener">ESPHome SCD4X CO2 sensor</a></li><li><a href="https://esphome.io/components/api/" rel="noopener">ESPHome native API</a></li><li><a href="https://esphome.io/components/select/template/" rel="noopener">ESPHome template select</a></li><li><a href="https://www.home-assistant.io/integrations/esphome/" rel="noopener">Home Assistant ESPHome integration</a></li><li><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html" rel="noopener">Espressif ESP32 GPIO reference</a></li><li><a href="https://sensirion.com/media/documents/33FD6951/6A7C10A0/HT_DS_Datasheet_SHT4x_V7.3.pdf" rel="noopener">Sensirion SHT4x datasheet</a></li><li><a href="https://sensirion.com/media/documents/A88858C9/629626D4/Application_Note_Creep_Mitigation_SHT4x.pdf" rel="noopener">Sensirion application note: creep mitigation for SHT4x</a></li><li><a href="https://sensirion.com/media/documents/48C4B7FB/64C134E7/Sensirion_SCD4x_Datasheet.pdf" rel="noopener">Sensirion SCD4x datasheet</a></li><li><a href="https://sensirion.com/media/documents/9D6E378D/6AC75EB6/CD_AN_Sensor_Operation_Guide_D1.pdf" rel="noopener">Sensirion SCD4x sensor operation guide</a></li><li><a href="https://gml.noaa.gov/ccgg/trends/global.html" rel="noopener">NOAA global monthly mean CO2</a></li><li><a href="https://nvlpubs.nist.gov/nistpubs/jres/81A/jresv81An1p89_A1b.pdf" rel="noopener">Greenspan, Humidity fixed points of binary saturated aqueous solutions (NIST)</a></li><li><a href="https://ucanr.edu/sites/default/files/2012-05/144772.pdf" rel="noopener">UC ANR, Growing oyster mushrooms</a></li><li><a href="https://projects.sare.org/media/pdf/F/u/n/FungiAlly_Oyster_booklet_Final-1.pdf" rel="noopener">SARE and FungiAlly, Oyster mushroom cultivation guide</a></li></ul>
+      
+      <h2>Keep reading</h2><ul class="faq-links"><li><a href="/guides/humidity-and-fresh-air">Humidity and fresh air</a></li><li><a href="/tools/fresh-air-planner">Fresh air calculator</a></li><li><a href="/shrooly-alternatives">Shrooly alternatives</a></li><li><a href="/chambers">Which chambers work with Shroom Labs</a></li><li><a href="/profiles/pearl-oyster">Pearl oyster grow profile</a></li><li><a href="/install">Install on a Shrooly</a></li></ul>
+      <h2>More from the blog</h2><ul class="faq-links"><li><a href="/blog/how-to-fruit-a-lions-mane-kit">How to fruit a lion's mane grow kit</a></li><li><a href="/blog/how-to-fruit-an-oyster-mushroom-kit">How to fruit an oyster mushroom grow kit</a></li><li><a href="/blog/do-mushrooms-need-light">Do mushrooms need light to grow?</a></li></ul>
+      <p class="muted"><a href="/blog">All posts</a> · <a href="/blog/feed.xml">RSS feed</a></p>
+    </article></main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/chambers">Chambers</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <nav class="footer-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/lite.js"></script>
+</body>
+</html>

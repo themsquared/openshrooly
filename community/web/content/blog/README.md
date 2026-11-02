@@ -35,6 +35,7 @@ howto: How to set up light for a grow
 
 - `## Heading` and `### Heading`. No single `#`, the page already has the h1.
 - Paragraphs, `- ` lists, `1. ` lists, `| a | b |` tables (first row is the header), `> ` notes.
+- Fenced code blocks: a line with three backticks and an optional language (`yaml`), the code, then a line with three backticks. Shown as escaped text in a scrolling box. The dash and arrow check still applies inside code, so write lambdas with `.` not `->`.
 - `**bold**`, `_italic_`, `` `code` ``, `[label](/path)` or `[label](https://...)`.
 - An `## FAQ` (or a heading with "questions") whose `###` questions are followed by paragraphs becomes FAQPage JSON-LD.
 - `## Sources` with a list of https links is required. Every number in the post should trace to a profile or a source.
