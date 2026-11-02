@@ -1429,6 +1429,8 @@ button.small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 .blog-item p.eyebrow { margin: 0; }
 .blog-note { border-left: 3px solid var(--sl-mycelium); padding: 0.4rem 0 0.4rem 0.9rem; color: var(--sl-ink-dim); }
 .blog-post code { overflow-wrap: anywhere; }
+.blog-code { max-width: 100%; overflow-x: auto; margin: 1rem 0; padding: 0.8rem 0.9rem; border: 1px solid var(--sl-line); border-radius: 12px; background: rgba(7, 17, 14, 0.6); font-size: 13px; line-height: 1.45; }
+.blog-code code { white-space: pre; overflow-wrap: normal; }
 
 /* Free tools: /tools/grow-timeline and /tools/fresh-air-planner. Mobile first, one column at 390px. */
 .tool-form { margin: 1.25rem 0; padding: 1rem; border: 1px solid var(--sl-line); border-radius: 16px; background: rgba(7, 17, 14, 0.45); }
