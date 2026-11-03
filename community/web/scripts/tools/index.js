@@ -1,9 +1,10 @@
 /**
- * The two free tools. Each page is server rendered with a worked example, so it reads fine without
+ * The free tools. Each page is server rendered with a worked example, so it reads fine without
  * JavaScript and crawlers see real numbers. js/tools.js takes over the form in the browser.
  */
 import { airChanges, chamberLiters, flowLpm, REFERENCE_ACH, round, timeline } from "../../public/js/tool-math.js";
-import { airResult, esc, table, timelineResult } from "../../public/js/tool-render.js";
+import { airResult, esc, substrateResult, table, timelineResult } from "../../public/js/tool-render.js";
+import { SUBSTRATES, byIdSubstrate, substratePlan, batchWet, gramsText } from "../../public/js/substrate-math.js";
 import { link, toolSpecies } from "../guides/data.js";
 
 export const TOOLS_UPDATED = "2026-10-27";
@@ -69,6 +70,10 @@ const growTimeline = {
 <p>See <a href="/guides/how-long-to-grow-mushrooms">how long mushrooms take to grow</a> for each stage, and the time from a kit.</p>`,
     },
     {
+      h2: "Can a chamber follow these stages for me?",
+      html: `<p>Yes, if you grow in a Shrooly running OpenShrooly. Load the same free profile on the chamber and it steps through each stage on these days.</p>`,
+    },
+    {
       h2: "Why might my dates be different?",
       html: `<p>Colonization speed depends on temperature, how much spawn went into the block, and the strain. A cool room can add a week or more. Pins need humidity, fresh air, and light at the same time, and they stall without them. If nothing has happened by the end of a stage, read <a href="/guides/mushroom-grow-kit-not-growing">grow kit not growing</a> or <a href="/guides/mushrooms-not-pinning">mushrooms not pinning</a>.</p>`,
     },
@@ -87,7 +92,7 @@ const growTimeline = {
     ["How long does it take to grow mushrooms?", "/guides/how-long-to-grow-mushrooms"],
     ["Fresh air and humidity planner", "/tools/fresh-air-planner"],
     ["Mushroom grow kit not growing", "/guides/mushroom-grow-kit-not-growing"],
-    ["All grow guides", "/grow"],
+    ["All free grow tools", "/tools"],
   ],
 };
 
@@ -174,4 +179,89 @@ const freshAir = {
   ],
 };
 
-export const TOOL_PAGES = [growTimeline, freshAir].map((t) => ({ ...t, updated: TOOLS_UPDATED, path: `/tools/${t.slug}` }));
+
+/* ---------- substrate calculator ---------- */
+
+export const SUBSTRATE_SOURCES = {
+  "cvg-rhizo": ["Rhizo Funga, The best CVG recipe", "https://rhizofunga.com/blogs/mushroom-teks-recipes/best-cvg-recipe"],
+  "cvg-ez": ["EZMushroom, Coco coir (CVG) substrate recipe", "https://ezmushroom.com/grow/coco-coir-cvg-substrate-recipe/"],
+  freshcap: ["FreshCap Mushrooms, Growing mushrooms on soy hulls (the Master's Mix)", "https://freshcap.com/blogs/growing/growing-mushrooms-on-soy-hulls-the-masters-mix"],
+  pennstate: ["Penn State Department of Plant Pathology, Specialty mushroom production technology", "https://plantpath.psu.edu/about/facilities/mushroom/resources/specialty-mushrooms/production-technology"],
+  "ucanr-sawdust": ["UC Agriculture and Natural Resources, Sawdust and straw as substrate", "https://ucanr.edu/sites/default/files/2011-06/111961.pdf"],
+  ufifas: ["University of Florida IFAS Extension, D.I.Y. FunGuide: Grow your own oyster mushrooms at home (SS662)", "https://doi.org/10.32473/edis-ss662-2018"],
+  grocycle: ["GroCycle, Growing mushrooms in coffee grounds", "https://grocycle.com/growing-mushrooms-in-coffee-grounds/"],
+};
+
+const exSub = byIdSubstrate("cvg");
+const exPlan = substratePlan(exSub, batchWet(exSub), exSub.spawn.default);
+const recipeRows = SUBSTRATES.map((s) => {
+  const total = batchWet(s);
+  const dry = s.dry.map((d) => `${Math.round((d.g / total) * 100)}% ${d.name.toLowerCase()}`).join(", ");
+  return `<tr><th scope="row">${esc(s.short)}</th><td>${dry}${s.gypsum ? `, ${Math.round((s.gypsum / total) * 100)}% gypsum` : ""}${s.water ? `, ${Math.round((s.water / total) * 100)}% water` : ""}</td><td>${s.spawn.low === s.spawn.high ? s.spawn.low : `${s.spawn.low} to ${s.spawn.high}`}%</td><td>${s.species.map((id) => link(id)).join(", ")}</td></tr>`;
+});
+
+const substrateCalc = {
+  slug: "substrate-calculator",
+  script: "/js/tools.js",
+  sources: SUBSTRATE_SOURCES,
+  title: "Mushroom substrate calculator: CVG, Master's Mix, sawdust, straw, coffee",
+  h1: "Mushroom substrate and spawn calculator",
+  description: "Enter a tub size or a target weight, pick CVG, Master's Mix, hardwood sawdust, straw, or coffee grounds, and get dry ingredients, water, gypsum, and spawn.",
+  answer: `Pick a substrate, enter your container size or the wet weight you want, and set a spawn rate. The calculator scales a published recipe to give you each dry ingredient, the water to reach field capacity, the gypsum, and the grain spawn to mix in. One standard CVG batch, a 650 g coir brick, makes about ${gramsText(batchWet(exSub))} of wet substrate.`,
+  form: () => `<form class="tool-form card" id="tool-form" data-tool="substrate-calculator" novalidate>
+  <label for="sc-sub">Substrate</label>
+  <select id="sc-sub" name="substrate">${SUBSTRATES.map((s) => `<option value="${s.id}"${s.id === exSub.id ? " selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
+  <fieldset class="tool-choice">
+    <legend>Size by</legend>
+    <label class="toggle"><input type="radio" name="by" value="weight" checked> Target wet substrate weight</label>
+    <label class="toggle"><input type="radio" name="by" value="container"> Container or tub size</label>
+  </fieldset>
+  <div class="tool-grid" data-by="weight">
+    <div><label for="sc-wet">Wet substrate weight</label><input id="sc-wet" name="wet" type="number" inputmode="decimal" min="0" step="any" value="${(batchWet(exSub) / 1000).toFixed(2)}"></div>
+    <div><label for="sc-wet-unit">Units</label><select id="sc-wet-unit" name="wetUnit"><option value="kg" selected>kg</option><option value="lb">lb</option></select></div>
+  </div>
+  <div class="tool-grid three" data-by="container" hidden>
+    <div><label for="sc-vol">Container size</label><input id="sc-vol" name="vol" type="number" inputmode="decimal" min="0" step="any" value="60"></div>
+    <div><label for="sc-vol-unit">Units</label><select id="sc-vol-unit" name="volUnit"><option value="l" selected>liters</option><option value="qt">quarts</option><option value="gal">gallons</option></select></div>
+    <div><label for="sc-fill">Fill to (%)</label><input id="sc-fill" name="fill" type="number" inputmode="numeric" min="1" max="100" step="1" value="25"></div>
+  </div>
+  <label for="sc-spawn">Spawn rate (% of wet substrate)</label>
+  <input id="sc-spawn" name="spawn" type="number" inputmode="decimal" min="0" max="100" step="any" value="${exSub.spawn.default}">
+  <p class="muted tool-note">Container sizing uses a rough packed density for each substrate. A monotub is usually filled 10 to 13 cm (4 to 5 in) deep, about a quarter of a 60 L tub. Weigh your first batch and switch to weight.</p>
+</form>`,
+  result: () => substrateResult(exPlan, SPECIES),
+  sections: [
+    {
+      h2: "How does the substrate calculator work?",
+      html: `<p>Each substrate starts from one published batch, listed in the sources. The calculator scales every ingredient by the same factor so the batch weighs what you asked for when wet. Spawn is added on top as a percent of the wet substrate weight.</p>
+${table("Recipes by share of the wet batch weight", ["Substrate", "Recipe", "Spawn rate", "Grow profiles"], recipeRows)}`,
+    },
+    {
+      h2: "What is field capacity?",
+      html: `<p>Field capacity is as much water as the substrate can hold without free water pooling. Squeeze a handful hard: a few drops should come out, not a stream. Too wet is the most common cause of slow colonization and bacterial blotch, so add the last of the water slowly. Supplemented sawdust and Master's Mix sit near 60% moisture and drained straw near 65%.</p>`,
+    },
+    {
+      h2: "Which substrate should I use?",
+      html: `<p>For oysters, straw and coffee grounds are cheap and need only pasteurizing. Master's Mix and supplemented sawdust give bigger harvests of wood lovers like ${link("lions-mane")}, ${link("shiitake")}, and ${link("chestnut")}, but they must be pressure sterilized, which needs a pressure cooker and clean work. CVG is easy to pasteurize in a bucket and is the usual monotub bulk substrate.</p>`,
+    },
+    {
+      h2: "How much spawn should I use?",
+      html: `<p>Extension guides give 5 to 10% of the wet weight for straw and sawdust. Home growers often use 10 to 20% in CVG and Master's Mix. More spawn colonizes faster and leaves less time for mold, at a higher cost. GroCycle uses 10% of the coffee weight for coffee grounds.</p>`,
+    },
+  ],
+  faq: [
+    { q: "How much water do I add to CVG?", a: `The common batch is one 650 g coir brick, about 2 quarts (1.9 L) of vermiculite, 1 cup of gypsum, and about 4.25 L of boiling water. Hold some water back and finish with the squeeze test.` },
+    { q: "What is the Master's Mix ratio?", a: "Equal dry weights of hardwood sawdust and soybean hulls, hydrated to about 60% moisture. For a 2.3 kg (5 lb) block that is 453 g of each and 1.4 L of water, then 2.5 hours at 15 PSI." },
+    { q: "What spawn rate should I use for straw?", a: "University of Florida IFAS Extension gives 5 to 10% of the drained wet straw weight. 10% colonizes faster." },
+    { q: "Do I need gypsum?", a: "CVG recipes use about 1 cup per 650 g brick and supplemented sawdust uses about 1%. Straw and coffee grounds do not need it, and Master's Mix works without it." },
+    { q: "Can I pasteurize Master's Mix or bran?", a: "No. Soy hulls and bran are rich enough that molds win unless the substrate is pressure sterilized. Pasteurize only straw, CVG, and fresh coffee grounds." },
+  ],
+  related: [
+    ["Grow timeline calculator", "/tools/grow-timeline"],
+    ["Fresh air and humidity planner", "/tools/fresh-air-planner"],
+    ["Mushroom growing conditions for every species", "/grow"],
+    ["All free grow tools", "/tools"],
+  ],
+};
+
+export const TOOL_PAGES = [substrateCalc, growTimeline, freshAir].map((t) => ({ ...t, updated: TOOLS_UPDATED, path: `/tools/${t.slug}` }));

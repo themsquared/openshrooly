@@ -17,7 +17,8 @@ import { blogLlms, blogLlmsFull, blogRedirects, blogSitemapEntries, publishedPos
 import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
 import { CHAMBER_PAGES, SOURCES as CHAMBER_SOURCES, CHECKED as CHAMBER_CHECKED } from "./chambers/index.js";
 import { latinName, orList, otherNames, speciesTitle } from "./species-names.js";
-import { SPECIES as TOOL_SPECIES, TOOL_PAGES, TOOL_SOURCES } from "./tools/index.js";
+import { SPECIES as TOOL_SPECIES, TOOL_PAGES, TOOL_SOURCES, TOOLS_UPDATED } from "./tools/index.js";
+import { GROW_LOG, renderGrowLogBody } from "./growlog/index.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "..", "..", "data", "profiles");
@@ -942,6 +943,7 @@ export function renderHubPage(profiles) {
   const guides = GUIDES.length
     ? `<h2>Grow guides</h2><ul class="faq-links">${GUIDES.map((g) => `<li><a href="/guides/${g.slug}">${escapeHtml(g.h1)}</a>. ${escapeHtml(g.description)}</li>`).join("")}</ul>`
     : "";
+  const toolsList = `<h2>Free grow tools</h2><ul class="faq-links">${TOOL_PAGES.map((t) => `<li><a href="${t.path}">${escapeHtml(t.h1)}</a>. ${escapeHtml(t.description)}</li>`).join("")}<li><a href="/tools">All free grow tools</a></li></ul>`;
   const body = `
     <article class="profile-page guide-page">
       ${crumbsHtml([["Home", "/"], ["Grow guides", ""]])}
@@ -956,6 +958,7 @@ export function renderHubPage(profiles) {
       </table></div>
       ${chefLineTeaser(profiles)}
       ${guides}
+      ${toolsList}
       <h2>Common questions</h2>
       ${faqHtml(faq)}
     </article>`;
@@ -1162,13 +1165,13 @@ export function renderToolPage(tool) {
         "@id": `${url}#faq`,
         mainEntity: tool.faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
       },
-      breadcrumbs([["Home", `${SITE}/`], ["Grow guides", `${SITE}/grow`], [tool.h1, url]]),
+      breadcrumbs([["Home", `${SITE}/`], ["Free grow tools", `${SITE}/tools`], [tool.h1, url]]),
     ],
   };
   const sections = tool.sections.map((sec) => `<h2>${escapeHtml(sec.h2)}</h2>${sec.html}`).join("\n      ");
   const body = `
     <article class="profile-page guide-page tool-page">
-      ${crumbsHtml([["Home", "/"], ["Grow guides", "/grow"], [tool.h1, ""]])}
+      ${crumbsHtml([["Home", "/"], ["Free grow tools", "/tools"], [tool.h1, ""]])}
       <p class="eyebrow">Free grow tool</p>
       <h1>${escapeHtml(tool.h1)}</h1>
       ${updatedHtml(tool.updated)}
@@ -1177,7 +1180,7 @@ export function renderToolPage(tool) {
       <div id="tool-result" class="tool-result" aria-live="polite">${tool.result()}</div>
       ${sections}
       <h2>FAQ</h2>${faqHtml(tool.faq)}
-      <h2>Sources</h2><ul class="faq-links">${TOOL_SOURCES.map(([label, href]) => `<li><a href="${href}" rel="nofollow noopener">${escapeHtml(label)}</a></li>`).join("")}<li><a href="/grow">Shroom Labs grow profiles</a></li></ul>
+      <h2>Sources</h2><ul class="faq-links">${(tool.sources ? Object.values(tool.sources) : TOOL_SOURCES).map(([label, href]) => `<li><a href="${href}" rel="nofollow noopener">${escapeHtml(label)}</a></li>`).join("")}<li><a href="/grow">Shroom Labs grow profiles</a></li></ul>
       <h2>Keep reading</h2><ul class="faq-links">${tool.related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>
     </article>`;
   return shell({
@@ -1186,6 +1189,55 @@ export function renderToolPage(tool) {
     body,
     script: tool.script,
   });
+}
+
+/** /tools: every free grow tool on one page. */
+export function renderToolsHub() {
+  const url = `${SITE}/tools`;
+  const answer = "Free mushroom growing calculators: scale a substrate recipe and spawn, get dated stages for a grow profile, and check your chamber's fresh air.";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "CollectionPage", "@id": `${url}#page`, name: "Free mushroom growing tools", description: answer, url, inLanguage: "en", dateModified: TOOLS_UPDATED, isAccessibleForFree: true, publisher: ORG_REF,
+        mainEntity: { "@type": "ItemList", itemListElement: TOOL_PAGES.map((t, i) => ({ "@type": "ListItem", position: i + 1, name: t.h1, url: `${SITE}${t.path}` })) } },
+      breadcrumbs([["Home", `${SITE}/`], ["Free grow tools", url]]),
+    ],
+  };
+  const body = `
+    <article class="profile-page guide-page tool-page">
+      ${crumbsHtml([["Home", "/"], ["Free grow tools", ""]])}
+      <p class="eyebrow">Free grow tools</p>
+      <h1>Free mushroom growing tools</h1>
+      ${updatedHtml(TOOLS_UPDATED)}
+      <p class="lede answer-first">${escapeHtml(answer)}</p>
+      <ul class="faq-links">${TOOL_PAGES.map((t) => `<li><a href="${t.path}">${escapeHtml(t.h1)}</a>. ${escapeHtml(t.description)}</li>`).join("")}</ul>
+      <h2>Keep reading</h2><ul class="faq-links"><li><a href="/grow">Mushroom growing conditions for every species</a></li><li><a href="/grow-log">Shroom Labs grow log</a></li></ul>
+    </article>`;
+  return shell({ head: { title: "Free mushroom growing tools and calculators · Shroom Labs", description: answer, path: "/tools", type: "website", modified: TOOLS_UPDATED, jsonLd }, activeId: "grow", body });
+}
+
+/** /grow-log: public log of the Shroom Labs test chambers. Only real entries, never invented readings. */
+export function renderGrowLogPage() {
+  const url = `${SITE}/grow-log`;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "WebPage", "@id": `${url}#page`, name: GROW_LOG.h1, description: GROW_LOG.answer, url, inLanguage: "en", dateModified: GROW_LOG.updated, publisher: ORG_REF },
+      { "@type": "FAQPage", "@id": `${url}#faq`, mainEntity: GROW_LOG.faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+      breadcrumbs([["Home", `${SITE}/`], [GROW_LOG.h1, url]]),
+    ],
+  };
+  const body = `
+    <article class="profile-page guide-page grow-log-page">
+      ${crumbsHtml([["Home", "/"], [GROW_LOG.h1, ""]])}
+      <p class="eyebrow">Grow log</p>
+      <h1>${escapeHtml(GROW_LOG.h1)}</h1>
+      ${updatedHtml(GROW_LOG.updated)}
+      <p class="lede answer-first">${escapeHtml(GROW_LOG.answer)}</p>
+      ${renderGrowLogBody()}
+      <h2>FAQ</h2>${faqHtml(GROW_LOG.faq)}
+    </article>`;
+  return shell({ head: { title: GROW_LOG.title, description: GROW_LOG.description, path: "/grow-log", type: "website", modified: GROW_LOG.updated, jsonLd }, activeId: "grow", body });
 }
 
 /** The one call to action every Shrooly owner page ends with. */
@@ -1342,7 +1394,9 @@ export function sitemapEntries(profiles) {
     { path: "/grow", lastmod: HUB_UPDATED.value },
     { path: "/chefs-line", lastmod: PAGES_UPDATED },
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
+    { path: "/tools", lastmod: TOOLS_UPDATED },
     ...TOOL_PAGES.map((t) => ({ path: t.path, lastmod: t.updated })),
+    { path: "/grow-log", lastmod: GROW_LOG.updated },
     ...profiles.filter(isSearchProfile).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
     ...profiles.filter((p) => isPsi(p) && isIndexableProfile(p)).map((p) => ({ path: `/profiles/${p.id}`, lastmod: lastUpdated(p) })),
     ...blogSitemapEntries(publishedPosts()),
@@ -1431,6 +1485,8 @@ ${GUIDES.map((g) => `- [${g.h1}](${SITE}/guides/${g.slug}): ${g.answer}`).join("
 
 ## Free grow tools
 
+- [Free mushroom growing tools](${SITE}/tools): every free calculator on one page.
+- [Shroom Labs grow log](${SITE}/grow-log): ${GROW_LOG.answer}
 ${TOOL_PAGES.map((t) => `- [${t.h1}](${SITE}${t.path}): ${t.answer}`).join("\n")}
 
 ## Grow profiles by species
@@ -1529,7 +1585,7 @@ export function renderRedirects(profiles) {
   for (const p of CHAMBER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
   for (const t of TOOL_PAGES) lines.push(`${t.path}.html ${t.path} 301!`);
-  lines.push("/tools /grow 301!", "/tools/ /grow 301!");
+  lines.push("/tools.html /tools 301!", "/grow-log.html /grow-log 301!");
   for (const p of profiles) lines.push(`/profiles/${p.id}.html /profiles/${p.id} 301!`);
   lines.push("/profiles /grow 301!", "/profiles/ /grow 301!", "/guides /grow 301!", "/guides/ /grow 301!");
   lines.push(...blogRedirects(publishedPosts()));
@@ -1789,6 +1845,8 @@ export function writeSeoFiles(dir = PUBLIC) {
   for (const page of OWNER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderOwnerPage(page));
   for (const page of CHAMBER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderChamberPage(page));
   for (const tool of TOOL_PAGES) writeFileSync(join(dir, "tools", `${tool.slug}.html`), renderToolPage(tool));
+  writeFileSync(join(dir, "tools.html"), renderToolsHub());
+  writeFileSync(join(dir, "grow-log.html"), renderGrowLogPage());
   writeFileSync(join(dir, "js", "tool-species.js"), `/** Generated by scripts/generate-seo.js from the free culinary profiles. Used by js/tools.js. */\nexport const SPECIES = ${JSON.stringify(TOOL_SPECIES)};\n`);
   writeFileSync(join(dir, "js", "indexed-profiles.js"), `/** Generated by scripts/generate-seo.js. Profiles with a static page under /profiles/. */\nexport const INDEXED_PROFILES = new Set(${JSON.stringify(profiles.map((p) => p.id))});\n`);
   for (const profile of profiles) {
