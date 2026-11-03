@@ -3,6 +3,7 @@
  * and the browser (js/tools.js renders what the visitor enters), so both read the same.
  */
 import { compareAch, fanLine, lightLine, REFERENCE_ACH, round, shortDay, tempText } from "./tool-math.js";
+import { gramsText, waterText } from "./substrate-math.js";
 
 export const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -57,3 +58,24 @@ export function airResult(species, stage, liters, air) {
 ${advice}`;
 }
 
+
+/** Result block for the substrate calculator. `species` is the tool species list, for profile links. Shared with the browser. */
+export function substrateResult(plan, species = []) {
+  if (!plan) return `<p class="tool-summary">Enter a container size or a target weight to see your amounts.</p>`;
+  const sub = plan.substrate;
+  const g = (n) => gramsText(n);
+  const rows = plan.dry.map(
+    (d) => `<tr><th scope="row">${esc(d.name)}</th><td>${g(d.g)}${d.liters ? `, about ${d.liters.toFixed(1)} L` : ""}</td><td>${d.wet ? "Wet, as collected" : "Dry, as bought"}</td></tr>`
+  );
+  rows.push(`<tr><th scope="row">Gypsum</th><td>${plan.gypsum > 0 ? g(plan.gypsum) : "None"}</td><td>${plan.gypsum > 0 ? "Dry" : "Not used in this recipe"}</td></tr>`);
+  rows.push(`<tr><th scope="row">Water to field capacity</th><td>${waterText(plan.water)}</td><td>${plan.water > 0 ? "Hold back about a tenth, then squeeze test" : "Add none"}</td></tr>`);
+  rows.push(`<tr><th scope="row">Grain spawn</th><td>${g(plan.spawn)}</td><td>${plan.spawnPercent}% of the wet substrate</td></tr>`);
+  const names = new Map(species.map((s) => [s.id, s.name]));
+  const links = sub.species.filter((id) => names.has(id)).map((id) => `<a href="/profiles/${id}">${esc(names.get(id))}</a>`);
+  const range = sub.spawn.low === sub.spawn.high ? `${sub.spawn.low}%` : `${sub.spawn.low} to ${sub.spawn.high}%`;
+  return `<p class="tool-summary"><strong>${esc(sub.short)}: ${g(plan.wet)} of wet substrate plus ${g(plan.spawn)} of spawn, ${g(plan.total)} in all.</strong></p>
+${table(`${esc(sub.short)} amounts`, ["Ingredient", "Amount", "Notes"], rows)}
+<p>${esc(sub.prep)} ${esc(sub.note)} Common spawn rate for this substrate: ${range}.</p>
+${links.length ? `<p>Grow profiles that use it: ${links.join(", ")}.</p>` : ""}
+<p class="muted">Field capacity means a hard squeeze gives a few drops, not a stream. Weights are scaled from the published recipes in the sources below.</p>`;
+}

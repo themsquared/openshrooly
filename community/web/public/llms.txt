@@ -53,6 +53,9 @@ All grow numbers on this site come from the published grow profiles. Temperature
 
 ## Free grow tools
 
+- [Free mushroom growing tools](https://shroomlabs.io/tools): every free calculator on one page.
+- [Shroom Labs grow log](https://shroomlabs.io/grow-log): We are setting up three chambers to log in public: two Shroolys and one Lykyn Single-Tier, growing the same species side by side. Nothing has started yet, so there are no readings, yields, or photos here. Entries go up as they happen.
+- [Mushroom substrate and spawn calculator](https://shroomlabs.io/tools/substrate-calculator): Pick a substrate, enter your container size or the wet weight you want, and set a spawn rate. The calculator scales a published recipe to give you each dry ingredient, the water to reach field capacity, the gypsum, and the grain spawn to mix in. One standard CVG batch, a 650 g coir brick, makes about 5.26 kg (11.6 lb) of wet substrate.
 - [Mushroom grow timeline calculator](https://shroomlabs.io/tools/grow-timeline): Pick a mushroom and the day you start, and this calculator lists the date each stage begins, the temperature, humidity, fresh air, and light to use, and your first harvest window. Totals run from 20 days for pink oyster to 78 days for turkey tail. You can save every stage to your calendar as an .ics file.
 - [Mushroom fresh air and humidity planner](https://shroomlabs.io/tools/fresh-air-planner): Enter your chamber size and fan flow, and this planner works out how many times an hour your fan replaces the air in the chamber, next to the humidity and fan cycle your mushroom's profile uses. Oyster growing rooms are commonly run at about 4 to 6 fresh air changes an hour while fruiting, so you get a number to compare against.
 
