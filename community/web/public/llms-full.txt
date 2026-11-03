@@ -1621,6 +1621,72 @@ A: Yes. Most kits give two or three flushes with a rest and a cold soak between 
 
 ---
 
+## Mushroom substrate and spawn calculator
+
+URL: https://shroomlabs.io/tools/substrate-calculator
+Updated: 2026-10-27
+
+Pick a substrate, enter your container size or the wet weight you want, and set a spawn rate. The calculator scales a published recipe to give you each dry ingredient, the water to reach field capacity, the gypsum, and the grain spawn to mix in. One standard CVG batch, a 650 g coir brick, makes about 5.26 kg (11.6 lb) of wet substrate.
+
+### Example
+
+CVG: 5.26 kg (11.6 lb) of wet substrate plus 1.05 kg (2.3 lb) of spawn, 6.31 kg (13.9 lb) in all.
+
+CVG amounts |  | Ingredient | Amount | Notes
+ | Coco coir (compressed brick) | 650 g (22.9 oz) | Dry, as bought
+ | Vermiculite | 190 g (6.7 oz), about 1.9 L | Dry, as bought
+ | Gypsum | 170 g (6.0 oz) | Dry
+ | Water to field capacity | 4.25 L (4.5 qt) | Hold back about a tenth, then squeeze test
+ | Grain spawn | 1.05 kg (2.3 lb) | 20% of the wet substrate
+
+Pour boiling water over the dry mix in a lidded bucket and leave it to cool, often overnight. This pasteurizes it. Gypsum is the usual 1 cup per 650 g brick. Coir bricks differ, so hold back some water and finish with the squeeze test. Common spawn rate for this substrate: 10 to 20%.
+
+Grow profiles that use it: Pearl Oyster, Blue Oyster, Pink Oyster.
+
+Field capacity means a hard squeeze gives a few drops, not a stream. Weights are scaled from the published recipes in the sources below.
+
+### How does the substrate calculator work?
+
+Each substrate starts from one published batch, listed in the sources. The calculator scales every ingredient by the same factor so the batch weighs what you asked for when wet. Spawn is added on top as a percent of the wet substrate weight.
+
+Recipes by share of the wet batch weight |  | Substrate | Recipe | Spawn rate | Grow profiles
+ | CVG | 12% coco coir (compressed brick), 4% vermiculite, 3% gypsum, 81% water | 10 to 20% | Pearl Oyster, Blue Oyster, Pink Oyster
+ | Master's Mix | 20% hardwood fuel pellets or sawdust, 20% soybean hull pellets, 61% water | 10 to 20% | Lion's Mane, Chestnut Mushroom, King Oyster, Pioppino, Pearl Oyster
+ | Supplemented sawdust | 32% hardwood sawdust or fuel pellets, 8% wheat bran, 0% gypsum, 60% water | 5 to 10% | Shiitake, Lion's Mane, Maitake, Reishi, Enoki, Nameko, King Oyster
+ | Straw | 35% chopped wheat or oat straw, 65% water | 5 to 10% | Pearl Oyster, Blue Oyster, Golden Oyster, Pink Oyster, Wine Cap
+ | Coffee grounds | 83% fresh used coffee grounds (under 24 hours old), 17% pasteurized straw or hydrated sawdust pellets | 10% | Pearl Oyster, Blue Oyster, Pink Oyster
+
+### What is field capacity?
+
+Field capacity is as much water as the substrate can hold without free water pooling. Squeeze a handful hard: a few drops should come out, not a stream. Too wet is the most common cause of slow colonization and bacterial blotch, so add the last of the water slowly. Supplemented sawdust and Master's Mix sit near 60% moisture and drained straw near 65%.
+
+### Which substrate should I use?
+
+For oysters, straw and coffee grounds are cheap and need only pasteurizing. Master's Mix and supplemented sawdust give bigger harvests of wood lovers like Lion's Mane, Shiitake, and Chestnut Mushroom, but they must be pressure sterilized, which needs a pressure cooker and clean work. CVG is easy to pasteurize in a bucket and is the usual monotub bulk substrate.
+
+### How much spawn should I use?
+
+Extension guides give 5 to 10% of the wet weight for straw and sawdust. Home growers often use 10 to 20% in CVG and Master's Mix. More spawn colonizes faster and leaves less time for mold, at a higher cost. GroCycle uses 10% of the coffee weight for coffee grounds.
+
+### FAQ
+
+Q: How much water do I add to CVG?
+A: The common batch is one 650 g coir brick, about 2 quarts (1.9 L) of vermiculite, 1 cup of gypsum, and about 4.25 L of boiling water. Hold some water back and finish with the squeeze test.
+
+Q: What is the Master's Mix ratio?
+A: Equal dry weights of hardwood sawdust and soybean hulls, hydrated to about 60% moisture. For a 2.3 kg (5 lb) block that is 453 g of each and 1.4 L of water, then 2.5 hours at 15 PSI.
+
+Q: What spawn rate should I use for straw?
+A: University of Florida IFAS Extension gives 5 to 10% of the drained wet straw weight. 10% colonizes faster.
+
+Q: Do I need gypsum?
+A: CVG recipes use about 1 cup per 650 g brick and supplemented sawdust uses about 1%. Straw and coffee grounds do not need it, and Master's Mix works without it.
+
+Q: Can I pasteurize Master's Mix or bran?
+A: No. Soy hulls and bran are rich enough that molds win unless the substrate is pressure sterilized. Pasteurize only straw, CVG, and fresh coffee grounds.
+
+---
+
 ## Mushroom grow timeline calculator
 
 URL: https://shroomlabs.io/tools/grow-timeline
@@ -1678,6 +1744,10 @@ Days from the start of colonization to the end of the first harvest |  | Mushroo
  | Turkey Tail | 78
 
 See how long mushrooms take to grow for each stage, and the time from a kit.
+
+### Can a chamber follow these stages for me?
+
+Yes, if you grow in a Shrooly running OpenShrooly. Load the same free profile on the chamber and it steps through each stage on these days. Grow Coach reads the chamber's live readings and suggests humidity and temperature changes for the stage you are in, so you are not guessing from a date alone.
 
 ### Why might my dates be different?
 

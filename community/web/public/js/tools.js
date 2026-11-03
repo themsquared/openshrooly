@@ -1,8 +1,9 @@
-/** Free tool pages: the grow timeline calculator and the fresh air planner. Runs on /tools/* only. */
+/** Free tool pages: substrate calculator, grow timeline calculator, and fresh air planner. Runs on /tools/* only. */
 import "./lite.js";
 import { SPECIES } from "./tool-species.js";
 import { airChanges, buildIcs, chamberLiters, flowLpm, isoDay, timeline } from "./tool-math.js";
-import { airResult, timelineResult } from "./tool-render.js";
+import { airResult, substrateResult, timelineResult } from "./tool-render.js";
+import { SUBSTRATES, byIdSubstrate, containerWetGrams, substratePlan } from "./substrate-math.js";
 
 const form = document.getElementById("tool-form");
 const out = document.getElementById("tool-result");
@@ -109,7 +110,33 @@ function freshAirPlanner() {
   render(false);
 }
 
+function substrateCalculator() {
+  const el = form.elements;
+  const want = params.get("substrate");
+  if (want && SUBSTRATES.some((s) => s.id === want)) el.substrate.value = want;
+  el.spawn.value = byIdSubstrate(el.substrate.value).spawn.default;
+  function render(interacted) {
+    const sub = byIdSubstrate(el.substrate.value);
+    const by = form.querySelector('input[name="by"]:checked')?.value || "weight";
+    form.querySelectorAll("[data-by]").forEach((g) => (g.hidden = g.dataset.by !== by));
+    const wetGrams = by === "container"
+      ? containerWetGrams(Number(el.vol.value), el.volUnit.value, Number(el.fill.value), sub)
+      : Number(el.wet.value) * (el.wetUnit.value === "lb" ? 453.59237 : 1000);
+    const plan = substratePlan(sub, wetGrams, el.spawn.value);
+    out.innerHTML = plan ? substrateResult(plan, SPECIES) : "<p>Enter a size above zero and a spawn rate from 0 to 100%.</p>";
+    if (interacted) track("tool_use", sub.id);
+  }
+  form.addEventListener("submit", (e) => e.preventDefault());
+  form.addEventListener("input", (e) => {
+    if (e.target === el.substrate) el.spawn.value = byIdSubstrate(el.substrate.value).spawn.default;
+    render(true);
+  });
+  form.addEventListener("change", () => render(true));
+  render(false);
+}
+
 if (form && out) {
+  if (form.dataset.tool === "substrate-calculator") substrateCalculator();
   if (form.dataset.tool === "grow-timeline") growTimeline();
   if (form.dataset.tool === "fresh-air-planner") freshAirPlanner();
 }
