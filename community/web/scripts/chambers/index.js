@@ -14,6 +14,7 @@ export const CHAMBERS_UPDATED = "2026-10-27";
 export const CHECKED = "October 27, 2026";
 
 const REPO = "https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom";
+const ADAPTER = "https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/adapters/ac-infinity.js";
 const a = (href, text) => `<a href="${href}" rel="noopener">${text}</a>`;
 
 export const SOURCES = {
@@ -33,6 +34,13 @@ export const SOURCES = {
   ihc200: { label: "tuya-local issue: Inkbird IHC-200 humidity controller detected as another device (December 2023)", url: "https://github.com/make-all/tuya-local/issues/1466" },
   aciBle: { label: "ha-ac-infinity-ble: local Bluetooth control of AC Infinity Controller 67 and 69 for Home Assistant", url: "https://github.com/Viss/ha-ac-infinity-ble" },
   aciCloud: { label: "homeassistant-acinfinity: AC Infinity Wi-Fi controllers in Home Assistant", url: "https://github.com/dalinicus/homeassistant-acinfinity" },
+  aciManual: { label: "AC Infinity Controller 69 PRO manual (PDF)", url: "https://acinfinity.com/content/CTR69P2212X1_221215_CONTROLLER%2069%20PRO%20Manual.pdf" },
+  aciOverview: { label: "AC Infinity: Controller 69 PRO overview", url: "https://acinfinity.com/pages/controller-programming/controller-69-pro-overview.html" },
+  aciEcosystem: { label: "AC Infinity: ecosystem compatibility chart", url: "https://acinfinity.com/pages/ac-infinity-ecosystem/ecosystem-compatibility.html" },
+  aciPlug: { label: "AC Infinity: UIS Control Plug for outlet powered equipment", url: "https://acinfinity.com/uis-control-plug-for-outlet-powered-equipment/" },
+  aciOutlet: { label: "AC Infinity: controlling outlet devices", url: "https://acinfinity.com/pages/ac-infinity-ecosystem/controlling-outlet-devices.html" },
+  nyxBle: { label: "acinfinity-ble: clean room Bluetooth library developed on a Controller 69 Pro", url: "https://github.com/Nyx000/acinfinity-ble" },
+  aciAdapter: { label: "Shroom Labs AC Infinity adapter on GitHub", url: ADAPTER },
 };
 
 const cite = (key) => a(SOURCES[key].url, SOURCES[key].label.split(":")[0].split(" (")[0]);
@@ -56,8 +64,8 @@ export const CHAMBERS = [
   },
   {
     name: "AC Infinity controllers",
-    status: "Use as is",
-    how: "Keep the stock app. Set it from a grow profile, or automate it in Home Assistant over Bluetooth with a community integration. Shroom Labs does not control it directly.",
+    status: "Community, untested",
+    how: `A free Shroom Labs adapter sets a Wi-Fi Controller 69 PRO from a grow profile through AC Infinity's cloud. It is written from a community integration and has not run on a real controller yet. <a href="/ac-infinity">Read first</a>.`,
   },
   {
     name: "A tub, tent, or box you built",
@@ -187,6 +195,7 @@ const terrashroom = {
   related: [
     ["Mushroom growing conditions for every species", "/grow"],
     ["How much humidity and fresh air mushrooms need", "/guides/humidity-and-fresh-air"],
+    ["AC Infinity for mushrooms", "/ac-infinity"],
   ],
 };
 
@@ -197,9 +206,9 @@ const chambers = {
   eyebrow: "Chambers and controllers",
   crumb: "Chambers",
   updated: CHAMBERS_UPDATED,
-  description: "Shrooly is supported. Terrashroom has community firmware, untested. Inkbird, Tuya, and AC Infinity controllers work as is with our free grow profiles.",
+  description: "Shrooly is supported. Terrashroom and AC Infinity have community software, untested. Inkbird and Tuya controllers work as is with our free grow profiles.",
   answer:
-    "Shrooly is fully supported. Terrashroom has free community firmware that is untested on real hardware. Inkbird and other Tuya Wi-Fi controllers, and AC Infinity controllers, keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.",
+    "Shrooly is fully supported. Terrashroom has free community firmware and AC Infinity Wi-Fi controllers have a free community adapter, both untested on real hardware. Inkbird and other Tuya Wi-Fi controllers keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.",
   cta: [
     ["Install on your Shrooly", "/install"],
     ["Terrashroom owners", "/terrashroom"],
@@ -228,8 +237,8 @@ const chambers = {
     },
     {
       h2: "Does AC Infinity work with Shroom Labs?",
-      answer: "It works as it is. Set the fan and humidity triggers from a grow profile in its own app, and Shroom Labs does not control it directly.",
-      html: `<p>For Home Assistant, ${cite("aciBle")} is a community integration for local Bluetooth control of Controller 67 and 69 models. The controller takes one Bluetooth connection at a time, so close the phone app first. Wi-Fi models also work with ${cite("aciCloud")}, which signs in to your AC Infinity account. We have not tested either.</p>`,
+      answer: "Partly. A free community adapter sets a Wi-Fi controller such as the Controller 69 PRO from a grow profile, but it is untested on real hardware.",
+      html: `<p>Read <a href="/ac-infinity">AC Infinity for mushrooms</a> for how it works and what is untested. For Home Assistant, ${cite("aciBle")} is a community integration for local Bluetooth control of Controller 67 and 69 models. The controller takes one Bluetooth connection at a time, so close the phone app first. Wi-Fi models also work with ${cite("aciCloud")}, which signs in to your AC Infinity account. We have not tested either.</p>`,
     },
     {
       h2: "What if my chamber is not listed?",
@@ -238,7 +247,7 @@ const chambers = {
     },
     {
       h2: "What does each status mean?",
-      answer: "Supported means we run it ourselves. Community, untested means the firmware exists but has not run on a real unit. Use as is means you keep the stock software.",
+      answer: "Supported means we run it ourselves. Community, untested means our firmware or adapter exists but has not run on a real unit. Use as is means you keep the stock software.",
       faq: false,
       html: `<p>We only mark a chamber supported once it has run our firmware on real hardware. When that changes for Terrashroom, this page will say so.</p>`,
     },
@@ -246,13 +255,102 @@ const chambers = {
   sources: ["openshrooly", "terrashroomUpdate", "parkerRepo", "tuyaLocal", "ihc200", "aciBle", "aciCloud"],
   related: [
     ["Terrashroom after the shutdown", "/terrashroom"],
+    ["AC Infinity for mushrooms", "/ac-infinity"],
     ["Reuse your Shrooly", "/reuse-your-shrooly"],
     ["Shrooly shut down? Your options", "/shrooly-alternatives"],
     ["Mushroom growing conditions for every species", "/grow"],
   ],
 };
 
-export const CHAMBER_PAGES = [chambers, terrashroom];
+const acInfinity = {
+  slug: "ac-infinity",
+  title: "AC Infinity Controller 69 PRO for mushrooms: tent fruiting chamber",
+  h1: "AC Infinity for mushrooms",
+  eyebrow: "For AC Infinity owners",
+  crumb: "AC Infinity",
+  updated: "2026-11-03",
+  description: "Turn a grow tent or martha rack into a fruiting chamber with an AC Infinity Controller 69 PRO. A free community adapter sets it from a grow profile. Untested.",
+  answer:
+    "An AC Infinity Controller 69 PRO can run a mushroom fruiting chamber: a humidifier, an exhaust fan, and a heater on its ports, each switched by the chamber's humidity and temperature. Shroom Labs has a free community adapter that sets those ports from a grow profile through AC Infinity's cloud. It is untested on real hardware, so we are looking for owners to try it.",
+  cta: [
+    ["Help test it", "/contact?topic=chamber"],
+    ["Build guide", "/guides/ac-infinity-mushroom-fruiting-chamber"],
+  ],
+  sections: [
+    {
+      h2: "Does the Controller 69 PRO work with Shroom Labs?",
+      answer: "Yes, as a community, untested controller: our adapter writes grow profile numbers to it over AC Infinity's cloud, and nobody at Shroom Labs has run it on a real controller yet.",
+      html: `<p>The 69 PRO has 4 UIS ports, runs each one at 10 speed levels, and connects to the AC Infinity app over Bluetooth or 2.4 GHz Wi-Fi (${cite("aciManual")}), and AC Infinity walks through its modes in its ${a(SOURCES.aciOverview.url, "Controller 69 PRO overview")}. The ${cite("aciCloud")} integration for Home Assistant lists the Controller 69 WiFi, 69 Pro, 69 Pro+ and AI+ as cloud capable. Our adapter is written from that integration's code, and handles the 69 WiFi, 69 PRO, and 69 PRO+. The AI+ uses a different write call and is not covered yet.</p>`,
+    },
+    {
+      h2: "How does a grow tent become a fruiting chamber?",
+      answer: "Put a humidifier, an exhaust fan, and a heater on the controller's ports, and let its sensor switch each one on the chamber's humidity and temperature.",
+      html: `<ul>
+        <li><strong>Humidifier.</strong> AUTO mode with the low humidity trigger. The manual says that trigger is for humidifiers: the port turns on when humidity falls to it.</li>
+        <li><strong>Exhaust fan.</strong> CYCLE mode for fresh air on a schedule, on for a set time and off for the rest. The manual's high humidity and high temperature triggers are for exhaust fans too, if you would rather vent on those.</li>
+        <li><strong>Heater.</strong> AUTO mode with the low temperature trigger, which the manual says is for heating.</li>
+      </ul>
+      <p>AC Infinity lists its CLOUDFORGE humidifiers, CLOUDLINE inline fans, CLOUDRAY clip fans, and THERMOFORGE heaters as working with the 69 PRO (${cite("aciEcosystem")}). A martha rack, a shelf unit with a zip cover, works the same way. The <a href="/guides/ac-infinity-mushroom-fruiting-chamber">build guide</a> has the parts and settings.</p>`,
+    },
+    {
+      h2: "Can I plug a regular humidifier or heater into it?",
+      answer: "A regular humidifier, yes, through the UIS Control Plug, but use a THERMOFORGE heater for heat.",
+      html: `<p>The ${cite("aciPlug")} turns an outlet device on and off, with no speed control, and only works with devices that start on their own when they get power (${cite("aciOutlet")}). AC Infinity warns against using it for continuous high wattage loads such as heaters. A THERMOFORGE heater plugs straight into a UIS port.</p>`,
+    },
+    {
+      h2: "How does the adapter set the controller from a grow profile?",
+      answer: "It turns each stage into port settings, signs in to your AC Infinity account, reads each port, and writes the new values back.",
+      html: `<ul>
+        <li><strong>Humidifier port.</strong> AUTO, low humidity trigger at the stage humidity. Speed follows the profile's humidifier speed.</li>
+        <li><strong>Heater port.</strong> AUTO, low temperature trigger at the stage temperature minus its hysteresis. Left alone when the stage turns heat off.</li>
+        <li><strong>Fan port.</strong> CYCLE, on for the stage fan run and off for the rest of the period. Run times are rounded up to whole minutes, because the integration sets cycle times in minutes.</li>
+      </ul>
+      <p>Your email, password, controller, and ports come from environment variables on your own computer and are never stored by Shroom Labs. It is a dry run by default and prints the plan, and only writes when you add <code>--apply</code>. The code and its tests are in the ${cite("aciAdapter")}.</p>`,
+    },
+    {
+      h2: "How hard is each way to connect?",
+      answer: "The cloud is the easy way for Wi-Fi models, Bluetooth is harder work, and the base Controller 69 only has Bluetooth.",
+      html: `<div class="table-wrap"><table class="conditions-table"><caption>Ways to talk to an AC Infinity controller, checked November 3, 2026</caption><thead><tr><th scope="col">Way</th><th scope="col">Effort</th><th scope="col">Works with</th></tr></thead><tbody>
+        <tr><th scope="row">AC Infinity cloud</th><td>Easy. Your account email and password, no tools.</td><td>69 WiFi, 69 PRO, 69 PRO+, per ${cite("aciCloud")}. Needs internet.</td></tr>
+        <tr><th scope="row">Bluetooth, fans</th><td>Medium. A Home Assistant box in range.</td><td>Controller 67 and 69, per ${cite("aciBle")}. One Bluetooth connection at a time.</td></tr>
+        <tr><th scope="row">Bluetooth, full settings</th><td>Hard. Still being worked out by the community.</td><td>69 PRO, per ${cite("nyxBle")}. Writing the AUTO triggers over Bluetooth is not mapped yet.</td></tr>
+      </tbody></table></div>
+      <p>Our adapter uses the cloud. A local Bluetooth version would need no account, and we will add it when the community has the AUTO settings mapped.</p>`,
+    },
+    {
+      h2: "What is untested?",
+      answer: "All of it, on a real controller. The adapter passes our automated checks against a fake AC Infinity server, but has not written to a real 69 PRO yet.",
+      html: `<ul>
+        <li>Every write on a real controller.</li>
+        <li>Whether the cloud accepts every value the profiles produce.</li>
+        <li>How fast a CLOUDFORGE humidifier brings a tent to fruiting humidity.</li>
+        <li>The AI+ controller. It is not supported yet.</li>
+        <li>Bluetooth. It is not supported yet.</li>
+      </ul>
+      <p>The cloud API is not published by AC Infinity, so a change on their side could break it. If that happens, set the controller by hand from the <a href="/grow">grow profiles</a>.</p>`,
+    },
+    {
+      h2: "Can I help test it?",
+      answer: "Yes. If you own a Controller 69 PRO, message us and we will go through a first dry run and write with you.",
+      html: `<p><a href="/contact?topic=chamber">Message us</a> and pick A chamber. Tell us your controller model and what is on each port. Every report, good or bad, goes into the adapter notes.</p>`,
+    },
+    {
+      h2: "Who made this adapter?",
+      answer: "Shroom Labs wrote it from the community Home Assistant integration. We are not made by or affiliated with AC Infinity.",
+      faq: false,
+      html: `<p>The endpoints and field names come from ${cite("aciCloud")} by dalinicus, released under the MIT license. Thank you. If anything here is wrong, <a href="/contact?topic=chamber">tell us</a> and we will fix it.</p>`,
+    },
+  ],
+  sources: ["aciManual", "aciOverview", "aciEcosystem", "aciPlug", "aciOutlet", "aciCloud", "aciBle", "nyxBle", "aciAdapter"],
+  related: [
+    ["AC Infinity tent fruiting chamber build guide", "/guides/ac-infinity-mushroom-fruiting-chamber"],
+    ["Chambers that work with Shroom Labs", "/chambers"],
+    ["Terrashroom after the shutdown", "/terrashroom"],
+    ["Mushroom growing conditions for every species", "/grow"],
+  ],
+};
+
+export const CHAMBER_PAGES = [chambers, terrashroom, acInfinity];
 
 /** The searches these pages answer. */
 export const TARGET_QUERIES = [
@@ -267,4 +365,8 @@ export const TARGET_QUERIES = [
   "mushroom chamber compatibility",
   "inkbird mushroom",
   "ac infinity mushroom",
+  "ac infinity controller 69 pro mushroom",
+  "ac infinity mushroom grow tent",
+  "martha rack ac infinity",
+  "ac infinity home assistant mushroom",
 ];
