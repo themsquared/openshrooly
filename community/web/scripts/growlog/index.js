@@ -8,8 +8,8 @@ import { link } from "../guides/data.js";
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export const CHAMBERS = [
-  { id: "shrooly-a", name: "Shrooly A", hardware: "Shrooly", software: "OpenShrooly firmware with Grow Coach", status: "Starting soon", note: "Runs the free profile for the comparison species." },
-  { id: "shrooly-b", name: "Shrooly B", hardware: "Shrooly", software: "OpenShrooly firmware with Grow Coach", status: "Starting soon", note: "Second Shrooly, so one odd block does not decide the result." },
+  { id: "shrooly-a", name: "Shrooly A", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Runs the free profile for the comparison species." },
+  { id: "shrooly-b", name: "Shrooly B", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Second Shrooly, so one odd block does not decide the result." },
   { id: "lykyn", name: "Lykyn Single-Tier", hardware: "Lykyn Single-Tier smart grow box", software: "Stock Lykyn controls for now", status: "Arriving, outside-control validation pending", note: "We still have to confirm Shroom Labs can read and set it from outside. Until then it runs on its own controls." },
 ];
 
@@ -25,7 +25,7 @@ export const ENTRY_FIELDS = [
   ["day", "Grow day"],
   ["stage", "Stage"],
   ["temp", "Temperature (°C, from the chamber log)"],
-  ["rh", "Humidity (% RH, from the chamber log)"],
+  ["rh", "Humidity (%, from the chamber log)"],
   ["note", "What we saw"],
   ["weight", "Harvest weight (g, scale, only on harvest days)"],
 ];
@@ -69,7 +69,7 @@ export function renderGrowLogBody(entries = ENTRIES) {
     : `<p><strong>No entries yet.</strong> The first one goes up the day the grows start.</p>`;
   return `<h2>The chambers</h2><div class="grow-log-chambers">${cards}</div>
 <h2>Planned comparison: Shrooly vs Lykyn</h2>
-<p>Species: ${link(COMPARISON.species)}. ${esc(COMPARISON.plan)} The Shroolys follow the free profile, and you can map the stage dates with the <a href="/tools/grow-timeline?species=${COMPARISON.species}">grow timeline calculator</a>. <a href="/coach">Grow Coach</a> watches the Shrooly readings.</p>
+<p>Species: ${link(COMPARISON.species)}. ${esc(COMPARISON.plan)} The Shroolys follow the free profile, and you can map the stage dates with the <a href="/tools/grow-timeline?species=${COMPARISON.species}">grow timeline calculator</a>.</p>
 <h2>Log entries</h2>
 ${log}
 <h2>What each entry records</h2>

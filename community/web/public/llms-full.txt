@@ -1747,7 +1747,7 @@ See how long mushrooms take to grow for each stage, and the time from a kit.
 
 ### Can a chamber follow these stages for me?
 
-Yes, if you grow in a Shrooly running OpenShrooly. Load the same free profile on the chamber and it steps through each stage on these days. Grow Coach reads the chamber's live readings and suggests humidity and temperature changes for the stage you are in, so you are not guessing from a date alone.
+Yes, if you grow in a Shrooly running OpenShrooly. Load the same free profile on the chamber and it steps through each stage on these days.
 
 ### Why might my dates be different?
 

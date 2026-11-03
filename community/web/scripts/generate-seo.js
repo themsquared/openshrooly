@@ -1194,12 +1194,12 @@ export function renderToolPage(tool) {
 /** /tools: every free grow tool on one page. */
 export function renderToolsHub() {
   const url = `${SITE}/tools`;
-  const answer = "Free calculators for home mushroom growing: scale a substrate recipe and spawn, get dated stages for any free grow profile, and check your chamber's fresh air. No sign in.";
+  const answer = "Free mushroom growing calculators: scale a substrate recipe and spawn, get dated stages for a grow profile, and check your chamber's fresh air.";
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
       { "@type": "CollectionPage", "@id": `${url}#page`, name: "Free mushroom growing tools", description: answer, url, inLanguage: "en", dateModified: TOOLS_UPDATED, isAccessibleForFree: true, publisher: ORG_REF,
-        hasPart: TOOL_PAGES.map((t) => ({ "@type": "WebPage", name: t.h1, url: `${SITE}${t.path}` })) },
+        mainEntity: { "@type": "ItemList", itemListElement: TOOL_PAGES.map((t, i) => ({ "@type": "ListItem", position: i + 1, name: t.h1, url: `${SITE}${t.path}` })) } },
       breadcrumbs([["Home", `${SITE}/`], ["Free grow tools", url]]),
     ],
   };
@@ -1211,7 +1211,7 @@ export function renderToolsHub() {
       ${updatedHtml(TOOLS_UPDATED)}
       <p class="lede answer-first">${escapeHtml(answer)}</p>
       <ul class="faq-links">${TOOL_PAGES.map((t) => `<li><a href="${t.path}">${escapeHtml(t.h1)}</a>. ${escapeHtml(t.description)}</li>`).join("")}</ul>
-      <h2>Keep reading</h2><ul class="faq-links"><li><a href="/grow">Mushroom growing conditions for every species</a></li><li><a href="/grow-log">Shroom Labs grow log</a></li><li><a href="/coach">Grow Coach</a></li></ul>
+      <h2>Keep reading</h2><ul class="faq-links"><li><a href="/grow">Mushroom growing conditions for every species</a></li><li><a href="/grow-log">Shroom Labs grow log</a></li></ul>
     </article>`;
   return shell({ head: { title: "Free mushroom growing tools and calculators · Shroom Labs", description: answer, path: "/tools", type: "website", modified: TOOLS_UPDATED, jsonLd }, activeId: "grow", body });
 }

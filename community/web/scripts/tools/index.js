@@ -71,7 +71,7 @@ const growTimeline = {
     },
     {
       h2: "Can a chamber follow these stages for me?",
-      html: `<p>Yes, if you grow in a Shrooly running OpenShrooly. Load the same free profile on the chamber and it steps through each stage on these days. <a href="/coach">Grow Coach</a> reads the chamber's live readings and suggests humidity and temperature changes for the stage you are in, so you are not guessing from a date alone.</p>`,
+      html: `<p>Yes, if you grow in a Shrooly running OpenShrooly. Load the same free profile on the chamber and it steps through each stage on these days.</p>`,
     },
     {
       h2: "Why might my dates be different?",
@@ -92,7 +92,6 @@ const growTimeline = {
     ["How long does it take to grow mushrooms?", "/guides/how-long-to-grow-mushrooms"],
     ["Fresh air and humidity planner", "/tools/fresh-air-planner"],
     ["Mushroom grow kit not growing", "/guides/mushroom-grow-kit-not-growing"],
-    ["Grow Coach", "/coach"],
     ["All free grow tools", "/tools"],
   ],
 };
