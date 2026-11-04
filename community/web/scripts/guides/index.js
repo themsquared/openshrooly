@@ -1,11 +1,12 @@
 /** Long-form grow guides. Each cluster lives in its own file and is added here. */
+import { BUILD_GUIDES } from "./build.js";
 import { KIT_GUIDES } from "./kits.js";
 import { PROBLEM_GUIDES } from "./problems.js";
 import { REFERENCE_GUIDES } from "./reference.js";
 import { START_GUIDES } from "./start.js";
 import { withAffiliateNote } from "./suppliers.js";
 
-const ALL = [...START_GUIDES, ...PROBLEM_GUIDES, ...REFERENCE_GUIDES, ...KIT_GUIDES];
+const ALL = [...START_GUIDES, ...PROBLEM_GUIDES, ...REFERENCE_GUIDES, ...KIT_GUIDES, ...BUILD_GUIDES];
 const SLUGS = new Set(ALL.map((g) => g.slug));
 
 /**

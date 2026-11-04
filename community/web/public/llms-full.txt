@@ -28,6 +28,7 @@ Shroom Labs is not made by or affiliated with the company behind Shrooly.
 - Chef's line: https://shroomlabs.io/chefs-line
 - Chambers that work with Shroom Labs: https://shroomlabs.io/chambers
 - Terrashroom after the shutdown: https://shroomlabs.io/terrashroom
+- AC Infinity for mushrooms: https://shroomlabs.io/ac-infinity
 - FAQ: https://shroomlabs.io/faq
 
 ---
@@ -462,7 +463,7 @@ If you would rather not install anything, run it by hand with a ready to fruit b
 URL: https://shroomlabs.io/chambers
 Updated: 2026-10-27
 
-Shrooly is fully supported. Terrashroom has free community firmware that is untested on real hardware. Inkbird and other Tuya Wi-Fi controllers, and AC Infinity controllers, keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.
+Shrooly is fully supported. Terrashroom has free community firmware and AC Infinity Wi-Fi controllers have a free community adapter, both untested on real hardware. Inkbird and other Tuya Wi-Fi controllers keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.
 
 ### Which chambers are supported?
 
@@ -472,7 +473,7 @@ Chambers and controllers, checked October 27, 2026 |  | Chamber | Status | How i
  | Shrooly | Supported | Free OpenShrooly firmware, installed from Chrome or Edge in about 5 minutes. Grow profiles and the phone dashboard work. Install.
  | Terrashroom | Community, untested | Free community ESPHome firmware. It builds and passes our checks but has not run on a real unit yet. Read first.
  | Inkbird and other Tuya Wi-Fi controllers | Use as is | Keep the stock app. Set it to the numbers in a grow profile, or automate it in Home Assistant with tuya-local. Shroom Labs does not control it directly.
- | AC Infinity controllers | Use as is | Keep the stock app. Set it from a grow profile, or automate it in Home Assistant over Bluetooth with a community integration. Shroom Labs does not control it directly.
+ | AC Infinity controllers | Community, untested | A free Shroom Labs adapter sets a Wi-Fi Controller 69 PRO from a grow profile through AC Infinity's cloud. It is written from a community integration and has not run on a real controller yet. Read first.
  | A tub, tent, or box you built | Use as is | Use the free grow profiles and grow timeline to run it by hand.
 
 ### Does Shroom Labs work with Shrooly?
@@ -495,9 +496,9 @@ If you use Home Assistant, the community tuya-local for Home Assistant integrati
 
 ### Does AC Infinity work with Shroom Labs?
 
-It works as it is. Set the fan and humidity triggers from a grow profile in its own app, and Shroom Labs does not control it directly.
+Partly. A free community adapter sets a Wi-Fi controller such as the Controller 69 PRO from a grow profile, but it is untested on real hardware.
 
-For Home Assistant, ha-ac-infinity-ble is a community integration for local Bluetooth control of Controller 67 and 69 models. The controller takes one Bluetooth connection at a time, so close the phone app first. Wi-Fi models also work with homeassistant-acinfinity, which signs in to your AC Infinity account. We have not tested either.
+Read AC Infinity for mushrooms for how it works and what is untested. For Home Assistant, ha-ac-infinity-ble is a community integration for local Bluetooth control of Controller 67 and 69 models. The controller takes one Bluetooth connection at a time, so close the phone app first. Wi-Fi models also work with homeassistant-acinfinity, which signs in to your AC Infinity account. We have not tested either.
 
 ### What if my chamber is not listed?
 
@@ -507,7 +508,7 @@ Start with mushroom growing conditions for every species. If your chamber has an
 
 ### What does each status mean?
 
-Supported means we run it ourselves. Community, untested means the firmware exists but has not run on a real unit. Use as is means you keep the stock software.
+Supported means we run it ourselves. Community, untested means our firmware or adapter exists but has not run on a real unit. Use as is means you keep the stock software.
 
 We only mark a chamber supported once it has run our firmware on real hardware. When that changes for Terrashroom, this page will say so.
 
@@ -649,6 +650,105 @@ The pin facts come from Parker Ryan's aparkerryan27/terrashroomPublic on GitHub.
 - Espressif: ESP32 boot mode selection and strapping pins: https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/boot-mode-selection.html
 - Espressif: espefuse set_flash_voltage: https://docs.espressif.com/projects/esptool/en/latest/esp32/espefuse/set-flash-voltage-cmd.html
 - Shroom Labs Terrashroom firmware on GitHub: https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom
+
+---
+
+## AC Infinity for mushrooms
+
+URL: https://shroomlabs.io/ac-infinity
+Updated: 2026-11-03
+
+An AC Infinity Controller 69 PRO can run a mushroom fruiting chamber: a humidifier, an exhaust fan, and a heater on its ports, each switched by the chamber's humidity and temperature. Shroom Labs has a free community adapter that sets those ports from a grow profile through AC Infinity's cloud. It is untested on real hardware, so we are looking for owners to try it.
+
+### Does the Controller 69 PRO work with Shroom Labs?
+
+Yes, as a community, untested controller: our adapter writes grow profile numbers to it over AC Infinity's cloud, and nobody at Shroom Labs has run it on a real controller yet.
+
+The 69 PRO has 4 UIS ports, runs each one at 10 speed levels, and connects to the AC Infinity app over Bluetooth or 2.4 GHz Wi-Fi (AC Infinity Controller 69 PRO manual), and AC Infinity walks through its modes in its Controller 69 PRO overview. The homeassistant-acinfinity integration for Home Assistant lists the Controller 69 WiFi, 69 Pro, 69 Pro+ and AI+ as cloud capable. Our adapter is written from that integration's code, and handles the 69 WiFi, 69 PRO, and 69 PRO+. The AI+ uses a different write call and is not covered yet.
+
+### How does a grow tent become a fruiting chamber?
+
+Put a humidifier, an exhaust fan, and a heater on the controller's ports, and let its sensor switch each one on the chamber's humidity and temperature.
+
+- Humidifier. AUTO mode with the low humidity trigger. The manual says that trigger is for humidifiers: the port turns on when humidity falls to it.
+
+- Exhaust fan. CYCLE mode for fresh air on a schedule, on for a set time and off for the rest. The manual's high humidity and high temperature triggers are for exhaust fans too, if you would rather vent on those.
+
+- Heater. AUTO mode with the low temperature trigger, which the manual says is for heating.
+
+      AC Infinity lists its CLOUDFORGE humidifiers, CLOUDLINE inline fans, CLOUDRAY clip fans, and THERMOFORGE heaters as working with the 69 PRO (AC Infinity). A martha rack, a shelf unit with a zip cover, works the same way. The build guide has the parts and settings.
+
+### Can I plug a regular humidifier or heater into it?
+
+A regular humidifier, yes, through the UIS Control Plug, but use a THERMOFORGE heater for heat.
+
+The AC Infinity turns an outlet device on and off, with no speed control, and only works with devices that start on their own when they get power (AC Infinity). AC Infinity warns against using it for continuous high wattage loads such as heaters. A THERMOFORGE heater plugs straight into a UIS port.
+
+### How does the adapter set the controller from a grow profile?
+
+It turns each stage into port settings, signs in to your AC Infinity account, reads each port, and writes the new values back.
+
+- Humidifier port. AUTO, low humidity trigger at the stage humidity. Speed follows the profile's humidifier speed.
+
+- Heater port. AUTO, low temperature trigger at the stage temperature minus its hysteresis. Left alone when the stage turns heat off.
+
+- Fan port. CYCLE, on for the stage fan run and off for the rest of the period. Run times are rounded up to whole minutes, because the integration sets cycle times in minutes.
+
+      Your email, password, controller, and ports come from environment variables on your own computer and are never stored by Shroom Labs. It is a dry run by default and prints the plan, and only writes when you add --apply. The code and its tests are in the Shroom Labs AC Infinity adapter on GitHub.
+
+### How hard is each way to connect?
+
+The cloud is the easy way for Wi-Fi models, Bluetooth is harder work, and the base Controller 69 only has Bluetooth.
+
+Ways to talk to an AC Infinity controller, checked November 3, 2026 |  | Way | Effort | Works with
+
+         | AC Infinity cloud | Easy. Your account email and password, no tools. | 69 WiFi, 69 PRO, 69 PRO+, per homeassistant-acinfinity. Needs internet.
+
+         | Bluetooth, fans | Medium. A Home Assistant box in range. | Controller 67 and 69, per ha-ac-infinity-ble. One Bluetooth connection at a time.
+
+         | Bluetooth, full settings | Hard. Still being worked out by the community. | 69 PRO, per acinfinity-ble. Writing the AUTO triggers over Bluetooth is not mapped yet.
+
+      Our adapter uses the cloud. A local Bluetooth version would need no account, and we will add it when the community has the AUTO settings mapped.
+
+### What is untested?
+
+All of it, on a real controller. The adapter passes our automated checks against a fake AC Infinity server, but has not written to a real 69 PRO yet.
+
+- Every write on a real controller.
+
+- Whether the cloud accepts every value the profiles produce.
+
+- How fast a CLOUDFORGE humidifier brings a tent to fruiting humidity.
+
+- The AI+ controller. It is not supported yet.
+
+- Bluetooth. It is not supported yet.
+
+      The cloud API is not published by AC Infinity, so a change on their side could break it. If that happens, set the controller by hand from the grow profiles.
+
+### Can I help test it?
+
+Yes. If you own a Controller 69 PRO, message us and we will go through a first dry run and write with you.
+
+Message us and pick A chamber. Tell us your controller model and what is on each port. Every report, good or bad, goes into the adapter notes.
+
+### Who made this adapter?
+
+Shroom Labs wrote it from the community Home Assistant integration. We are not made by or affiliated with AC Infinity.
+
+The endpoints and field names come from homeassistant-acinfinity by dalinicus, released under the MIT license. Thank you. If anything here is wrong, tell us and we will fix it.
+
+### Sources
+
+- AC Infinity Controller 69 PRO manual (PDF): https://acinfinity.com/content/CTR69P2212X1_221215_CONTROLLER%2069%20PRO%20Manual.pdf
+- AC Infinity: Controller 69 PRO overview: https://acinfinity.com/pages/controller-programming/controller-69-pro-overview.html
+- AC Infinity: ecosystem compatibility chart: https://acinfinity.com/pages/ac-infinity-ecosystem/ecosystem-compatibility.html
+- AC Infinity: UIS Control Plug for outlet powered equipment: https://acinfinity.com/uis-control-plug-for-outlet-powered-equipment/
+- AC Infinity: controlling outlet devices: https://acinfinity.com/pages/ac-infinity-ecosystem/controlling-outlet-devices.html
+- homeassistant-acinfinity: AC Infinity Wi-Fi controllers in Home Assistant: https://github.com/dalinicus/homeassistant-acinfinity
+- ha-ac-infinity-ble: local Bluetooth control of AC Infinity Controller 67 and 69 for Home Assistant: https://github.com/Viss/ha-ac-infinity-ble
+- acinfinity-ble: clean room Bluetooth library developed on a Controller 69 Pro: https://github.com/Nyx000/acinfinity-ble
+- Shroom Labs AC Infinity adapter on GitHub: https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/adapters/ac-infinity.js
 
 ---
 
@@ -1618,6 +1718,92 @@ A: After a harvest a block rests for one to two weeks. Soak it in cold water for
 
 Q: Can a mushroom kit grow again?
 A: Yes. Most kits give two or three flushes with a rest and a cold soak between them, each smaller than the last.
+
+---
+
+## Build a mushroom fruiting chamber with an AC Infinity Controller 69 PRO
+
+URL: https://shroomlabs.io/guides/ac-infinity-mushroom-fruiting-chamber
+Updated: 2026-11-03
+
+Put a grow tent or martha rack, a Controller 69 PRO, a humidifier, an exhaust fan, and a heater together. The humidifier runs on the low humidity trigger, the heater on the low temperature trigger, and the fan on a cycle for fresh air. The settings for each species come straight from its free grow profile.
+
+### What parts do I need?
+
+- An enclosure. A grow tent, or a martha rack: a wire shelf unit with a zip up plastic cover. Either holds humidity and gives you shelves or floor space for blocks.
+
+- The controller. An AC Infinity Controller 69 PRO. It has 4 UIS ports, 10 speed levels on each, and a sensor probe for temperature and humidity, and it connects to the app over Bluetooth or 2.4 GHz Wi-Fi (Controller 69 PRO manual).
+
+- A humidifier. A CLOUDFORGE humidifier plugs straight into a port. AC Infinity lists the CLOUDFORGE line as compatible with the 69 PRO (ecosystem chart). A regular humidifier works through the UIS Control Plug if it turns itself back on when it gets power.
+
+- An exhaust fan. A CLOUDLINE inline fan or a CLOUDRAY clip fan, both on the same chart.
+
+- A heater, if your room runs cool. A THERMOFORGE heater, also on the chart. Do not run a space heater through the UIS Control Plug: AC Infinity warns against continuous high wattage loads on it (UIS Control Plug).
+
+Each port runs one program, so give every device its own port.
+
+### How do I wire the ports?
+
+One device per port keeps it simple. This is the layout our adapter and the table below assume:
+
+- Port 1, humidifier. AUTO mode, low humidity trigger on, everything else off.
+
+- Port 2, exhaust fan. CYCLE mode, on for the fresh air run, off for the rest of the period.
+
+- Port 3, heater. AUTO mode, low temperature trigger on, everything else off.
+
+- Port 4, spare. A circulation fan or a light, if you want one.
+
+The manual describes the low humidity trigger as the one for humidifiers and the low temperature trigger as the one for heating. A port in AUTO turns on when the reading reaches its trigger and off once it moves past it.
+
+Hang the sensor probe at the height of your blocks, out of the direct mist. A probe in the mist reads wet and keeps the humidifier off while the rest of the chamber dries out.
+
+### What settings should I use for each mushroom?
+
+These are the fruiting stage numbers from each free grow profile, turned into controller settings the same way our adapter does it. Fan times are rounded up to whole minutes, the way the community integration our adapter is built from sets cycle times.
+
+Controller 69 PRO fruiting settings from the grow profiles |  | Mushroom | Humidifier low trigger | Heater low trigger | Fan cycle
+ | Pearl Oyster | 88%, speed 8 | 15 °C (59 °F) | 1 min on, 9 min off, speed 5
+ | Blue Oyster | 87%, speed 8 | 13 °C (55 °F) | 1 min on, 9 min off, speed 5
+ | Pink Oyster | 86%, speed 8 | 23 °C (73 °F) | 1 min on, 9 min off, speed 5
+ | Lion's Mane | 90%, speed 8 | 16 °C (61 °F) | 1 min on, 17 min off, speed 3
+ | Shiitake | 85%, speed 8 | 15 °C (59 °F) | 1 min on, 11 min off, speed 4
+
+The heater trigger is the profile temperature minus its hysteresis, so the heater only runs when the room is below the range the profile allows. Other stages, such as pinning, have their own numbers on each profile page in the grow profiles.
+
+### Can Shroom Labs set the controller for me?
+
+Yes, with a free community adapter that is untested on real hardware. It signs in to your AC Infinity account through the same cloud the app uses, reads each port, and writes the new values. It works with Wi-Fi models such as the 69 PRO, not the Bluetooth only Controller 69. Read AC Infinity for mushrooms first: it covers how the adapter works, what is untested, and why your password stays on your computer.
+
+### How much fresh air does a tent need?
+
+More than most people expect. Mushrooms breathe out carbon dioxide, and too much of it gives long stems and small caps. The fan cycle in each profile is a starting point. Size the run time to your tent with the fresh air planner, and lengthen it if stems stretch. How much humidity and fresh air mushrooms need goes deeper.
+
+Fresh air dries the chamber, so you will see the humidifier kick on after every fan run. That is normal. If humidity never recovers between runs, move the humidifier output closer to the blocks or shorten the fan run a little.
+
+### What goes wrong most often?
+
+- Water on everything. Fog that settles on the floor and walls drips. Point the humidifier output into open air and put a tray under the blocks.
+
+- The humidifier never stops. Check the probe is not in the mist and the tent zips are closed.
+
+- The heater runs all the time. The room is too cold for the tent to hold heat. Move the tent or insulate the floor.
+
+- Pins stall. Usually too little fresh air or too little humidity. Go through mushrooms not pinning.
+
+### FAQ
+
+Q: Can an AC Infinity controller run a mushroom fruiting chamber?
+A: Yes. A Controller 69 PRO can run a humidifier on its low humidity trigger, a heater on its low temperature trigger, and an exhaust fan on a cycle, all from one probe.
+
+Q: Which AC Infinity humidifier works with the Controller 69 PRO?
+A: AC Infinity lists its CLOUDFORGE humidifiers as compatible. A regular humidifier also works through the UIS Control Plug if it turns itself back on when it gets power.
+
+Q: Can I use a space heater with the UIS Control Plug?
+A: AC Infinity warns against continuous high wattage loads such as heaters on the UIS Control Plug, so use a THERMOFORGE heater on a UIS port instead.
+
+Q: Does Shroom Labs control AC Infinity controllers?
+A: There is a free community adapter for Wi-Fi models such as the 69 PRO. It is untested on real hardware, and it is a dry run unless you tell it to write.
 
 ---
 
