@@ -1526,7 +1526,7 @@ function stripHtml(html) {
 export function renderLlmsFull(profiles) {
   const out = [
     `# Shroom Labs: full text\n\n> ${ABOUT}\n\nEvery grow number below comes from the published Shroom Labs grow profiles. Source: ${SITE}/grow`,
-    `## About Shroom Labs\n\nURL: ${SITE}/\n\n${llmsAbout(profiles).join("\n\n")}\n\n### Key pages\n\n- Install OpenShrooly: ${SITE}/install\n- Grow Coach and Autopilot: ${SITE}/coach\n- Grow guides for every species: ${SITE}/grow\n- Chef's line: ${SITE}/chefs-line\n- Chambers that work with Shroom Labs: ${SITE}/chambers\n- Terrashroom after the shutdown: ${SITE}/terrashroom\n- FAQ: ${SITE}/faq`,
+    `## About Shroom Labs\n\nURL: ${SITE}/\n\n${llmsAbout(profiles).join("\n\n")}\n\n### Key pages\n\n- Install OpenShrooly: ${SITE}/install\n- Grow Coach and Autopilot: ${SITE}/coach\n- Grow guides for every species: ${SITE}/grow\n- Chef's line: ${SITE}/chefs-line\n- Chambers that work with Shroom Labs: ${SITE}/chambers\n- Terrashroom after the shutdown: ${SITE}/terrashroom\n- AC Infinity for mushrooms: ${SITE}/ac-infinity\n- FAQ: ${SITE}/faq`,
   ];
   for (const p of OWNER_PAGES) {
     out.push(

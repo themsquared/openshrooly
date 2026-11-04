@@ -36,3 +36,7 @@ community/api/.dev.vars
 
 # Signed releases are published to Netlify, never committed
 community/web/public/firmware/
+
+# Local secrets (AC Infinity and other adapter credentials)
+.env
+.env.*
