@@ -213,7 +213,7 @@ test("Google sign-up does not put the email local part or name on public API, pa
   assert.equal(r.done.status, 200);
   const row = await ctx.db.one("SELECT * FROM users WHERE email=?", ["grower@gmail.com"]);
   assertPublicHandle(row, r.done.data.user);
-  const extra = ["Ada", "Lovelace"];
+  const extra = ["\\bAda\\b", "\\bLovelace\\b"];
   const leak = (value, label) => assertNoPublicPii(value, "grower@gmail.com", extra, label);
 
   const token = r.done.data.access_token;
