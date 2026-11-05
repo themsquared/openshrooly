@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Lykyn mushroom grow box: outside control without flashing</title>
+  <meta name="description" content="What outside control means for a Lykyn, what we will record when the box arrives, and how that differs from flashing a Shrooly chamber.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Lykyn mushroom grow box: outside control without flashing">
+  <meta property="og:description" content="What outside control means for a Lykyn, what we will record when the box arrives, and how that differs from flashing a Shrooly chamber.">
+  <meta property="og:url" content="https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control">
+  <meta property="og:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Lykyn mushroom grow box: outside control without flashing">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Lykyn mushroom grow box: outside control without flashing">
+  <meta name="twitter:description" content="What outside control means for a Lykyn, what we will record when the box arrives, and how that differs from flashing a Shrooly chamber.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/default.jpg">
+  <meta property="article:modified_time" content="2026-11-05">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","@id":"https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control#article","headline":"Outside control for a Lykyn mushroom grow box","description":"Outside control means we talk to a Lykyn through its existing app and cloud, and we leave the stock software on the box. When our unit arrives we will record what the official app sends, write it up in a public adapter repo, and only then try a dry run. None of that is proven yet. This is not a reflash, which is how OpenShrooly runs a Shrooly chamber.","url":"https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control","mainEntityOfPage":"https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control","image":"https://shroomlabs.io/og/default.jpg","inLanguage":"en","dateModified":"2026-11-05","author":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/"},"publisher":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/"}},{"@type":"FAQPage","@id":"https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control#faq","mainEntity":[{"@type":"Question","name":"What does outside control mean?","acceptedAnswer":{"@type":"Answer","text":"We talk to the Lykyn through its existing app and cloud, and we leave the stock software on the box."}},{"@type":"Question","name":"Will Shroom Labs flash the Lykyn?","acceptedAnswer":{"@type":"Answer","text":"No. The plan is outside control. Flashing is how OpenShrooly runs a Shrooly chamber, not how we plan to run a Lykyn."}},{"@type":"Question","name":"Can I use a grow profile on a Lykyn today?","acceptedAnswer":{"@type":"Answer","text":"Yes, by copying the numbers into the official Lykyn app. Shroom Labs cannot apply a profile to a Lykyn yet."}},{"@type":"Question","name":"Where is the adapter code?","acceptedAnswer":{"@type":"Answer","text":"In the public lykyn-adapter repo on GitHub. It is a pitch and a place for notes. Nothing in it talks to a real Lykyn yet."}}]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"Grow guides","item":"https://shroomlabs.io/grow"},{"@type":"ListItem","position":3,"name":"Outside control for a Lykyn mushroom grow box","item":"https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control"}]}]}</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RKQ4CBEZWY"></script>
+  <script src="/js/ga.js" defer></script>
+  <!--/SEO_HEAD-->
+  <link rel="preload" href="/fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/fraunces-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="grow">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow" aria-current="page">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <article class="profile-page guide-page">
+      <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><a href="/grow">Grow guides</a></li><li aria-current="page">Outside control for a Lykyn mushroom grow box</li></ol></nav>
+      <p class="eyebrow">Chamber guide</p>
+      <h1>Outside control for a Lykyn mushroom grow box</h1>
+      <p class="updated muted">Updated <time datetime="2026-11-05">2026-11-05</time></p>
+      <p class="lede answer-first">Outside control means we talk to a Lykyn through its existing app and cloud, and we leave the stock software on the box. When our unit arrives we will record what the official app sends, write it up in a public adapter repo, and only then try a dry run. None of that is proven yet. This is not a reflash, which is how OpenShrooly runs a Shrooly chamber.</p>
+      <h2>What does outside control mean?</h2><p>Outside control is a way to read and set a chamber without replacing the software that shipped on it. The official app stays the source of how the box talks. We watch that path, write down the reads and writes, and later wrap them in a small adapter so a grow profile can drive the same settings.</p>
+<p>For a Lykyn that means:</p>
+<ul>
+<li><strong>Stock software stays on the box.</strong> We do not flash it. We do not ask you to open it.</li>
+<li><strong>The official app and cloud stay in place.</strong> The adapter, once it exists, would sign in the same way the app does, on your own computer.</li>
+<li><strong>Credentials stay with you.</strong> Email and password would live as environment variables on the machine that runs the adapter, the same way the <a href="/ac-infinity">AC Infinity adapter</a> does. Shroom Labs would not store them.</li>
+<li><strong>A dry run comes first.</strong> A first tool should print the plan and write nothing, until someone adds an apply flag on purpose.</li>
+</ul>
+<p>That is the plan. It is not a working adapter. Read <a href="/lykyn">Lykyn for mushrooms</a> for the arrival status.</p>
+      <h2>What will we look at when the box arrives?</h2><p>The unit is in transit. Until it is on a bench here, there is nothing to record. When it arrives we will set it up the way Lykyn describes on the <a href="https://lykyn.com/" rel="noopener">official Lykyn site</a>: water in the reservoir, a fruiting block on the tray, species picked in the app. Then we watch three links.</p>
+<ol>
+<li><strong>Phone to box.</strong> What the official app sends over the local network, if it talks to the box directly at all.</li>
+<li><strong>Phone to cloud.</strong> What the app sends to Lykyn's servers to read humidity and temperature, and to change humidity, fans, light, or the species preset.</li>
+<li><strong>Box to cloud.</strong> Whether the chamber reports readings on its own, and how often.</li>
+</ol>
+<p>We will write down field names, units, and which settings the app actually changes. Those notes go in the <a href="https://github.com/themsquared/lykyn-adapter" rel="noopener">Shroom Labs Lykyn adapter on GitHub</a>. The repo is public on purpose. Credentials stay out of it.</p>
+<p>We are looking for the same kinds of things a grow profile needs: humidity, temperature, fresh air, and light. If those can be read and set from outside, a later adapter can map a free profile onto them. If they cannot, this guide will say so and you should keep using the Lykyn app by hand with the numbers from the <a href="/grow">grow profiles</a>.</p>
+<p>Nothing in that list is mapped yet. Treat every endpoint, field, and unit as unknown until a note lands in the repo with a date.</p>
+      <h2>What is untested?</h2><p>All of it. Outside-control validation has not started. The public repo holds a short pitch, not a tool you can run.</p>
+<ul>
+<li>Whether a sign in from software we write is accepted.</li>
+<li>Whether live humidity and temperature can be read from outside.</li>
+<li>Whether humidity, fans, light, or a species preset can be set from outside.</li>
+<li>Whether those writes match what the official app shows after they land.</li>
+<li>Whether a Lykyn holds fruiting humidity for lion's mane, oyster, or shiitake the way the profiles ask.</li>
+<li>How a Lykyn compares to a Shrooly chamber on the same block. That comparison is the planned <a href="/grow-log">grow log</a>, and it has not started.</li>
+</ul>
+<p>Until those are checked, do not claim a Lykyn is supported. The <a href="/chambers">chambers table</a> marks it Arriving. The grow log marks it arriving, outside-control validation pending. Both stay that way until someone here has read and set a real unit from outside.</p>
+      <h2>How is this different from flashing a Shrooly chamber?</h2><p>OpenShrooly replaces the stock software on a Shrooly chamber. You install it from Chrome or Edge with a USB-C cable in about 5 minutes. After that the chamber runs on your own Wi-Fi from a local web page, and the Shrooly app is not in the path. That is a reflash.</p>
+<p>The Lykyn plan is the opposite. The stock software stays. The official app stays. We build a translator that sits outside and speaks the same language the app already speaks. If Lykyn changes that language, the adapter can break. If it breaks, you still have the official app and can set the box by hand from a grow profile.</p>
+<p>Terrashroom is on the flash path, like a Shrooly chamber: community ESPHome firmware, untested on real hardware. AC Infinity is on the outside-control path, like Lykyn: a cloud adapter written from a community integration, also untested on a real controller. Lykyn is earlier than AC Infinity. AC Infinity has adapter code and tests against a fake server. Lykyn has a repo and a plan.</p>
+<div class="table-wrap"><table class="conditions-table"><caption>How Shroom Labs talks to each chamber, November 5, 2026</caption><thead><tr><th scope="col">Chamber</th><th scope="col">Method</th><th scope="col">Status</th></tr></thead><tbody>
+<tr><th scope="row"><a href="/install">Shrooly chamber</a></th><td>Flash OpenShrooly. Local web page, no stock app.</td><td>Supported</td></tr>
+<tr><th scope="row"><a href="/terrashroom">Terrashroom</a></th><td>Flash community ESPHome firmware.</td><td>Community, untested</td></tr>
+<tr><th scope="row"><a href="/ac-infinity">AC Infinity</a></th><td>Cloud adapter. Stock controller software stays.</td><td>Community, untested</td></tr>
+<tr><th scope="row"><a href="/lykyn">Lykyn</a></th><td>Outside-control adapter planned. Stock software stays.</td><td>Arriving, validation pending</td></tr>
+</tbody></table></div>
+<p>If you want the chamber to run with no vendor app at all, a Shrooly chamber with OpenShrooly is the one we already run. A Lykyn will keep using Lykyn's app until someone proves an outside path, and maybe after that too.</p>
+      <h2>Can I use a grow profile on a Lykyn today?</h2><p>Yes, by hand. Open the species in the <a href="/grow">grow profiles</a>, copy the humidity, temperature, fresh air, and light for the stage you are in, and set the official Lykyn app as close as it allows. The app's species presets are Lykyn's, not ours. We have not compared them to the profiles.</p>
+<p>Automatic apply from Shroom Labs is the adapter's job, and that job has not started. The <a href="/tools/grow-timeline">grow timeline calculator</a> still helps you pick stage dates while the box runs on its own controls.</p>
+<p>Shroom Labs is not made by Lykyn. Product steps quoted above come from the official site. If you own a box and want to share what the app lets you set, use the contact page on this site and pick A chamber.</p>
+      <h2>FAQ</h2><h3>What does outside control mean?</h3><p>We talk to the Lykyn through its existing app and cloud, and we leave the stock software on the box.</p><h3>Will Shroom Labs flash the Lykyn?</h3><p>No. The plan is outside control. Flashing is how OpenShrooly runs a Shrooly chamber, not how we plan to run a Lykyn.</p><h3>Can I use a grow profile on a Lykyn today?</h3><p>Yes, by copying the numbers into the official Lykyn app. Shroom Labs cannot apply a profile to a Lykyn yet.</p><h3>Where is the adapter code?</h3><p>In the public lykyn-adapter repo on GitHub. It is a pitch and a place for notes. Nothing in it talks to a real Lykyn yet.</p>
+      <h2>Keep reading</h2><ul class="faq-links"><li><a href="/lykyn">Lykyn for mushrooms</a></li><li><a href="/grow-log">Shroom Labs grow log</a></li><li><a href="/chambers">Mushroom chambers that work with Shroom Labs</a></li><li><a href="/grow">Conditions for every species</a></li></ul>
+    </article></main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/chambers">Chambers</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <nav class="footer-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/lite.js"></script>
+</body>
+</html>
