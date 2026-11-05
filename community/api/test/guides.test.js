@@ -60,20 +60,34 @@ test("guide links resolve: profiles are free and indexed, guides exist, affiliat
     const html = main(page(g.slug));
     for (const [, href] of html.matchAll(/href="([^"]+)"/g)) {
       if (href.startsWith("http")) {
-        assert.match(href, /^https:\/\/(northspore\.com|pnwspore\.com|openshrooly\.com|ucanr\.edu|projects\.sare\.org|acinfinity\.com)\//, `${g.slug} external ${href}`);
+        assert.match(href, /^https:\/\/(northspore\.com|pnwspore\.com|openshrooly\.com|ucanr\.edu|projects\.sare\.org|acinfinity\.com|lykyn\.com|github\.com)\//, `${g.slug} external ${href}`);
         continue;
       }
       assert.doesNotMatch(href, /\.html/, `${g.slug} ${href}`);
       const profile = href.match(/^\/profiles\/([a-z0-9-]+)$/);
       if (profile) assert.ok(indexed.has(profile[1]), `${g.slug} links free profile ${href}`);
       else if (href.startsWith("/guides/")) assert.ok(existsSync(join(PUBLIC, `${href}.html`)), `${g.slug} ${href}`);
-      else assert.ok(["/", "/grow", "/install", "/docs", "/faq", "/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq", "/shrooly-pods", "/shrooly-alternatives", "/chambers", "/terrashroom", "/ac-infinity", "/tools/grow-timeline", "/tools/fresh-air-planner"].includes(href), `${g.slug} ${href}`);
+      else assert.ok(["/", "/grow", "/install", "/docs", "/faq", "/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq", "/shrooly-pods", "/shrooly-alternatives", "/chambers", "/terrashroom", "/ac-infinity", "/lykyn", "/grow-log", "/tools/grow-timeline", "/tools/fresh-air-planner"].includes(href), `${g.slug} ${href}`);
     }
     // The affiliate note shows only when the page holds a tagged affiliate link, and then it must.
     if (/\sdata-affiliate[\s>]/.test(html)) assert.match(text(html), /commission/, `${g.slug} discloses affiliate links`);
     else assert.doesNotMatch(text(html), /affiliate|commission/i, `${g.slug} claims affiliate links it does not have`);
     assert.ok(/href="\/profiles\//.test(html) || /href="\/grow"/.test(html), `${g.slug} links to profiles`);
   }
+});
+
+test("the Lykyn outside-control guide stays arriving and links the adapter repo", () => {
+  const g = GUIDES.find((x) => x.slug === "lykyn-mushroom-grow-box-outside-control");
+  assert.ok(g, "guide is registered");
+  const html = page(g.slug);
+  const body = text(main(html));
+  assert.match(body, /outside control/i);
+  assert.match(body, /validation has not started|untested/i);
+  assert.match(body, /not a reflash/i);
+  assert.doesNotMatch(body, /\bvalidated\b/i);
+  assert.doesNotMatch(html, /href="\/coach"|Grow Coach/);
+  assert.ok(html.includes("https://github.com/themsquared/lykyn-adapter"), "adapter repo");
+  assert.ok(html.includes('href="/lykyn"'), "chamber page");
 });
 
 test("guides are in the sitemap, llms.txt, llms-full.txt, the hub, and redirect from .html", () => {
