@@ -46,7 +46,25 @@ test("chamber copy is plain and honest: no dashes, arrows, or harsh words, and T
   const status = Object.fromEntries(CHAMBERS.map((c) => [c.name, c.status]));
   assert.equal(status.Shrooly, "Supported");
   assert.equal(status.Terrashroom, "Community, untested");
+  assert.equal(status.Lykyn, "Arriving");
   assert.equal(CHAMBERS.filter((c) => c.status === "Supported").length, 1, "only Shrooly is marked supported");
+});
+
+test("the Lykyn page is arriving, not validated, and links the public adapter repo", () => {
+  const html = read("lykyn.html");
+  const body = text(main(html));
+  assert.match(body, /arriving/i);
+  assert.match(body, /outside-control validation has not started/i);
+  assert.match(body, /untested on real hardware/i);
+  assert.match(body, /not made by or affiliated with Lykyn/i);
+  assert.doesNotMatch(body, /\bvalidated\b|adapter (works|is ready|is live)/i);
+  assert.doesNotMatch(html, /href="\/coach"|Grow Coach/);
+  assert.ok(html.includes('href="https://github.com/themsquared/lykyn-adapter"'), "adapter repo");
+  assert.ok(html.includes('href="/grow-log"'), "grow log");
+  assert.ok(html.includes('href="/guides/lykyn-mushroom-grow-box-outside-control"'), "guide");
+  const how = CHAMBERS.find((c) => c.name === "Lykyn");
+  assert.match(how.how, /outside-control adapter planned, validation pending/i);
+  assert.match(how.how, /href="\/lykyn"/);
 });
 
 test("chamber pages cite their sources and are wired into the sitemap, llms files, redirects, and footer", () => {
@@ -68,8 +86,10 @@ test("chamber pages cite their sources and are wired into the sitemap, llms file
   }
   assert.ok(read("index.html").includes('href="/chambers"'), "footer links the hub");
   assert.ok(read("docs.html").includes('href="/terrashroom"'));
+  assert.ok(read("docs.html").includes('href="/lykyn"'));
   assert.ok(read("shrooly-alternatives.html").includes('href="/chambers"'));
   assert.ok(read("guides/grow-kit-vs-monotub-vs-smart-chamber.html").includes('href="/terrashroom"'));
+  assert.ok(read("guides/grow-kit-vs-monotub-vs-smart-chamber.html").includes('href="/lykyn"'));
 });
 
 test("the Terrashroom page pin table matches the firmware", () => {
