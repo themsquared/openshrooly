@@ -88,7 +88,8 @@ test("built pages carry BlogPosting JSON-LD, GA, a valid feed, sitemap and llms 
     assert.equal(article.datePublished, first.date);
     assert.equal(article.dateModified, first.updated);
     assert.ok(nodes.some((n) => n["@type"] === "BreadcrumbList"));
-    assert.match(html, /G-RKQ4CBEZWY/);
+    if (first.offmenu) assert.doesNotMatch(html, /G-RKQ4CBEZWY|googletagmanager|\/js\/ga\.js/);
+    else assert.match(html, /G-RKQ4CBEZWY/);
     assert.match(html, /application\/rss\+xml/);
     assert.doesNotMatch(html, /[\u2013\u2014]/);
     const index = readFileSync(join(dir, "blog.html"), "utf8");
