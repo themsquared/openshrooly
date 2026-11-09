@@ -22,7 +22,7 @@ function htmlFiles(dir) {
 }
 
 function isOffMenuPage(html) {
-  return html.includes(">Off-menu Profile<");
+  return html.includes(">Off-menu Profile<") || (html.includes('class="profile-page guide-page blog-post"') && html.includes('<p class="eyebrow">Off-menu research</p>'));
 }
 
 test("every public page loads GA in the head, except sign-in, token, installer, staff, and Off-menu pages", () => {
