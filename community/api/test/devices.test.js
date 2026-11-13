@@ -1305,3 +1305,60 @@ test("inbox tells the chamber what is growing so its own page can show it", asyn
   assert.equal(after.data.grow_url, `${ctx.SITE_ORIGIN}/profiles/lions-mane`);
   assert.equal(after.data.grow_image, `${ctx.SITE_ORIGIN}/img/species/species-lions-mane-640.webp`);
 });
+
+test("enroll stores a known device_type and ignores an unknown one", async () => {
+  const ctx = env();
+  const pair = await devicePair();
+  const enrolled = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "lykynaabbccdd0011", public_jwk: pair.public_jwk, name: "Lykyn", device_type: "lykyn_chamber", model: "Lykyn" },
+  });
+  assert.equal(enrolled.status, 200, JSON.stringify(enrolled.data));
+  const row = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [enrolled.data.device_id]);
+  assert.equal(row.device_type, "lykyn_chamber");
+  assert.equal(row.model, "Lykyn");
+  assert.equal(row.name, "Lykyn");
+
+  const bare = await devicePair();
+  const defaults = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "shroolyaabbccdd22", public_jwk: bare.public_jwk, name: "Kitchen" },
+  });
+  assert.equal(defaults.status, 200, JSON.stringify(defaults.data));
+  const defaultRow = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [defaults.data.device_id]);
+  assert.equal(defaultRow.device_type, "shrooly_chamber");
+
+  const junk = await devicePair();
+  const ignored = await call(ctx, "POST", "/api/devices/enroll", {
+    body: { hardware_id: "junkaabbccddee33", public_jwk: junk.public_jwk, name: "Odd", device_type: "not_a_chamber" },
+  });
+  assert.equal(ignored.status, 200, JSON.stringify(ignored.data));
+  const junkRow = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [ignored.data.device_id]);
+  assert.equal(junkRow.device_type, "shrooly_chamber");
+});
+
+test("telemetry updates device_type when the chamber reports a known type", async () => {
+  const ctx = env();
+  const { token } = await register(ctx);
+  const d = await enrollClaimIssue(ctx, token);
+  const before = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(before.device_type, "shrooly_chamber");
+  const tel = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/telemetry`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { temperature: 20.9, humidity: 88.7, device_type: "lykyn_chamber", model: "Lykyn", target_humidity_step: 0.5, temperature_target_step: 0.5 },
+  });
+  assert.equal(tel.status, 200, JSON.stringify(tel.data));
+  const after = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(after.device_type, "lykyn_chamber");
+  assert.equal(after.model, "Lykyn");
+
+  const kept = await deviceCall(ctx, "POST", `/api/devices/${d.deviceId}/telemetry`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+    body: { temperature: 21, humidity: 89, device_type: "mystery_box" },
+  });
+  assert.equal(kept.status, 200, JSON.stringify(kept.data));
+  const still = await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", [d.deviceId]);
+  assert.equal(still.device_type, "lykyn_chamber");
+});

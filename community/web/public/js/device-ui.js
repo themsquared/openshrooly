@@ -9,7 +9,18 @@ export const DEFAULT_DEVICE_TYPE = "shrooly_chamber";
 export function deviceTypeLabel(type) {
   const id = String(type || DEFAULT_DEVICE_TYPE);
   if (id === "shrooly_chamber") return "Shrooly chamber";
+  if (id === "lykyn_chamber") return "Lykyn Chamber";
   return id.replaceAll("_", " ");
+}
+
+function rangeAttr(range, index, fallback) {
+  const n = Array.isArray(range) ? Number(range[index]) : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function stepAttr(steps, key, fallback) {
+  const n = Number(steps?.[key]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 export function speciesLine(device) {
@@ -541,7 +552,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
           <input name="temperature_c" type="number" step="0.1" min="10" max="32" value="${numOrBlank(device.setpoints?.temperature_c)}"${disabled}>
         </label>
         <label>Humidity (%)
-          <input name="humidity_percent" type="number" step="1" min="60" max="98" value="${numOrBlank(device.setpoints?.humidity_percent)}"${disabled}>
+          <input name="humidity_percent" type="number" step="${stepAttr(device.capabilities?.steps, "humidity_percent", 0.5)}" min="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 0, 30)}" max="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 1, 98)}" value="${numOrBlank(device.setpoints?.humidity_percent)}"${disabled}>
         </label>
       </div>
       ${fan}

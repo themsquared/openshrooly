@@ -533,3 +533,34 @@ test("a linked chamber that never checked in is waiting, not offline, and carrie
   assert.ok(kinds.includes("waiting"));
   assert.ok(!kinds.includes("offline"));
 });
+
+test("a Lykyn chamber is labeled Lykyn Chamber and accepts a half-percent humidity target", async () => {
+  const ctx = env();
+  const { token, user } = await register(ctx, "lykyn@example.com");
+  await addDevice(ctx, user.id, "dev-lykyn", { name: "Chamber" });
+  await ctx.db.run("UPDATE cloud_devices SET device_type=?, model=? WHERE id=?", ["lykyn_chamber", "Lykyn", "dev-lykyn"]);
+  await addReading(ctx, "dev-lykyn", {
+    temperature: 20.9,
+    humidity: 88.7,
+    temperature_setpoint: 20,
+    humidity_setpoint: 88,
+  });
+  const list = await call(ctx, "GET", "/api/fleet/devices", { token });
+  assert.equal(list.status, 200, JSON.stringify(list.data));
+  const device = list.data.devices.find((d) => d.id === "dev-lykyn");
+  assert.equal(device.device_type, "lykyn_chamber");
+  assert.equal(device.device_type_label, "Lykyn Chamber");
+  assert.equal(device.model, "Lykyn");
+
+  const applied = await call(ctx, "POST", "/api/fleet/devices/dev-lykyn/apply", {
+    token,
+    body: { action: "setpoints", payload: { humidity_percent: 88.5 } },
+  });
+  assert.equal(applied.status, 200, JSON.stringify(applied.data));
+  assert.equal(applied.data.results[0].status, "queued");
+  const rows = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=?", ["dev-lykyn"]);
+  assert.ok(rows.length);
+  const queued = rows.sort((a, b) => Number(b.id) - Number(a.id))[0];
+  const payload = typeof queued.payload === "string" ? JSON.parse(queued.payload) : queued.payload;
+  assert.equal(payload.humidity_percent, 88.5);
+});

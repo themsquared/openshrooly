@@ -78,6 +78,7 @@ export const CLOUD_CONTROLS = [
 export function deviceTypeLabel(type) {
   const id = String(type || DEFAULT_DEVICE_TYPE);
   if (id === "shrooly_chamber") return "Shrooly chamber";
+  if (id === "lykyn_chamber") return "Lykyn Chamber";
   return id.replaceAll("_", " ");
 }
 
@@ -350,6 +351,7 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     last_seen_at: device.last_seen_at,
     device_type: deviceType,
     device_type_label: deviceTypeLabel(deviceType),
+    model: device.model || null,
     online,
     linked,
     controllable: linked && device.status === "active",
@@ -397,7 +399,7 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
       : null,
     coach,
     firmware: caps.firmware,
-    capabilities: { source: caps.source, firmware: caps.firmware, list: caps.list, ranges: caps.ranges, knob_ranges: caps.knob_ranges },
+    capabilities: { source: caps.source, firmware: caps.firmware, list: caps.list, ranges: caps.ranges, knob_ranges: caps.knob_ranges, steps: caps.steps },
     controls,
     commands,
     cert_expires_at: activeCert?.not_after || null,
