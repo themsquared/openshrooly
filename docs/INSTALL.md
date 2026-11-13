@@ -118,3 +118,29 @@ cd webapp && npm test                          # update UI wiring, no automatic 
 cd community/web && npm test                   # installer: signed only, same site only
 cd community/api && npm test                   # site chrome and SEO
 ```
+
+## Lykyn USB installer (ESP32-C3)
+
+The Lykyn is a different board (ESP32-C3, 4 MB, native USB), so it has its own release stream:
+
+| Piece | Where |
+| --- | --- |
+| Page | `https://shroomlabs.io/install-lykyn` (noindex until the first signed release is published) |
+| Release info (signed) | `https://shroomlabs.io/firmware/lykyn/manifest.json` |
+| Image | `https://shroomlabs.io/firmware/lykyn/lykyn-<version>.factory.bin`, merged image written at offset 0 |
+| Signed product name | `lykyn-usb` (cannot be replayed as `openshrooly-usb`) |
+
+Differences from the Shrooly installer:
+
+- Chip family `ESP32-C3`. ESP Web Tools talks to the C3 native USB serial/JTAG port and offers Improv Wi-Fi setup afterwards.
+- The install dialog never offers "erase". The Lykyn keeps unit data in `factory_nvs` (0x3e0000), and the stock app stays in the second app slot as a fallback.
+- The image must be the public build (`lykyn-public.yaml` in themsquared/lykyn-firmware), which has no passwords baked in.
+
+Publish a release (key stays outside the repo, same release key as the Shrooly):
+
+```
+node scripts/sign_release.mjs --product lykyn --key /path/outside/repo/key.pem --version 0.1.0 \
+  --factory lykyn-public.factory.bin --out community/web/public/firmware/lykyn
+```
+
+Do not publish until the build has run on a real Lykyn.

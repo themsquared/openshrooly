@@ -5,7 +5,7 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkImage, installerManifest, loadVerifiedRelease, releaseUrlAllowed, signedMessage, verifyEntry, RELEASE_PUBLIC_KEY } from "../public/js/install.js";
+import { checkImage, installerManifest, loadVerifiedRelease, releaseUrlAllowed, signedMessage, verifyEntry, RELEASE_PUBLIC_KEY, TARGETS } from "../public/js/install.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pub = join(here, "..", "public");
@@ -113,4 +113,59 @@ test("no published release says coming soon, a real failure says network", async
   await assert.rejects(loadVerifiedRelease(serverError), (e) => e.message === "network");
   const offline = async () => { throw new TypeError("Failed to fetch"); };
   await assert.rejects(loadVerifiedRelease(offline), (e) => e.message === "network");
+});
+
+test("Lykyn installer: ESP32-C3, signed under its own product, never offers an erase", async () => {
+  const bytes = Buffer.from("pretend lykyn image");
+  const usb = release(good.privateKey, bytes, {
+    product: "lykyn-usb",
+    version: "0.1.0",
+    url: "https://shroomlabs.io/firmware/lykyn/lykyn-0.1.0.factory.bin",
+  });
+  const fetchFn = async (path) => {
+    if (path === "/firmware/lykyn/manifest.json") return new Response(JSON.stringify({ usb }));
+    assert.equal(path, "/firmware/lykyn/lykyn-0.1.0.factory.bin");
+    return new Response(bytes);
+  };
+  const { entry, bytes: got } = await loadVerifiedRelease(fetchFn, { publicKeyHex: good.hex, target: "lykyn" });
+  assert.deepEqual(Buffer.from(got), bytes);
+  const m = installerManifest(entry, "blob:x", "lykyn");
+  assert.equal(m.builds[0].chipFamily, "ESP32-C3");
+  assert.equal(m.new_install_prompt_erase, false);
+  assert.equal(m.builds[0].improv, true);
+  assert.deepEqual(m.builds[0].parts, [{ path: "blob:x", offset: 0 }]);
+  assert.equal(TARGETS.openshrooly.erase, true);
+});
+
+test("a Shrooly signature cannot install on a Lykyn, and the reverse", async () => {
+  const bytes = Buffer.from("pretend image");
+  const shroolyEntry = release(good.privateKey, bytes);
+  await assert.rejects(verifyEntry(shroolyEntry, { product: "lykyn-usb", publicKeyHex: good.hex, prefix: TARGETS.lykyn.prefix }), /invalid/);
+  const lykynEntry = release(good.privateKey, bytes, { product: "lykyn-usb", url: "https://shroomlabs.io/firmware/lykyn/a.bin" });
+  await assert.rejects(verifyEntry(lykynEntry, { product: "openshrooly-usb", publicKeyHex: good.hex }), /invalid/);
+  await assert.rejects(verifyEntry(lykynEntry, { product: "lykyn-usb", publicKeyHex: good.hex }), /invalid/);
+  assert.equal(releaseUrlAllowed("https://shroomlabs.io/firmware/lykyn/a.bin", TARGETS.lykyn.prefix), true);
+  assert.equal(releaseUrlAllowed("https://shroomlabs.io/firmware/stable/a.bin", TARGETS.lykyn.prefix), false);
+});
+
+test("Lykyn installer page loads nothing from other sites and has plain copy", () => {
+  const html = readFileSync(join(pub, "install-lykyn.html"), "utf8");
+  for (const m of html.matchAll(/<script[^>]*src="([^"]+)"/g)) assert.ok(m[1].startsWith("/"), m[1]);
+  assert.doesNotMatch(html, /unpkg|github|[\u2013\u2014]|firmware|\bOTA\b|manifest|Ed25519|ESP Web Tools/i);
+  assert.match(html, /data-install-target="lykyn"/);
+  const toml = readFileSync(join(here, "..", "netlify.toml"), "utf8");
+  const csp = toml.split('for = "/install-lykyn"')[1].split("[[headers]]")[0];
+  assert.doesNotMatch(csp, /unpkg|github/);
+  assert.match(csp, /script-src 'self';/);
+});
+
+test("published Lykyn release, when present, is signed and matches its image", async () => {
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(join(pub, "firmware", "lykyn", "manifest.json"), "utf8"));
+  } catch {
+    return;
+  }
+  await verifyEntry(manifest.usb, { product: "lykyn-usb", prefix: TARGETS.lykyn.prefix });
+  await checkImage(manifest.usb, readFileSync(join(pub, new URL(manifest.usb.url).pathname)));
 });
