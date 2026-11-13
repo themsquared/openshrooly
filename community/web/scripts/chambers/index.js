@@ -4,16 +4,16 @@
  *
  * Rules for this file (checked by api/test/chambers.test.js):
  * - Every status is honest. Shrooly is supported. Terrashroom and AC Infinity are
- *   community software, untested on real hardware. Lykyn is arriving; outside-control
- *   validation has not started. Controllers we do not run keep their own software.
+ *   community software, untested on real hardware. Lykyn is on the bench with outside
+ *   control in progress. Controllers we do not run keep their own software.
  * - Every fact about another company links a public source in `sources`.
  *   No unit counts, no guesses about money or motives.
  * - Each question h2 is answered by its first sentence. Those become FAQPage markup.
  * - Plain words: no dashes, no arrows.
  */
 
-export const CHAMBERS_UPDATED = "2026-10-27";
-export const CHECKED = "November 5, 2026";
+export const CHAMBERS_UPDATED = "2026-11-13";
+export const CHECKED = "November 13, 2026";
 
 const REPO = "https://github.com/themsquared/openshrooly/tree/cursor/community-platform-fa9c/esphome/terrashroom";
 const ADAPTER = "https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/adapters/ac-infinity.js";
@@ -74,8 +74,8 @@ export const CHAMBERS = [
   },
   {
     name: "Lykyn",
-    status: "Arriving",
-    how: `Outside-control adapter planned, validation pending. The box is in transit and has not been tested. <a href="/lykyn">Read first</a>.`,
+    status: "On bench, outside control in progress",
+    how: `Stock firmware stays on the box. A Socket.IO stand-in in the public <a href="https://github.com/themsquared/lykyn-adapter">lykyn-adapter</a> speaks the same protocol as Lykyn's cloud. Live LAN control still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session. <a href="/lykyn">Read first</a>.`,
   },
   {
     name: "A tub, tent, or box you built",
@@ -216,9 +216,9 @@ const chambers = {
   eyebrow: "Chambers and controllers",
   crumb: "Chambers",
   updated: "2026-11-05",
-  description: "Shrooly is supported. Terrashroom and AC Infinity are community, untested. A Lykyn is arriving. Inkbird and Tuya work as is with the free grow profiles.",
+  description: "Shrooly is supported. Terrashroom and AC Infinity are community, untested. A Lykyn is on the bench. Inkbird and Tuya work as is with free grow profiles.",
   answer:
-    "Shrooly is fully supported. Terrashroom has free community firmware and AC Infinity Wi-Fi controllers have a free community adapter, both untested on real hardware. A Lykyn Smart Mushroom Grow Box is arriving, and outside-control validation has not started. Inkbird and other Tuya Wi-Fi controllers keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.",
+    "Shrooly is fully supported. Terrashroom has free community firmware and AC Infinity Wi-Fi controllers have a free community adapter, both untested on real hardware. A Lykyn Smart Mushroom Grow Box is on the bench: stock firmware stays on it, and a public Socket.IO stand-in in lykyn-adapter speaks the same protocol as Lykyn's cloud. Live LAN control still needs a TLS path the stock box trusts, or a logged-in cloud session. Inkbird and other Tuya Wi-Fi controllers keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.",
   cta: [
     ["Install on your Shrooly", "/install"],
     ["Terrashroom owners", "/terrashroom"],
@@ -252,8 +252,8 @@ const chambers = {
     },
     {
       h2: "Does Shroom Labs work with Lykyn?",
-      answer: "Not yet. The box is arriving, and outside-control validation has not started, so it is untested on real hardware.",
-      html: `<p>The plan is to drive it through the official app and cloud, without flashing, then document and open-source the adapter. Read <a href="/lykyn">Lykyn for mushrooms</a> and the <a href="/guides/lykyn-mushroom-grow-box-outside-control">outside-control guide</a>. Public notes live in the ${cite("lykynAdapter")}.</p>`,
+      answer: "In progress. The box is on the bench with stock firmware, and a public Socket.IO stand-in speaks its cloud protocol. A live LAN push still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session.",
+      html: `<p>We drive it without flashing. The ${cite("lykynAdapter")} has the stand-in, Black Oyster example profiles, and protocol notes. Read <a href="/lykyn">Lykyn for mushrooms</a> and the <a href="/guides/lykyn-mushroom-grow-box-outside-control">outside-control guide</a>.</p>`,
     },
     {
       h2: "What if my chamber is not listed?",
@@ -262,7 +262,7 @@ const chambers = {
     },
     {
       h2: "What does each status mean?",
-      answer: "Supported means we run it ourselves. Community, untested means our firmware or adapter exists but has not run on a real unit. Arriving means the chamber is on the way and validation has not started. Use as is means you keep the stock software.",
+      answer: "Supported means we run it ourselves. Community, untested means our firmware or adapter exists but has not run on a real unit. On bench, outside control in progress means the chamber is here and the stock path is being proven. Use as is means you keep the stock software.",
       faq: false,
       html: `<p>We only mark a chamber supported once it has run our firmware on real hardware. When that changes for Terrashroom or Lykyn, this page will say so.</p>`,
     },
@@ -368,55 +368,48 @@ const acInfinity = {
 
 const lykyn = {
   slug: "lykyn",
-  title: "Lykyn Smart Mushroom Grow Box: outside control, arriving",
+  title: "Lykyn Smart Mushroom Grow Box: outside control on the bench",
   h1: "Lykyn for mushrooms",
   eyebrow: "For Lykyn owners",
   crumb: "Lykyn",
-  updated: "2026-11-05",
-  description: "A Lykyn Smart Mushroom Grow Box is arriving at Shroom Labs. We plan outside control through the official app, without flashing. Validation has not started.",
+  updated: CHAMBERS_UPDATED,
+  description: "A Lykyn box is on the bench at Shroom Labs. Stock firmware stays. A public Socket.IO stand-in speaks the same protocol as Lykyn's cloud.",
   answer:
-    "A Lykyn Smart Mushroom Grow Box is a countertop chamber with an official app. Shroom Labs plans to drive it through that app and cloud, without flashing the box, then document and open-source the adapter. The box is arriving. Outside-control validation has not started, so it is untested on real hardware.",
+    "A Lykyn Smart Mushroom Grow Box is a countertop chamber with an official app. Shroom Labs drives it without flashing, through a Socket.IO stand-in that speaks the same protocol as Lykyn's cloud. The box is on the bench with a Black Oyster bag. Live LAN control still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session.",
   cta: [
     ["Outside-control guide", "/guides/lykyn-mushroom-grow-box-outside-control"],
     ["See the adapter repo", LYKYN_ADAPTER],
+    ["Grow log", "/grow-log"],
   ],
   sections: [
     {
       h2: "Does Shroom Labs work with Lykyn?",
-      answer: "Not yet. The box is arriving, and outside-control validation has not started, so it is untested on real hardware.",
-      html: `<p>We have a public repo for the adapter pitch and a planned side by side grow with two Shrooly chambers. Until the unit is here and we can read and set it from outside, it runs on its own controls. That status is also on the <a href="/grow-log">grow log</a>.</p>`,
+      answer: "In progress. The box is on the bench with stock firmware, and a public Socket.IO stand-in speaks its cloud protocol. A live LAN push still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session.",
+      html: `<p>We leave the official firmware on the box. The ${cite("lykynAdapter")} accepts telemetry and pushes settings. Status is also on the <a href="/grow-log">grow log</a>.</p>`,
     },
     {
       h2: "What is a Lykyn Smart Mushroom Grow Box?",
-      answer: "It is a countertop mushroom chamber with an official phone app that picks a species and runs humidity, airflow, and light.",
-      html: `<p>Lykyn sells a Single-Tier box and a two layer model. The company says you add water, put in a fruiting block, cut an X, and pick the species in the app (${cite("lykynSite")}). We have not run one, so those steps are from the official site, not from a Shroom Labs grow.</p>`,
+      answer: "A countertop smart chamber with fans, a humidifier, lights, and a temp and humidity sensor, set up from an official app over Bluetooth and run day to day through Lykyn's cloud.",
+      html: `<p>Lykyn sells a Single-Tier box and a two layer model. The company says you add water, put in a fruiting block, cut an X, and pick the species in the app (${cite("lykynSite")}). Our unit is a Single-Tier MUSHROOM box on firmware 0.17.0.</p>`,
     },
     {
-      h2: "What does outside control mean?",
-      answer: "We talk to the box through the same app and cloud the owner already uses, and we leave the stock software on it.",
-      html: `<p>The adapter, once it exists, would read the same numbers the app shows and write the same kind of settings the app writes. Credentials would stay on your computer. We will not ask anyone to open the box or flash it for this work.</p>`,
+      h2: "How does outside control work?",
+      answer: "The box talks Socket.IO to lykyn.app. Our stand-in speaks the same events: it reads updateDevice telemetry and pushes settings the firmware applies.",
+      html: `<p>The stand-in, CLI, and Black Oyster example profiles are in the ${cite("lykynAdapter")}. Credentials and device ids stay in a local .env and never go in git.</p>`,
     },
     {
-      h2: "What will Shroom Labs do when the box arrives?",
-      answer: "Record what the official app sends to the box and to Lykyn's cloud, write those notes in the public repo, then try a dry run that prints a plan and writes nothing.",
-      html: `<p>The first pass is a watch, not a write. We want to see whether humidity, temperature, fans, and light can be read and set from outside. If that works, we document it and open-source the adapter. If it does not, this page will say so. The empty repo is the ${cite("lykynAdapter")}.</p>`,
-    },
-    {
-      h2: "What is untested?",
-      answer: "All of it. The box is still in transit, and no adapter code has talked to a real Lykyn.",
-      html: `<ul>
-        <li>Whether the official app or cloud accepts a sign in from software we write.</li>
-        <li>Whether we can read live humidity and temperature from outside.</li>
-        <li>Whether we can set humidity, fans, light, or a species profile from outside.</li>
+      h2: "What still blocks a live LAN push?",
+      answer: "TLS. The stock box verifies certificates for the hostname lykyn.app. A DNS override alone is not enough, and we will not reconfigure a home router until a trusted TLS path exists. A live LAN settings push is still untested on real hardware.",
+      html: `<p>Two paths remain: terminate TLS in a way the stock box trusts, or drive settings through the owner's logged-in Lykyn cloud session. Details are in the adapter's dns-override doc.</p>
+      <ul>
         <li>Whether a grow profile can be applied without using the Lykyn app by hand.</li>
         <li>How a Lykyn compares to a Shrooly chamber on the same species. That is the planned <a href="/grow-log">grow log</a>.</li>
-      </ul>
-      <p>There is no working command line tool yet. Do not treat the repo as something you can run against a box.</p>`,
+      </ul>`,
     },
     {
-      h2: "How is this different from OpenShrooly on a Shrooly chamber?",
-      answer: "OpenShrooly replaces the stock software on a Shrooly chamber by flashing it. The Lykyn plan leaves the stock software on the box and talks to it from outside.",
-      html: `<p>Flashing is how we run a Shrooly chamber, and it is the untested plan for a Terrashroom. Lykyn is the other path: keep the official app, watch how it talks, and build an adapter around that. Read the <a href="/guides/lykyn-mushroom-grow-box-outside-control">outside-control guide</a> for the full split.</p>`,
+      h2: "How is this different from OpenShrooly?",
+      answer: "OpenShrooly replaces the stock software on a Shrooly chamber by flashing it. The Lykyn path leaves the stock software on the box and talks to it from outside.",
+      html: `<p>Flashing is how we run a Shrooly chamber, and it is the untested plan for a Terrashroom. Lykyn is the other path: keep the official firmware and build an adapter around its cloud protocol. Read the <a href="/guides/lykyn-mushroom-grow-box-outside-control">outside-control guide</a> for the full split.</p>`,
     },
     {
       h2: "Can I help?",
@@ -424,21 +417,19 @@ const lykyn = {
       html: `<p><a href="/contact?topic=chamber">Message us</a> and pick A chamber. We are not asking anyone to flash a Lykyn. Notes about what the app shows, and whether it works without the cloud, all help. Every report goes into the adapter notes.</p>`,
     },
     {
-      h2: "Who is working on this?",
+      h2: "Who made this page?",
       answer: "Shroom Labs. We are not made by or affiliated with Lykyn.",
-      faq: false,
-      html: `<p>Product facts on this page come from the ${cite("lykynSite")}. If anything here is wrong, <a href="/contact?topic=chamber">tell us</a> and we will fix it.</p>`,
+      html: `<p>Product facts on this page come from the ${cite("lykynSite")} and from a read-only look at one stock box. If anything here is wrong, <a href="/contact?topic=chamber">tell us</a> and we will fix it.</p>`,
     },
   ],
+
   sources: ["lykynSite", "lykynAdapter"],
   related: [
     ["Lykyn outside-control guide", "/guides/lykyn-mushroom-grow-box-outside-control"],
     ["Shroom Labs grow log", "/grow-log"],
     ["Mushroom growing conditions for every species", "/grow"],
   ],
-};
-
-export const CHAMBER_PAGES = [chambers, terrashroom, acInfinity, lykyn];
+};export const CHAMBER_PAGES = [chambers, terrashroom, acInfinity, lykyn];
 
 /** The searches these pages answer. */
 export const TARGET_QUERIES = [

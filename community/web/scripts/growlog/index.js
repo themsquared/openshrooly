@@ -10,12 +10,12 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export const CHAMBERS = [
   { id: "shrooly-a", name: "Shrooly A", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Runs the free profile for the comparison species." },
   { id: "shrooly-b", name: "Shrooly B", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Second Shrooly, so one odd block does not decide the result." },
-  { id: "lykyn", name: "Lykyn Single-Tier", hardware: "Lykyn Single-Tier smart grow box", software: "Stock Lykyn controls for now", status: "Arriving, outside-control validation pending", note: "We still have to confirm Shroom Labs can read and set it from outside. Until then it runs on its own controls." },
+  { id: "lykyn", name: "Lykyn Single-Tier", hardware: "Lykyn Single-Tier smart grow box (ESP32-C3)", software: "Stock Lykyn firmware 0.17.0 plus Shroom Labs lykyn-adapter stand-in", status: "On bench, Black Oyster fruiting", note: "Protocol captured. The box is running OysterBlackPearl in SMART mode. Outside control through the public lykyn-adapter is built; a live LAN push still needs a TLS path the stock box trusts, or the owner's Lykyn cloud session." },
 ];
 
 export const COMPARISON = {
   species: "lions-mane",
-  plan: "The same species from the same batch of blocks, started the same day, in both Shroolys and the Lykyn. We log days to first pins, days to first harvest, and fresh weight per flush.",
+  plan: "The Lykyn is on a Black Oyster block now while outside control is proven. The side-by-side Shrooly comparison species is still planned; we log days to first pins, days to first harvest, and fresh weight per flush.",
 };
 
 /** Every entry must use these keys. Values come from the chamber log or a scale, never from an estimate. */
@@ -34,13 +34,13 @@ export const ENTRY_FIELDS = [
 export const ENTRIES = [];
 
 export const GROW_LOG = {
-  updated: "2026-11-03",
+  updated: "2026-11-13",
   title: "Mushroom grow log: Shrooly vs Lykyn, same species · Shroom Labs",
   h1: "Shroom Labs grow log",
   description: "A public log of three home mushroom chambers, two Shroolys and a Lykyn Single-Tier, growing the same species side by side. Starting soon.",
-  answer: "We are setting up three chambers to log in public: two Shroolys and one Lykyn Single-Tier, growing the same species side by side. Nothing has started yet, so there are no readings, yields, or photos here. Entries go up as they happen.",
+  answer: "Three chambers are in play: two Shroolys and one Lykyn Single-Tier. The Lykyn is on the bench with a Black Oyster bag and stock firmware. Outside-control tooling is in the public lykyn-adapter. Log entries go up as they happen.",
   faq: [
-    { q: "When does the grow log start?", a: "When the Lykyn arrives and we confirm we can read and set it from outside. The two Shroolys start the same day so the comparison is fair." },
+    { q: "When does the grow log start?", a: "The Lykyn is on the bench with a Black Oyster bag. First readings go up once we are logging from the stand-in or the chamber's own serial. The Shrooly side-by-side comparison starts when that grow is ready." },
     { q: "Are the numbers real?", a: "Yes. Each entry comes from a chamber log or a kitchen scale. If we did not measure it, the entry leaves it blank." },
     { q: "Why compare a Shrooly and a Lykyn?", a: "Both are small home chambers. Growing the same species from the same blocks in each shows how much the chamber itself changes the result." },
   ],
