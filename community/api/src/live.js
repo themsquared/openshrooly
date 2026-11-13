@@ -56,6 +56,7 @@ function log(event, fields = {}) {
 /** Per device type, how to build its page snapshot. Unknown types use the chamber builder. */
 const SNAPSHOT_BUILDERS = {
   shrooly_chamber: buildChamberSnapshot,
+  lykyn_chamber: buildChamberSnapshot,
 };
 
 async function buildChamberSnapshot(env, device, owner, now) {

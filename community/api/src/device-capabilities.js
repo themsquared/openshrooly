@@ -74,8 +74,27 @@ export const BASELINE_CAPABILITIES = ["setpoints.temperature", "setpoints.humidi
 
 /** Device types the cloud knows how to drive. Unknown types get no assumed capabilities. */
 export const DEVICE_TYPES = {
-  shrooly_chamber: { baseline: BASELINE_CAPABILITIES },
+  shrooly_chamber: {
+    baseline: BASELINE_CAPABILITIES,
+    ranges: { temperature_c: [10, 32], humidity_percent: [60, 98] },
+  },
+  lykyn_chamber: {
+    baseline: BASELINE_CAPABILITIES,
+    ranges: { temperature_c: [10, 32], humidity_percent: [30, 95] },
+  },
 };
+
+/** Known type token from an enroll or telemetry body, or null if missing or unknown. */
+export function normalizeDeviceType(value) {
+  const id = String(value || "").trim().toLowerCase();
+  return id && Object.prototype.hasOwnProperty.call(DEVICE_TYPES, id) ? id : null;
+}
+
+/** Short model name from enroll or telemetry, or null if missing. */
+export function normalizeDeviceModel(value) {
+  const raw = String(value || "").replace(/[^\x20-\x7e]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
+  return raw || null;
+}
 
 /**
  * Chamber knobs a 1.0.5-sl.1+ setpoints command can carry. `key` is both the command payload
@@ -148,6 +167,11 @@ function num(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function setpointStep(value, fallback) {
+  const n = num(value);
+  return n > 0 && n <= 5 ? n : fallback;
+}
+
 function parseJson(value, fallback = null) {
   if (value == null || value === "") return fallback;
   if (typeof value === "object") return value;
@@ -193,14 +217,19 @@ export function deviceCapabilities(doc = {}, deviceType = "shrooly_chamber") {
   const list = reported || (type ? type.baseline.slice() : []);
   const has = new Set(list);
   const firmware = raw.firmware_version || raw.firmware || raw.version || null;
+  const typeLimits = type?.ranges || FIRMWARE_SETPOINT_LIMITS;
   return {
     source: reported ? "reported" : !type ? "unknown_type" : hasSetpointFields(raw) ? "inferred" : "assumed",
     device_type: deviceType || "shrooly_chamber",
     firmware: firmware ? String(firmware) : null,
     list,
     ranges: {
-      temperature_c: intersect(FIRMWARE_SETPOINT_LIMITS.temperature_c, raw.temperature_target_min, raw.temperature_target_max),
-      humidity_percent: intersect(FIRMWARE_SETPOINT_LIMITS.humidity_percent, raw.target_humidity_min, raw.target_humidity_max),
+      temperature_c: intersect(typeLimits.temperature_c || FIRMWARE_SETPOINT_LIMITS.temperature_c, raw.temperature_target_min, raw.temperature_target_max),
+      humidity_percent: intersect(typeLimits.humidity_percent || FIRMWARE_SETPOINT_LIMITS.humidity_percent, raw.target_humidity_min, raw.target_humidity_max),
+    },
+    steps: {
+      temperature_c: setpointStep(raw.temperature_target_step, 0.1),
+      humidity_percent: setpointStep(raw.target_humidity_step, 0.5),
     },
     knob_ranges: knobRanges(raw.ranges),
     temperature: has.has("setpoints.temperature"),
@@ -353,7 +382,10 @@ export function supportedSetpoints(payload = {}, caps, requested = payload, { cu
     else if (asked.has("temperature_c")) skipped.push({ field: "temperature_c", note: support.temperature.note });
   }
   if (h != null) {
-    if (caps.humidity) out.humidity_percent = Math.round(clip(h, caps.ranges.humidity_percent) * 10) / 10;
+    if (caps.humidity) {
+      const step = caps.steps?.humidity_percent || 0.5;
+      out.humidity_percent = Math.round((Math.round(clip(h, caps.ranges.humidity_percent) / step) * step) * 100) / 100;
+    }
     else if (asked.has("humidity_percent")) skipped.push({ field: "humidity_percent", note: support.humidity.note });
   }
   for (const knob of KNOBS) {

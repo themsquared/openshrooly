@@ -857,6 +857,7 @@ function dispatch(mode, tables, ids, sql, params) {
       last_seen_at: params[10],
       created_at: params[11],
       device_type: params[12] || "shrooly_chamber",
+      model: params[13] || null,
     });
     return {};
   }
@@ -968,6 +969,19 @@ function dispatch(mode, tables, ids, sql, params) {
   if (q === "UPDATE cloud_devices SET last_inbox_at=? WHERE id=?") {
     const row = tables.cloud_devices.find((d) => d.id === params[1]);
     if (row) row.last_inbox_at = params[0];
+    return { changes: row ? 1 : 0 };
+  }
+  if (q === "UPDATE cloud_devices SET device_type=?, model=? WHERE id=?") {
+    const row = tables.cloud_devices.find((d) => d.id === params[2]);
+    if (row) {
+      row.device_type = params[0];
+      row.model = params[1];
+    }
+    return { changes: row ? 1 : 0 };
+  }
+  if (q === "UPDATE cloud_devices SET device_type=? WHERE id=?") {
+    const row = tables.cloud_devices.find((d) => d.id === params[1]);
+    if (row) row.device_type = params[0];
     return { changes: row ? 1 : 0 };
   }
   if (q.startsWith("UPDATE cloud_devices SET last_seen_at=")) {
