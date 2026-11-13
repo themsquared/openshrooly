@@ -25,6 +25,7 @@ const pearl = demoDevices()[0];
 test("device type label keeps Shrooly as the hardware name only", () => {
   assert.equal(deviceTypeLabel("shrooly_chamber"), "Shrooly chamber");
   assert.equal(deviceTypeLabel(""), "Shrooly chamber");
+  assert.equal(deviceTypeLabel("lykyn_chamber"), "Lykyn Chamber");
 });
 
 test("device cards make species and grow identity obvious", () => {
@@ -126,6 +127,24 @@ const sl2 = { ...pearl, firmware: null, capabilities: { source: "inferred", list
 function tagFor(html, name) {
   return html.match(new RegExp(`<input name="${name}"[^>]*>`))[0];
 }
+
+test("humidity target accepts half-percent steps", () => {
+  const html = renderControls(pearl, { profiles: [pearl.profile], canWrite: true });
+  const tag = tagFor(html, "humidity_percent");
+  assert.match(tag, /step="0.5"/);
+  const lykyn = {
+    ...pearl,
+    device_type: "lykyn_chamber",
+    capabilities: { ...(pearl.capabilities || {}), ranges: { temperature_c: [10, 32], humidity_percent: [30, 95] }, steps: { humidity_percent: 0.5, temperature_c: 0.5 } },
+  };
+  const lykynTag = tagFor(renderControls(lykyn, { profiles: [pearl.profile], canWrite: true }), "humidity_percent");
+  assert.match(lykynTag, /step="0.5"/);
+  assert.match(lykynTag, /min="30"/);
+  assert.match(lykynTag, /max="95"/);
+  const card = renderDeviceCard({ id: "lyk", name: "Chamber", device_type: "lykyn_chamber", online: true, reading: null });
+  assert.match(card, /Lykyn Chamber/);
+  assert.doesNotMatch(card, /Shrooly chamber/i);
+});
 
 test("controls the firmware can't take are left out, with one plain line", () => {
   const html = renderControls(sl2, { profiles: [pearl.profile], canWrite: true });

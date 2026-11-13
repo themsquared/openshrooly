@@ -13,7 +13,7 @@ import {
   setpointsMatch,
 } from "./coach-autopilot.js";
 import { applyDeviceChange, commandExpired } from "./fleet.js";
-import { commandSupersedes, deviceCapabilities } from "./device-capabilities.js";
+import { commandSupersedes, deviceCapabilities, normalizeDeviceModel, normalizeDeviceType } from "./device-capabilities.js";
 import { loadRecentTelemetry } from "./coach-learn.js";
 import { chamberGrow } from "./chamber-grow.js";
 import {
@@ -136,8 +136,26 @@ function publicDevice(row) {
     cloud_enabled: Boolean(Number(row.cloud_enabled)),
     last_seen_at: row.last_seen_at,
     device_type: row.device_type || "shrooly_chamber",
+    model: row.model || null,
     created_at: row.created_at,
   };
+}
+
+/** Persist a known device_type and model from enroll or telemetry. Unknown types are ignored. */
+async function storeReportedType(db, deviceOrId, body) {
+  const type = normalizeDeviceType(body?.device_type);
+  const model = normalizeDeviceModel(body?.model);
+  if (!type && !model) return null;
+  const row = typeof deviceOrId === "object" && deviceOrId ? deviceOrId : { id: deviceOrId };
+  const id = row.id;
+  if (!id) return null;
+  const nextType = type || row.device_type || "shrooly_chamber";
+  const nextModel = model || row.model || null;
+  if (nextType === (row.device_type || "shrooly_chamber") && nextModel === (row.model || null)) return nextType;
+  await db.run("UPDATE cloud_devices SET device_type=?, model=? WHERE id=?", [nextType, nextModel, id]);
+  row.device_type = nextType;
+  row.model = nextModel;
+  return nextType;
 }
 
 /**
@@ -542,6 +560,7 @@ export async function handleDevices(method, path, url, request, env) {
         "UPDATE cloud_devices SET enroll_hash=?, claim_code_hash=?, claim_expires_at=?, status=? WHERE id=?",
         [enrollHash, codeHash, expires, "claimed", existing.id]
       );
+      await storeReportedType(db, existing, body);
       await audit(db, existing.owner_id, "device_relink_enroll", existing.id, request);
       const claimUrl = `${site}/claim?code=${code}`;
       return json({
@@ -572,6 +591,7 @@ export async function handleDevices(method, path, url, request, env) {
         [id, await boundHardwareId(hardwareId, publicJwk), JSON.stringify(publicJwk), name, "unclaimed", null, enrollHash, codeHash, expires, 0, null, nowIso()]
       );
     }
+    await storeReportedType(db, existing ? { ...existing, id } : { id, device_type: null }, body);
     await audit(db, null, "device_enroll", id, request);
     const claimUrl = `${site}/claim?code=${code}`;
     return json({
@@ -886,6 +906,7 @@ export async function handleDevices(method, path, url, request, env) {
       nowIso(),
     ]);
     await db.run("UPDATE cloud_devices SET last_seen_at=? WHERE id=?", [nowIso(), bound.device.id]);
+    await storeReportedType(db, bound.device, body);
     try {
       if (body.ack_command_id) {
         const acked = await noteAutopilotCommandAck(

@@ -718,6 +718,31 @@ export function renderHead({ title, description, path, robots = "index,follow", 
   return lines.join("\n  ");
 }
 
+export const PWA_THEME = "#07110e";
+
+export const PWA_HEAD = [
+  `<link rel="manifest" href="/manifest.webmanifest">`,
+  `<meta name="theme-color" content="${PWA_THEME}">`,
+  `<meta name="mobile-web-app-capable" content="yes">`,
+  `<meta name="apple-mobile-web-app-capable" content="yes">`,
+  `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`,
+  `<meta name="apple-mobile-web-app-title" content="Shroom Labs">`,
+  `<script src="/js/pwa.js" defer></script>`,
+].join("\n  ");
+
+/** Insert or refresh the PWA head tags without duplicating them. */
+export function stampPwa(html) {
+  const block = `<!--PWA-->\n  ${PWA_HEAD}\n  <!--/PWA-->`;
+  let out = html.replace(/\n  <!--PWA-->[\s\S]*?<!--\/PWA-->\n?/g, "\n");
+  if (out.includes('rel="apple-touch-icon"')) {
+    return out.replace(
+      /<link rel="apple-touch-icon" href="\/apple-touch-icon.png">/,
+      `<link rel="apple-touch-icon" href="/apple-touch-icon.png">\n  ${block}`
+    );
+  }
+  return out.replace("</head>", `  ${block}\n</head>`);
+}
+
 function shell({ head, activeId, hideCoach = false, body, script = "/js/lite.js" }) {
   return `<!doctype html>
 <html lang="en">
@@ -733,6 +758,9 @@ function shell({ head, activeId, hideCoach = false, body, script = "/js/lite.js"
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!--PWA-->
+  ${PWA_HEAD}
+  <!--/PWA-->
   <script src="/js/config.js"></script>
 </head>
 <body data-page="${escapeHtml(activeId || "page")}"${hideCoach ? ' data-coach-off' : ""}>
@@ -1857,7 +1885,7 @@ export function writeSeoFiles(dir = PUBLIC) {
     const path = join(dir, file);
     const html = readFileSync(path, "utf8");
     if (!html.includes("<!--SEO_HEAD-->") || !html.includes("<!--CHROME_HEADER-->")) throw new Error(`${file} is missing SEO_HEAD or CHROME_HEADER markers`);
-    writeFileSync(path, stampChrome(stampHead(html, page), page.active));
+    writeFileSync(path, stampPwa(stampChrome(stampHead(html, page), page.active)));
   }
   const blogWarnings = writeBlog(dir, profiles);
   return { profiles: profiles.length, nav: NAV_ITEMS.map((n) => n.label), blogWarnings };
