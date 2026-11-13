@@ -207,7 +207,7 @@ test("rename and Unlink require confirm and stay on the owner", async () => {
   assert.equal(row.status, "revoked");
 });
 
-test("fleet setpoint apply pauses Autopilot immediately", async () => {
+test("fleet setpoint apply is refused while Autopilot is on and does not pause Coach", async () => {
   const ctx = env();
   const { token, user } = await register(ctx, "pause@example.com");
   await grantCoach(ctx, token);
@@ -219,16 +219,25 @@ test("fleet setpoint apply pauses Autopilot immediately", async () => {
     body: { device_id: "dev-pause", mode: "autopilot", profile_id: pearlOyster.id },
   });
   assert.equal(on.status, 200, JSON.stringify(on.data));
+  const preview = await call(ctx, "POST", "/api/fleet/preview", {
+    token,
+    body: { action: "setpoints", device_ids: ["dev-pause"], payload: { temperature_c: 18 } },
+  });
+  assert.equal(preview.status, 200, JSON.stringify(preview.data));
+  assert.equal(preview.data.results[0].status, "failed");
+  assert.match(preview.data.results[0].error, /coach is managing targets/i);
   const applied = await call(ctx, "POST", "/api/fleet/apply", {
     token,
     body: { action: "setpoints", device_ids: ["dev-pause"], payload: { temperature_c: 18 } },
   });
   assert.equal(applied.status, 200, JSON.stringify(applied.data));
-  assert.equal(applied.data.results[0].status, "queued");
+  assert.equal(applied.data.results[0].status, "failed");
+  assert.match(applied.data.results[0].error, /coach is managing targets/i);
+  const queued = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=?", ["dev-pause"]);
+  assert.equal((queued || []).length, 0);
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-pause", { token });
-  assert.equal(status.data.mode, "advisor");
-  assert.equal(status.data.status, "paused");
-  assert.match(status.data.pause_reason, /you changed a target yourself/i);
+  assert.equal(status.data.mode, "autopilot");
+  assert.notEqual(status.data.status, "paused");
 });
 
 test("fleet profile action requires a published or owned profile and does not leak names", async () => {

@@ -371,7 +371,7 @@ test("stale readings flip Autopilot back to Advisor with a visible reason", asyn
   assert.match(status.data.pause_reason, /stale/i);
 });
 
-test("a manual setpoint change pauses Autopilot for 12 hours", async () => {
+test("a manual setpoint write is refused while Autopilot is on and does not pause Coach", async () => {
   const ctx = env();
   const { token, user } = await register(ctx, "manual@example.com");
   await subscribe(ctx, token);
@@ -387,18 +387,37 @@ test("a manual setpoint change pauses Autopilot for 12 hours", async () => {
     token,
     body: { kind: "setpoints", payload: { temperature_c: 18 } },
   });
-  assert.equal(cmd.status, 200, JSON.stringify(cmd.data));
+  assert.equal(cmd.status, 409, JSON.stringify(cmd.data));
+  assert.match(cmd.data.error, /coach is managing targets/i);
+  const queued = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=?", ["dev-manual"]);
+  assert.equal((queued || []).length, 0);
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-manual", { token });
-  assert.equal(status.data.mode, "advisor");
-  assert.equal(status.data.status, "paused");
-  assert.match(status.data.pause_reason, /you changed a target yourself/i);
-  const until = Date.parse(status.data.pause_until);
-  assert.ok(until - Date.now() > 11 * 60 * 60 * 1000);
+  assert.equal(status.data.mode, "autopilot");
+  assert.notEqual(status.data.status, "paused");
+  assert.equal(status.data.pause_reason, null);
+  const off = await call(ctx, "POST", "/api/coach/autopilot/mode", {
+    token,
+    body: { device_id: "dev-manual", mode: "advisor" },
+  });
+  assert.equal(off.status, 200, JSON.stringify(off.data));
+  const afterOff = await call(ctx, "POST", "/api/devices/dev-manual/commands", {
+    token,
+    body: { kind: "setpoints", payload: { temperature_c: 18 } },
+  });
+  assert.equal(afterOff.status, 200, JSON.stringify(afterOff.data));
+  // A leftover 12 hour self-pause from before this change can be cleared by turning Coach back on.
+  const saved = await getDeviceMode(ctx.db, "dev-manual", user.id);
+  saved.mode = "advisor";
+  saved.paused = 1;
+  saved.pause_reason = "You changed a target yourself, so Coach stopped adjusting for 12 hours.";
+  saved.pause_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
   const again = await call(ctx, "POST", "/api/coach/autopilot/mode", {
     token,
     body: { device_id: "dev-manual", mode: "autopilot", profile_id: pearlOyster.id },
   });
-  assert.equal(again.status, 409);
+  assert.equal(again.status, 200, JSON.stringify(again.data));
+  assert.equal(again.data.mode, "autopilot");
+  assert.notEqual(again.data.status, "paused");
 });
 
 test("enabling Autopilot requires a published culinary profile", async () => {
@@ -565,7 +584,7 @@ test("a missing profile pauses Autopilot and reverts to Advisor", async () => {
   assert.match(status.data.pause_reason, /profile/i);
 });
 
-test("reported setpoints that differ from last_setpoints pause for 12 hours", async () => {
+test("reported setpoints that differ from last_setpoints do not pause Autopilot", async () => {
   const ctx = env();
   const { token, user } = await register(ctx, "lan@example.com");
   await subscribe(ctx, token);
@@ -604,13 +623,10 @@ test("reported setpoints that differ from last_setpoints pause for 12 hours", as
     user,
     now: t1,
   });
-  assert.equal(second.paused, true);
-  assert.equal(second.flipped_to, "advisor");
-  assert.match(second.reason, /you changed a target yourself/i);
+  assert.notEqual(second.paused, true, JSON.stringify(second));
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-lan", { token });
-  assert.equal(status.data.mode, "advisor");
-  assert.equal(status.data.status, "paused");
-  assert.match(status.data.pause_reason, /you changed a target yourself/i);
+  assert.equal(status.data.mode, "autopilot");
+  assert.notEqual(status.data.status, "paused");
 });
 
 test("setpointsMismatch ignores a just-applied command and detects a LAN change", () => {
