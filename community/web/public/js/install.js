@@ -10,6 +10,28 @@
 export const RELEASE_PUBLIC_KEY = "d060c2d2edb7871bcd6e211e23df8378e470cecf4ffb8575490fbbabab4afcdb";
 export const MANIFEST_PATH = "/firmware/stable/manifest.json";
 export const RELEASE_PREFIX = "https://shroomlabs.io/firmware/stable/";
+
+// One signed release stream per product. Each has its own signed product name, so a
+// signature for one can never be replayed for another. The Lykyn image is built for the
+// ESP32-C3 and must never erase the chamber's stored unit data, so it never offers an erase.
+export const TARGETS = {
+  openshrooly: {
+    manifestPath: MANIFEST_PATH,
+    prefix: RELEASE_PREFIX,
+    product: "openshrooly-usb",
+    name: "OpenShrooly",
+    chipFamily: "ESP32-S3",
+    erase: true,
+  },
+  lykyn: {
+    manifestPath: "/firmware/lykyn/manifest.json",
+    prefix: "https://shroomlabs.io/firmware/lykyn/",
+    product: "lykyn-usb",
+    name: "Shroom Labs Lykyn",
+    chipFamily: "ESP32-C3",
+    erase: false,
+  },
+};
 const VERSION_RE = /^(0|[1-9]\d{0,6})\.(0|[1-9]\d{0,6})\.(0|[1-9]\d{0,6})(-sl\.(0|[1-9]\d{0,6}))?$/;
 const MAX_IMAGE = 16 * 1024 * 1024;
 
@@ -33,9 +55,9 @@ function base64ToBytes(b64) {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
-export function releaseUrlAllowed(url) {
-  if (typeof url !== "string" || url.length > 200 || !url.startsWith(RELEASE_PREFIX)) return false;
-  const rest = url.slice(RELEASE_PREFIX.length);
+export function releaseUrlAllowed(url, prefix = RELEASE_PREFIX) {
+  if (typeof url !== "string" || url.length > 200 || !url.startsWith(prefix)) return false;
+  const rest = url.slice(prefix.length);
   return rest.length > 0 && /^[A-Za-z0-9._/-]+$/.test(rest) && !rest.includes("..") && !rest.includes("//");
 }
 
@@ -46,7 +68,7 @@ export function signedMessage(e) {
   );
 }
 
-export async function verifyEntry(entry, { product, publicKeyHex = RELEASE_PUBLIC_KEY, subtle = globalThis.crypto?.subtle } = {}) {
+export async function verifyEntry(entry, { product, publicKeyHex = RELEASE_PUBLIC_KEY, subtle = globalThis.crypto?.subtle, prefix = RELEASE_PREFIX } = {}) {
   if (!entry || typeof entry !== "object") throw new ReleaseError("invalid");
   const ok =
     entry.product === product &&
@@ -58,7 +80,7 @@ export async function verifyEntry(entry, { product, publicKeyHex = RELEASE_PUBLI
     entry.size <= MAX_IMAGE &&
     typeof entry.sha256 === "string" &&
     /^[0-9a-f]{64}$/.test(entry.sha256) &&
-    releaseUrlAllowed(entry.url) &&
+    releaseUrlAllowed(entry.url, prefix) &&
     typeof entry.signature === "string";
   if (!ok) throw new ReleaseError("invalid");
   let key;
@@ -81,9 +103,11 @@ export async function checkImage(entry, bytes, subtle = globalThis.crypto?.subtl
 
 // Loads and verifies the USB release. fetchFn reads paths on this site only.
 export async function loadVerifiedRelease(fetchFn = (p) => fetch(p, { cache: "no-store", credentials: "omit" }), opts = {}) {
+  const target = TARGETS[opts.target || "openshrooly"];
+  if (!target) throw new ReleaseError("invalid");
   let manifest;
   try {
-    const res = await fetchFn(MANIFEST_PATH);
+    const res = await fetchFn(target.manifestPath);
     // No manifest on the site means nothing has been published yet, not a network problem.
     if (res.status === 404) throw new ReleaseError("unreleased");
     if (!res.ok) throw new Error();
@@ -92,7 +116,7 @@ export async function loadVerifiedRelease(fetchFn = (p) => fetch(p, { cache: "no
     if (err instanceof ReleaseError) throw err;
     throw new ReleaseError("network");
   }
-  const usb = await verifyEntry(manifest?.usb, { ...opts, product: "openshrooly-usb" });
+  const usb = await verifyEntry(manifest?.usb, { ...opts, product: target.product, prefix: target.prefix });
   let bytes;
   try {
     const res = await fetchFn(new URL(usb.url).pathname);
@@ -105,12 +129,13 @@ export async function loadVerifiedRelease(fetchFn = (p) => fetch(p, { cache: "no
   return { entry: usb, bytes };
 }
 
-export function installerManifest(entry, imageUrl) {
+export function installerManifest(entry, imageUrl, targetName = "openshrooly") {
+  const target = TARGETS[targetName];
   return {
-    name: "OpenShrooly",
+    name: target.name,
     version: entry.version,
-    new_install_prompt_erase: true,
-    builds: [{ chipFamily: "ESP32-S3", improv: true, parts: [{ path: imageUrl, offset: 0 }] }],
+    new_install_prompt_erase: target.erase,
+    builds: [{ chipFamily: target.chipFamily, improv: true, parts: [{ path: imageUrl, offset: 0 }] }],
   };
 }
 
@@ -118,10 +143,11 @@ async function main() {
   const status = document.querySelector("#status");
   const error = document.querySelector("#error");
   const button = document.querySelector("#install-button");
+  const targetName = document.querySelector("[data-install-target]")?.dataset.installTarget || "openshrooly";
   try {
-    const { entry, bytes } = await loadVerifiedRelease();
+    const { entry, bytes } = await loadVerifiedRelease(undefined, { target: targetName });
     const imageUrl = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
-    const manifest = installerManifest(entry, imageUrl);
+    const manifest = installerManifest(entry, imageUrl, targetName);
     button.manifest = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: "application/json" }));
     button.classList.remove("hidden");
     status.textContent = `Version ${entry.version} is ready. It passed the Shroom Labs signature check.`;

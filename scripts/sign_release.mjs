@@ -25,7 +25,8 @@ function args(argv) {
     if (!k.startsWith("--") || argv[i + 1] === undefined) throw new Error(`bad argument ${k}`);
     out[k.slice(2)] = argv[i + 1];
   }
-  for (const need of ["key", "version", "ota", "factory", "out"]) {
+  const needs = out.product === "lykyn" ? ["key", "version", "factory", "out"] : ["key", "version", "ota", "factory", "out"];
+  for (const need of needs) {
     if (!out[need]) throw new Error(`missing --${need}`);
   }
   return out;
@@ -66,6 +67,42 @@ function entry(privateKey, publicKey, fields) {
   const signature = sign(null, msg, privateKey).toString("base64");
   if (!verify(null, msg, publicKey, Buffer.from(signature, "base64"))) throw new Error("self-check failed");
   return { ...fields, signature };
+}
+
+// Lykyn USB release. Own folder, own product name (lykyn-usb), ESP32-C3 merged image from offset 0.
+// The Lykyn image is not an over-the-air release, so there is no OTA entry.
+//
+//   node scripts/sign_release.mjs --product lykyn --key /path/outside/repo/key.pem --version 0.1.0 \
+//     --factory firmware.factory.bin --out community/web/public/firmware/lykyn
+export function signLykynRelease(opts, repo = REPO) {
+  if (!VERSION_RE.test(opts.version)) throw new Error("version must look like 1.0.3 or 1.0.3-sl.1");
+  const channel = "stable";
+  const keyPath = realpathSync(opts.key);
+  if (!relative(realpathSync(repo), keyPath).startsWith("..")) {
+    throw new Error("refusing to use a private key stored inside the repository");
+  }
+  const privateKey = createPrivateKey(readFileSync(keyPath));
+  if (privateKey.asymmetricKeyType !== "ed25519") throw new Error("key must be Ed25519");
+  const publicKey = createPublicKey(privateKey);
+  const expected = opts.expectPublic ?? devicePublicKeyHex(repo);
+  if (rawPublicHex(publicKey) !== expected) {
+    throw new Error("this key does not match the release key");
+  }
+  mkdirSync(opts.out, { recursive: true });
+  const bytes = readFileSync(opts.factory);
+  const name = `lykyn-${opts.version}.factory.bin`;
+  copyFileSync(opts.factory, join(opts.out, name));
+  const usb = entry(privateKey, publicKey, {
+    product: "lykyn-usb",
+    channel,
+    version: opts.version,
+    size: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    url: `${ORIGIN}lykyn/${name}`,
+  });
+  const manifest = { usb, chip: "ESP32-C3", key: rawPublicHex(publicKey).slice(0, 16) };
+  writeFileSync(join(opts.out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  return manifest;
 }
 
 export function signRelease(opts, repo = REPO) {
@@ -123,7 +160,13 @@ export function signRelease(opts, repo = REPO) {
 
 if (process.argv[1] && basename(process.argv[1]) === "sign_release.mjs") {
   try {
-    const m = signRelease(args(process.argv.slice(2)));
+    const a = args(process.argv.slice(2));
+    if (a.product === "lykyn") {
+      const lm = signLykynRelease(a);
+      console.log(`signed lykyn ${lm.usb.version}: usb ${lm.usb.size} bytes ${lm.usb.sha256}`);
+      process.exit(0);
+    }
+    const m = signRelease(a);
     console.log(`signed ${m.version}: ota ${m.size} bytes ${m.sha256}, usb ${m.usb.size} bytes ${m.usb.sha256}`);
   } catch (e) {
     console.error(`sign_release: ${e.message}`);

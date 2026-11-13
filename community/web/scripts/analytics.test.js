@@ -11,7 +11,7 @@ const pub = join(here, "..", "public");
 const TAG = `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>`;
 // Sign-in callback and alert links carry one-time codes, profile.html can show Off-menu Profiles,
 // the installer loads nothing from other sites, and the admin and moderator pages are private staff tools.
-const SKIP = new Set(["auth/callback.html", "alerts-unsub.html", "profile.html", "install.html", "admin.html", "moderate.html"]);
+const SKIP = new Set(["auth/callback.html", "alerts-unsub.html", "profile.html", "install.html", "install-lykyn.html", "admin.html", "moderate.html"]);
 
 function htmlFiles(dir) {
   return readdirSync(dir).flatMap((name) => {

@@ -1711,6 +1711,16 @@ export const PAGES = {
     description: "Shrooly app not working? Put free OpenShrooly software on your Shrooly from Chrome or Edge with a USB-C cable in about 5 minutes. Signed releases only.",
     jsonLd: { "@context": "https://schema.org", "@graph": [openShroolyJsonLd(), breadcrumbs([["Home", `${SITE}/`], ["Install over USB", `${SITE}/install`]])] },
   },
+  "install-lykyn.html": {
+    active: "install",
+    // Same rule as /install: nothing from other sites, so no analytics.
+    analytics: false,
+    sitemap: false,
+    robots: "noindex,follow",
+    path: "/install-lykyn",
+    title: "Install on your Lykyn: Shroom Labs software over USB",
+    description: "Put Shroom Labs software on a Lykyn chamber from Chrome or Edge with a USB-C data cable. Signed releases only. Beta.",
+  },
   "login.html": { active: "", path: "/login", robots: PRIVATE, title: "Sign in · Shroom Labs", description: "Sign in to Shroom Labs to publish Profiles, buy them, and link a chamber. No password." },
   "register.html": { active: "", path: "/register", robots: PRIVATE, title: "Create account · Shroom Labs", description: "Create a Shroom Labs account to publish Profiles, buy them, and link a chamber. No password." },
   "account.html": { active: "", path: "/account", robots: PRIVATE, title: "Account · Shroom Labs", description: "Your Shroom Labs profile, devices, billing, security, and shared profiles." },
