@@ -464,18 +464,18 @@ If you would rather not install anything, run it by hand with a ready to fruit b
 URL: https://shroomlabs.io/chambers
 Updated: 2026-11-05
 
-Shrooly is fully supported. Terrashroom has free community firmware and AC Infinity Wi-Fi controllers have a free community adapter, both untested on real hardware. A Lykyn Smart Mushroom Grow Box is arriving, and outside-control validation has not started. Inkbird and other Tuya Wi-Fi controllers keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.
+Shrooly is fully supported. Terrashroom has free community firmware and AC Infinity Wi-Fi controllers have a free community adapter, both untested on real hardware. A Lykyn Smart Mushroom Grow Box is on the bench: stock firmware stays on it, and a public Socket.IO stand-in in lykyn-adapter speaks the same protocol as Lykyn's cloud. Live LAN control still needs a TLS path the stock box trusts, or a logged-in cloud session. Inkbird and other Tuya Wi-Fi controllers keep their own software: set them from the free grow profiles, or automate them in Home Assistant. Any tub or box works with the profiles too.
 
 ### Which chambers are supported?
 
 Here is each one and what works today.
 
-Chambers and controllers, checked November 5, 2026 |  | Chamber | Status | How it works with Shroom Labs
+Chambers and controllers, checked November 13, 2026 |  | Chamber | Status | How it works with Shroom Labs
  | Shrooly | Supported | Free OpenShrooly firmware, installed from Chrome or Edge in about 5 minutes. Grow profiles and the phone dashboard work. Install.
  | Terrashroom | Community, untested | Free community ESPHome firmware. It builds and passes our checks but has not run on a real unit yet. Read first.
  | Inkbird and other Tuya Wi-Fi controllers | Use as is | Keep the stock app. Set it to the numbers in a grow profile, or automate it in Home Assistant with tuya-local. Shroom Labs does not control it directly.
  | AC Infinity controllers | Community, untested | A free Shroom Labs adapter sets a Wi-Fi Controller 69 PRO from a grow profile through AC Infinity's cloud. It is written from a community integration and has not run on a real controller yet. Read first.
- | Lykyn | Arriving | Outside-control adapter planned, validation pending. The box is in transit and has not been tested. Read first.
+ | Lykyn | On bench, outside control in progress | Stock firmware stays on the box. A Socket.IO stand-in in the public lykyn-adapter speaks the same protocol as Lykyn's cloud. Live LAN control still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session. Read first.
  | A tub, tent, or box you built | Use as is | Use the free grow profiles and grow timeline to run it by hand.
 
 ### Does Shroom Labs work with Shrooly?
@@ -504,9 +504,9 @@ Read AC Infinity for mushrooms for how it works and what is untested. For Home A
 
 ### Does Shroom Labs work with Lykyn?
 
-Not yet. The box is arriving, and outside-control validation has not started, so it is untested on real hardware.
+In progress. The box is on the bench with stock firmware, and a public Socket.IO stand-in speaks its cloud protocol. A live LAN push still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session.
 
-The plan is to drive it through the official app and cloud, without flashing, then document and open-source the adapter. Read Lykyn for mushrooms and the outside-control guide. Public notes live in the Shroom Labs Lykyn adapter on GitHub.
+We drive it without flashing. The Shroom Labs Lykyn adapter on GitHub has the stand-in, Black Oyster example profiles, and protocol notes. Read Lykyn for mushrooms and the outside-control guide.
 
 ### What if my chamber is not listed?
 
@@ -516,7 +516,7 @@ Start with mushroom growing conditions for every species. If your chamber has an
 
 ### What does each status mean?
 
-Supported means we run it ourselves. Community, untested means our firmware or adapter exists but has not run on a real unit. Arriving means the chamber is on the way and validation has not started. Use as is means you keep the stock software.
+Supported means we run it ourselves. Community, untested means our firmware or adapter exists but has not run on a real unit. On bench, outside control in progress means the chamber is here and the stock path is being proven. Use as is means you keep the stock software.
 
 We only mark a chamber supported once it has run our firmware on real hardware. When that changes for Terrashroom or Lykyn, this page will say so.
 
@@ -536,7 +536,7 @@ We only mark a chamber supported once it has run our firmware on real hardware. 
 ## Terrashroom after the shutdown
 
 URL: https://shroomlabs.io/terrashroom
-Updated: 2026-10-27
+Updated: 2026-11-13
 
 Terrashroom closed in June 2025 and said its devices would stop working as its cloud service ended. Shroom Labs now has free community firmware that runs a Terrashroom on your own Wi-Fi with no cloud. It is untested on real hardware, so we are looking for owners to try it first.
 
@@ -764,55 +764,43 @@ The endpoints and field names come from homeassistant-acinfinity by dalinicus, r
 ## Lykyn for mushrooms
 
 URL: https://shroomlabs.io/lykyn
-Updated: 2026-11-05
+Updated: 2026-11-13
 
-A Lykyn Smart Mushroom Grow Box is a countertop chamber with an official app. Shroom Labs plans to drive it through that app and cloud, without flashing the box, then document and open-source the adapter. The box is arriving. Outside-control validation has not started, so it is untested on real hardware.
+A Lykyn Smart Mushroom Grow Box is a countertop chamber with an official app. Shroom Labs drives it without flashing, through a Socket.IO stand-in that speaks the same protocol as Lykyn's cloud. The box is on the bench with a Black Oyster bag. Live LAN control still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session.
 
 ### Does Shroom Labs work with Lykyn?
 
-Not yet. The box is arriving, and outside-control validation has not started, so it is untested on real hardware.
+In progress. The box is on the bench with stock firmware, and a public Socket.IO stand-in speaks its cloud protocol. A live LAN push still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session.
 
-We have a public repo for the adapter pitch and a planned side by side grow with two Shrooly chambers. Until the unit is here and we can read and set it from outside, it runs on its own controls. That status is also on the grow log.
+We leave the official firmware on the box. The Shroom Labs Lykyn adapter on GitHub accepts telemetry and pushes settings. Status is also on the grow log.
 
 ### What is a Lykyn Smart Mushroom Grow Box?
 
-It is a countertop mushroom chamber with an official phone app that picks a species and runs humidity, airflow, and light.
+A countertop smart chamber with fans, a humidifier, lights, and a temp and humidity sensor, set up from an official app over Bluetooth and run day to day through Lykyn's cloud.
 
-Lykyn sells a Single-Tier box and a two layer model. The company says you add water, put in a fruiting block, cut an X, and pick the species in the app (Lykyn Smart Mushroom Grow Box). We have not run one, so those steps are from the official site, not from a Shroom Labs grow.
+Lykyn sells a Single-Tier box and a two layer model. The company says you add water, put in a fruiting block, cut an X, and pick the species in the app (Lykyn Smart Mushroom Grow Box). Our unit is a Single-Tier MUSHROOM box on firmware 0.17.0.
 
-### What does outside control mean?
+### How does outside control work?
 
-We talk to the box through the same app and cloud the owner already uses, and we leave the stock software on it.
+The box talks Socket.IO to lykyn.app. Our stand-in speaks the same events: it reads updateDevice telemetry and pushes settings the firmware applies.
 
-The adapter, once it exists, would read the same numbers the app shows and write the same kind of settings the app writes. Credentials would stay on your computer. We will not ask anyone to open the box or flash it for this work.
+The stand-in, CLI, and Black Oyster example profiles are in the Shroom Labs Lykyn adapter on GitHub. Credentials and device ids stay in a local .env and never go in git.
 
-### What will Shroom Labs do when the box arrives?
+### What still blocks a live LAN push?
 
-Record what the official app sends to the box and to Lykyn's cloud, write those notes in the public repo, then try a dry run that prints a plan and writes nothing.
+TLS. The stock box verifies certificates for the hostname lykyn.app. A DNS override alone is not enough, and we will not reconfigure a home router until a trusted TLS path exists. A live LAN settings push is still untested on real hardware.
 
-The first pass is a watch, not a write. We want to see whether humidity, temperature, fans, and light can be read and set from outside. If that works, we document it and open-source the adapter. If it does not, this page will say so. The empty repo is the Shroom Labs Lykyn adapter on GitHub.
-
-### What is untested?
-
-All of it. The box is still in transit, and no adapter code has talked to a real Lykyn.
-
-- Whether the official app or cloud accepts a sign in from software we write.
-
-- Whether we can read live humidity and temperature from outside.
-
-- Whether we can set humidity, fans, light, or a species profile from outside.
+Two paths remain: terminate TLS in a way the stock box trusts, or drive settings through the owner's logged-in Lykyn cloud session. Details are in the adapter's dns-override doc.
 
 - Whether a grow profile can be applied without using the Lykyn app by hand.
 
 - How a Lykyn compares to a Shrooly chamber on the same species. That is the planned grow log.
 
-      There is no working command line tool yet. Do not treat the repo as something you can run against a box.
+### How is this different from OpenShrooly?
 
-### How is this different from OpenShrooly on a Shrooly chamber?
+OpenShrooly replaces the stock software on a Shrooly chamber by flashing it. The Lykyn path leaves the stock software on the box and talks to it from outside.
 
-OpenShrooly replaces the stock software on a Shrooly chamber by flashing it. The Lykyn plan leaves the stock software on the box and talks to it from outside.
-
-Flashing is how we run a Shrooly chamber, and it is the untested plan for a Terrashroom. Lykyn is the other path: keep the official app, watch how it talks, and build an adapter around that. Read the outside-control guide for the full split.
+Flashing is how we run a Shrooly chamber, and it is the untested plan for a Terrashroom. Lykyn is the other path: keep the official firmware and build an adapter around its cloud protocol. Read the outside-control guide for the full split.
 
 ### Can I help?
 
@@ -820,11 +808,11 @@ Yes, if you own a Lykyn. Message us with the model, Single-Tier or two layer, an
 
 Message us and pick A chamber. We are not asking anyone to flash a Lykyn. Notes about what the app shows, and whether it works without the cloud, all help. Every report goes into the adapter notes.
 
-### Who is working on this?
+### Who made this page?
 
 Shroom Labs. We are not made by or affiliated with Lykyn.
 
-Product facts on this page come from the Lykyn Smart Mushroom Grow Box. If anything here is wrong, tell us and we will fix it.
+Product facts on this page come from the Lykyn Smart Mushroom Grow Box and from a read-only look at one stock box. If anything here is wrong, tell us and we will fix it.
 
 ### Sources
 
@@ -1891,69 +1879,61 @@ A: There is a free community adapter for Wi-Fi models such as the 69 PRO. It is 
 ## Outside control for a Lykyn mushroom grow box
 
 URL: https://shroomlabs.io/guides/lykyn-mushroom-grow-box-outside-control
-Updated: 2026-11-05
+Updated: 2026-11-13
 
-Outside control means we talk to a Lykyn through its existing app and cloud, and we leave the stock software on the box. When our unit arrives we will record what the official app sends, write it up in a public adapter repo, and only then try a dry run. None of that is proven yet. This is not a reflash, which is how OpenShrooly runs a Shrooly chamber.
+Outside control means we talk to a Lykyn through the same Socket.IO protocol its cloud uses, and we leave the stock software on the box. Our unit is on the bench. The public lykyn-adapter has a stand-in, Black Oyster example profiles, and protocol notes. A live LAN push still needs a TLS cert the stock box trusts for lykyn.app, or a logged-in cloud session. This is not a reflash, which is how OpenShrooly runs a Shrooly chamber.
 
 ### What does outside control mean?
 
-Outside control is a way to read and set a chamber without replacing the software that shipped on it. The official app stays the source of how the box talks. We watch that path, write down the reads and writes, and later wrap them in a small adapter so a grow profile can drive the same settings.
+Outside control is a way to read and set a chamber without replacing the software that shipped on it. The stock firmware stays. We speak the same language the official cloud already speaks.
 
 For a Lykyn that means:
 
 - Stock software stays on the box. We do not flash it. We do not ask you to open it.
 
-- The official app and cloud stay in place. The adapter, once it exists, would sign in the same way the app does, on your own computer.
+- The box talks Socket.IO to lykyn.app. Our stand-in accepts updateDevice telemetry and pushes settings the firmware applies.
 
-- Credentials stay with you. Email and password would live as environment variables on the machine that runs the adapter, the same way the AC Infinity adapter does. Shroom Labs would not store them.
+- Credentials stay with you. Device ids and account tokens live in a local .env. Shroom Labs does not store them.
 
-- A dry run comes first. A first tool should print the plan and write nothing, until someone adds an apply flag on purpose.
+- A dry run comes first. The CLI prints a plan by default and only writes when you add an apply flag on purpose.
 
-That is the plan. It is not a working adapter. Read Lykyn for mushrooms for the arrival status.
+Read Lykyn for mushrooms for the current status.
 
-### What will we look at when the box arrives?
+### What did we record from the box on the bench?
 
-The unit is in transit. Until it is on a bench here, there is nothing to record. When it arrives we will set it up the way Lykyn describes on the official Lykyn site: water in the reservoir, a fruiting block on the tray, species picked in the app. Then we watch three links.
+Our Single-Tier MUSHROOM box is on firmware 0.17.0 (ESP32-C3). From a read-only dump and its serial log we recorded:
 
-- Phone to box. What the official app sends over the local network, if it talks to the box directly at all.
+- Cloud protocol. Engine.IO v4 / Socket.IO on path /socket.io/ to lykyn.app over TLS.
 
-- Phone to cloud. What the app sends to Lykyn's servers to read humidity and temperature, and to change humidity, fans, light, or the species preset.
+- Telemetry. The box emits updateDevice with temperature, humidity, fans, humidifier, light, and current settings.
 
-- Box to cloud. Whether the chamber reports readings on its own, and how often.
+- Settings push. The cloud sends a settings object (as getDeviceInfo). The firmware applies any non-special event that carries that shape.
 
-We will write down field names, units, and which settings the app actually changes. Those notes go in the Shroom Labs Lykyn adapter on GitHub. The repo is public on purpose. Credentials stay out of it.
+- Hardware. Sensirion SHT3x sensor, inlet and outlet fans, humidifier, addressable LED strip. GPIO map and clamps are in the lykyn-adapter docs.
 
-We are looking for the same kinds of things a grow profile needs: humidity, temperature, fresh air, and light. If those can be read and set from outside, a later adapter can map a free profile onto them. If they cannot, this guide will say so and you should keep using the Lykyn app by hand with the numbers from the grow profiles.
+Wi-Fi names, device ids, and tokens stay out of the public repo.
 
-Nothing in that list is mapped yet. Treat every endpoint, field, and unit as unknown until a note lands in the repo with a date.
+### What is still untested?
 
-### What is untested?
+A live LAN settings push against a stock box. The stand-in and its unit tests pass with a fake client. A real box verifies TLS certificates for the hostname lykyn.app, so a DNS override alone is not enough.
 
-All of it. Outside-control validation has not started. The public repo holds a short pitch, not a tool you can run.
+- Whether a trusted TLS path on the LAN can complete the handshake.
 
-- Whether a sign in from software we write is accepted.
+- Whether a logged-in Lykyn cloud session can drive the same settings from Shroom Labs.
 
-- Whether live humidity and temperature can be read from outside.
+- How a Lykyn compares to a Shrooly chamber on the same block. That comparison is the planned grow log.
 
-- Whether humidity, fans, light, or a species preset can be set from outside.
-
-- Whether those writes match what the official app shows after they land.
-
-- Whether a Lykyn holds fruiting humidity for lion's mane, oyster, or shiitake the way the profiles ask.
-
-- How a Lykyn compares to a Shrooly chamber on the same block. That comparison is the planned grow log, and it has not started.
-
-Until those are checked, do not claim a Lykyn is supported. The chambers table marks it Arriving. The grow log marks it arriving, outside-control validation pending. Both stay that way until someone here has read and set a real unit from outside.
+The chambers table marks it On bench, outside control in progress. The grow log marks it on bench with a Black Oyster bag. Neither says Supported until a real push lands.
 
 ### How is this different from flashing a Shrooly chamber?
 
 OpenShrooly replaces the stock software on a Shrooly chamber. You install it from Chrome or Edge with a USB-C cable in about 5 minutes. After that the chamber runs on your own Wi-Fi from a local web page, and the Shrooly app is not in the path. That is a reflash.
 
-The Lykyn plan is the opposite. The stock software stays. The official app stays. We build a translator that sits outside and speaks the same language the app already speaks. If Lykyn changes that language, the adapter can break. If it breaks, you still have the official app and can set the box by hand from a grow profile.
+The Lykyn plan is the opposite. The stock software stays. We build a translator that sits outside and speaks the same language the cloud already speaks. If Lykyn changes that language, the adapter can break. If it breaks, you still have the official app and can set the box by hand from a grow profile.
 
-Terrashroom is on the flash path, like a Shrooly chamber: community ESPHome firmware, untested on real hardware. AC Infinity is on the outside-control path, like Lykyn: a cloud adapter written from a community integration, also untested on a real controller. Lykyn is earlier than AC Infinity. AC Infinity has adapter code and tests against a fake server. Lykyn has a repo and a plan.
+Terrashroom is on the flash path, like a Shrooly chamber: community ESPHome firmware, untested on real hardware. AC Infinity is on the outside-control path, like Lykyn: a cloud adapter written from a community integration, also untested on a real controller. Lykyn now has a working stand-in and protocol notes. AC Infinity has adapter code and tests against a fake server.
 
-How Shroom Labs talks to each chamber, November 5, 2026 |  | Chamber | Method | Status
+How Shroom Labs talks to each chamber, November 13, 2026 |  | Chamber | Method | Status
 
  | Shrooly chamber | Flash OpenShrooly. Local web page, no stock app. | Supported
 
@@ -1961,31 +1941,31 @@ How Shroom Labs talks to each chamber, November 5, 2026 |  | Chamber | Method | 
 
  | AC Infinity | Cloud adapter. Stock controller software stays. | Community, untested
 
- | Lykyn | Outside-control adapter planned. Stock software stays. | Arriving, validation pending
+ | Lykyn | Socket.IO stand-in. Stock software stays. | On bench, outside control in progress
 
-If you want the chamber to run with no vendor app at all, a Shrooly chamber with OpenShrooly is the one we already run. A Lykyn will keep using Lykyn's app until someone proves an outside path, and maybe after that too.
+If you want the chamber to run with no vendor app at all, a Shrooly chamber with OpenShrooly is the one we already run. A Lykyn keeps stock firmware and talks through the adapter.
 
 ### Can I use a grow profile on a Lykyn today?
 
-Yes, by hand. Open the species in the grow profiles, copy the humidity, temperature, fresh air, and light for the stage you are in, and set the official Lykyn app as close as it allows. The app's species presets are Lykyn's, not ours. We have not compared them to the profiles.
+Yes. Open the species in the grow profiles, copy the humidity, temperature, fresh air, and light for the stage you are in, and set the official Lykyn app as close as it allows. Or run the stand-in from the lykyn-adapter with an example Black Oyster profile once a TLS or cloud path is in place.
 
-Automatic apply from Shroom Labs is the adapter's job, and that job has not started. The grow timeline calculator still helps you pick stage dates while the box runs on its own controls.
+The grow timeline calculator still helps you pick stage dates while the box runs.
 
-Shroom Labs is not made by Lykyn. Product steps quoted above come from the official site. If you own a box and want to share what the app lets you set, use the contact page on this site and pick A chamber.
+Shroom Labs is not made by Lykyn. Product steps quoted above come from the official site and from one stock box on the bench. If you own a box and want to share what the app lets you set, use the contact page on this site and pick A chamber.
 
 ### FAQ
 
 Q: What does outside control mean?
-A: We talk to the Lykyn through its existing app and cloud, and we leave the stock software on the box.
+A: We talk to the Lykyn through the same Socket.IO protocol its cloud uses, and we leave the stock software on the box.
 
 Q: Will Shroom Labs flash the Lykyn?
-A: No. The plan is outside control. Flashing is how OpenShrooly runs a Shrooly chamber, not how we plan to run a Lykyn.
+A: No. The plan is outside control. Flashing is how OpenShrooly runs a Shrooly chamber, not how we run a Lykyn.
 
 Q: Can I use a grow profile on a Lykyn today?
-A: Yes, by copying the numbers into the official Lykyn app. Shroom Labs cannot apply a profile to a Lykyn yet.
+A: Yes, by copying the numbers into the official Lykyn app, or through the public lykyn-adapter stand-in once a TLS or cloud path is in place.
 
 Q: Where is the adapter code?
-A: In the public lykyn-adapter repo on GitHub. It is a pitch and a place for notes. Nothing in it talks to a real Lykyn yet.
+A: In the public lykyn-adapter repo on GitHub. It has a Socket.IO stand-in, protocol notes, and Black Oyster example profiles.
 
 ---
 

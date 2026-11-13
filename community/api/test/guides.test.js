@@ -76,13 +76,13 @@ test("guide links resolve: profiles are free and indexed, guides exist, affiliat
   }
 });
 
-test("the Lykyn outside-control guide stays arriving and links the adapter repo", () => {
+test("the Lykyn outside-control guide is on the bench and links the adapter repo", () => {
   const g = GUIDES.find((x) => x.slug === "lykyn-mushroom-grow-box-outside-control");
   assert.ok(g, "guide is registered");
   const html = page(g.slug);
   const body = text(main(html));
   assert.match(body, /outside control/i);
-  assert.match(body, /validation has not started|untested/i);
+  assert.match(body, /still untested|TLS|stock (firmware|software)/i);
   assert.match(body, /not a reflash/i);
   assert.doesNotMatch(body, /\bvalidated\b/i);
   assert.doesNotMatch(html, /href="\/coach"|Grow Coach/);

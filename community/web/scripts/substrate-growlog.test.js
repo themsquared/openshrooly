@@ -41,7 +41,7 @@ test("grow log shows no invented data until real entries exist", () => {
   const html = renderGrowLogBody();
   assert.match(html, /No entries yet/);
   assert.equal(CHAMBERS.length, 3);
-  assert.match(html, /Arriving, outside-control validation pending/);
+  assert.match(html, /On bench, Black Oyster fruiting/);
   assert.doesNotMatch(html, /<img/);
   assert.throws(() => validateEntry({ date: "2026-11-03", chamber: "nope", note: "x" }));
   assert.ok(validateEntry({ date: "2026-11-03", chamber: "lykyn", note: "Blocks unpacked" }));
