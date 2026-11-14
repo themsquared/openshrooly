@@ -168,7 +168,7 @@ test("on 1.0.5 Autopilot moves the grow to pinning by day: one command with fan,
   assert.equal(back.air_exchange_period_min, 60);
 });
 
-test("someone changing the light on the chamber pauses Autopilot like a setpoint change", async () => {
+test("someone changing the light on the chamber does not pause Autopilot", async () => {
   const { ctx, token } = await setup("knobs-manual@example.com", "dev-k2", reading105({ day: 15 }));
   const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-k2" } });
   assert.equal(run.data.applied, true, JSON.stringify(run.data));
@@ -197,8 +197,8 @@ test("someone changing the light on the chamber pauses Autopilot like a setpoint
   const { runAutopilotForDevice } = await import("../src/coach-autopilot.js");
   const user = await ctx.db.one("SELECT * FROM users WHERE id=?", [device.owner_id]);
   const again = { data: await runAutopilotForDevice(ctx.db, ctx, { device: { ...device, last_seen_at: new Date(later).toISOString() }, user, now: later }) };
-  assert.equal(again.data.paused, true, JSON.stringify(again.data));
-  assert.match(again.data.reason, /changed a target yourself/);
+  assert.notEqual(again.data.paused, true, JSON.stringify(again.data));
+  assert.equal(again.data.applied, true, JSON.stringify(again.data));
 });
 
 test("a chamber that kept the Autopilot knobs does not trip the manual override", async () => {

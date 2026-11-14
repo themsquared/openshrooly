@@ -6,7 +6,6 @@ import {
   clampAutopilotSetpoints,
   cloudDeliveryActive,
   limitAutopilotStep,
-  setpointsMismatch,
   stageFromProfile,
 } from "./coach-autopilot.js";
 import { REACHABILITY_MS } from "../scripts/coach-readings.js";
@@ -120,10 +119,8 @@ export function planBridgeCommand({ command, stage = {}, reading, now = Date.now
   if (missingFrom) {
     return { ok: false, status: "failed", reason: missingFrom, mark: true };
   }
-  const plannedFrom = payload.from || payload.planned_from;
-  if (setpointsMismatch(reading, plannedFrom, { now })) {
-    return { ok: false, status: "failed", reason: "Chamber setpoint changed; manual override wins.", mark: true };
-  }
+  // Autopilot stays in control: a local setpoint change does not refuse the command.
+  // Coach writes its targets even if the chamber was edited on the device.
 
   const proposed = {
     temperature_c: payload.temperature_c ?? payload.temperature_target,

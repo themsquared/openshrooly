@@ -263,14 +263,15 @@ test("live writes refuse commands that lack a from snapshot", async () => {
   assert.equal(posts.length, 0);
 });
 
-test("manual override wins when the chamber setpoint moved", () => {
+test("bridge still writes Autopilot targets when the chamber setpoint moved", () => {
   const plan = planBridgeCommand({
     command: command(),
     stage: fruiting,
     reading: { ...reading, temperature_setpoint: 18, humidity_setpoint: 80 },
   });
-  assert.equal(plan.ok, false);
-  assert.match(plan.reason, /manual override/i);
+  assert.equal(plan.ok, true, JSON.stringify(plan));
+  assert.ok(plan.writes.length);
+  assert.ok(plan.writes.every((w) => w.field === "temperature_target" || w.field === "target_humidity"));
 });
 
 test("live writes honor the 10 minute rate limit and the kill switch", async () => {

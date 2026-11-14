@@ -81,6 +81,13 @@ export function growingLabels(device) {
   return { title, latin: sub, phase };
 }
 
+export const COACH_MANAGES_NOTE = "Coach is managing targets. Turn Coach off to set them yourself.";
+
+/** Autopilot is on and not in a safety pause, so the site should not take manual target edits. */
+export function coachManagingTargets(device) {
+  return device?.coach?.mode === "autopilot" && device?.coach?.status !== "paused";
+}
+
 export function coachLine(device) {
   if (device?.off_menu) return "";
   if (!device?.coach) return "";
@@ -415,12 +422,14 @@ export const GROW_PHASES = ["Idle", "Colonizing", "Pinning", "Fruiting", "Harves
 
 export function renderControls(device, { profiles = [], canWrite = false, showCoach = false } = {}) {
   const disabled = canWrite ? "" : " disabled";
+  const locked = coachManagingTargets(device);
+  const targetOff = canWrite && !locked ? "" : " disabled";
   const controls = device.controls || {};
   const supported = (key) => controls[key]?.supported !== false;
   // Newer knobs show only when the chamber says it can take them.
   const reported = (key) => controls[key]?.supported === true;
   const chamber = device.chamber || {};
-  const profileOff = canWrite && supported("profile") ? "" : " disabled";
+  const profileOff = canWrite && !locked && supported("profile") ? "" : " disabled";
   // What the chamber runs now wins over the stage recipe, so Save never surprises.
   const light = device.chamber_light || device.light || {};
   const whitePct = light.white_percent ?? (light.white_led_lux != null ? Math.round(whiteLuxToPercent(light.white_led_lux)) : null);
@@ -446,6 +455,9 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       : !device.last_seen_at
         ? "Changes from here turn on after the chamber's first check-in."
         : "This chamber is offline. Changes from here come back when it checks in again.";
+  const coachNote = locked
+    ? `<p class="muted" data-coach-managing>${COACH_MANAGES_NOTE}</p>`
+    : "";
   const onlyHere = chamberOnlyLine(controls);
   const coach =
     showCoach && !device.off_menu
@@ -463,7 +475,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       : "";
   const fan = supported("fan")
     ? `<label>Fan speed (%)
-          <input name="fan_speed_percent" type="number" step="5" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${disabled}>
+          <input name="fan_speed_percent" type="number" step="5" min="15" max="100" value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${targetOff}>
         </label>
         ${reported("air") ? "" : `<p class="muted">Fan period and run time stay on the chamber.</p>`}`
     : "";
@@ -472,13 +484,13 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       <legend>Fresh air</legend>
       <div class="row">
         <label>Run every (minutes)
-          <input name="air_exchange_period_min" type="number" step="1" min="1" max="240" value="${numOrBlank(chamber.air_exchange_period_min)}"${disabled}>
+          <input name="air_exchange_period_min" type="number" step="1" min="1" max="240" value="${numOrBlank(chamber.air_exchange_period_min)}"${targetOff}>
         </label>
         <label>For (seconds)
-          <input name="air_exchange_run_sec" type="number" step="5" min="5" max="900" value="${numOrBlank(chamber.air_exchange_run_sec)}"${disabled}>
+          <input name="air_exchange_run_sec" type="number" step="5" min="5" max="900" value="${numOrBlank(chamber.air_exchange_run_sec)}"${targetOff}>
         </label>
       </div>
-      <button type="submit" class="secondary" data-action="air"${disabled}>Save fresh air</button>
+      <button type="submit" class="secondary" data-action="air"${targetOff}>Save fresh air</button>
       ${controlMsg("air")}
     </fieldset>`
     : "";
@@ -491,19 +503,19 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
           controls.stage?.phase === false
             ? ""
             : `<label>Phase on the chamber
-          <select name="grow_phase"${disabled}>${GROW_PHASES.map((p) => `<option value="${p}"${p === phaseNow ? " selected" : ""}>${p}</option>`).join("")}</select>
+          <select name="grow_phase"${targetOff}>${GROW_PHASES.map((p) => `<option value="${p}"${p === phaseNow ? " selected" : ""}>${p}</option>`).join("")}</select>
         </label>`
         }
         ${
           controls.stage?.day === false
             ? ""
             : `<label>Grow day
-          <input name="grow_day" type="number" step="1" min="0" max="90" value="${numOrBlank(chamber.grow_day)}"${disabled}>
+          <input name="grow_day" type="number" step="1" min="0" max="90" value="${numOrBlank(chamber.grow_day)}"${targetOff}>
         </label>`
         }
       </div>
       <p class="muted">Only changes what the chamber shows and counts. Start this grow above sets the whole phase.</p>
-      <button type="submit" class="secondary" data-action="stage"${disabled}>Save phase</button>
+      <button type="submit" class="secondary" data-action="stage"${targetOff}>Save phase</button>
       ${controlMsg("stage")}
     </fieldset>`
     : "";
@@ -513,33 +525,34 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       ${controlNote(controls.light)}
       <div class="row">
         <label>Lights on at (hour)
-          <input name="sunrise_hour" type="number" step="1" min="0" max="23" value="${numOrBlank(light.sunrise_hour)}"${disabled}${scheduleOff}>
+          <input name="sunrise_hour" type="number" step="1" min="0" max="23" value="${numOrBlank(light.sunrise_hour)}"${targetOff}${scheduleOff}>
         </label>
         <label>Hours on
-          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${disabled}${scheduleOff}>
+          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${targetOff}${scheduleOff}>
         </label>
       </div>
       <label>White brightness (%)
-        <input name="white_percent" type="number" step="1" min="0" max="100" value="${numOrBlank(whitePct)}"${disabled}${colorOff}>
+        <input name="white_percent" type="number" step="1" min="0" max="100" value="${numOrBlank(whitePct)}"${targetOff}${colorOff}>
       </label>
       <p class="muted lux-preview" data-lux-preview aria-live="polite">${escapeHtml(luxPreview(whitePct ?? 0))}</p>
       <div class="row">
-        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${disabled}${colorOff}></label>
-        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${disabled}${colorOff}></label>
-        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${disabled}${colorOff}></label>
+        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${targetOff}${colorOff}></label>
+        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${targetOff}${colorOff}></label>
+        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${targetOff}${colorOff}></label>
       </div>
       <p class="muted">Hours on 0 means dark, with brightness and colors at 0 too. A light that is on with 0 hours runs 12 hours.</p>
-      <button type="submit" class="secondary" data-action="light"${disabled}>Save light</button>
+      <button type="submit" class="secondary" data-action="light"${targetOff}>Save light</button>
       ${controlMsg("light")}
     </fieldset>`
     : "";
   return `<form id="device-controls" class="card alert-form">
     ${notice ? `<p class="muted">${escapeHtml(notice)}</p>` : ""}
+    ${coachNote}
     <fieldset id="grow">
       <legend>What's growing</legend>
       <div class="row">
-        <label>Profile <select name="profile_id"${disabled}>${profileOptions}</select></label>
-        <label>Phase <select name="stage"${disabled}>${stageOptions || `<option value="">Start from the beginning</option>`}</select></label>
+        <label>Profile <select name="profile_id"${targetOff}>${profileOptions}</select></label>
+        <label>Phase <select name="stage"${targetOff}>${stageOptions || `<option value="">Start from the beginning</option>`}</select></label>
       </div>
       <button type="submit" data-action="profile"${profileOff}>Start this grow</button>
       ${controlNote(controls.profile)}
@@ -549,14 +562,14 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       <legend>Climate</legend>
       <div class="row">
         <label>Temperature (°C)
-          <input name="temperature_c" type="number" step="0.1" min="10" max="32" value="${numOrBlank(device.setpoints?.temperature_c)}"${disabled}>
+          <input name="temperature_c" type="number" step="0.1" min="10" max="32" value="${numOrBlank(device.setpoints?.temperature_c)}"${targetOff}>
         </label>
         <label>Humidity (%)
-          <input name="humidity_percent" type="number" step="${stepAttr(device.capabilities?.steps, "humidity_percent", 0.5)}" min="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 0, 30)}" max="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 1, 98)}" value="${numOrBlank(device.setpoints?.humidity_percent)}"${disabled}>
+          <input name="humidity_percent" type="number" step="${stepAttr(device.capabilities?.steps, "humidity_percent", 0.5)}" min="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 0, 30)}" max="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 1, 98)}" value="${numOrBlank(device.setpoints?.humidity_percent)}"${targetOff}>
         </label>
       </div>
       ${fan}
-      <button type="submit" class="secondary" data-action="climate"${disabled}>Save climate</button>
+      <button type="submit" class="secondary" data-action="climate"${targetOff}>Save climate</button>
       ${controlMsg("climate")}
     </fieldset>
     ${airBlock}
