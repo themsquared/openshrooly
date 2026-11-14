@@ -730,15 +730,42 @@ export function expandStage(stage = {}) {
   };
 }
 
-/** The stage the grower last applied to this chamber for this profile (site apply or an Autopilot command). */
-export async function chosenStageFor(db, deviceId, profileId) {
+const FAILED_ACKS = new Set(["failed", "refused"]);
+
+function commandAck(payload = {}) {
+  const ack = payload._ack || {};
+  const status = ack.status ? String(ack.status) : null;
+  return { status, reason: ack.reason ? String(ack.reason) : null };
+}
+
+/** Most recent command that named a profile stage for this chamber, including its ack. */
+export async function latestStagedCommand(db, deviceId, profileId) {
   if (!deviceId || !profileId) return null;
   const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? ORDER BY id DESC LIMIT ?", [deviceId, 50]);
   for (const row of rows || []) {
     const payload = parseJson(row.payload, {});
-    if (payload?.stage && payload.profile_id === profileId) return String(payload.stage);
+    if (payload?.stage && payload.profile_id === profileId) {
+      return { stage: String(payload.stage), payload, ack: commandAck(payload), row };
+    }
   }
   return null;
+}
+
+/** The stage the grower last applied to this chamber for this profile (site apply or an Autopilot command). */
+export async function chosenStageFor(db, deviceId, profileId) {
+  const last = await latestStagedCommand(db, deviceId, profileId);
+  return last?.stage || null;
+}
+
+/**
+ * If the last stage apply failed and Autopilot would now steer a different stage
+ * (for example fruiting, because the chamber never left its default), do not quietly
+ * follow that later stage. Returns the device's error, or null when Autopilot may proceed.
+ */
+export function failedStageApplyBlocks(last, pick) {
+  if (!last || !FAILED_ACKS.has(last.ack?.status)) return null;
+  if (!pick?.stageId || last.stage === pick.stageId) return null;
+  return last.ack.reason || "The last phase change failed.";
 }
 
 export function stageFromProfile(profile, { knobs = {}, caps = {}, chosenStage = null } = {}) {
@@ -1158,8 +1185,13 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     return { paused: true, reason, flipped_to: "advisor" };
   }
   const profile = resolved.profile;
-  const chosenStage = await chosenStageFor(db, device.id, state.profile_id);
+  const lastStaged = await latestStagedCommand(db, device.id, state.profile_id);
+  const chosenStage = lastStaged?.stage || null;
   const pick = pickAutopilotStage(profile, knobs, caps, { chosenStage });
+  const blocked = failedStageApplyBlocks(lastStaged, pick);
+  if (blocked) {
+    return { applied: false, status: "failed", error: blocked, reason: blocked, skipped: "phase_apply_failed", stage: lastStaged.stage };
+  }
   const stage = expandStage(pick.stage);
   const reports = await db.all("SELECT * FROM grow_reports WHERE author_id=?", [user.id]);
   const model = buildDeviceModel(samples, reports.filter((r) => !String(r.profile_id || "").includes("psilocybin")));

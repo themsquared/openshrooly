@@ -434,3 +434,109 @@ test("device payload exposes chamber knobs, light in lux and %, and drops the ai
   assert.deepEqual(d.capabilities.knob_ranges.white_intensity, [0, 4000, 5]);
   assert.ok(d.cloud_controls.find((c) => c.id === "stage").supported);
 });
+
+const colonization = pearlOyster.stages.find((s) => s.id === "colonization");
+
+const LYKYN_READING = {
+  temperature: 18.7,
+  humidity: 86.83,
+  temperature_c: 18.7,
+  humidity_percent: 86.83,
+  temperature_setpoint: 16,
+  humidity_setpoint: 90,
+  temperature_target_min: 15,
+  temperature_target_max: 35,
+  target_humidity_min: 30,
+  target_humidity_max: 100,
+  firmware_version: "0.2.0",
+  device_type: "lykyn_chamber",
+  model: "Lykyn",
+  air_exchange_speed: 50,
+  air_exchange_period_min: 10,
+  air_exchange_run_sec: 40,
+  sunrise_hour: 8,
+  light_hours: 12,
+  white_intensity: 20,
+  color_r: 0,
+  color_g: 0,
+  color_b: 80,
+  grow_phase: "Fruiting",
+  ranges: {
+    air_exchange_speed: [33, 100, 1],
+    air_exchange_period_min: [1, 240, 1],
+    air_exchange_run_sec: [5, 600, 5],
+    sunrise_hour: [0, 23, 1],
+    light_hours: [0, 24, 1],
+    white_intensity: [0, 100, 1],
+    color_r: [0, 100, 1],
+    color_g: [0, 100, 1],
+    color_b: [0, 100, 1],
+  },
+  capabilities: [
+    "setpoints.temperature",
+    "setpoints.humidity",
+    "setpoints.multi",
+    "ack.refused",
+    "setpoints.fan",
+    "air.schedule",
+    "light.schedule",
+    "light.color",
+    "grow.phase",
+  ],
+};
+
+async function setupLykyn(email) {
+  const s = await setup(email);
+  await s.ctx.db.run("UPDATE cloud_devices SET device_type=? WHERE id=?", ["lykyn_chamber", "dev-1"]);
+  await s.ctx.db.run("DELETE FROM device_telemetry WHERE device_id=?", ["dev-1"]);
+  await addReading(s.ctx, "dev-1", LYKYN_READING);
+  return s;
+}
+
+test("Shrooly colonization apply still lands Colonizing with the colonization recipe", async () => {
+  const { ctx, token } = await setupSl5("colo-shrooly@example.com");
+  const res = await applyProfile(ctx, token, { stage: "colonization" });
+  const r = res.data.results[0];
+  assert.equal(r.status, "queued", JSON.stringify(res.data));
+  const p = JSON.parse((await rows(ctx))[0].payload);
+  assert.equal(p.grow_phase, "Colonizing");
+  assert.equal(p.temperature_c, colonization.temperature_c);
+  assert.equal(p.humidity_percent, colonization.humidity_percent);
+  assert.equal(p.air_exchange_speed, colonization.fan.speed_percent);
+  assert.equal(p.air_exchange_period_min, colonization.fan.period_min);
+  assert.equal(p.light_hours, 0);
+  assert.equal(p.white_intensity, 0);
+});
+
+test("Lykyn colonization apply lands Colonization, clamps fan to 33, and leaves lights off", async () => {
+  const { ctx, token } = await setupLykyn("colo-lykyn@example.com");
+  const res = await applyProfile(ctx, token, { stage: "colonization" });
+  const r = res.data.results[0];
+  assert.equal(r.status, "queued", JSON.stringify(res.data));
+  const p = JSON.parse((await rows(ctx))[0].payload);
+  assert.equal(p.grow_phase, "Colonization");
+  assert.equal(p.temperature_c, colonization.temperature_c);
+  assert.equal(p.humidity_percent, colonization.humidity_percent);
+  assert.equal(p.air_exchange_speed, 33, "profile 20 is below the Lykyn fan minimum");
+  assert.equal(p.air_exchange_period_min, colonization.fan.period_min);
+  assert.equal(p.air_exchange_run_sec, colonization.fan.run_duration_s);
+  assert.equal(p.light_hours, 0);
+  assert.equal(p.white_intensity, 0);
+});
+
+test("Lykyn fruiting apply converts 92 lux to percent and accepts a Colonization stage name", async () => {
+  const { ctx, token } = await setupLykyn("fruit-lykyn@example.com");
+  const res = await applyProfile(ctx, token);
+  assert.equal(res.data.results[0].status, "queued", JSON.stringify(res.data));
+  const p = JSON.parse((await rows(ctx))[0].payload);
+  assert.equal(p.grow_phase, "Fruiting");
+  assert.equal(p.white_intensity, 20);
+  assert.equal(p.light_hours, fruiting.light.duration_hours);
+  const stage = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
+    token,
+    body: { action: "stage", payload: { grow_phase: "Colonization" } },
+  });
+  assert.equal(stage.data.results[0].status, "queued", JSON.stringify(stage.data));
+  const q = JSON.parse((await rows(ctx))[1].payload);
+  assert.equal(q.grow_phase, "Colonization");
+});

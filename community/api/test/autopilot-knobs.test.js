@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { nowIso } from "../src/crypto.js";
 import { fanRangeForStage, pickAutopilotStage, recipeKnobs, steerFan } from "../src/autopilot-knobs.js";
-import { deviceCapabilities } from "../src/device-capabilities.js";
+import { deviceCapabilities, growPhaseForStage, sameGrowPhase } from "../src/device-capabilities.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 const pearl = JSON.parse(readFileSync(new URL("../../../data/profiles/culinary/pearl-oyster.json", import.meta.url), "utf8"));
@@ -75,6 +75,10 @@ test("fan guardrail is the stage fan +/- 20, inside 15 to 80, and RH steers one 
   assert.equal(wet.fan, 55);
   assert.match(wet.reason, /high/);
   assert.equal(steerFan(stage, { humidity: 80 }, caps105).fan, 35);
+  // Still a few points under the 88 target: keep the lower fan, even though 86.83 is inside the 85-91 hysteresis band.
+  const short = steerFan(stage, { humidity: 86.83 }, caps105);
+  assert.equal(short.fan, 35);
+  assert.match(short.reason, /low/);
   assert.equal(steerFan({ fan: { speed_percent: 75 }, humidity_percent: 80 }, { humidity: 99 }, caps105).fan, 80);
 });
 
@@ -144,7 +148,7 @@ test("on 1.0.5 Autopilot moves the grow to pinning by day: one command with fan,
   assert.equal(cmd.source, "grow-coach-autopilot");
   assert.equal(cmd.grow_phase, "Pinning");
   assert.equal(cmd.temperature_c, 23, "temperature still steps 1 C at a time");
-  assert.equal(cmd.air_exchange_speed, 30, "fan steps 10 toward the pinning 35");
+  assert.equal(cmd.air_exchange_speed, 25, "RH 91 is under the pinning 93 target, so the fan steps toward a reduced 25, not the full 35");
   assert.equal(cmd.fan_speed_percent, undefined, "firmware keys only");
   assert.equal(cmd.air_exchange_period_min, 15);
   assert.equal(cmd.air_exchange_run_sec, 35);
@@ -289,4 +293,103 @@ test("a fruiting grow on a chamber still showing its default Colonizing phase st
   assert.equal(cmd.air_exchange_period_min, 18);
   const apply = run.data.actions.find((a) => a.action === "apply");
   assert.match(apply.reason, /to match the fruiting stage you applied/);
+});
+
+test("Colonizing and Colonization are the same stage, named for the chamber", () => {
+  assert.equal(growPhaseForStage("colonization"), "Colonizing");
+  assert.equal(growPhaseForStage("Colonization"), "Colonizing");
+  assert.equal(growPhaseForStage("colonizing"), "Colonizing");
+  const lykyn = deviceCapabilities({ firmware_version: "0.2.0", capabilities: CAPS_105, ranges: { white_intensity: [0, 100, 1], air_exchange_speed: [33, 100, 1] } }, "lykyn_chamber");
+  assert.equal(growPhaseForStage("colonization", lykyn), "Colonization");
+  assert.equal(growPhaseForStage("Colonizing", lykyn), "Colonization");
+  assert.equal(sameGrowPhase("Colonizing", "Colonization"), true);
+  assert.equal(sameGrowPhase("Colonizing", "Fruiting"), false);
+  assert.equal(pickAutopilotStage(pearl, { grow_day: 3, grow_phase: "Colonization" }, lykyn).stageId, "colonization");
+  const pin = pickAutopilotStage(pearl, { grow_day: 15, grow_phase: "Colonization" }, lykyn);
+  assert.equal(pin.stageId, "pinning");
+  assert.equal(pin.transition, true);
+  const col = pearl.stages.find((st) => st.id === "colonization");
+  const knobs = recipeKnobs(col, "colonization", lykyn);
+  assert.equal(knobs.grow_phase, "Colonization");
+  assert.equal(knobs.white_intensity, 0);
+  assert.equal(knobs.light_hours, 0);
+  const fruiting = pearl.stages.find((st) => st.id === "fruiting");
+  assert.equal(recipeKnobs(fruiting, "fruiting", lykyn).white_intensity, 20);
+  assert.equal(recipeKnobs(fruiting, "fruiting", caps105).white_intensity, 92);
+  assert.equal(recipeKnobs(col, "colonization", caps105).grow_phase, "Colonizing");
+});
+
+test("a Shrooly colonization grow still lands Colonizing, not Fruiting", async () => {
+  const doc = reading105({
+    day: 3,
+    phase: "Idle",
+    temperature: 18,
+    humidity: 86,
+    temperature_setpoint: 16,
+    humidity_setpoint: 88,
+    air_exchange_speed: 50,
+    air_exchange_period_min: 10,
+    air_exchange_run_sec: 40,
+    light_hours: 12,
+    white_intensity: 92,
+    color_b: 80,
+  });
+  const { ctx, token } = await setup("knobs-colo-shrooly@example.com", "dev-k-colo", doc);
+  const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-k-colo" } });
+  assert.equal(run.status, 200, JSON.stringify(run.data));
+  assert.equal(run.data.applied, true, JSON.stringify(run.data));
+  assert.equal(run.data.stage, "colonization");
+  const cmd = (await openCommands(ctx, "dev-k-colo")).at(-1);
+  assert.equal(cmd.grow_phase, "Colonizing");
+  assert.equal(cmd.temperature_c, 17, "temperature still steps 1 C at a time toward 24");
+  assert.equal(cmd.air_exchange_speed, 40, "fan steps 10 toward the colonization 20");
+  assert.equal(cmd.air_exchange_period_min, 60);
+  assert.equal(cmd.light_hours, 0);
+  assert.equal(cmd.white_intensity, 0);
+});
+
+test("a failed colonization apply does not let Autopilot silently steer fruiting", async () => {
+  const doc = reading105({
+    day: 3,
+    phase: "Fruiting",
+    temperature: 18.7,
+    humidity: 86.83,
+    temperature_setpoint: 16,
+    humidity_setpoint: 90,
+    air_exchange_speed: 50,
+    air_exchange_period_min: 10,
+    air_exchange_run_sec: 40,
+    light_hours: 12,
+    white_intensity: 92,
+    color_b: 80,
+  });
+  const { ctx, token } = await setup("knobs-failed-colo@example.com", "dev-k-fail", doc, pearl, (c) =>
+    c.db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+      "dev-k-fail",
+      "setpoints",
+      JSON.stringify({
+        profile_id: pearl.id,
+        stage: "colonization",
+        source: "fleet",
+        grow_phase: "Colonizing",
+        temperature_c: 24,
+        humidity_percent: 90,
+        _ack: { status: "failed", reason: "grow_phase is not an option" },
+      }),
+      nowIso(),
+      nowIso(),
+    ])
+  );
+  const before = (await ctx.db.all("SELECT id FROM device_commands WHERE device_id=?", ["dev-k-fail"])).length;
+  const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-k-fail" } });
+  assert.equal(run.status, 200, JSON.stringify(run.data));
+  assert.equal(run.data.applied, false, JSON.stringify(run.data));
+  assert.equal(run.data.status, "failed");
+  assert.equal(run.data.skipped, "phase_apply_failed");
+  assert.match(run.data.error, /grow_phase is not an option/);
+  assert.notEqual(run.data.stage, "fruiting");
+  const open = await openCommands(ctx, "dev-k-fail");
+  assert.equal(open.length, 0, "no new Autopilot command was queued");
+  const after = (await ctx.db.all("SELECT id FROM device_commands WHERE device_id=?", ["dev-k-fail"])).length;
+  assert.equal(after, before);
 });
