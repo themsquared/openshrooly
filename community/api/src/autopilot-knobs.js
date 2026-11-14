@@ -4,14 +4,14 @@
  * step from it; nothing here comes from a model.
  */
 
-import { chamberKnobs, growPhaseForStage, KNOB_KEYS, knobSupported, readingMatchesTargets, stageTargets } from "./device-capabilities.js";
+import { chamberKnobs, growPhaseForStage, KNOB_KEYS, knobSupported, readingMatchesTargets, sameGrowPhase, stageTargets } from "./device-capabilities.js";
 
 /** Fan may move this far from the stage's fan speed, never outside FAN_CLAMP. */
 export const FAN_BAND = 20;
 export const FAN_CLAMP = [15, 80];
 export const FAN_STEP = 10;
-/** RH this far past the stage band nudges the fan one step. */
-export const FAN_RH_TRIGGER = 3;
+/** Hold the fan step until RH is within this many points of the stage humidity target. */
+export const FAN_IN_BAND = 1;
 
 /** Knobs Autopilot sets straight from the stage recipe when the chamber can take them. */
 export const RECIPE_KEYS = ["air_exchange_period_min", "air_exchange_run_sec", "sunrise_hour", "light_hours", "white_intensity", "color_r", "color_g", "color_b"];
@@ -44,7 +44,9 @@ export function stageIndexForDay(profile, day) {
 
 export function stageIndexForPhase(profile, phase) {
   if (!phase) return -1;
-  return (profile?.stages || []).findIndex((s) => growPhaseForStage(s.id) === phase);
+  return (profile?.stages || []).findIndex(
+    (s) => sameGrowPhase(growPhaseForStage(s.id), phase) || s.id === phase
+  );
 }
 
 /**
@@ -64,8 +66,8 @@ export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage
   let source = byChoice === index && byChoice > Math.max(byPhase, byDay) ? "chosen" : byDay > byPhase ? "grow_day" : byPhase >= 0 ? "phase" : "default";
   if (index < 0) index = fallback;
   const stage = stages[index] || {};
-  const phase = growPhaseForStage(stage.id);
-  const transition = Boolean(caps.multi && caps.grow_phase && phase && knobs.grow_phase && knobs.grow_phase !== phase && index > byPhase);
+  const phase = growPhaseForStage(stage.id, caps);
+  const transition = Boolean(caps.multi && caps.grow_phase && phase && knobs.grow_phase && !sameGrowPhase(knobs.grow_phase, phase) && index > byPhase);
   return { stage, stageId: stage.id || null, index, source, phase, transition, from_phase: knobs.grow_phase || null, grow_day: num(knobs.grow_day) };
 }
 
@@ -83,21 +85,24 @@ export function fanRangeForStage(stage = {}, caps = {}) {
 }
 
 /**
- * Fan target for this stage: the recipe speed, one step more when RH runs high (more fresh air
- * dries the chamber), one step less when it runs low. Always inside fanRangeForStage.
+ * Fan target for this stage: the recipe speed, one step more when RH is above the stage
+ * humidity target, one step less when it is below. The step is held until RH is back
+ * within FAN_IN_BAND of the target, so a chamber a few points short keeps the lower fan.
+ * Always inside fanRangeForStage.
  */
 export function steerFan(stage = {}, reading = {}, caps = {}) {
   const range = fanRangeForStage(stage, caps);
   const base = num(stage.fan?.speed_percent ?? stage.fan_speed_percent) ?? 30;
   const rh = num(reading?.humidity);
-  const lo = num(stage.humidity_target_min) ?? num(stage.humidity_percent);
-  const hi = num(stage.humidity_target_max) ?? num(stage.humidity_percent);
+  const lo = num(stage.humidity_target_min);
+  const hi = num(stage.humidity_target_max);
+  const center = num(stage.humidity_percent) ?? (lo != null && hi != null ? (lo + hi) / 2 : lo ?? hi);
   let target = base;
   let reason = null;
-  if (rh != null && hi != null && rh >= hi + FAN_RH_TRIGGER) {
+  if (rh != null && center != null && rh > center + FAN_IN_BAND) {
     target = base + FAN_STEP;
     reason = `Humidity is running high, so the fan runs a step faster.`;
-  } else if (rh != null && lo != null && rh <= lo - FAN_RH_TRIGGER) {
+  } else if (rh != null && center != null && rh < center - FAN_IN_BAND) {
     target = base - FAN_STEP;
     reason = `Humidity is running low, so the fan runs a step slower.`;
   }
@@ -106,7 +111,7 @@ export function steerFan(stage = {}, reading = {}, caps = {}) {
 
 /** Stage recipe knobs (fresh air, light, phase) this chamber can take, firmware keys. */
 export function recipeKnobs(stage = {}, stageId, caps = {}) {
-  const targets = stageTargets(stage, { stageId });
+  const targets = stageTargets(stage, { stageId, caps });
   const out = {};
   for (const key of RECIPE_KEYS) if (targets[key] != null && knobSupported(caps, key)) out[key] = targets[key];
   if (targets.grow_phase && caps.multi && caps.grow_phase) out.grow_phase = targets.grow_phase;
@@ -118,7 +123,7 @@ export function recipeChanges(recipe = {}, knobs = {}) {
   const out = {};
   for (const [key, value] of Object.entries(recipe)) {
     if (key === "grow_phase") {
-      if (knobs.grow_phase !== value) out[key] = value;
+      if (!sameGrowPhase(knobs.grow_phase, value)) out[key] = value;
     } else if (!readingMatchesTargets(knobs, { [key]: value })) out[key] = value;
   }
   return out;
@@ -139,7 +144,7 @@ export function knobsMismatch(doc = {}, last = {}) {
   delete want.grow_day; // the chamber counts days itself
   for (const [key, value] of Object.entries(want)) {
     if (key === "grow_phase") {
-      if (knobs.grow_phase && knobs.grow_phase !== value) return true;
+      if (knobs.grow_phase && !sameGrowPhase(knobs.grow_phase, value)) return true;
       continue;
     }
     if (knobs[key] == null) continue;

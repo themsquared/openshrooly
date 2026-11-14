@@ -14,6 +14,7 @@ import {
   renderDeviceCards,
   renderIdentity,
   speciesLine,
+  growPhasesForDevice,
   renderCommandList,
   resultMessage,
   commandStatusLabel,
@@ -272,6 +273,24 @@ test("a 1.0.5 chamber gets fan, fresh air, light in % with a lux preview, and it
   assert.equal(luxPreview(20), "About 92 lux");
   assert.match(luxPreview(100), /4000 lux \(the most/);
   assert.doesNotMatch(html, DASH);
+  assert.match(html, /<option value="Colonizing">/);
+  assert.doesNotMatch(html, /<option value="Colonization">/);
+});
+
+test("Lykyn phase select uses Colonization, Shrooly keeps Colonizing", () => {
+  assert.deepEqual(growPhasesForDevice({}), ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"]);
+  assert.deepEqual(growPhasesForDevice({ device_type: "shrooly_chamber" }), ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"]);
+  assert.deepEqual(growPhasesForDevice({ device_type: "lykyn_chamber" }), ["Fruiting", "Pinning", "Colonization", "Custom"]);
+  const html = renderControls({
+    ...sl2,
+    device_type: "lykyn_chamber",
+    firmware: "0.2.0",
+    controls: SL5_CONTROLS,
+    chamber: { grow_phase: "Colonization", air_exchange_period_min: 60, air_exchange_run_sec: 15 },
+  }, { canWrite: true });
+  assert.match(html, /<option value="Colonization" selected>/);
+  assert.match(html, /<option value="Custom">/);
+  assert.doesNotMatch(html, /<option value="Colonizing">/);
 });
 
 test("air and phase controls stay hidden until the chamber reports them", () => {
