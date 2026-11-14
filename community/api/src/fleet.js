@@ -385,7 +385,7 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     },
     // What the chamber reports it is running now (null per knob when it doesn't say).
     chamber: knobs,
-    chamber_light: lightFromKnobs(knobs),
+    chamber_light: lightFromKnobs(knobs, caps),
     light: lightFromStage(stage),
     // The recipe band for the current stage, so pages can show readings against it.
     targets: stage.id
@@ -486,7 +486,7 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
     const out = {};
     if (payload.grow_phase != null && payload.grow_phase !== "") {
       const phase = growPhaseForStage(String(payload.grow_phase));
-      if (!phase || !GROW_PHASE_OPTIONS.includes(phase)) return { ok: false, error: `Phase must be one of ${GROW_PHASE_OPTIONS.join(", ")}.` };
+      if (!phase) return { ok: false, error: `Phase must be one of ${GROW_PHASE_OPTIONS.join(", ")}.` };
       out.grow_phase = phase;
     }
     if (payload.grow_day != null && payload.grow_day !== "") {

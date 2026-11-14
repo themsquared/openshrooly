@@ -417,8 +417,14 @@ export function autopilotSummary(next = {}) {
   return `Set ${parts.length ? `${parts.join(", ")} and ${last}` : last}`;
 }
 
-/** Chamber grow phases (the chamber's own select). */
+/** Chamber grow phases for a Shrooly. Lykyn uses LYKYN_GROW_PHASES. */
 export const GROW_PHASES = ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"];
+export const LYKYN_GROW_PHASES = ["Fruiting", "Pinning", "Colonization", "Custom"];
+
+/** The phase names this chamber's select will accept. */
+export function growPhasesForDevice(device = {}) {
+  return device.device_type === "lykyn_chamber" ? LYKYN_GROW_PHASES : GROW_PHASES;
+}
 
 export function renderControls(device, { profiles = [], canWrite = false, showCoach = false } = {}) {
   const disabled = canWrite ? "" : " disabled";
@@ -495,6 +501,8 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
     </fieldset>`
     : "";
   const phaseNow = chamber.grow_phase || "";
+  const phaseOptions = growPhasesForDevice(device);
+  const phaseList = phaseNow && !phaseOptions.includes(phaseNow) ? [phaseNow, ...phaseOptions] : phaseOptions;
   const stageBlock = reported("stage")
     ? `<fieldset>
       <legend>Chamber phase</legend>
@@ -503,7 +511,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
           controls.stage?.phase === false
             ? ""
             : `<label>Phase on the chamber
-          <select name="grow_phase"${targetOff}>${GROW_PHASES.map((p) => `<option value="${p}"${p === phaseNow ? " selected" : ""}>${p}</option>`).join("")}</select>
+          <select name="grow_phase"${targetOff}>${phaseList.map((p) => `<option value="${p}"${p === phaseNow ? " selected" : ""}>${p}</option>`).join("")}</select>
         </label>`
         }
         ${

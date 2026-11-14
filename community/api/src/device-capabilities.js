@@ -118,8 +118,11 @@ const KNOB_BY_KEY = Object.fromEntries(KNOBS.map((k) => [k.key, k]));
 export const LIGHT_KEYS = ["sunrise_hour", "light_hours", "white_intensity", "color_r", "color_g", "color_b"];
 const LIGHT_MIX_KEYS = ["white_intensity", "color_r", "color_g", "color_b"];
 
-/** The chamber's grow_phase select options (display only on the chamber). */
+/** Chamber grow_phase options for a Shrooly. Lykyn uses LYKYN_GROW_PHASE_OPTIONS. */
 export const GROW_PHASE_OPTIONS = ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"];
+/** Lykyn firmware stage names (lykyn-core.yaml). */
+export const LYKYN_GROW_PHASE_OPTIONS = ["Fruiting", "Pinning", "Colonization", "Custom"];
+/** Canonical (Shrooly) phase for a profile stage id. Colonization is remapped per chamber. */
 const STAGE_TO_PHASE = {
   colonization: "Colonizing",
   colonizing: "Colonizing",
@@ -132,16 +135,56 @@ const STAGE_TO_PHASE = {
   harvest: "Harvest",
   idle: "Idle",
 };
-const PHASE_TO_STAGE = { Colonizing: "colonization", Pinning: "pinning", Fruiting: "fruiting" };
+const PHASE_TO_STAGE = {
+  Colonizing: "colonization",
+  Colonization: "colonization",
+  Pinning: "pinning",
+  Fruiting: "fruiting",
+};
 
-/** Chamber phase for a profile stage id, or null when there is no sensible match. */
-export function growPhaseForStage(stageId) {
-  if (!stageId) return null;
-  if (GROW_PHASE_OPTIONS.includes(stageId)) return stageId;
-  return STAGE_TO_PHASE[String(stageId).toLowerCase()] || null;
+/** Whether this chamber uses Lykyn's phase names ("Colonization" instead of "Colonizing"). */
+export function isLykynChamber(caps = {}) {
+  return caps.device_type === "lykyn_chamber";
 }
 
-/** Profile stage id for a chamber phase ("" for Idle, Harvest, or unknown). */
+/** The phase names this chamber's select will accept. */
+export function growPhaseOptionsFor(caps = {}) {
+  return isLykynChamber(caps) ? LYKYN_GROW_PHASE_OPTIONS : GROW_PHASE_OPTIONS;
+}
+
+/** True when two phase strings are the same stage (Colonizing and Colonization count as one). */
+export function sameGrowPhase(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const sa = stageForGrowPhase(a);
+  const sb = stageForGrowPhase(b);
+  return Boolean(sa && sa === sb);
+}
+
+/** The phase string this chamber wants for a canonical or alias phase. */
+export function phaseForChamber(phase, caps = {}) {
+  if (!phase) return null;
+  if (isLykynChamber(caps)) return phase === "Colonizing" ? "Colonization" : phase;
+  return phase === "Colonization" ? "Colonizing" : phase;
+}
+
+/**
+ * Chamber phase for a profile stage id or a phase name, or null when there is no match.
+ * Pass caps so a Lykyn gets "Colonization" and a Shrooly keeps "Colonizing".
+ */
+export function growPhaseForStage(stageId, caps = {}) {
+  if (!stageId) return null;
+  const raw = String(stageId);
+  let canonical = STAGE_TO_PHASE[raw.toLowerCase()] || null;
+  if (!canonical) {
+    if (raw === "Colonization") canonical = "Colonizing";
+    else if (GROW_PHASE_OPTIONS.includes(raw)) canonical = raw;
+    else if (raw === "Custom") return isLykynChamber(caps) ? "Custom" : null;
+  }
+  return canonical ? phaseForChamber(canonical, caps) : null;
+}
+
+/** Profile stage id for a chamber phase ("" for Idle, Harvest, Custom, or unknown). */
 export function stageForGrowPhase(phase) {
   return PHASE_TO_STAGE[String(phase || "")] || "";
 }
@@ -263,14 +306,17 @@ export function chamberKnobs(doc = {}) {
 }
 
 /** Light as the site shows it: the profile light shape, from chamber knob values. */
-export function lightFromKnobs(knobs = {}) {
+export function lightFromKnobs(knobs = {}, caps = {}) {
   if (LIGHT_KEYS.every((k) => knobs[k] == null)) return null;
-  const lux = knobs.white_intensity;
+  const raw = knobs.white_intensity;
+  const percentScale = whiteIsPercent(caps);
+  const lux = raw == null ? null : percentScale ? whitePercentToLux(raw) : raw;
+  const percent = raw == null ? null : percentScale ? Math.round(raw) : Math.round(whiteLuxToPercent(raw));
   return {
     sunrise_hour: knobs.sunrise_hour,
     duration_hours: knobs.light_hours,
     white_led_lux: lux,
-    white_percent: lux == null ? null : Math.round(whiteLuxToPercent(lux)),
+    white_percent: percent,
     red_percent: knobs.color_r,
     green_percent: knobs.color_g,
     blue_percent: knobs.color_b,
@@ -316,8 +362,14 @@ export function snapKnob(value, [lo, hi, step]) {
   return Math.round(clip(snapped, [lo, hi]) * 100) / 100;
 }
 
+/** True when this chamber's white_intensity is 0-100% rather than lux (Lykyn). */
+export function whiteIsPercent(caps = {}) {
+  const hi = caps.knob_ranges?.white_intensity?.[1];
+  return hi != null && hi <= 100;
+}
+
 /** Knob keys from the site's light shape (a profile stage light, plus optional white_percent). */
-export function lightToKnobs(light = {}) {
+export function lightToKnobs(light = {}, caps = {}) {
   const out = {};
   const set = (key, value) => {
     const n = num(value);
@@ -325,8 +377,14 @@ export function lightToKnobs(light = {}) {
   };
   set("sunrise_hour", light.sunrise_hour);
   set("light_hours", light.duration_hours ?? light.light_hours);
-  if (num(light.white_percent) != null) out.white_intensity = whitePercentToLux(num(light.white_percent));
-  else set("white_intensity", light.white_led_lux ?? light.white_intensity);
+  const percent = whiteIsPercent(caps);
+  if (num(light.white_percent) != null) {
+    out.white_intensity = percent ? num(light.white_percent) : whitePercentToLux(num(light.white_percent));
+  } else if (num(light.white_led_lux) != null) {
+    out.white_intensity = percent ? whiteLuxToPercent(num(light.white_led_lux)) : num(light.white_led_lux);
+  } else {
+    set("white_intensity", light.white_intensity);
+  }
   set("color_r", light.red_percent ?? light.color_r);
   set("color_g", light.green_percent ?? light.color_g);
   set("color_b", light.blue_percent ?? light.color_b);
@@ -334,11 +392,11 @@ export function lightToKnobs(light = {}) {
 }
 
 /** Firmware payload keys from what the site sends: aliases, the light object, then the knob keys. */
-function normalizeInput(input = {}) {
+function normalizeInput(input = {}, caps = {}) {
   const out = { ...input };
   if (num(out.air_exchange_speed) == null && num(out.fan_speed_percent) != null) out.air_exchange_speed = num(out.fan_speed_percent);
   if (out.light && typeof out.light === "object") {
-    for (const [key, value] of Object.entries(lightToKnobs(out.light))) if (num(out[key]) == null) out[key] = value;
+    for (const [key, value] of Object.entries(lightToKnobs(out.light, caps))) if (num(out[key]) == null) out[key] = value;
   }
   return out;
 }
@@ -373,7 +431,7 @@ export function supportedSetpoints(payload = {}, caps, requested = payload, { cu
   const out = {};
   const skipped = [];
   const asked = new Set(askedKeys(requested));
-  const input = completeLight(normalizeInput(payload), current);
+  const input = completeLight(normalizeInput(payload, caps), current);
   const support = controlSupport(caps);
   const t = num(input.temperature_c);
   const h = num(input.humidity_percent);
@@ -395,7 +453,7 @@ export function supportedSetpoints(payload = {}, caps, requested = payload, { cu
     else if (asked.has(knob.key)) skipped.push({ field: knob.key, note: NOTES[knob.group] });
   }
   if (input.grow_phase) {
-    const phase = growPhaseForStage(input.grow_phase);
+    const phase = growPhaseForStage(input.grow_phase, caps);
     if (phase && caps.multi && caps.grow_phase) out.grow_phase = phase;
     else if (asked.has("grow_phase")) skipped.push({ field: "grow_phase", note: phase ? NOTES.stage : "That phase doesn't match one the chamber shows." });
   }
@@ -409,7 +467,7 @@ function hasTargets(payload = {}) {
 }
 
 /** Everything a profile stage sets on the chamber, as setpoints input. */
-export function stageTargets(stage = {}, { stageId = null, growDay = null } = {}) {
+export function stageTargets(stage = {}, { stageId = null, growDay = null, caps = {} } = {}) {
   const fan = stage.fan || {};
   return {
     temperature_c: num(stage.temperature_c),
@@ -418,8 +476,8 @@ export function stageTargets(stage = {}, { stageId = null, growDay = null } = {}
     air_exchange_period_min: num(fan.period_min),
     air_exchange_run_sec: num(fan.run_duration_s),
     // Every stage has a duration and a mix; a stage saved without light is dark.
-    ...lightToKnobs(normalizeStoredStageLight(stage.light)),
-    grow_phase: growPhaseForStage(stageId || stage.id),
+    ...lightToKnobs(normalizeStoredStageLight(stage.light), caps),
+    grow_phase: growPhaseForStage(stageId || stage.id, caps),
     grow_day: num(growDay),
   };
 }
@@ -440,7 +498,7 @@ export function planForCapabilities(plan, caps, { stage = {}, requested = {}, cu
   }
   if (plan.kind === "apply_profile") {
     if (caps.apply_profile) return { ok: true, commands: [{ kind: "apply_profile", payload: plan.payload }], skipped: [], translated: false };
-    const targets = stageTargets(stage, { stageId: plan.payload.stage, growDay });
+    const targets = stageTargets(stage, { stageId: plan.payload.stage, growDay, caps });
     const asked = caps.multi ? targets : { temperature_c: targets.temperature_c, humidity_percent: targets.humidity_percent, air_exchange_speed: targets.air_exchange_speed };
     const { payload, skipped } = supportedSetpoints(asked, caps, asked, { current });
     if (!caps.multi && stage.light && Object.keys(stage.light).length) skipped.push({ field: "light", note: NOTES.light });
@@ -487,7 +545,7 @@ export function readingMatchesTargets(reading = {}, target = {}) {
     const got = num(reading[knob.key]);
     if (got == null || Math.abs(got - want) > Math.max(0.15, knob.range[2] / 2)) return false;
   }
-  if (target.grow_phase && reading.grow_phase !== target.grow_phase) return false;
+  if (target.grow_phase && !sameGrowPhase(reading.grow_phase, target.grow_phase)) return false;
   return true;
 }
 
