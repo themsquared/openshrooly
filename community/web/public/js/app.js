@@ -11,6 +11,8 @@ import { queueItemHtml } from "./moderate-queue.js";
 import { escapeHtml, renderSafeMarkdown, safeDisplay } from "./safe-markdown.js";
 import {
   coachLine,
+  coachManagingTargets,
+  COACH_MANAGES_NOTE,
   deviceMetaLine,
   chartReady,
   growLine,
@@ -2472,6 +2474,9 @@ async function renderFleet() {
     if (lightForm && d.controls?.light?.supported === false) {
       for (const el of lightForm.querySelectorAll("input, button, select")) el.disabled = true;
       lightForm.insertAdjacentHTML("afterbegin", `<p class="muted control-note">${escapeHtml(d.controls.light.note)}</p>`);
+    } else if (lightForm && coachManagingTargets(d)) {
+      for (const el of lightForm.querySelectorAll("input, button, select")) el.disabled = true;
+      lightForm.insertAdjacentHTML("afterbegin", `<p class="muted control-note">${escapeHtml(COACH_MANAGES_NOTE)}</p>`);
     }
     bindLightForm(lightForm, {
       summary: $("#detail-light-summary"),

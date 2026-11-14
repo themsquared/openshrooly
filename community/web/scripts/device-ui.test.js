@@ -8,6 +8,8 @@ import {
   deviceTypeLabel,
   growLine,
   renderControls,
+  COACH_MANAGES_NOTE,
+  coachManagingTargets,
   renderDeviceCard,
   renderDeviceCards,
   renderIdentity,
@@ -62,6 +64,39 @@ test("device page identity and controls use chamber names, not product Shrooly",
   assert.doesNotMatch(identity + controls, DASH);
   const offMenu = renderControls({ ...pearl, off_menu: true, coach: null }, { canWrite: true, showCoach: true });
   assert.doesNotMatch(offMenu, /Coach Autopilot|Coach mode/);
+});
+
+test("Coach Autopilot locks every target field and leaves mode and name editable", () => {
+  const auto = {
+    ...pearl,
+    coach: { mode: "autopilot", status: "autopilot" },
+  };
+  const html = renderControls(auto, { profiles: [pearl.profile], canWrite: true, showCoach: true });
+  assert.equal(coachManagingTargets(auto), true);
+  assert.match(html, new RegExp(COACH_MANAGES_NOTE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(html, /data-coach-managing/);
+  for (const name of [
+    "temperature_c",
+    "humidity_percent",
+    "fan_speed_percent",
+    "profile_id",
+    "stage",
+    "sunrise_hour",
+    "duration_hours",
+    "white_percent",
+  ]) {
+    assert.match(html, new RegExp(`name="${name}"[^>]*disabled`), name);
+  }
+  assert.match(html, /data-action="climate"[^>]*disabled/);
+  assert.match(html, /data-action="light"[^>]*disabled/);
+  assert.match(html, /data-action="profile"[^>]*disabled/);
+  assert.doesNotMatch(html, /name="coach_mode"[^>]*disabled/);
+  assert.doesNotMatch(html, /name="device_name"[^>]*disabled/);
+  assert.doesNotMatch(html, /data-action="name"[^>]*disabled/);
+  assert.doesNotMatch(html, /data-action="coach_mode"[^>]*disabled/);
+  const off = renderControls({ ...auto, coach: { mode: "advisor", status: "advisor" } }, { profiles: [pearl.profile], canWrite: true, showCoach: true });
+  assert.doesNotMatch(off, /data-coach-managing/);
+  assert.doesNotMatch(off, /name="temperature_c"[^>]*disabled/);
 });
 
 test("offline devices keep controls read only", () => {

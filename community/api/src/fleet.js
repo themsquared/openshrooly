@@ -18,9 +18,9 @@ import {
   clampAutopilotSetpoints,
   coachAutopilotAvailable,
   coachAutopilotFlagOn,
+  COACH_MANAGES_TARGETS,
   getDeviceMode,
   insertedId,
-  noteManualSetpointCommand,
   rememberDeviceProfile,
   setDeviceAutopilotMode,
 } from "./coach-autopilot.js";
@@ -591,6 +591,12 @@ function autopilotSteering(env, modeRow) {
   return coachAutopilotFlagOn(env) && modeRow.mode === "autopilot" && !Number(modeRow.paused);
 }
 
+const COACH_LOCKED_KINDS = new Set(["setpoints", "apply_profile", "schedule", "stage"]);
+
+function coachBlocksChange(env, modeRow, plan) {
+  return Boolean(plan?.ok && COACH_LOCKED_KINDS.has(plan.kind) && autopilotSteering(env, modeRow));
+}
+
 function profileLabel(profile, stage) {
   return `${profile?.name || profile?.id || "Profile"}${stage?.name ? ` ${stage.name}` : ""}`;
 }
@@ -644,8 +650,11 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   return { modeRow, profile, stage, current, caps, plan, translated, trustReported };
 }
 
-function previewResult(device, { plan, translated, profile, stage }) {
+function previewResult(device, { plan, translated, profile, stage, modeRow }, env) {
   if (!plan.ok) return { device_id: device.id, name: device.name, status: "failed", error: plan.error, preview: null };
+  if (coachBlocksChange(env, modeRow, plan)) {
+    return { device_id: device.id, name: device.name, status: "failed", error: COACH_MANAGES_TARGETS, preview: plan.preview };
+  }
   if (translated && !translated.ok) {
     return { device_id: device.id, name: device.name, status: "failed", error: translated.error, preview: plan.preview };
   }
@@ -691,19 +700,13 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
   if (!translated.ok) {
     return { ...base, status: "failed", error: translated.error, skipped: translated.skipped || [], preview: plan.preview };
   }
+  if (coachBlocksChange(env, modeRow, plan)) {
+    return { ...base, status: "failed", error: COACH_MANAGES_TARGETS, preview: plan.preview };
+  }
   if (plan.kind === "apply_profile") {
     // The chamber's reported grow day belongs to whatever it ran before, so only trust it
     // for the same profile. A different profile starts its own clock.
     await setActiveGrow(db, user, device, profile, plan.payload.stage, now, trustReported ? current : null);
-    if (autopilotSteering(env, modeRow)) {
-      return {
-        ...base,
-        status: "applied",
-        preview: plan.preview,
-        commands: [],
-        message: `Coach now adjusts toward ${profileLabel(profile, stage)} a step at a time. No direct change was sent.`,
-      };
-    }
   }
   const requestId = requestIdFrom(payload);
   const recent = await recentCommands(db, device.id, 20);
@@ -713,7 +716,6 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
     const dup = findDuplicate(recent, { kind: command.kind, payload: command.payload, requestId, now });
     const row = dup || (await insertCommand(db, device, command.kind, command.payload, { requestId }));
     if (dup) deduped = true;
-    else if (command.kind === "setpoints") await noteManualSetpointCommand(db, device, { ...command.payload, source: "fleet" });
     states.push(commandState(row, { device, caps, now }));
   }
   const status = states.some((c) => c.status === "failed")
@@ -838,7 +840,7 @@ export async function handleFleet(method, path, url, request, env) {
     const now = Date.now();
     if (deviceAction[2] === "preview") {
       const planned = await planChange(db, user, device, { action: body.action, payload: body.payload || {} }, now);
-      return json({ scope: "device", results: [previewResult(device, planned)] });
+      return json({ scope: "device", results: [previewResult(device, planned, env)] });
     }
     const result = await applyOne(db, env, user, device, { action: body.action, payload: body.payload || {} }, now);
     await writeAudit(db, user, {
@@ -938,7 +940,7 @@ export async function handleFleet(method, path, url, request, env) {
     for (const device of devices) {
       if (path.endsWith("/preview")) {
         const planned = await planChange(db, user, device, { action: body.action, payload: body.payload || {} }, now);
-        results.push(previewResult(device, planned));
+        results.push(previewResult(device, planned, env));
       } else {
         results.push(await applyOne(db, env, user, device, { action: body.action, payload: body.payload || {} }, now));
       }

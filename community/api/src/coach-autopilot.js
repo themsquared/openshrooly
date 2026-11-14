@@ -4,7 +4,7 @@ import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { coachAccess } from "./coach-access.js";
 import { chamberKnobs, deviceCapabilities, KNOBS, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
-import { knobTargets, knobsMismatch, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
+import { knobTargets, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
 import {
   applyJevDecision,
   askJev,
@@ -45,7 +45,6 @@ export const AUTOPILOT_LIMITS = {
   minIntervalMs: 60 * 60 * 1000,
   dailyCap: 8,
   staleMs: READINGS_STALE_MS,
-  manualPauseMs: 12 * 60 * 60 * 1000,
   physicalTemp: [0, 45],
   physicalRh: [10, 100],
   jumpTemp: 8,
@@ -67,6 +66,9 @@ export async function coachAutopilotAvailable(env, db, user) {
 }
 
 export const AUTOPILOT_SOURCES = new Set(["grow-coach-autopilot", "grow-coach-autopilot-undo"]);
+
+/** Shown in the UI and returned when a manual target write is refused during Autopilot. */
+export const COACH_MANAGES_TARGETS = "Coach is managing targets. Turn Coach off to set them yourself.";
 
 export function inferDelivery(device = {}) {
   return String(device.id || "").startsWith("sldev_") ? "cloud" : "local";
@@ -702,10 +704,8 @@ export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, pr
     if (!resolved.error) state.profile_id = resolved.profile.id;
   }
   if (nextMode === "autopilot") {
-    const until = state.pause_until ? Date.parse(state.pause_until) : NaN;
-    if (Number(state.paused) && Number.isFinite(until) && until > Date.now()) {
-      return { error: state.pause_reason || "Coach stopped adjusting for now.", status: 409 };
-    }
+    // Turning Coach on always clears a pause, including a leftover 12 hour
+    // self-pause from before manual edits were refused instead.
     state.paused = 0;
     state.pause_reason = null;
     state.pause_until = null;
@@ -714,36 +714,6 @@ export async function setDeviceAutopilotMode(db, env, user, { deviceId, mode, pr
   state.mode = nextMode;
   await writeDeviceMode(db, state);
   return { ok: true, ...publicStatus(state), profile_id: state.profile_id, delivery: state.delivery || inferDelivery(device) };
-}
-
-export async function pauseForManualOverride(db, deviceId, userId, now = Date.now()) {
-  const state = await getDeviceMode(db, deviceId, userId);
-  if (state.mode !== "autopilot") return state;
-  state.mode = "advisor";
-  state.paused = 1;
-  state.pause_reason = "You changed a target yourself, so Coach stopped adjusting for 12 hours.";
-  state.pause_until = new Date(now + AUTOPILOT_LIMITS.manualPauseMs).toISOString().replace(/\.\d+Z$/, "Z");
-  state.last_manual_at = new Date(now).toISOString().replace(/\.\d+Z$/, "Z");
-  await writeDeviceMode(db, state);
-  await addLog(db, {
-    device_id: deviceId,
-    user_id: userId,
-    action: "pause",
-    old_value: null,
-    new_value: null,
-    reason: state.pause_reason,
-    readings: null,
-  });
-  return state;
-}
-
-export async function noteManualSetpointCommand(db, device, payload) {
-  if (!device?.id || !device.owner_id) return;
-  const source = payload?.source || "";
-  if (AUTOPILOT_SOURCES.has(source)) return;
-  const state = await getDeviceMode(db, device.id, device.owner_id);
-  if (state.mode !== "autopilot") return;
-  await pauseForManualOverride(db, device.id, device.owner_id);
 }
 
 export function expandStage(stage = {}) {
@@ -1175,25 +1145,8 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   ]);
   const pendingAutopilot = (pending || []).filter(isAutopilotCommand);
   const last = parseJson(state.last_setpoints, {});
-  const lastApplied = state.last_change_at ? Date.parse(state.last_change_at) : NaN;
-  const settling = Number.isFinite(lastApplied) && now - lastApplied < AUTOPILOT_LIMITS.staleMs;
-  const knobsMoved = caps.multi && !settling && knobsMismatch(doc, last);
-  if (knobsMoved || setpointsMismatch(current, last, { now, lastChangeAt: state.last_change_at })) {
-    for (const command of pendingAutopilot) {
-      await finalizeAutopilotCommand(db, {
-        command,
-        state,
-        user,
-        status: "refused",
-        reason: "Chamber setpoint changed; manual override wins.",
-        now,
-        readings: current,
-      });
-    }
-    await pauseForManualOverride(db, device.id, user.id, now);
-    const paused = await getDeviceMode(db, device.id, user.id);
-    return { paused: true, reason: paused.pause_reason, flipped_to: "advisor" };
-  }
+  // A local setpoint difference no longer pauses Coach. Pending Autopilot
+  // commands still wait; otherwise the next eligible pass writes Coach's targets back.
   if (pendingAutopilot.length) {
     return { skipped: "pending", reason: "Waiting for the chamber to apply the last Autopilot command." };
   }

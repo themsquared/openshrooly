@@ -224,7 +224,7 @@ test("a profile apply sets the active grow profile and species on the card and d
   assert.equal(card.stage.id, "fruiting");
 });
 
-test("with Autopilot steering, a profile apply switches its target and sends nothing direct", async () => {
+test("with Autopilot steering, a profile apply is refused and sends nothing", async () => {
   const { ctx, token } = await setup("steer@example.com");
   await grantCoach(ctx, token);
   const on = await call(ctx, "POST", "/api/coach/autopilot/mode", {
@@ -235,11 +235,12 @@ test("with Autopilot steering, a profile apply switches its target and sends not
   const before = (await rows(ctx)).length;
   const res = await applyProfile(ctx, token);
   const r = res.data.results[0];
-  assert.equal(r.status, "applied");
-  assert.match(r.message, /Coach now adjusts toward/i);
+  assert.equal(r.status, "failed", JSON.stringify(r));
+  assert.match(r.error, /coach is managing targets/i);
   assert.equal((await rows(ctx)).length, before);
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-1", { token });
   assert.equal(status.data.mode, "autopilot");
+  assert.notEqual(status.data.status, "paused");
 });
 
 test("command states: queued, delivered, applied by ack or readings, failed, expired", () => {
