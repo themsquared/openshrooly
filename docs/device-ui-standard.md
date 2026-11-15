@@ -52,6 +52,19 @@ Profiles that cite a lux figure keep the lux they actually produced, so the new 
 
 A profile's percent is a share of each chamber's maximum, so the same profile sends the same percent to a Shrooly and a Lykyn. It does not promise the same lux. The Shrooly maximum is measured (4000 lux). The Lykyn ring has no lux calibration yet. A lux meter reading at full ring output would let the Lykyn adapter report lux too.
 
+## Profiles state a physical light target
+
+Percent is what Coach, the pages and the status API speak. A profile stage still states the light it wants in physical terms: `white_led_lux` (lux of white) and, optionally, `blue_umol_m2s` (blue photon flux, umol per m2 per second). Each chamber type carries a calibration in `community/api/src/light-calibration.js` (the site reads a byte-identical copy): what it puts out at 100 percent.
+
+| Chamber | White at 100% | Blue at 100% | Basis |
+|---|---|---|---|
+| Shrooly | 4000 lux | none yet, uses the stage's blue percent | The white entity's cap. The lux curve was measured with a Sekonic L-758DR; the strip itself reached 8317 lux at full drive. |
+| Lykyn | 400 lux | 3.5 umol/m2/s | Estimated, not measured. 16 WS2812B pixels, datasheet intensities, 30 to 50% of the light reaching a 30 x 30 cm floor. The range is about 160 to 600 lux and 1.6 to 5.3 umol/m2/s. |
+
+The adapter turns a target into that chamber's percent (lux / lux-at-100, clamped to 100). So 92 lux is 2.3% on a Shrooly and 23% on the Lykyn estimate. When a target is above what the chamber makes, the command goes out at 100 and the site and Coach say so: "Wanted 600 lux of white, this chamber tops out at about 400 lux (estimated)." A blue target converts the same way on a chamber that has a blue figure, and falls back to the stage's blue percent on one that does not.
+
+To replace the Lykyn estimate, change the two numbers in `light-calibration.js`, copy the file to `community/web/public/js/`, and set `estimated` to false. Nothing else holds them. Coach and the stage code never check the chamber type: they ask the adapter.
+
 ## Local status API
 
 `GET /api/status` reports light as `rgba`, each 0 to 100 and normalized to that chamber's maximum. `a` is the white channel, not opacity. See `docs/local-api.md` on the firmware branches.

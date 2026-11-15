@@ -46,9 +46,14 @@ class LightSchedule:
     red_percent: int = 0
     green_percent: int = 0
     blue_percent: int = 0
+    # Optional physical blue target, umol/m2/s. A chamber with a blue calibration turns it into its own blue percent.
+    blue_umol_m2s: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        out = asdict(self)
+        if out.get("blue_umol_m2s") is None:
+            del out["blue_umol_m2s"]
+        return out
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "LightSchedule":
@@ -61,6 +66,7 @@ class LightSchedule:
             red_percent=int(data.get("red_percent", 0)),
             green_percent=int(data.get("green_percent", 0)),
             blue_percent=int(data.get("blue_percent", 0)),
+            blue_umol_m2s=float(data["blue_umol_m2s"]) if data.get("blue_umol_m2s") is not None else None,
         )
 
 

@@ -534,6 +534,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
         <input name="white_percent" type="number" step="0.1" min="0" max="100" value="${numOrBlank(whitePct)}"${targetOff}${colorOff}>
       </label>
       <p class="muted">${escapeHtml(adapter.white.note)}</p>
+      ${device.light?.limit_note ? `<p class="muted" data-light-limit>${escapeHtml(device.light.limit_note)}</p>` : ""}
       <div class="row">
         <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${targetOff}${colorOff}></label>
         <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${targetOff}${colorOff}></label>

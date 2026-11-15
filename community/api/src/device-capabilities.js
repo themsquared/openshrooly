@@ -310,7 +310,8 @@ export function lightToKnobs(light = {}, caps = {}) {
   };
   set("sunrise_hour", light.sunrise_hour);
   set("light_hours", light.duration_hours ?? light.light_hours);
-  const white = deviceAdapter(caps).white;
+  const adapter = deviceAdapter(caps);
+  const white = adapter.white;
   if (num(light.white_percent) != null) {
     out.white_intensity = white.fromPercent(num(light.white_percent));
   } else if (num(light.white_led_lux) != null) {
@@ -320,7 +321,10 @@ export function lightToKnobs(light = {}, caps = {}) {
   }
   set("color_r", light.red_percent ?? light.color_r);
   set("color_g", light.green_percent ?? light.color_g);
-  set("color_b", light.blue_percent ?? light.color_b);
+  // A blue target in umol/m2/s wins when this chamber has a blue figure. Otherwise the blue percent stands.
+  const bluePercent = adapter.light.bluePercent(light);
+  if (bluePercent != null) out.color_b = bluePercent;
+  else set("color_b", light.blue_percent ?? light.color_b);
   return out;
 }
 
@@ -415,6 +419,13 @@ export function stageTargets(stage = {}, { stageId = null, growDay = null, caps 
   };
 }
 
+/** A note per light target this chamber cannot reach ("Wanted 600 lux of white, this chamber tops out at ..."). */
+function lightLimitNotes(stage = {}, caps = {}) {
+  return deviceAdapter(caps)
+    .light.limits(stage?.light)
+    .map((l) => ({ field: l.channel === "white" ? "white_intensity" : "color_b", note: l.note }));
+}
+
 /**
  * Turn a validated plan into commands this chamber can run.
  * Returns { ok, commands: [{kind, payload}], skipped, translated, full, error }.
@@ -442,6 +453,7 @@ export function planForCapabilities(plan, caps, { stage = {}, requested = {}, cu
       if (!sendable.length) {
         return { ok: false, error: skipped[0]?.note || "This chamber can't take that change from the cloud.", skipped };
       }
+      skipped.push(...lightLimitNotes(stage, caps));
       const body = {
         ...payload,
         profile_id: plan.payload.profile_id,
@@ -464,6 +476,7 @@ export function planForCapabilities(plan, caps, { stage = {}, requested = {}, cu
     const { payload, skipped } = supportedSetpoints(asked, caps, asked, { current });
     if (!caps.multi && stage.light && Object.keys(stage.light).length) skipped.push({ field: "light", note: NOTES.light });
     if (!hasTargets(payload)) return { ok: false, error: "This profile phase has no targets this chamber can take from the cloud.", skipped };
+    if (caps.multi) skipped.push(...lightLimitNotes(stage, caps));
     const commands = [
       {
         kind: "setpoints",

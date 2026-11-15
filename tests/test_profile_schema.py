@@ -157,3 +157,16 @@ def test_stored_legacy_light_reads_as_dark_or_12h_but_saves_stay_strict():
     once = normalize_stored_light(raw)
     assert normalize_stored_light(once) == once
     assert "light" not in {s["id"]: s for s in raw["stages"]}["colonization"]
+
+
+def test_optional_blue_target_is_kept_and_checked():
+    raw = json.loads((ROOT / "data/profiles/culinary/pearl-oyster.json").read_text())
+    assert "blue_umol_m2s" not in raw["stages"][1]["light"]
+    raw["stages"][1]["light"]["blue_umol_m2s"] = 3.5
+    profile = validate_profile(raw)
+    assert profile.stages[1].light.blue_umol_m2s == 3.5
+    assert profile.to_dict()["stages"][1]["light"]["blue_umol_m2s"] == 3.5
+    assert "blue_umol_m2s" not in profile.to_dict()["stages"][0]["light"]
+    raw["stages"][1]["light"]["blue_umol_m2s"] = 500
+    with pytest.raises(ValidationError, match="blue_umol_m2s"):
+        validate_profile(raw)

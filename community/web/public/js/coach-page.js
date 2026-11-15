@@ -238,6 +238,7 @@ export function renderCoachGauges(device) {
       <strong>${lightNow ? escapeHtml(lightNow) : `<span class="gauge-missing">Not reported</span>`}</strong>
       ${light?.sunrise_hour != null ? `<span class="gauge-target">on at ${escapeHtml(withUnit(light.sunrise_hour, ":00"))}</span>` : ""}
       ${lightGoal ? `<span class="gauge-target">recipe ${escapeHtml(lightGoal)}</span>` : ""}
+      ${device.light?.limit_note ? `<span class="gauge-target" data-light-limit>${escapeHtml(device.light.limit_note)}</span>` : ""}
     </div>
   </div>`;
 }
