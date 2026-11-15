@@ -1,0 +1,42 @@
+# Shared LAN discovery and read-only status API. See docs/local-api.md.
+mdns:
+  services:
+    - service: _shroomlabs
+      protocol: _tcp
+      port: 80
+      txt:
+        type: shrooly_chamber
+        model: OpenShrooly
+        fw: ${device_version}
+        api: "1"
+        path: /api/status
+
+shroom_labs_local_api:
+  type: shrooly_chamber
+  model: OpenShrooly
+  firmware: ${device_version}
+  temperature: temperature
+  humidity: humidity
+  fan_rpm: fan_tach_internal
+  temperature_target: temperature_target
+  temperature_tolerance: temperature_hysteresis
+  humidity_target: target_humidity
+  humidity_tolerance: humidity_hysteresis
+  stage: grow_phase
+  sunrise_hour: sunrise_hour
+  light_hours: light_hours
+  light_r: color_r
+  light_g: color_g
+  light_b: color_b
+  light_white: white_intensity
+  light_on: grow_lights_on
+  light_status: lights_status
+  humidifier_on: humidifier_on
+  humidifier_level: humidifier_speed
+  humidifier_status: humidifier_fan_status
+  fae_period_min: air_exchange_period_min
+  fae_run_s: air_exchange_run_sec
+  fae_speed: air_exchange_speed
+  fae_on: air_exchange_on
+  fae_status: air_exchange_status
+  cloud_id: shl_cloud
