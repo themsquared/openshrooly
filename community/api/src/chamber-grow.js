@@ -6,6 +6,7 @@
  */
 import { SQL as ALERT_SQL } from "./alerts/store.js";
 import { readRules } from "./alerts/rules.js";
+import { deviceAdapter } from "./device-adapters.js";
 import { isOffMenu, profilePath } from "./pack.js";
 
 // Profiles with a licensed photo (Off-menu and Chef's line), and the smallest copy the site has of each.
@@ -94,7 +95,37 @@ export function chamberText(value, max) {
   return String(value || "").replace(/[^\x20-\x7e]/g, "").replace(/["\\<>]/g, "").replace(/\s+/g, " ").trim().slice(0, max).trim();
 }
 
-const NONE = { grow_name: "", grow_url: "", grow_image: "" };
+const NONE = { grow_name: "", grow_url: "", grow_image: "", profile_id: "", profile_stages: {} };
+
+const STAGE_IDS = ["colonization", "pinning", "fruiting"];
+
+/** Compact stage recipes for the chamber, in percent. Empty when the profile has no such stage. */
+export function chamberProfileStages(profile, deviceType) {
+  const white = deviceAdapter(deviceType).white;
+  const out = {};
+  for (const id of STAGE_IDS) {
+    const s = (profile?.stages || []).find((row) => row.id === id);
+    if (!s) continue;
+    const lux = s.light?.white_led_lux;
+    out[id] = {
+      temperature_c: s.temperature_c ?? null,
+      humidity_percent: s.humidity_percent ?? null,
+      temperature_hysteresis: s.temperature_hysteresis ?? null,
+      humidity_hysteresis: s.humidity_hysteresis ?? null,
+      fan_speed_percent: s.fan?.speed_percent ?? null,
+      air_exchange_period_min: s.fan?.period_min ?? null,
+      air_exchange_run_sec: s.fan?.run_duration_s ?? null,
+      sunrise_hour: s.light?.sunrise_hour ?? null,
+      light_hours: s.light?.duration_hours ?? null,
+      white_percent: lux == null ? null : white.percentFromRecipeLux(lux),
+      red_percent: s.light?.red_percent ?? null,
+      green_percent: s.light?.green_percent ?? null,
+      blue_percent: s.light?.blue_percent ?? null,
+      humidifier_speed_percent: s.humidifier_speed_percent ?? null,
+    };
+  }
+  return out;
+}
 
 /** Empty strings mean "nothing picked", so the chamber clears what it showed. */
 export async function chamberGrow(db, env, device) {
@@ -121,6 +152,8 @@ export async function chamberGrow(db, env, device) {
       grow_name: name,
       grow_url: path && path.length < 100 ? `${site}${path}` : "",
       grow_image: photo ? `${site}${photo}` : "",
+      profile_id: chamberText(profile.id, 64),
+      profile_stages: chamberProfileStages(profile, device.device_type),
     };
   } catch {
     // A missing table or bad profile row must never break the inbox.

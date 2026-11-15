@@ -547,6 +547,17 @@ test("Lykyn fruiting apply converts 92 lux to percent and accepts a Colonization
   assert.equal(stage.data.results[0].status, "queued", JSON.stringify(stage.data));
   const q = JSON.parse((await rows(ctx))[1].payload);
   assert.equal(q.grow_phase, "Colonization");
+  assert.equal(q.stage, "colonization");
+  assert.equal(q.profile_id, pearlOyster.id);
+  assert.equal(q.temperature_c, colonization.temperature_c);
+  assert.equal(q.humidity_percent, colonization.humidity_percent);
+  assert.equal(q.air_exchange_speed, 33, "profile 20 clamps to the Lykyn fan minimum");
+  assert.equal(q.air_exchange_period_min, colonization.fan.period_min);
+  assert.equal(q.air_exchange_run_sec, colonization.fan.run_duration_s);
+  assert.equal(q.light_hours, 0);
+  assert.equal(q.white_intensity, 0);
+  assert.equal("grow_day" in q, false, "picking a stage must not reset the start date");
+  assert.equal(q.translated_from, "stage");
 });
 
 
@@ -621,7 +632,7 @@ test("Lykyn: Coach keeps steering Colonization after a manual phase change, not 
   });
   const staged = await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id);
   assert.equal(staged.manualPhase, true, "the manual phase change is the grower's latest say");
-  assert.equal(staged.stage, null);
+  assert.equal(staged.stage, "colonization");
   await coachOn(ctx, token, user);
   const result = await runCoach(ctx, user);
   assert.notEqual(result.stage, "fruiting", JSON.stringify(result));
@@ -633,6 +644,36 @@ test("Lykyn: Coach keeps steering Colonization after a manual phase change, not 
     assert.equal(p.light_hours, 0, "colonization keeps the light off");
   }
   assert.ok(mine.length >= 4, "Coach corrected the lights for colonization");
+});
+
+test("Coach steers Colonization as soon as the grower queues that phase, even if the chamber still says Fruiting", async () => {
+  const { ctx, token, user } = await setupLykyn("queued-colo@example.com");
+  await addCommand(ctx, "dev-1", {
+    kind: "setpoints",
+    payload: { grow_phase: "Colonization", source: "fleet" },
+    issued: minutesAgo(2),
+    consumed: null,
+  });
+  await ctx.db.run("DELETE FROM device_telemetry WHERE device_id=?", ["dev-1"]);
+  await addReading(ctx, "dev-1", {
+    ...LYKYN_READING,
+    grow_phase: "Fruiting",
+    temperature_setpoint: 23,
+    humidity_setpoint: 90,
+    air_exchange_speed: 50,
+    light_hours: 12,
+    white_intensity: 28,
+  });
+  const staged = await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id);
+  assert.equal(staged.stage, "colonization");
+  await coachOn(ctx, token, user);
+  const result = await runCoach(ctx, user);
+  assert.notEqual(result.stage, "fruiting", JSON.stringify(result));
+  for (const row of await coachRows(ctx)) {
+    const p = JSON.parse(row.payload);
+    assert.equal(p.stage, "colonization", row.payload);
+    assert.equal(p.light_hours, 0, "colonization keeps the light off");
+  }
 });
 
 test("Shrooly: Coach keeps steering Colonizing after a manual phase change, not Fruiting", async () => {
@@ -682,7 +723,7 @@ test("Coach's own commands are not the grower's stage choice, and a newer manual
   await addCommand(ctx, "dev-1", { payload: { grow_phase: "Colonizing", source: "fleet", ...ACKED() }, issued: minutesAgo(30) });
   const last = await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id);
   assert.equal(last.manualPhase, true);
-  assert.equal(last.stage, null);
+  assert.equal(last.stage, "colonization");
 });
 
 test("Start this grow with Coach on sets the grow and Coach steers that stage (Lykyn and Shrooly)", async () => {
@@ -875,7 +916,10 @@ test("Lykyn takes Custom from the site, a Shrooly says it has no such phase", as
     const r = res.data.results[0];
     if (fx.type === "lykyn_chamber") {
       assert.equal(r.status, "queued", JSON.stringify(res.data));
-      assert.equal(JSON.parse((await rows(ctx))[0].payload).grow_phase, "Custom");
+      const p = JSON.parse((await rows(ctx))[0].payload);
+      assert.equal(p.grow_phase, "Custom");
+      assert.equal(p.temperature_c, undefined, "Custom has no profile recipe");
+      assert.equal(p.translated_from, undefined);
     } else {
       assert.equal(r.status, "failed", JSON.stringify(res.data));
     }

@@ -4,6 +4,7 @@ import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { coachAccess } from "./coach-access.js";
 import { chamberKnobs, deviceCapabilities, KNOBS, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
+import { stageIdForPhase } from "./device-adapters.js";
 import { knobTargets, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
 import {
   applyJevDecision,
@@ -741,9 +742,10 @@ function commandAck(payload = {}) {
 /**
  * The grower's latest say on which stage this chamber is in, newest first:
  * - a command that named a profile stage (Start this grow, or a profile apply), or
- * - a manual phase change with no stage (the phase box on the device page). That one
- *   returns `{ stage: null, manualPhase: true }`, so Coach follows the chamber's own phase
- *   instead of an older stage choice.
+ * - a manual phase change with no stage field (the Stage picker). That still counts as the
+ *   grower's choice: map the phase to a profile stage (Colonization / Colonizing is
+ *   colonization) so Coach does not keep steering Fruiting while the change is in flight.
+ *   Custom has no profile stage, so `stage` stays null and Coach follows the chamber.
  * Autopilot's own commands never count: their stage is only what Coach steered, and
  * counting them made Coach keep steering whatever it had steered before (Fruiting) even
  * after the grower moved the chamber back to Colonization.
@@ -760,7 +762,8 @@ export async function latestStagedCommand(db, deviceId, profileId) {
     if (row.kind === "setpoints" && payload?.grow_phase && !payload.stage) {
       const ack = commandAck(payload);
       if (ack.status && (FAILED_ACKS.has(ack.status) || ack.status === "expired")) continue;
-      return { stage: null, manualPhase: true, payload, ack, row };
+      const stage = stageIdForPhase(payload.grow_phase) || null;
+      return { stage, manualPhase: true, payload, ack, row };
     }
   }
   return null;
@@ -773,13 +776,12 @@ export async function chosenStageFor(db, deviceId, profileId) {
 }
 
 /**
- * If the last stage apply failed and Autopilot would now steer a different stage
- * (for example fruiting, because the chamber never left its default), do not quietly
- * follow that later stage. Returns the device's error, or null when Autopilot may proceed.
+ * If the last stage apply failed, do not retry it and do not follow the chamber into a
+ * later stage (for example fruiting, because the chamber never left its default). The
+ * grower has to pick again. Returns the device's error, or null when Autopilot may proceed.
  */
 export function failedStageApplyBlocks(last, pick) {
   if (!last || !last.stage || !FAILED_ACKS.has(last.ack?.status)) return null;
-  if (!pick?.stageId || last.stage === pick.stageId) return null;
   return last.ack.reason || "The last phase change failed.";
 }
 

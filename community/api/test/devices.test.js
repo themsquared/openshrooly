@@ -1289,9 +1289,10 @@ test("inbox tells the chamber what is growing so its own page can show it", asyn
   assert.equal(before.status, 200, JSON.stringify(before.data));
   // Nothing picked: empty strings, so the chamber clears its card. Old keys are unchanged.
   assert.deepEqual(
-    { name: before.data.grow_name, url: before.data.grow_url, image: before.data.grow_image },
-    { name: "", url: "", image: "" }
+    { name: before.data.grow_name, url: before.data.grow_url, image: before.data.grow_image, id: before.data.profile_id },
+    { name: "", url: "", image: "", id: "" }
   );
+  assert.deepEqual(before.data.profile_stages, {});
   assert.ok(Array.isArray(before.data.commands));
   assert.equal(before.data.offline_ok, true);
 
@@ -1304,6 +1305,11 @@ test("inbox tells the chamber what is growing so its own page can show it", asyn
   assert.equal(after.data.grow_name, "Lion's Mane");
   assert.equal(after.data.grow_url, `${ctx.SITE_ORIGIN}/profiles/lions-mane`);
   assert.equal(after.data.grow_image, `${ctx.SITE_ORIGIN}/img/species/species-lions-mane-640.webp`);
+  assert.equal(after.data.profile_id, "lions-mane");
+  assert.equal(after.data.profile_stages.fruiting.humidity_percent, 90);
+  assert.equal(after.data.profile_stages.colonization.temperature_c, 22);
+  assert.equal(after.data.profile_stages.fruiting.temperature_c, 17);
+  assert.equal("grow_day" in after.data.profile_stages.fruiting, false);
 });
 
 test("enroll stores a known device_type and ignores an unknown one", async () => {
