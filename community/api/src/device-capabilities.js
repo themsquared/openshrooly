@@ -11,9 +11,10 @@ import {
   DEFAULT_SUNRISE_HOUR,
   FIRMWARE_FALLBACK_LIGHT_HOURS,
   normalizeStoredStageLight,
-  whiteLuxToPercent,
-  whitePercentToLux,
 } from "./profile-schema.js";
+import { DEFAULT_DEVICE_TYPE, deviceAdapter, DEVICE_TYPES, normalizeDeviceType, samePhase, stageIdForPhase } from "./device-adapters.js";
+
+export { DEVICE_TYPES, normalizeDeviceType };
 
 /** Long enough to outlive a poll the chamber's hourly connect cap pushes back (polls are 15 min). */
 export const COMMAND_TTL_MS = 2 * 60 * 60 * 1000;
@@ -69,27 +70,6 @@ export const CAPABILITY_TOKENS = {
   firmware_notice: "update notice on the chamber screen",
 };
 
-/** What every Shroom Labs cloud firmware so far can run. */
-export const BASELINE_CAPABILITIES = ["setpoints.temperature", "setpoints.humidity"];
-
-/** Device types the cloud knows how to drive. Unknown types get no assumed capabilities. */
-export const DEVICE_TYPES = {
-  shrooly_chamber: {
-    baseline: BASELINE_CAPABILITIES,
-    ranges: { temperature_c: [10, 32], humidity_percent: [60, 98] },
-  },
-  lykyn_chamber: {
-    baseline: BASELINE_CAPABILITIES,
-    ranges: { temperature_c: [10, 32], humidity_percent: [30, 95] },
-  },
-};
-
-/** Known type token from an enroll or telemetry body, or null if missing or unknown. */
-export function normalizeDeviceType(value) {
-  const id = String(value || "").trim().toLowerCase();
-  return id && Object.prototype.hasOwnProperty.call(DEVICE_TYPES, id) ? id : null;
-}
-
 /** Short model name from enroll or telemetry, or null if missing. */
 export function normalizeDeviceModel(value) {
   const raw = String(value || "").replace(/[^\x20-\x7e]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
@@ -118,75 +98,27 @@ const KNOB_BY_KEY = Object.fromEntries(KNOBS.map((k) => [k.key, k]));
 export const LIGHT_KEYS = ["sunrise_hour", "light_hours", "white_intensity", "color_r", "color_g", "color_b"];
 const LIGHT_MIX_KEYS = ["white_intensity", "color_r", "color_g", "color_b"];
 
-/** Chamber grow_phase options for a Shrooly. Lykyn uses LYKYN_GROW_PHASE_OPTIONS. */
-export const GROW_PHASE_OPTIONS = ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"];
-/** Lykyn firmware stage names (lykyn-core.yaml). */
-export const LYKYN_GROW_PHASE_OPTIONS = ["Fruiting", "Pinning", "Colonization", "Custom"];
-/** Canonical (Shrooly) phase for a profile stage id. Colonization is remapped per chamber. */
-const STAGE_TO_PHASE = {
-  colonization: "Colonizing",
-  colonizing: "Colonizing",
-  browning: "Colonizing",
-  pinning: "Pinning",
-  cold_shock: "Pinning",
-  fruiting: "Fruiting",
-  flush: "Fruiting",
-  rest: "Harvest",
-  harvest: "Harvest",
-  idle: "Idle",
-};
-const PHASE_TO_STAGE = {
-  Colonizing: "colonization",
-  Colonization: "colonization",
-  Pinning: "pinning",
-  Fruiting: "fruiting",
-};
-
-/** Whether this chamber uses Lykyn's phase names ("Colonization" instead of "Colonizing"). */
-export function isLykynChamber(caps = {}) {
-  return caps.device_type === "lykyn_chamber";
-}
-
 /** The phase names this chamber's select will accept. */
 export function growPhaseOptionsFor(caps = {}) {
-  return isLykynChamber(caps) ? LYKYN_GROW_PHASE_OPTIONS : GROW_PHASE_OPTIONS;
+  return deviceAdapter(caps).phaseOptions;
 }
 
 /** True when two phase strings are the same stage (Colonizing and Colonization count as one). */
 export function sameGrowPhase(a, b) {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const sa = stageForGrowPhase(a);
-  const sb = stageForGrowPhase(b);
-  return Boolean(sa && sa === sb);
-}
-
-/** The phase string this chamber wants for a canonical or alias phase. */
-export function phaseForChamber(phase, caps = {}) {
-  if (!phase) return null;
-  if (isLykynChamber(caps)) return phase === "Colonizing" ? "Colonization" : phase;
-  return phase === "Colonization" ? "Colonizing" : phase;
+  return samePhase(a, b);
 }
 
 /**
- * Chamber phase for a profile stage id or a phase name, or null when there is no match.
+ * Chamber phase for a profile stage id or a phase name, or null when this chamber has no match.
  * Pass caps so a Lykyn gets "Colonization" and a Shrooly keeps "Colonizing".
  */
 export function growPhaseForStage(stageId, caps = {}) {
-  if (!stageId) return null;
-  const raw = String(stageId);
-  let canonical = STAGE_TO_PHASE[raw.toLowerCase()] || null;
-  if (!canonical) {
-    if (raw === "Colonization") canonical = "Colonizing";
-    else if (GROW_PHASE_OPTIONS.includes(raw)) canonical = raw;
-    else if (raw === "Custom") return isLykynChamber(caps) ? "Custom" : null;
-  }
-  return canonical ? phaseForChamber(canonical, caps) : null;
+  return deviceAdapter(caps).nativePhase(stageId);
 }
 
 /** Profile stage id for a chamber phase ("" for Idle, Harvest, Custom, or unknown). */
 export function stageForGrowPhase(phase) {
-  return PHASE_TO_STAGE[String(phase || "")] || "";
+  return stageIdForPhase(phase);
 }
 
 /** The firmware's own cloud clamp (cloud_format.h SETPOINT_*). */
@@ -236,11 +168,11 @@ function intersect([lo, hi], min, max) {
   return out[0] <= out[1] ? out : [lo, hi];
 }
 
-function knobRanges(reported) {
+function knobRanges(reported, typeDefaults = {}) {
   const out = {};
   const raw = reported && typeof reported === "object" ? reported : {};
   for (const knob of KNOBS) {
-    const [lo, hi, step] = knob.range;
+    const [lo, hi, step] = typeDefaults[knob.key] || knob.range;
     const r = Array.isArray(raw[knob.key]) ? raw[knob.key].map(num) : [];
     const min = r[0] != null ? Math.max(lo, r[0]) : lo;
     const max = r[1] != null ? Math.min(hi, r[1]) : hi;
@@ -256,14 +188,14 @@ function knobRanges(reported) {
 export function deviceCapabilities(doc = {}, deviceType = "shrooly_chamber") {
   const raw = doc && typeof doc === "object" ? doc : {};
   const reported = Array.isArray(raw.capabilities) ? raw.capabilities.map(String).filter((t) => t in CAPABILITY_TOKENS) : null;
-  const type = DEVICE_TYPES[deviceType || "shrooly_chamber"];
+  const type = DEVICE_TYPES[deviceType || DEFAULT_DEVICE_TYPE];
   const list = reported || (type ? type.baseline.slice() : []);
   const has = new Set(list);
   const firmware = raw.firmware_version || raw.firmware || raw.version || null;
   const typeLimits = type?.ranges || FIRMWARE_SETPOINT_LIMITS;
   return {
     source: reported ? "reported" : !type ? "unknown_type" : hasSetpointFields(raw) ? "inferred" : "assumed",
-    device_type: deviceType || "shrooly_chamber",
+    device_type: deviceType || DEFAULT_DEVICE_TYPE,
     firmware: firmware ? String(firmware) : null,
     list,
     ranges: {
@@ -274,7 +206,7 @@ export function deviceCapabilities(doc = {}, deviceType = "shrooly_chamber") {
       temperature_c: setpointStep(raw.temperature_target_step, 0.1),
       humidity_percent: setpointStep(raw.target_humidity_step, 0.5),
     },
-    knob_ranges: knobRanges(raw.ranges),
+    knob_ranges: knobRanges(raw.ranges, deviceAdapter(deviceType || DEFAULT_DEVICE_TYPE).knobRanges),
     temperature: has.has("setpoints.temperature"),
     humidity: has.has("setpoints.humidity"),
     multi: has.has("setpoints.multi"),
@@ -309,9 +241,9 @@ export function chamberKnobs(doc = {}) {
 export function lightFromKnobs(knobs = {}, caps = {}) {
   if (LIGHT_KEYS.every((k) => knobs[k] == null)) return null;
   const raw = knobs.white_intensity;
-  const percentScale = whiteIsPercent(caps);
-  const lux = raw == null ? null : percentScale ? whitePercentToLux(raw) : raw;
-  const percent = raw == null ? null : percentScale ? Math.round(raw) : Math.round(whiteLuxToPercent(raw));
+  const white = deviceAdapter(caps).white;
+  const lux = raw == null ? null : white.toLux(raw);
+  const percent = raw == null ? null : Math.round(white.toPercent(raw));
   return {
     sunrise_hour: knobs.sunrise_hour,
     duration_hours: knobs.light_hours,
@@ -362,12 +294,6 @@ export function snapKnob(value, [lo, hi, step]) {
   return Math.round(clip(snapped, [lo, hi]) * 100) / 100;
 }
 
-/** True when this chamber's white_intensity is 0-100% rather than lux (Lykyn). */
-export function whiteIsPercent(caps = {}) {
-  const hi = caps.knob_ranges?.white_intensity?.[1];
-  return hi != null && hi <= 100;
-}
-
 /** Knob keys from the site's light shape (a profile stage light, plus optional white_percent). */
 export function lightToKnobs(light = {}, caps = {}) {
   const out = {};
@@ -377,11 +303,11 @@ export function lightToKnobs(light = {}, caps = {}) {
   };
   set("sunrise_hour", light.sunrise_hour);
   set("light_hours", light.duration_hours ?? light.light_hours);
-  const percent = whiteIsPercent(caps);
+  const white = deviceAdapter(caps).white;
   if (num(light.white_percent) != null) {
-    out.white_intensity = percent ? num(light.white_percent) : whitePercentToLux(num(light.white_percent));
+    out.white_intensity = white.fromPercent(num(light.white_percent));
   } else if (num(light.white_led_lux) != null) {
-    out.white_intensity = percent ? whiteLuxToPercent(num(light.white_led_lux)) : num(light.white_led_lux);
+    out.white_intensity = white.fromLux(num(light.white_led_lux));
   } else {
     set("white_intensity", light.white_intensity);
   }
@@ -657,7 +583,7 @@ export function setpointParts(payload = {}, caps = {}) {
       const bits = [];
       if (payload.light_hours != null) bits.push(`${payload.light_hours} h`);
       if (payload.sunrise_hour != null) bits.push(`from ${hourLabel(Number(payload.sunrise_hour))}`);
-      if (payload.white_intensity != null) bits.push(whiteIsPercent(caps) ? `white ${payload.white_intensity}%` : `white ${payload.white_intensity} lux`);
+      if (payload.white_intensity != null) bits.push(deviceAdapter(caps).white.describe(payload.white_intensity));
       const rgb = ["color_r", "color_g", "color_b"].map((k) => payload[k]);
       if (rgb.some((v) => v != null)) bits.push(`RGB ${rgb.map((v) => v ?? "-").join("/")}%`);
       parts.push(`light ${bits.join(" ")}`.trim());

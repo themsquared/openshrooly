@@ -12,6 +12,7 @@ import {
   COMMAND_TTL_MS,
 } from "../src/device-capabilities.js";
 import { latestStagedCommand, runAutopilotForDevice, setDeviceAutopilotMode } from "../src/coach-autopilot.js";
+import { deviceAdapter, CANONICAL_STAGES } from "../src/device-adapters.js";
 import { validateStageLight } from "../src/profile-schema.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
@@ -765,4 +766,147 @@ test("Lykyn command summaries say white in percent, Shrooly in lux", () => {
   assert.match(commandState({ id: 1, kind: "setpoints", payload: JSON.stringify(payload), issued_at: nowIso(), consumed_at: null }, { caps: lykyn }).summary, /white 40%/);
   const shrooly = deviceCapabilities(SL5_READING);
   assert.match(commandState({ id: 1, kind: "setpoints", payload: JSON.stringify(payload), issued_at: nowIso(), consumed_at: null }, { caps: shrooly }).summary, /white 40 lux/);
+});
+
+
+// ---- Same Coach, same decisions, on every chamber type ----
+//
+// The same grow situation is set up on a Shrooly and on a Lykyn, each in its own words (Colonizing
+// against Colonization, white in lux against percent). Whatever Coach and the apply path decide must
+// match once the commands are read back through the adapter. Coach has no device-type branch, so any
+// difference here is a leak.
+
+const FIXTURES = [
+  { name: "Shrooly", type: "shrooly_chamber", setup: setupSl5, base: SL5_READING, white: 92 },
+  { name: "Lykyn", type: "lykyn_chamber", setup: setupLykyn, base: LYKYN_READING, white: 20 },
+];
+const FAN_FLOOR = 33; // the strictest chamber's minimum: below it both chambers end up at the floor
+const FAN_STEP = 5; // the coarsest chamber's step: the chambers snap a fan figure to their own step
+
+function canonicalCommand(adapter, p) {
+  const out = {
+    stage: p.stage ?? null,
+    phase: p.grow_phase ? adapter.stage(p.grow_phase) : null,
+    temperature_c: p.temperature_c ?? null,
+    humidity_percent: p.humidity_percent ?? null,
+    fan: p.air_exchange_speed == null ? null : Math.round(Math.max(p.air_exchange_speed, FAN_FLOOR) / FAN_STEP) * FAN_STEP,
+    period: p.air_exchange_period_min ?? null,
+    run: p.air_exchange_run_sec ?? null,
+    light_hours: p.light_hours ?? null,
+    white_percent: p.white_intensity == null ? null : Math.round(adapter.white.toPercent(p.white_intensity)),
+    rgb: ["color_r", "color_g", "color_b"].map((k) => p[k] ?? null),
+  };
+  return out;
+}
+
+async function reportReading(ctx, fx, phaseStage, extra = {}) {
+  const adapter = deviceAdapter(fx.type);
+  await ctx.db.run("DELETE FROM device_telemetry WHERE device_id=?", ["dev-1"]);
+  await addReading(ctx, "dev-1", {
+    ...fx.base,
+    grow_phase: adapter.nativePhase(phaseStage),
+    grow_day: 3,
+    temperature: 22,
+    temperature_c: 22,
+    temperature_setpoint: 24,
+    humidity: 90,
+    humidity_percent: 90,
+    humidity_setpoint: 90,
+    air_exchange_speed: FAN_FLOOR,
+    air_exchange_period_min: 60,
+    air_exchange_run_sec: 15,
+    light_hours: 12,
+    white_intensity: fx.white,
+    color_b: 80,
+    ...extra,
+  });
+}
+
+test("adapters name the same four stages and hide each chamber's own words", () => {
+  const shrooly = deviceAdapter("shrooly_chamber");
+  const lykyn = deviceAdapter("lykyn_chamber");
+  assert.deepEqual(CANONICAL_STAGES, ["Colonization", "Pinning", "Fruiting", "Custom"]);
+  assert.equal(shrooly.nativePhase("Colonization"), "Colonizing");
+  assert.equal(lykyn.nativePhase("Colonization"), "Colonization");
+  assert.equal(shrooly.nativePhase("Colonizing"), "Colonizing");
+  assert.equal(lykyn.nativePhase("Colonizing"), "Colonization");
+  assert.equal(shrooly.nativePhase("Custom"), null);
+  assert.equal(lykyn.nativePhase("Custom"), "Custom");
+  assert.equal(lykyn.nativePhase("Harvest"), null, "Lykyn has no Harvest phase");
+  assert.equal(shrooly.stage("Colonizing"), "Colonization");
+  assert.equal(lykyn.stage("Colonization"), "Colonization");
+  assert.equal(shrooly.white.fromPercent(20), 92);
+  assert.equal(lykyn.white.fromPercent(20), 20);
+  assert.equal(Math.round(shrooly.white.toPercent(92)), 20);
+  assert.equal(lykyn.white.describe(20), "white 20%");
+  assert.equal(shrooly.white.describe(92), "white 92 lux");
+  assert.deepEqual(lykyn.knobRanges.air_exchange_speed, [33, 100, 1]);
+  assert.equal(deviceCapabilities({}, "lykyn_chamber").knob_ranges.air_exchange_speed[0], 33, "fan floor before the chamber reports");
+  assert.equal(deviceCapabilities({}, "lykyn_chamber").knob_ranges.white_intensity[1], 100);
+  assert.equal(deviceCapabilities({}, "shrooly_chamber").knob_ranges.air_exchange_speed[0], 15);
+});
+
+test("Lykyn takes Custom from the site, a Shrooly says it has no such phase", async () => {
+  for (const fx of FIXTURES) {
+    const { ctx, token } = await fx.setup(`custom-${fx.type}@example.com`);
+    const res = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", { token, body: { action: "stage", payload: { grow_phase: "Custom" } } });
+    const r = res.data.results[0];
+    if (fx.type === "lykyn_chamber") {
+      assert.equal(r.status, "queued", JSON.stringify(res.data));
+      assert.equal(JSON.parse((await rows(ctx))[0].payload).grow_phase, "Custom");
+    } else {
+      assert.equal(r.status, "failed", JSON.stringify(res.data));
+    }
+  }
+});
+
+test("Start this grow at Colonization and at Fruiting sends the same commands on both chambers", async () => {
+  for (const stage of ["colonization", "pinning", "fruiting"]) {
+    const seen = [];
+    for (const fx of FIXTURES) {
+      const { ctx, token } = await fx.setup(`apply-${stage}-${fx.type}@example.com`);
+      const res = await applyProfile(ctx, token, { stage });
+      assert.equal(res.data.results[0].status, "queued", `${fx.name} ${stage} ${JSON.stringify(res.data)}`);
+      seen.push(canonicalCommand(deviceAdapter(fx.type), JSON.parse((await rows(ctx))[0].payload)));
+    }
+    assert.deepEqual(seen[0], seen[1], `${stage}: Shrooly and Lykyn must get the same command`);
+  }
+});
+
+test("Coach makes the same decisions on both chambers after a manual Colonization", async () => {
+  const seen = [];
+  for (const fx of FIXTURES) {
+    const { ctx, token, user } = await fx.setup(`parity-colo-${fx.type}@example.com`);
+    const adapter = deviceAdapter(fx.type);
+    await colonizationHistory(ctx, { phase: adapter.nativePhase("Colonization"), colonizationPhase: adapter.nativePhase("Colonization") });
+    await reportReading(ctx, fx, "Colonization");
+    const staged = await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id);
+    await coachOn(ctx, token, user);
+    const result = await runCoach(ctx, user);
+    const mine = (await coachRows(ctx)).slice(3).map((r) => canonicalCommand(adapter, JSON.parse(r.payload)));
+    seen.push({ manualPhase: staged.manualPhase, stage: staged.stage, picked: result.stage, mine });
+  }
+  assert.equal(seen[0].manualPhase, true);
+  assert.notEqual(seen[0].picked, "fruiting");
+  assert.deepEqual(seen[0], seen[1]);
+  assert.ok(seen[0].mine.length >= 1, "Coach corrected the lights for colonization on both");
+});
+
+test("Coach makes the same decisions on both chambers when the grower is already at Fruiting", async () => {
+  const seen = [];
+  for (const fx of FIXTURES) {
+    const { ctx, token, user } = await fx.setup(`parity-fruit-${fx.type}@example.com`);
+    const adapter = deviceAdapter(fx.type);
+    await addCommand(ctx, "dev-1", {
+      payload: { stage: "fruiting", profile_id: pearlOyster.id, source: "fleet", ...ACKED() },
+      issued: minutesAgo(90),
+    });
+    await reportReading(ctx, fx, "Fruiting", { light_hours: 0, white_intensity: 0, color_b: 0 });
+    await coachOn(ctx, token, user);
+    const result = await runCoach(ctx, user);
+    const mine = (await coachRows(ctx)).map((r) => canonicalCommand(adapter, JSON.parse(r.payload)));
+    seen.push({ picked: result.stage, mine });
+  }
+  assert.equal(seen[0].picked, "fruiting");
+  assert.deepEqual(seen[0], seen[1]);
 });
