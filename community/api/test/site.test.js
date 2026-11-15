@@ -252,6 +252,9 @@ test("Grow Coach stays off every static page except /coach, which is public and 
     // Chef's line profiles cost $2.99 or $3.99 one time, so only the Coach plan price and any monthly price are banned.
     if (file !== "tos.html" && file !== "coach.html") assert.doesNotMatch(html, /\$4\.99|\d\.99 (a|per) month|\$49 (a|per) year|\$49\/yr/, `${file} prices Coach`);
     if (file === "coach.html") continue;
+    // Supported chamber pages may say Coach works there and link to /coach.
+    const COACH_CONTEXT_PAGES = ["lykyn.html", "chambers.html", "guides/lykyn-mushroom-grow-box-outside-control.html"];
+    if (COACH_CONTEXT_PAGES.includes(file)) continue;
     // The terms and privacy policy must describe the Grow Coach plan and what it does with data
     // (Stripe asks for both). They name it in text but never link to it.
     if (LEGAL_PAGES.includes(file)) {

@@ -37,7 +37,7 @@ test("chamber copy is plain and honest: no dashes, arrows, or harsh words, and T
     const body = text(main(read(`${p.slug}.html`)));
     assert.doesNotMatch(body, /[\u2013\u2014\u2192\u2190]|->|=>/, p.slug);
     assert.doesNotMatch(body, /\bscam|fraud|stole|ripped off|defunct|bankrupt/i, p.slug);
-    assert.match(body, /untested on real hardware/i, p.slug);
+    if (p.slug !== "lykyn") assert.match(body, /untested on real hardware/i, p.slug);
   }
   const ts = text(main(read("terrashroom.html")));
   assert.match(ts, /GPIO12/);
@@ -46,25 +46,32 @@ test("chamber copy is plain and honest: no dashes, arrows, or harsh words, and T
   const status = Object.fromEntries(CHAMBERS.map((c) => [c.name, c.status]));
   assert.equal(status.Shrooly, "Supported");
   assert.equal(status.Terrashroom, "Community, untested");
-  assert.equal(status.Lykyn, "Arriving");
-  assert.equal(CHAMBERS.filter((c) => c.status === "Supported").length, 1, "only Shrooly is marked supported");
+  assert.equal(status.Lykyn, "Supported");
+  assert.deepEqual(CHAMBERS.filter((c) => c.status === "Supported").map((c) => c.name), ["Shrooly", "Lykyn"]);
 });
 
-test("the Lykyn page is arriving, not validated, and links the public adapter repo", () => {
+test("the Lykyn page is supported, validated, and links the public firmware repo", () => {
   const html = read("lykyn.html");
   const body = text(main(html));
-  assert.match(body, /arriving/i);
-  assert.match(body, /outside-control validation has not started/i);
-  assert.match(body, /untested on real hardware/i);
+  assert.match(body, /validated on a real unit/i);
+  assert.match(body, /native Shroom Labs firmware/i);
   assert.match(body, /not made by or affiliated with Lykyn/i);
-  assert.doesNotMatch(body, /\bvalidated\b|adapter (works|is ready|is live)/i);
-  assert.doesNotMatch(html, /href="\/coach"|Grow Coach/);
-  assert.ok(html.includes('href="https://github.com/themsquared/lykyn-adapter"'), "adapter repo");
+  assert.match(body, /USB-Serial\/JTAG/i);
+  assert.match(body, /download mode/i);
+  assert.match(body, /do not erase the flash/i);
+  assert.match(body, /Grow Coach/i);
+  assert.doesNotMatch(body, /locked down|unhackable/i);
+  assert.doesNotMatch(body, /the box is arriving|validation has not started/i);
+  assert.ok(html.includes('href="https://github.com/themsquared/lykyn-firmware"'), "firmware repo");
+  assert.ok(html.includes('href="https://github.com/themsquared/lykyn-adapter"'), "adapter repo still cited");
+  assert.ok(html.includes('href="/coach"'), "coach");
   assert.ok(html.includes('href="/grow-log"'), "grow log");
   assert.ok(html.includes('href="/guides/lykyn-mushroom-grow-box-outside-control"'), "guide");
   const how = CHAMBERS.find((c) => c.name === "Lykyn");
-  assert.match(how.how, /outside-control adapter planned, validation pending/i);
+  assert.match(how.how, /validated on a real unit/i);
   assert.match(how.how, /href="\/lykyn"/);
+  assert.equal(how.status, "Supported");
+  assert.match(html, /"@type":"HowTo"/);
 });
 
 test("chamber pages cite their sources and are wired into the sitemap, llms files, redirects, and footer", () => {

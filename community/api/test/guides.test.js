@@ -50,7 +50,11 @@ test("guide copy stays plain: no dashes, arrows, jargon, or Coach", () => {
   const banned = [/[\u2013\u2014\u2192\u21d2]/, /\bFAE\b/, /\bRH\b/, /setpoint/i, /fully indexed/i, /\bCoach\b/, /guaranteed?/i, /\bbest[- ]in[- ]class\b/i, /(?<!Open)Shrooly (?!(chambers?|devices?|app)\b)/];
   for (const g of GUIDES) {
     const body = text(main(page(g.slug)));
-    for (const re of banned) assert.doesNotMatch(body, re, `${g.slug} ${re}`);
+    for (const re of banned) {
+      // This guide covers a supported chamber that actually runs Coach, so the word is allowed here.
+      if (g.slug === "lykyn-mushroom-grow-box-outside-control" && re.source === "\\bCoach\\b") continue;
+      assert.doesNotMatch(body, re, `${g.slug} ${re}`);
+    }
   }
 });
 
@@ -67,7 +71,7 @@ test("guide links resolve: profiles are free and indexed, guides exist, affiliat
       const profile = href.match(/^\/profiles\/([a-z0-9-]+)$/);
       if (profile) assert.ok(indexed.has(profile[1]), `${g.slug} links free profile ${href}`);
       else if (href.startsWith("/guides/")) assert.ok(existsSync(join(PUBLIC, `${href}.html`)), `${g.slug} ${href}`);
-      else assert.ok(["/", "/grow", "/install", "/docs", "/faq", "/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq", "/shrooly-pods", "/shrooly-alternatives", "/chambers", "/terrashroom", "/ac-infinity", "/lykyn", "/grow-log", "/tools/grow-timeline", "/tools/fresh-air-planner"].includes(href), `${g.slug} ${href}`);
+      else assert.ok(["/", "/grow", "/install", "/docs", "/faq", "/what-happened-to-shrooly", "/reuse-your-shrooly", "/shrooly-faq", "/shrooly-pods", "/shrooly-alternatives", "/chambers", "/terrashroom", "/ac-infinity", "/lykyn", "/grow-log", "/tools/grow-timeline", "/tools/fresh-air-planner", "/coach"].includes(href), `${g.slug} ${href}`);
     }
     // The affiliate note shows only when the page holds a tagged affiliate link, and then it must.
     if (/\sdata-affiliate[\s>]/.test(html)) assert.match(text(html), /commission/, `${g.slug} discloses affiliate links`);
@@ -76,18 +80,22 @@ test("guide links resolve: profiles are free and indexed, guides exist, affiliat
   }
 });
 
-test("the Lykyn outside-control guide stays arriving and links the adapter repo", () => {
+test("the Lykyn firmware guide is validated and links the public firmware repo", () => {
   const g = GUIDES.find((x) => x.slug === "lykyn-mushroom-grow-box-outside-control");
   assert.ok(g, "guide is registered");
   const html = page(g.slug);
   const body = text(main(html));
-  assert.match(body, /outside control/i);
-  assert.match(body, /validation has not started|untested/i);
-  assert.match(body, /not a reflash/i);
-  assert.doesNotMatch(body, /\bvalidated\b/i);
-  assert.doesNotMatch(html, /href="\/coach"|Grow Coach/);
-  assert.ok(html.includes("https://github.com/themsquared/lykyn-adapter"), "adapter repo");
+  assert.match(body, /validated on a real unit/i);
+  assert.match(body, /native firmware/i);
+  assert.match(body, /do not run erase_flash|do not erase the flash/i);
+  assert.match(body, /Grow Coach/i);
+  assert.doesNotMatch(body, /locked down|unhackable/i);
+  assert.doesNotMatch(body, /the unit is in transit|validation has not started/i);
+  assert.ok(html.includes("https://github.com/themsquared/lykyn-firmware"), "firmware repo");
+  assert.ok(html.includes("https://github.com/themsquared/lykyn-adapter"), "adapter repo still cited");
   assert.ok(html.includes('href="/lykyn"'), "chamber page");
+  assert.ok(html.includes('href="/coach"'), "coach");
+  assert.match(html, /"@type":"HowTo"/);
 });
 
 test("guides are in the sitemap, llms.txt, llms-full.txt, the hub, and redirect from .html", () => {

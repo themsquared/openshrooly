@@ -95,82 +95,88 @@ ${table("Controller 69 PRO fruiting settings from the grow profiles", ["Mushroom
 
 const lykynOutsideControl = {
   slug: "lykyn-mushroom-grow-box-outside-control",
-  title: "Lykyn mushroom grow box: outside control without flashing",
-  h1: "Outside control for a Lykyn mushroom grow box",
+  title: "Lykyn mushroom grow box: Shroom Labs firmware",
+  h1: "How to run a Lykyn with Shroom Labs firmware",
   eyebrow: "Chamber guide",
-  description: "What outside control means for a Lykyn, what we will record when the box arrives, and how that differs from flashing a Shrooly chamber.",
-  answer: "Outside control means we talk to a Lykyn through its existing app and cloud, and we leave the stock software on the box. When our unit arrives we will record what the official app sends, write it up in a public adapter repo, and only then try a dry run. None of that is proven yet. This is not a reflash, which is how OpenShrooly runs a Shrooly chamber.",
+  description: "Install native Shroom Labs firmware on a Lykyn Smart Mushroom Grow Box. Validated on a real unit. Backup first, then flash, link, and grow.",
+  answer: "Shroom Labs runs a Lykyn with native firmware on the ESP32-C3, validated on a real unit. Back up the stock 4 MB flash first, flash the public image, and do not erase the flash. After that the box has a local dashboard, an optional cloud link, grow profiles, and Coach. This used to describe an outside-control plan that left the stock app in place. That is no longer the supported path.",
   sections: [
     {
-      h2: "What does outside control mean?",
-      html: `<p>Outside control is a way to read and set a chamber without replacing the software that shipped on it. The official app stays the source of how the box talks. We watch that path, write down the reads and writes, and later wrap them in a small adapter so a grow profile can drive the same settings.</p>
-<p>For a Lykyn that means:</p>
+      h2: "Does Shroom Labs work with a Lykyn now?",
+      html: `<p>Yes. Native firmware from the ${a("lykynFirmware", "Shroom Labs Lykyn firmware repo")} runs on a real unit. The <a href="/chambers">chambers table</a> marks Lykyn as supported, the same status as a Shrooly chamber.</p>
+<p>Once it is installed you can:</p>
 <ul>
-<li><strong>Stock software stays on the box.</strong> We do not flash it. We do not ask you to open it.</li>
-<li><strong>The official app and cloud stay in place.</strong> The adapter, once it exists, would sign in the same way the app does, on your own computer.</li>
-<li><strong>Credentials stay with you.</strong> Email and password would live as environment variables on the machine that runs the adapter, the same way the <a href="/ac-infinity">AC Infinity adapter</a> does. Shroom Labs would not store them.</li>
-<li><strong>A dry run comes first.</strong> A first tool should print the plan and write nothing, until someone adds an apply flag on purpose.</li>
+<li>Open the local dashboard at the chamber's address. The stock ESPHome entity table is at /esp.</li>
+<li>Link the box to a Shroom Labs account with the claim code it shows, or leave cloud off and stay on the LAN.</li>
+<li>Start a culinary grow profile. Colonization on a Lykyn uses the phase name Colonization. A Shrooly chamber uses Colonizing for the same stage.</li>
+<li>Use <a href="/coach">Grow Coach</a> in Advisor or Autopilot mode. Turn Coach off before you set targets yourself.</li>
 </ul>
-<p>That is the plan. It is not a working adapter. Read <a href="/lykyn">Lykyn for mushrooms</a> for the arrival status.</p>`,
+<p>Read <a href="/lykyn">Lykyn for mushrooms</a> for the hardware, ranges, and stage names.</p>`,
     },
     {
-      h2: "What will we look at when the box arrives?",
-      html: `<p>The unit is in transit. Until it is on a bench here, there is nothing to record. When it arrives we will set it up the way Lykyn describes on the ${a("lykynSite", "official Lykyn site")}: water in the reservoir, a fruiting block on the tray, species picked in the app. Then we watch three links.</p>
+      h2: "How do I flash a Lykyn safely?",
+      html: `<p>Back up the full stock flash first. The stock image and Shroom Labs firmware share a 4 MB partition layout, so that backup can be written back. Do not run erase_flash: that can wipe factory data the backup is meant to keep.</p>
 <ol>
-<li><strong>Phone to box.</strong> What the official app sends over the local network, if it talks to the box directly at all.</li>
-<li><strong>Phone to cloud.</strong> What the app sends to Lykyn's servers to read humidity and temperature, and to change humidity, fans, light, or the species preset.</li>
-<li><strong>Box to cloud.</strong> Whether the chamber reports readings on its own, and how often.</li>
+<li>Read the <a href="https://github.com/themsquared/lykyn-firmware/blob/main/docs/FLASH.md">flash guide</a> in the firmware repo. Use a USB data cable. The ESP32-C3 has native USB-Serial/JTAG, and download mode is how you put the chip in flash mode.</li>
+<li>Save a complete 4 MB backup of the unit as it shipped, and keep that file somewhere you can find.</li>
+<li>Build or download the image from the public repo. The provisioning build has no Wi-Fi baked in. After it boots, the box opens a Lykyn-Setup network, and Improv over USB also works.</li>
+<li>Flash only the slots the guide names. If something goes wrong, write the backup back. USB is the way home.</li>
 </ol>
-<p>We will write down field names, units, and which settings the app actually changes. Those notes go in the ${a("lykynAdapter", "Shroom Labs Lykyn adapter on GitHub")}. The repo is public on purpose. Credentials stay out of it.</p>
-<p>We are looking for the same kinds of things a grow profile needs: humidity, temperature, fresh air, and light. If those can be read and set from outside, a later adapter can map a free profile onto them. If they cannot, this guide will say so and you should keep using the Lykyn app by hand with the numbers from the <a href="/grow">grow profiles</a>.</p>
-<p>Nothing in that list is mapped yet. Treat every endpoint, field, and unit as unknown until a note lands in the repo with a date.</p>`,
+<p>This is not the <a href="/install">USB installer for a Shrooly chamber</a>. That page is for Shrooly chambers only.</p>`,
     },
     {
-      h2: "What is untested?",
-      html: `<p>All of it. Outside-control validation has not started. The public repo holds a short pitch, not a tool you can run.</p>
+      h2: "What can the firmware actually do?",
+      html: `<p>It reads the SHT3x for temperature and humidity, runs a local climate loop with no cloud required, and drives both PWM fans, the ultrasonic mister, and the 16 pixel grow ring.</p>
 <ul>
-<li>Whether a sign in from software we write is accepted.</li>
-<li>Whether live humidity and temperature can be read from outside.</li>
-<li>Whether humidity, fans, light, or a species preset can be set from outside.</li>
-<li>Whether those writes match what the official app shows after they land.</li>
-<li>Whether a Lykyn holds fruiting humidity for lion's mane, oyster, or shiitake the way the profiles ask.</li>
-<li>How a Lykyn compares to a Shrooly chamber on the same block. That comparison is the planned <a href="/grow-log">grow log</a>, and it has not started.</li>
+<li>Humidity targets: 30 to 95 percent relative humidity, in 0.5 steps.</li>
+<li>Fans: 33 to 100 percent duty. The firmware will not run them below 33 percent. A profile that asks for 20 percent is clamped to 33, and the apply still succeeds.</li>
+<li>Stages: Fruiting, Pinning, Colonization, and Custom. Colonization lights stay off.</li>
+<li>There is no heater or cooler. Over-temperature or over-humidity boosts the fans. If the sensor is lost for 60 seconds, the mister turns off and the fans sit at 33 percent.</li>
 </ul>
-<p>Until those are checked, do not claim a Lykyn is supported. The <a href="/chambers">chambers table</a> marks it Arriving. The grow log marks it arriving, outside-control validation pending. Both stay that way until someone here has read and set a real unit from outside.</p>`,
+<p>Cloud is optional. A cloud failure does not change the local loop.</p>`,
     },
     {
-      h2: "How is this different from flashing a Shrooly chamber?",
-      html: `<p>OpenShrooly replaces the stock software on a Shrooly chamber. You install it from Chrome or Edge with a USB-C cable in about 5 minutes. After that the chamber runs on your own Wi-Fi from a local web page, and the Shrooly app is not in the path. That is a reflash.</p>
-<p>The Lykyn plan is the opposite. The stock software stays. The official app stays. We build a translator that sits outside and speaks the same language the app already speaks. If Lykyn changes that language, the adapter can break. If it breaks, you still have the official app and can set the box by hand from a grow profile.</p>
-<p>Terrashroom is on the flash path, like a Shrooly chamber: community ESPHome firmware, untested on real hardware. AC Infinity is on the outside-control path, like Lykyn: a cloud adapter written from a community integration, also untested on a real controller. Lykyn is earlier than AC Infinity. AC Infinity has adapter code and tests against a fake server. Lykyn has a repo and a plan.</p>
-<div class="table-wrap"><table class="conditions-table"><caption>How Shroom Labs talks to each chamber, November 5, 2026</caption><thead><tr><th scope="col">Chamber</th><th scope="col">Method</th><th scope="col">Status</th></tr></thead><tbody>
-<tr><th scope="row"><a href="/install">Shrooly chamber</a></th><td>Flash OpenShrooly. Local web page, no stock app.</td><td>Supported</td></tr>
-<tr><th scope="row"><a href="/terrashroom">Terrashroom</a></th><td>Flash community ESPHome firmware.</td><td>Community, untested</td></tr>
+      h2: "How is this different from a Shrooly chamber?",
+      html: `<p>Both now run Shroom Labs firmware and can link to the same site, profiles, and Coach. The differences are the hardware and a few names and ranges.</p>
+<div class="table-wrap"><table class="conditions-table"><caption>How Shroom Labs talks to each chamber, November 15, 2026</caption><thead><tr><th scope="col">Chamber</th><th scope="col">Method</th><th scope="col">Status</th></tr></thead><tbody>
+<tr><th scope="row"><a href="/install">Shrooly chamber</a></th><td>Flash OpenShrooly from the USB installer. Local dashboard and cloud link.</td><td>Supported</td></tr>
+<tr><th scope="row"><a href="/lykyn">Lykyn</a></th><td>Flash native Shroom Labs firmware from the public repo. Local dashboard and cloud link.</td><td>Supported</td></tr>
+<tr><th scope="row"><a href="/terrashroom">Terrashroom</a></th><td>Flash community ESPHome firmware.</td><td>Community, untested on real hardware</td></tr>
 <tr><th scope="row"><a href="/ac-infinity">AC Infinity</a></th><td>Cloud adapter. Stock controller software stays.</td><td>Community, untested</td></tr>
-<tr><th scope="row"><a href="/lykyn">Lykyn</a></th><td>Outside-control adapter planned. Stock software stays.</td><td>Arriving, validation pending</td></tr>
 </tbody></table></div>
-<p>If you want the chamber to run with no vendor app at all, a Shrooly chamber with OpenShrooly is the one we already run. A Lykyn will keep using Lykyn's app until someone proves an outside path, and maybe after that too.</p>`,
+<p>White light is lux on a Shrooly chamber (0 to 4000) and percent on a Lykyn (0 to 100). The cloud converts a profile's lux figure when it talks to a Lykyn.</p>`,
     },
     {
-      h2: "Can I use a grow profile on a Lykyn today?",
-      html: `<p>Yes, by hand. Open the species in the <a href="/grow">grow profiles</a>, copy the humidity, temperature, fresh air, and light for the stage you are in, and set the official Lykyn app as close as it allows. The app's species presets are Lykyn's, not ours. We have not compared them to the profiles.</p>
-<p>Automatic apply from Shroom Labs is the adapter's job, and that job has not started. The <a href="/tools/grow-timeline">grow timeline calculator</a> still helps you pick stage dates while the box runs on its own controls.</p>
-<p>Shroom Labs is not made by Lykyn. Product steps quoted above come from the official site. If you own a box and want to share what the app lets you set, use the contact page on this site and pick A chamber.</p>`,
+      h2: "What happened to the outside-control plan?",
+      html: `<p>Before the unit arrived, this guide described talking to the official Lykyn app and cloud without flashing, and leaving the stock software on the box. That work was never the validated path. The ${a("lykynAdapter", "Shroom Labs Lykyn adapter on GitHub")} is still public as notes, and credentials stay out of it.</p>
+<p>If you do not want to flash, you can keep the official Lykyn app and copy numbers from a <a href="/grow">grow profile</a> by hand. Automatic apply, the local Shroom Labs dashboard, and Coach need the native firmware.</p>`,
     },
   ],
   faq: [
-    { q: "What does outside control mean?", a: "We talk to the Lykyn through its existing app and cloud, and we leave the stock software on the box." },
-    { q: "Will Shroom Labs flash the Lykyn?", a: "No. The plan is outside control. Flashing is how OpenShrooly runs a Shrooly chamber, not how we plan to run a Lykyn." },
-    { q: "Can I use a grow profile on a Lykyn today?", a: "Yes, by copying the numbers into the official Lykyn app. Shroom Labs cannot apply a profile to a Lykyn yet." },
-    { q: "Where is the adapter code?", a: "In the public lykyn-adapter repo on GitHub. It is a pitch and a place for notes. Nothing in it talks to a real Lykyn yet." },
+    { q: "Does Shroom Labs work with a Lykyn now?", a: "Yes. Native firmware runs on a real unit, with a local dashboard, an optional cloud link, grow profiles, and Coach." },
+    { q: "How do I flash a Lykyn safely?", a: "Back up the full stock flash first, then flash the public image. Do not erase the flash." },
+    { q: "Will I lose the stock firmware?", a: "Not if you keep a full 4 MB backup. The partition layout matches stock, so you can write that backup back." },
+    { q: "Can I use Grow Coach on a Lykyn?", a: "Yes. Advisor suggests targets, and Autopilot can queue them. Turn Coach off before you set targets yourself." },
+    { q: "What happened to outside control?", a: "That was the plan before the unit arrived. The supported path is now native firmware. The older adapter repo remains public as notes." },
   ],
+  howto: {
+    name: "How to flash a Lykyn safely",
+    description: "Back up the full stock flash first, then flash the public image. Do not erase the flash.",
+    steps: [
+      "Read the flash guide in the firmware repo. Use a USB data cable. The ESP32-C3 has native USB-Serial/JTAG, and download mode is how you put the chip in flash mode.",
+      "Save a complete 4 MB backup of the unit as it shipped, and keep that file somewhere you can find.",
+      "Build or download the image from the public repo. The provisioning build has no Wi-Fi baked in. After it boots, the box opens a Lykyn-Setup network, and Improv over USB also works.",
+      "Flash only the slots the guide names. If something goes wrong, write the backup back. USB is the way home.",
+    ],
+  },
   related: [
     ["Lykyn for mushrooms", "/lykyn"],
     ["Shroom Labs grow log", "/grow-log"],
     ["Mushroom chambers that work with Shroom Labs", "/chambers"],
+    ["Grow Coach", "/coach"],
     ["Conditions for every species", "/grow"],
   ],
-  updated: "2026-11-05",
+  updated: "2026-11-15",
 };
 
 export const BUILD_GUIDES = [acInfinityBuild, lykynOutsideControl];
