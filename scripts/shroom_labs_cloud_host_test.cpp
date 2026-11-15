@@ -772,7 +772,7 @@ int main() {
   expect(!eng.wiping(), "engine not wiping when linked");
 
   // What is growing rides on the inbox and shows on the chamber's own page while linked.
-  expect(eng.grow_json() == "{\"linked\":true,\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\",\"profile_id\":\"\"}", "no grow before inbox");
+  expect(eng.grow_json() == "{\"linked\":true,\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\",\"profile_id\":\"\",\"profile_stages\":{}}", "no grow before inbox");
   expect(eng.status_json().find("grow_name") == std::string::npos, "grow not in the login-only status");
   tr.steps = {{"/inbox", ok_body(200,
       "{\"commands\":[],\"cloud_enabled\":true,\"offline_ok\":true,\"grow_name\":\"Lion's Mane\","
@@ -787,6 +787,7 @@ int main() {
     expect(js.find("\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\"") != std::string::npos, "grow url in status");
     expect(js.find("species-lions-mane-640.webp\"") != std::string::npos, "grow image in status");
     expect(js.find("\"profile_id\":\"lions-mane\"") != std::string::npos, "profile id in status");
+    expect(js.find("\"profile_stages\":{}") != std::string::npos, "no stages yet from an older inbox");
     expect(eng.grow().id == "lions-mane", "engine grow id");
   }
   // An older server sends no grow keys: keep what the page shows.
@@ -815,6 +816,19 @@ int main() {
            "profile id stored with name and image");
     expect(parse_inbox_grow("{\"grow_name\":\"\",\"profile_id\":\"black-oyster\"}", &g) && g.id.empty(),
            "no profile id without a name");
+    expect(parse_inbox_grow("{\"grow_name\":\"Black Oyster\",\"profile_id\":\"black-oyster\","
+                           "\"profile_stages\":{\"colonization\":{\"temperature_c\":24,\"humidity_percent\":90,"
+                           "\"fan_speed_percent\":20,\"air_exchange_period_min\":60,\"air_exchange_run_sec\":15,"
+                           "\"light_hours\":0,\"white_percent\":0,\"red_percent\":0,\"green_percent\":0,\"blue_percent\":0}}}",
+                           &g) &&
+               g.stages_present && g.colonization.present && g.colonization.temperature_c == 24 &&
+               g.colonization.fan_speed_percent == 20 && !g.fruiting.present,
+           "profile stages stored with the grow");
+    StageRecipe rec;
+    expect(stage_recipe_for(g, "Colonization", &rec) && rec.temperature_c == 24, "Colonization looks up colonization");
+    expect(stage_recipe_for(g, "Colonizing", &rec) && rec.humidity_percent == 90, "Colonizing is the same stage");
+    expect(!stage_recipe_for(g, "Fruiting", &rec), "missing stage has no recipe");
+    expect(!stage_recipe_for(g, "Custom", &rec), "Custom has no profile recipe");
   }
 
   tr.steps = {{"/rotate", ok_body(429, "{}", true, 120)}};

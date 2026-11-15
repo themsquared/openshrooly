@@ -130,15 +130,45 @@ struct InboxCommand {
 
 size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max);
 
+
+/** One profile stage's knobs, in percent, as the inbox sends them. */
+struct StageRecipe {
+  bool present{false};
+  uint16_t mask{0};
+  float temperature_c{0};
+  float humidity_percent{0};
+  float temperature_hysteresis{0};
+  float humidity_hysteresis{0};
+  float fan_speed_percent{0};
+  float air_exchange_period_min{0};
+  float air_exchange_run_sec{0};
+  float sunrise_hour{0};
+  float light_hours{0};
+  float white_percent{0};
+  float red_percent{0};
+  float green_percent{0};
+  float blue_percent{0};
+  float humidifier_speed_percent{0};
+};
+
 /** What is growing, from the inbox reply. Shown on the chamber's own page. */
 struct InboxGrow {
   std::string id;     // profile id, for example black-oyster
   std::string name;
   std::string url;    // https:// only, else empty
   std::string image;  // https:// only, else empty
+  bool stages_present{false};
+  StageRecipe colonization;
+  StageRecipe pinning;
+  StageRecipe fruiting;
 };
 /** False when the reply has no grow_name (older server): keep what the chamber shows. */
 bool parse_inbox_grow(const char *json, InboxGrow *out);
+/** The named stage's profile recipe, or false when this grow has none (use the built-in). */
+bool stage_recipe_for(const InboxGrow &grow, const char *name, StageRecipe *out);
+/** The profile_stages object for /grow and NVS, or "{}". */
+std::string profile_stages_json(const InboxGrow &grow);
+bool parse_profile_stages(const char *json, InboxGrow *out);
 
 enum class SetpointDecision : uint8_t { Skip = 0, Apply, Refuse, Fail };
 

@@ -54,4 +54,26 @@ function missingStageNote(available) {
   return `This chamber has no ${missing.join(" or ")} stage.`
 }
 
-module.exports = { STAGES, CARDS, RECIPES, canonicalStage, missingStages, missingStageNote }
+
+const STAGE_IDS = { Colonization: "colonization", Pinning: "pinning", Fruiting: "fruiting" }
+
+/** Profile stage from the inbox, in the same shape as RECIPES, or null. */
+function recipeFromProfile(stage, profileStages) {
+  const raw = profileStages && profileStages[STAGE_IDS[stage] || ""]
+  if (!raw || raw.temperature_c == null && raw.humidity_percent == null) return null
+  return {
+    temperature: raw.temperature_c,
+    humidity: raw.humidity_percent,
+    sunrise: raw.sunrise_hour ?? 8,
+    lightHours: raw.light_hours ?? 0,
+    white: raw.white_percent ?? 0,
+    red: raw.red_percent ?? 0,
+    green: raw.green_percent ?? 0,
+    blue: raw.blue_percent ?? 0,
+    fanSpeed: raw.fan_speed_percent ?? 0,
+    airPeriodMin: raw.air_exchange_period_min ?? 60,
+    airRunSec: raw.air_exchange_run_sec ?? 15,
+  }
+}
+
+module.exports = { STAGES, CARDS, RECIPES, canonicalStage, missingStages, missingStageNote, recipeFromProfile }

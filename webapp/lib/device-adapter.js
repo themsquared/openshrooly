@@ -3,7 +3,7 @@
  * The page never checks the device type: it asks this file. See lib/stage-standard.js.
  */
 
-const { RECIPES, canonicalStage } = require("./stage-standard")
+const { RECIPES, canonicalStage, recipeFromProfile } = require("./stage-standard")
 
 /** Canonical stage to the name the Shrooly grow_phase select uses. It has no Custom. */
 const NATIVE_STAGE = { Colonization: "Colonizing", Pinning: "Pinning", Fruiting: "Fruiting" }
@@ -33,11 +33,11 @@ function nativeStage(stage) {
 }
 
 /** Writes that put this chamber in a stage and load that stage's recipe. */
-function stageWrites(stage) {
+function stageWrites(stage, profileStages) {
   const native = nativeStage(stage)
   if (!native) return []
-  const writes = [{ kind: "select", id: "grow_phase", value: native }, { kind: "number", id: "grow_day", value: 1 }]
-  const r = RECIPES[stage]
+  const writes = [{ kind: "select", id: "grow_phase", value: native }]
+  const r = recipeFromProfile(stage, profileStages) || RECIPES[stage]
   if (!r) return writes
   const fan = Math.max(r.fanSpeed, FAN_MIN_PERCENT)
   writes.push(

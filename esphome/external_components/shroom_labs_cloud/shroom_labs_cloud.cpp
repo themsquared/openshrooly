@@ -713,11 +713,18 @@ void ShroomLabsCloud::load_saved_grow_() {
   len = sizeof(buf);
   if (nvs_get_str(h, "grow_img", buf, &len) == ESP_OK)
     g.image = buf;
+  char stages[1536];
+  size_t stages_len = sizeof(stages);
+  if (nvs_get_str(h, "grow_st", stages, &stages_len) == ESP_OK) {
+    std::string wrapped = std::string("{\"profile_stages\":") + stages + "}";
+    parse_profile_stages(wrapped.c_str(), &g);
+  }
   nvs_close(h);
   this->saved_grow_id_ = g.id;
   this->saved_grow_name_ = g.name;
   this->saved_grow_url_ = g.url;
   this->saved_grow_image_ = g.image;
+  this->saved_grow_stages_ = profile_stages_json(g);
   this->grow_loaded_ = true;
   if (!g.id.empty() || !g.name.empty())
     this->engine_.restore_grow(g);
@@ -725,8 +732,9 @@ void ShroomLabsCloud::load_saved_grow_() {
 
 void ShroomLabsCloud::persist_grow_if_changed_() {
   const InboxGrow g = this->engine_.grow();
+  const std::string stages = profile_stages_json(g);
   if (this->grow_loaded_ && g.id == this->saved_grow_id_ && g.name == this->saved_grow_name_ &&
-      g.url == this->saved_grow_url_ && g.image == this->saved_grow_image_)
+      g.url == this->saved_grow_url_ && g.image == this->saved_grow_image_ && stages == this->saved_grow_stages_)
     return;
   nvs_handle_t h;
   if (nvs_open(NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
@@ -734,6 +742,8 @@ void ShroomLabsCloud::persist_grow_if_changed_() {
     nvs_set_str(h, "grow_nm", g.name.c_str());
     nvs_set_str(h, "grow_url", g.url.c_str());
     nvs_set_str(h, "grow_img", g.image.c_str());
+    if (stages.size() < 1536)
+      nvs_set_str(h, "grow_st", stages.c_str());
     nvs_commit(h);
     nvs_close(h);
   }
@@ -741,6 +751,7 @@ void ShroomLabsCloud::persist_grow_if_changed_() {
   this->saved_grow_name_ = g.name;
   this->saved_grow_url_ = g.url;
   this->saved_grow_image_ = g.image;
+  this->saved_grow_stages_ = stages;
   this->grow_loaded_ = true;
 }
 

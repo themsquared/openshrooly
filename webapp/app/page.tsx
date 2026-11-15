@@ -63,7 +63,7 @@ export default function Dashboard() {
   const [updateRequestError, setUpdateRequestError] = useState<string>('')
   const [demoMode, setDemoMode] = useState(false)
   // What is growing, from shroomlabs.io while linked. GET /cloud needs no sign-in.
-  const [cloudGrow, setCloudGrow] = useState({ linked: false, name: '', url: '', image: '' })
+  const [cloudGrow, setCloudGrow] = useState({ linked: false, name: '', url: '', image: '', stages: {} as Record<string, Record<string, number | null>> })
   const [reachable, setReachable] = useState<boolean | undefined>(undefined)
   const [lastError, setLastError] = useState('')
   const [writeError, setWriteError] = useState('')
@@ -242,7 +242,7 @@ export default function Dashboard() {
     if (stageBusy) return
     setStageBusy(true)
     setStageError('')
-    const writes = stageWrites(stage)
+    const writes = stageWrites(stage, cloudGrow.stages)
     const ok = demoMode ? true : await api.applyWrites(writes)
     if (ok) {
       setEntities((prev) => ({ ...prev, ...entityPatchFromWrites(writes) }))
@@ -769,6 +769,7 @@ export default function Dashboard() {
           name: String(body.grow_name || ''),
           url: String(body.grow_url || ''),
           image: String(body.grow_image || ''),
+          stages: body.profile_stages && typeof body.profile_stages === 'object' ? body.profile_stages : {},
         })
       } catch {
         // No cloud on this chamber, or offline: the card falls back to the local stage.

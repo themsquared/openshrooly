@@ -29,6 +29,21 @@ test("Colonization keeps the light off and the fan at or above this chamber's fl
   assert.equal(by.lights__duration__hours_, 0)
   assert.equal(by.white_led_intensity, 0)
   assert.ok(by.air_exchange__speed >= adapter.FAN_MIN_PERCENT)
+  assert.equal("grow_day" in by, false, "changing stage must not reset the start date")
+})
+
+test("a linked profile's stage knobs beat the built-in recipe", () => {
+  const by = Object.fromEntries(
+    adapter.stageWrites("Colonization", {
+      colonization: { temperature_c: 21, humidity_percent: 93, fan_speed_percent: 25, air_exchange_period_min: 45, air_exchange_run_sec: 20, light_hours: 0, white_percent: 0, red_percent: 0, green_percent: 0, blue_percent: 0 },
+    }).map((w) => [w.id, w.value])
+  )
+  assert.equal(by.grow_phase, "Colonizing")
+  assert.equal(by.temperature__target, 21)
+  assert.equal(by.target_humidity, 93)
+  assert.equal(by.air_exchange__speed, 25)
+  assert.equal(by.air_exchange__period__min_, 45)
+  assert.equal("grow_day" in by, false)
 })
 
 test("white percent to lux matches the cloud and firmware curve", () => {
