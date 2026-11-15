@@ -10,7 +10,7 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export const CHAMBERS = [
   { id: "shrooly-a", name: "Shrooly A", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Runs the free profile for the comparison species." },
   { id: "shrooly-b", name: "Shrooly B", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Second Shrooly, so one odd block does not decide the result." },
-  { id: "lykyn", name: "Lykyn Single-Tier", hardware: "Lykyn Single-Tier smart grow box", software: "Stock Lykyn controls for now", status: "Arriving, outside-control validation pending", note: "We still have to confirm Shroom Labs can read and set it from outside. Until then it runs on its own controls." },
+  { id: "lykyn", name: "Lykyn Single-Tier", hardware: "Lykyn Single-Tier smart grow box", software: "Shroom Labs firmware", status: "Supported, validated on a real unit", note: "Runs native Shroom Labs firmware with a local dashboard and an optional cloud link. The side by side grow has not started yet." },
 ];
 
 export const COMPARISON = {
@@ -34,10 +34,10 @@ export const ENTRY_FIELDS = [
 export const ENTRIES = [];
 
 export const GROW_LOG = {
-  updated: "2026-11-03",
+  updated: "2026-11-15",
   title: "Mushroom grow log: Shrooly vs Lykyn, same species · Shroom Labs",
   h1: "Shroom Labs grow log",
-  description: "A public log of three home mushroom chambers, two Shroolys and a Lykyn Single-Tier, growing the same species side by side. Starting soon.",
+  description: "Two Shrooly chambers and a Lykyn, set to grow the same species side by side. The Lykyn runs Shroom Labs firmware. The comparison grow has not started yet.",
   answer: "We are setting up three chambers to log in public: two Shroolys and one Lykyn Single-Tier, growing the same species side by side. Nothing has started yet, so there are no readings, yields, or photos here. Entries go up as they happen.",
   faq: [
     { q: "When does the grow log start?", a: "When the Lykyn arrives and we confirm we can read and set it from outside. The two Shroolys start the same day so the comparison is fair." },

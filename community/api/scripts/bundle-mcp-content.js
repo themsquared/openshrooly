@@ -12,6 +12,6 @@ const page = (file, url, kind) => {
 };
 const out = [];
 for (const d of ["guides", "blog"]) for (const f of readdirSync(join(pub, d)).filter((f) => f.endsWith(".html"))) out.push(page(`${d}/${f}`, `/${d}/${f.replace(/\.html$/, "")}`, d === "guides" ? "guide" : "blog"));
-for (const f of ["chambers", "install", "terrashroom", "what-happened-to-shrooly", "reuse-your-shrooly", "shrooly-alternatives", "shrooly-faq"]) out.push(page(`${f}.html`, `/${f}`, "chamber"));
+for (const f of ["chambers", "install", "terrashroom", "lykyn", "what-happened-to-shrooly", "reuse-your-shrooly", "shrooly-alternatives", "shrooly-faq"]) out.push(page(`${f}.html`, `/${f}`, "chamber"));
 writeFileSync(join(here, "..", "src", "mcp-content.json"), JSON.stringify(out, null, 2) + "\n");
 console.log(`bundled ${out.length} pages -> community/api/src/mcp-content.json`);
