@@ -14,16 +14,14 @@ import {
   renderDeviceCards,
   renderIdentity,
   speciesLine,
-  growPhasesForDevice,
   renderCommandList,
   resultMessage,
   commandStatusLabel,
   commandPending,
   newRequestId,
-  whiteIsPercentDevice,
   SENT_MESSAGE,
-  LYKYN_LIGHT_NOTE,
 } from "../public/js/device-ui.js";
+import { CANONICAL_STAGES, canonicalStage, deviceAdapter, profileStageId } from "../public/js/device-adapters.js";
 
 const DASH = /[\u2013\u2014]/;
 const pearl = demoDevices()[0];
@@ -89,8 +87,9 @@ test("Coach Autopilot locks every target field and leaves mode and name editable
   ]) {
     assert.match(html, new RegExp(`name="${name}"[^>]*disabled`), name);
   }
-  assert.match(html, /data-action="climate"[^>]*disabled/);
-  assert.match(html, /data-action="light"[^>]*disabled/);
+  for (const action of ["temperature", "humidity", "air", "light"]) assert.match(html, new RegExp(`data-action="${action}"[^>]*disabled`), action);
+  // The Stage picker loads a profile recipe, like Start this grow, so it stays open under Coach.
+  assert.doesNotMatch(html, /name="grow_phase"[^>]*disabled/);
   // Starting a grow is the grower's choice of what is growing, so it stays open under Coach.
   assert.doesNotMatch(html, /name="profile_id"[^>]*disabled/);
   assert.doesNotMatch(html, /name="stage"[^>]*disabled/);
@@ -195,22 +194,68 @@ test("controls the firmware can't take are left out, with one plain line", () =>
   assert.doesNotMatch(tagFor(html, "temperature_c"), /disabled/);
   assert.doesNotMatch(tagFor(html, "humidity_percent"), /disabled/);
   assert.match(html, /<button type="submit" data-action="profile">Start this grow/);
-  assert.match(html, /takes fan speed and the light schedule on the chamber itself/);
+  assert.match(html, /This chamber takes fan speed and how often and how long on the chamber itself for now/);
+  assert.match(html, /can't take light settings from the cloud yet/);
   assert.match(html, /can't load a whole profile/);
   // Nothing to say about an unreported software version.
   assert.doesNotMatch(html, /not reported|Chamber software/);
   assert.doesNotMatch(html, DASH);
 });
 
-test("one Save for the climate, and every Save says what happened right under it", () => {
+test("one Save per card, and every Save says what happened right under it", () => {
   const html = renderControls(pearl, { profiles: [pearl.profile], canWrite: true });
-  assert.equal(html.split('data-action="climate"').length - 1, 1);
-  assert.doesNotMatch(html, /data-action="setpoints"/);
-  for (const action of ["profile", "climate", "light", "name"]) assert.match(html, new RegExp(`data-msg-for="${action}"`));
+  for (const action of ["temperature", "humidity", "light", "air", "stage"]) assert.equal(html.split(`data-action="${action}"`).length - 1, 1, action);
+  assert.doesNotMatch(html, /data-action="climate"|data-action="setpoints"/);
+  for (const action of ["profile", "stage", "temperature", "humidity", "light", "air", "name"]) assert.match(html, new RegExp(`data-msg-for="${action}"`));
   // What's growing comes first and is the one primary button.
-  assert.ok(html.indexOf('id="grow"') < html.indexOf('data-action="climate"'));
+  assert.ok(html.indexOf('id="grow"') < html.indexOf('data-action="stage"'));
   assert.match(html, /<button type="submit" data-action="profile">/);
-  assert.match(html, /class="secondary" data-action="climate"/);
+  assert.match(html, /class="secondary" data-action="temperature"/);
+});
+
+const LEGENDS = /<legend>([^<]+)<\/legend>/g;
+const cardOrder = (html) => [...html.matchAll(LEGENDS)].map((m) => m[1]).filter((l) => ["Stage", "Temp", "Humidity", "Light", "Fresh air"].includes(l));
+
+test("every chamber gets the same cards in the same order: Stage, Temp, Humidity, Light, Fresh air", () => {
+  const lykyn = { ...pearl, device_type: "lykyn_chamber", capabilities: { knob_ranges: { white_intensity: [0, 100, 1], air_exchange_speed: [33, 100, 1] } } };
+  const want = ["Stage", "Temp", "Humidity", "Light", "Fresh air"];
+  const stageValues = (html) => [...html.match(/<select name="grow_phase"[^>]*>([\s\S]*?)<\/select>/)[1].matchAll(/<option value="([^"]+)"/g)].map((m) => m[1]);
+  for (const device of [pearl, lykyn, sl2, { ...sl2, device_type: "lykyn_chamber" }, { ...pearl, online: false }]) {
+    const html = renderControls(device, { profiles: [pearl.profile], canWrite: true });
+    assert.deepEqual(cardOrder(html), want, device.device_type || "shrooly");
+    assert.ok(html.indexOf('id="grow"') < html.indexOf("<legend>Stage</legend>"));
+    // The picker always lists the same four stages, in the same order.
+    assert.deepEqual(stageValues(html).filter((v) => CANONICAL_STAGES.includes(v)), CANONICAL_STAGES);
+  }
+  // A stage the chamber lacks stays listed but can't be picked.
+  const shrooly = renderControls(pearl, { canWrite: true });
+  assert.match(shrooly, /<option value="Custom" disabled>Custom \(not on this chamber\)<\/option>/);
+  assert.match(renderControls(lykyn, { canWrite: true }), /<option value="Custom">Custom<\/option>/);
+});
+
+test("a card the chamber can't take keeps its place and shows one note line", () => {
+  const html = renderControls(sl2, { profiles: [pearl.profile], canWrite: true });
+  assert.deepEqual(cardOrder(html), ["Stage", "Temp", "Humidity", "Light", "Fresh air"]);
+  const light = html.match(/<fieldset data-card="light">[\s\S]*?<\/fieldset>/)[0];
+  assert.equal(light.split("control-note").length - 1, 1);
+  assert.doesNotMatch(light, /<input/);
+  const air = html.match(/<fieldset data-card="fresh-air">[\s\S]*?<\/fieldset>/)[0];
+  assert.equal(air.split("control-note").length - 1, 1);
+  assert.doesNotMatch(air, /<input|<button/);
+});
+
+test("Fan speed floor and white unit come from the chamber's adapter", () => {
+  const lykyn = { ...pearl, device_type: "lykyn_chamber", capabilities: {} };
+  const html = renderControls(lykyn, { canWrite: true });
+  assert.match(tagFor(html, "fan_speed_percent"), /min="33"/);
+  assert.match(html, /White added to each color/);
+  assert.match(tagFor(renderControls(pearl, { canWrite: true }), "fan_speed_percent"), /min="15"/);
+  assert.equal(deviceAdapter(lykyn).white.percent, true);
+  assert.equal(deviceAdapter({}).white.percent, false);
+  assert.equal(deviceAdapter({ device_type: "mystery" }).label, "Shrooly chamber");
+  assert.equal(canonicalStage("Colonizing"), "Colonization");
+  assert.equal(profileStageId("Colonization"), "colonization");
+  assert.equal(profileStageId("Custom"), "");
 });
 
 test("an empty chamber gets a small icon and one next step, on the card and the page", async () => {
@@ -278,30 +323,27 @@ test("a 1.0.5 chamber gets fan, fresh air, light in % with a lux preview, and it
   assert.equal(luxPreview(20), "About 92 lux");
   assert.match(luxPreview(100), /4000 lux \(the most/);
   assert.doesNotMatch(html, DASH);
-  assert.match(html, /<option value="Colonizing">/);
-  assert.doesNotMatch(html, /<option value="Colonization">/);
+  assert.match(html, /<option value="Colonization">/);
+  assert.doesNotMatch(html, /Colonizing/);
 });
 
-test("Lykyn phase select uses Colonization, Shrooly keeps Colonizing", () => {
-  assert.deepEqual(growPhasesForDevice({}), ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"]);
-  assert.deepEqual(growPhasesForDevice({ device_type: "shrooly_chamber" }), ["Idle", "Colonizing", "Pinning", "Fruiting", "Harvest"]);
-  assert.deepEqual(growPhasesForDevice({ device_type: "lykyn_chamber" }), ["Fruiting", "Pinning", "Colonization", "Custom"]);
-  const html = renderControls({
-    ...sl2,
-    device_type: "lykyn_chamber",
-    firmware: "0.2.0",
-    controls: SL5_CONTROLS,
-    chamber: { grow_phase: "Colonization", air_exchange_period_min: 60, air_exchange_run_sec: 15 },
-  }, { canWrite: true });
-  assert.match(html, /<option value="Colonization" selected>/);
-  assert.match(html, /<option value="Custom">/);
-  assert.doesNotMatch(html, /<option value="Colonizing">/);
+test("the stage picker says Colonization on both chambers and selects what the chamber reports", () => {
+  const base = { ...sl2, firmware: "0.2.0", controls: SL5_CONTROLS };
+  const lykyn = renderControls({ ...base, device_type: "lykyn_chamber", chamber: { grow_phase: "Colonization" } }, { canWrite: true });
+  const shrooly = renderControls({ ...base, device_type: "shrooly_chamber", chamber: { grow_phase: "Colonizing" } }, { canWrite: true });
+  for (const html of [lykyn, shrooly]) {
+    assert.match(html, /<option value="Colonization" selected>/);
+    assert.doesNotMatch(html, /<option value="Colonizing"/);
+  }
+  // Idle and Harvest are real phases on a Shrooly: shown first so the box never lies.
+  const idle = renderControls({ ...base, chamber: { grow_phase: "Idle" } }, { canWrite: true });
+  assert.match(idle, /<option value="Idle" selected>/);
 });
 
-test("air and phase controls stay hidden until the chamber reports them", () => {
+test("grow day stays hidden until the chamber reports it", () => {
   const html = renderControls(sl2, { canWrite: true });
   assert.doesNotMatch(html, /name="air_exchange_period_min"/);
-  assert.doesNotMatch(html, /name="grow_phase"/);
+  assert.doesNotMatch(html, /name="grow_day"/);
   const offline = renderControls({ ...sl2, controls: SL5_CONTROLS, chamber: {} }, { canWrite: false });
   assert.match(tagFor(offline, "air_exchange_run_sec"), /disabled/);
 });
@@ -552,6 +594,7 @@ test("Autopilot log line names every knob it moved", async () => {
     }),
     "Set 23 °C, 93% RH, fan 30%, fresh air 35 s every 15 min, light 12 h at 90 lux and phase Pinning"
   );
+  assert.match(autopilotSummary({ light_hours: 12, white_intensity: 20 }, { device_type: "lykyn_chamber" }), /light 12 h at 20%/);
 });
 
 
@@ -564,15 +607,15 @@ test("Lykyn light controls are a color mix in percent with no lux readout", () =
     chamber_light: { sunrise_hour: 8, duration_hours: 12, white_percent: 20, red_percent: 0, green_percent: 0, blue_percent: 80 },
     coach: { mode: "advisor", status: "advisor" },
   };
-  assert.equal(whiteIsPercentDevice(lykyn), true);
+  assert.equal(deviceAdapter(lykyn).white.percent, true);
   const html = renderControls(lykyn, { profiles: [pearl.profile], canWrite: true, showCoach: true });
   assert.match(html, /White added to each color \(%\)/);
   assert.match(html, /name="white_percent"[^>]*value="20"/);
-  assert.ok(html.includes(LYKYN_LIGHT_NOTE));
+  assert.ok(html.includes(deviceAdapter(lykyn).white.note));
   assert.doesNotMatch(html, /lux/i);
   assert.doesNotMatch(html, /data-lux-preview/);
   assert.doesNotMatch(html, /brightness/i);
-  assert.doesNotMatch(LYKYN_LIGHT_NOTE, DASH);
+  assert.doesNotMatch(deviceAdapter(lykyn).white.note, DASH);
 });
 
 test("Shrooly light controls keep the lux preview", () => {
@@ -583,8 +626,8 @@ test("Shrooly light controls keep the lux preview", () => {
     chamber_light: { sunrise_hour: 8, duration_hours: 12, white_percent: 20, white_led_lux: 92, red_percent: 0, green_percent: 0, blue_percent: 80 },
     coach: { mode: "advisor", status: "advisor" },
   };
-  assert.equal(whiteIsPercentDevice(shrooly), false);
-  assert.equal(whiteIsPercentDevice({}), false);
+  assert.equal(deviceAdapter(shrooly).white.percent, false);
+  assert.equal(deviceAdapter({}).white.percent, false);
   const html = renderControls(shrooly, { profiles: [pearl.profile], canWrite: true, showCoach: true });
   assert.match(html, /White brightness \(%\)/);
   assert.match(html, /data-lux-preview/);
