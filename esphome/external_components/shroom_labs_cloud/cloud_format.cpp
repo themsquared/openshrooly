@@ -588,14 +588,16 @@ static std::string grow_link(const std::string &in) {
 }
 
 bool parse_inbox_grow(const char *json, InboxGrow *out) {
-  std::string name, url, image;
+  std::string name, url, image, id;
   if (out == nullptr || !json_get_string_top(json, "grow_name", &name))
     return false;
   json_get_string_top(json, "grow_url", &url);
   json_get_string_top(json, "grow_image", &image);
+  json_get_string_top(json, "profile_id", &id);
   out->name = grow_text(name, 48);
   out->url = out->name.empty() ? std::string() : grow_link(url);
   out->image = out->name.empty() ? std::string() : grow_link(image);
+  out->id = out->name.empty() ? std::string() : grow_text(id, 64);
   return true;
 }
 

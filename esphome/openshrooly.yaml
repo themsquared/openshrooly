@@ -261,3 +261,4 @@ packages:
   security: !include components/security.yaml
   daily_range: !include components/daily_range.yaml
   cloud: !include components/cloud.yaml
+  local_api: !include components/local_api.yaml
