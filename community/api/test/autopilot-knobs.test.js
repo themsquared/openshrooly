@@ -256,6 +256,9 @@ test("a chamber with old firmware still gets temperature and RH only", async () 
 test("a fruiting grow on a chamber still showing its default Colonizing phase stays fruiting (prod regression)", async () => {
   const lions = JSON.parse(readFileSync(new URL("../../../data/profiles/culinary/lions-mane.json", import.meta.url), "utf8"));
   assert.equal(pickAutopilotStage(lions, { grow_day: 2, grow_phase: "Colonizing" }, caps105, { chosenStage: "fruiting" }).stageId, "fruiting");
+  const back = pickAutopilotStage(pearl, { grow_day: 25, grow_phase: "Fruiting" }, caps105, { chosenStage: "colonization" });
+  assert.equal(back.stageId, "colonization", "a grower who went back to Colonization is not held on Fruiting");
+  assert.equal(back.source, "chosen");
   // The real first 1.0.5-sl.1 reading from Mike's chamber, after a site apply of lions-mane fruiting.
   const doc = reading105({
     day: 2,

@@ -40,13 +40,20 @@ function settingKeys(payload = {}) {
  * and (for setpoints) sets every knob the older one sets. A stale command must never apply over it.
  */
 export function commandSupersedes(newer, older) {
-  if (!newer || !older || newer.device_id !== older.device_id || newer.kind !== older.kind) return false;
-  if (!SUPERSEDABLE_KINDS.has(older.kind) || Number(newer.id) <= Number(older.id)) return false;
+  if (!newer || !older || newer.device_id !== older.device_id || Number(newer.id) <= Number(older.id)) return false;
   const np = parseJson(newer.payload, {}) || {};
+  const op = parseJson(older.payload, {}) || {};
   const ack = String(np._ack?.status || "");
   if (["failed", "refused", "expired"].includes(ack)) return false;
+  const olderAuto = String(op.source || "").startsWith("grow-coach-autopilot");
+  const newerAuto = String(np.source || "").startsWith("grow-coach-autopilot");
+  // A later stage or profile pick from the grower drops a queued Autopilot command,
+  // even when the pick does not repeat every Autopilot knob.
+  if (olderAuto && !newerAuto && (np.grow_phase || np.stage || newer.kind === "apply_profile")) return true;
+  if (newer.kind !== older.kind) return false;
+  if (!SUPERSEDABLE_KINDS.has(older.kind)) return false;
   if (older.kind !== "setpoints") return true;
-  const mine = settingKeys(parseJson(older.payload, {}) || {});
+  const mine = settingKeys(op);
   const theirs = settingKeys(np);
   if (!mine.size) return false;
   for (const key of mine) if (!theirs.has(key)) return false;
@@ -414,7 +421,35 @@ export function stageTargets(stage = {}, { stageId = null, growDay = null, caps 
  * `current` is the chamber's latest knob values (chamberKnobs); `growDay` the tracked grow day.
  */
 export function planForCapabilities(plan, caps, { stage = {}, requested = {}, current = {}, growDay = null } = {}) {
-  if (plan.kind === "setpoints" || plan.kind === "stage") {
+  if (plan.kind === "setpoints") {
+    const { payload, skipped, asked } = supportedSetpoints(plan.payload, caps, requested, { current });
+    const sendable = asked.filter((k) => payload[k] != null);
+    if (!sendable.length) {
+      return { ok: false, error: skipped[0]?.note || "This chamber can't take that change from the cloud.", skipped };
+    }
+    return { ok: true, commands: [{ kind: "setpoints", payload }], skipped, translated: false };
+  }
+  if (plan.kind === "stage") {
+    // When this profile has a recipe for the picked stage, send the four knobs with the phase.
+    // Do not invent a grow_day: changing stage must not reset the start date.
+    const hasRecipe = Boolean(stage && stage.id && (stage.temperature_c != null || stage.humidity_percent != null || stage.fan || stage.light));
+    if (hasRecipe) {
+      const targets = stageTargets(stage, { stageId: stage.id, growDay: plan.payload.grow_day, caps });
+      if (plan.payload.grow_day == null) delete targets.grow_day;
+      if (plan.payload.grow_phase) targets.grow_phase = plan.payload.grow_phase;
+      const { payload, skipped, asked } = supportedSetpoints(targets, caps, targets, { current });
+      const sendable = asked.filter((k) => payload[k] != null);
+      if (!sendable.length) {
+        return { ok: false, error: skipped[0]?.note || "This chamber can't take that change from the cloud.", skipped };
+      }
+      const body = {
+        ...payload,
+        profile_id: plan.payload.profile_id,
+        stage: stage.id,
+        translated_from: "stage",
+      };
+      return { ok: true, commands: [{ kind: "setpoints", payload: body }], skipped, translated: true, full: Boolean(caps.multi) };
+    }
     const { payload, skipped, asked } = supportedSetpoints(plan.payload, caps, requested, { current });
     const sendable = asked.filter((k) => payload[k] != null);
     if (!sendable.length) {

@@ -6,6 +6,7 @@ import { devStubsEnabled } from "./providers.js";
 import { ValidationError, validateStageLight } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
 import {
+  autopilotCommandExpired,
   expireSupersededAutopilotCommand,
   inferAutopilotApplyFromReading,
   isAutopilotCommand,
@@ -868,6 +869,16 @@ export async function handleDevices(method, path, url, request, env) {
     const open = [];
     for (const row of (rows || []).slice().sort((a, b) => Number(a.id) - Number(b.id))) {
       const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+      if (isAutopilotCommand(row) && autopilotCommandExpired(row)) {
+        await expireSupersededAutopilotCommand(
+          db,
+          bound.device,
+          row,
+          Date.now(),
+          "This Autopilot change sat too long, so it was dropped."
+        );
+        continue;
+      }
       if (commandExpired(payload)) continue;
       if (recent.some((newer) => commandSupersedes(newer, row)) || open.some((newer) => commandSupersedes(newer, row))) {
         await retireSuperseded(db, bound.device, row);

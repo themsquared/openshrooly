@@ -50,11 +50,12 @@ export function stageIndexForPhase(profile, phase) {
 }
 
 /**
- * Which stage Autopilot steers to. The chamber's grow day moves the grow forward through the
- * profile; it never moves a grow back to an earlier stage than the chamber's phase shows or
- * the stage the grower last applied from the site (`chosenStage`), so a chamber still on its
- * default phase does not drag a fruiting grow back to colonizing.
- * Chambers that report neither keep the old target (the fruiting stage).
+ * Which stage Autopilot steers to. The grower's last applied stage wins when the chamber
+ * still shows a different phase: the change may still be in flight, or they moved the grow
+ * back (for example from Fruiting to Colonization). Grow day only moves the grow forward
+ * once the chamber is already on that chosen stage. A fruiting apply is not dragged back
+ * to colonizing just because the chamber is still on its default phase.
+ * Chambers that report neither, with no chosen stage, keep the old target (fruiting).
  */
 export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage = null } = {}) {
   const stages = profile?.stages || [];
@@ -62,9 +63,16 @@ export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage
   const byPhase = caps.grow_phase ? stageIndexForPhase(profile, knobs.grow_phase) : -1;
   const byDay = caps.grow_day ? stageIndexForDay(profile, knobs.grow_day) : -1;
   const byChoice = chosenStage ? stages.findIndex((s) => s.id === chosenStage) : -1;
-  let index = Math.max(byPhase, byDay, byChoice);
-  let source = byChoice === index && byChoice > Math.max(byPhase, byDay) ? "chosen" : byDay > byPhase ? "grow_day" : byPhase >= 0 ? "phase" : "default";
-  if (index < 0) index = fallback;
+  let index;
+  let source;
+  if (byChoice >= 0 && (byPhase < 0 || byChoice !== byPhase)) {
+    index = byChoice;
+    source = "chosen";
+  } else {
+    index = Math.max(byPhase, byDay, byChoice);
+    source = byChoice === index && byChoice > Math.max(byPhase, byDay) ? "chosen" : byDay > byPhase ? "grow_day" : byPhase >= 0 ? "phase" : "default";
+    if (index < 0) index = fallback;
+  }
   const stage = stages[index] || {};
   const phase = growPhaseForStage(stage.id, caps);
   const transition = Boolean(caps.multi && caps.grow_phase && phase && knobs.grow_phase && !sameGrowPhase(knobs.grow_phase, phase) && index > byPhase);

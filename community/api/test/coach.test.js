@@ -67,9 +67,9 @@ test("device learning raises humidity when the chamber droops and stays in bound
   assert.ok(model.humidity_droop >= 5);
   assert.ok(model.temperature_offset > 1);
   const suggestion = suggestSetpoints(model, { humidity_percent: 90, temperature_c: 20, fan: { speed_percent: 30 } }, { auto: true });
-  assert.ok(suggestion.humidity_percent > 90);
-  assert.ok(suggestion.humidity_percent <= 96);
+  assert.equal(suggestion.humidity_percent, 90, "the humidity target stays on the profile");
   assert.equal(suggestion.temperature_c, 20);
+  assert.match(suggestion.reasons.join(" "), /lags humidity setpoint/i);
   assert.equal(suggestion.within_bounds, true);
   assert.equal(suggestion.auto_eligible, true);
 });
@@ -87,8 +87,8 @@ test("device learning lowers humidity when the chamber runs wet and ignores rest
   assert.equal(model.report_count, 1);
   assert.equal(model.outcome_success_rate, 0);
   const suggestion = suggestSetpoints(model, { humidity_percent: 90, temperature_c: 20 });
-  assert.ok(suggestion.humidity_percent < 90);
-  assert.ok(suggestion.humidity_percent >= 70);
+  assert.equal(suggestion.humidity_percent, 90, "Coach does not step the humidity target down when RH runs high");
+  assert.match(suggestion.reasons.join(" "), /Humidity runs high versus the target/);
   assert.equal(suggestion.temperature_c, 20);
 });
 
