@@ -183,7 +183,8 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Shiitake caps need 500 to 2,000 lux in the cited table, and less than 500 lux gives long stems. 37% white is about 506 lux and 51% is about 1,229 lux. Browning keeps the free card light.",
+    "white_scale": "output",
+    "why": "Shiitake caps need 500 to 2,000 lux in the cited table, and less than 500 lux gives long stems. 12.65% white is about 506 lux and 30.725% is about 1,229 lux. Browning keeps the free card light.",
     "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
     "sources": [
       {
@@ -205,35 +206,35 @@
     "phases": {
       "colonization": {
         "photoperiod_hours": 0.0,
-        "white_brightness_percent": 0.0,
+        "white_brightness_percent": 0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
       },
       "browning": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 26.0,
+        "white_brightness_percent": 4.75,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "cold_shock": {
         "photoperiod_hours": 0.0,
-        "white_brightness_percent": 0.0,
+        "white_brightness_percent": 0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
       },
       "pinning": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 37.0,
+        "white_brightness_percent": 12.65,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "fruiting": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 51.0,
+        "white_brightness_percent": 30.725,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

@@ -2285,12 +2285,6 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
   const form = $("#device-controls");
   const generalMsg = $("#device-controls-msg");
   // Picking a different profile resets the phase to its first stage (a new grow starts at day 1).
-  // The note under the white % box follows what is typed (a chamber with a brightest setting says so).
-  form?.addEventListener("input", (ev) => {
-    if (ev.target?.name !== "white_percent") return;
-    const out = form.querySelector("[data-white-note]");
-    if (out) out.textContent = deviceAdapter(currentDevice() || {}).white.preview(Number(ev.target.value) || 0);
-  });
   form?.addEventListener("change", (ev) => {
     if (ev.target?.name !== "profile_id" || !form.stage) return;
     const option = ev.target.selectedOptions?.[0];

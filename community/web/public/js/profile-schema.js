@@ -66,28 +66,76 @@ export function lightPhaseOn(phase = {}) {
 }
 
 /**
- * Firmware white channel curve, from lux_to_brightness in
- * esphome/scripts/lighting_control_manager.yaml. The chamber stores white as lux.
- * At or below 20% brightness the curve is linear and 20% is 92 lux. Above 20% it is
- * lux = 0.02307 * percent^2.768. The white entity tops out at 4000 lux (about 78%).
- * shared/openshrooly_lib/mapping.py uses the same numbers.
+ * Light percent is the same thing on every chamber: 0 to 100, where 100 is the most that
+ * channel can put out, and the scale is linear in output. The Shrooly white channel tops
+ * out at 4000 lux, so lux = 40 x percent. 100% is 4000 lux and there is no cap below it.
+ * The Lykyn ring is already linear output (gamma 1.0, brightness 100), so its percent is
+ * the channel value as is. shared/openshrooly_lib/mapping.py uses the same numbers.
  */
-export const WHITE_LINEAR_PERCENT = 20;
-export const WHITE_LINEAR_LUX = 92;
 export const WHITE_MAX_LUX = 4000;
+export const WHITE_LUX_PER_PERCENT = WHITE_MAX_LUX / 100;
+/** Marker on a light recipe whose white percent uses this scale. */
+export const LIGHT_SCALE = "output";
+
+/** Percent are kept to three decimals, which is exact for any whole lux (1 lux is 0.025%). */
+export function roundPercent(value) {
+  return Math.round(Number(value) * 1000) / 1000;
+}
 
 export function whitePercentToLux(percent) {
   const pct = Math.min(100, Number(percent));
   if (!(pct > 0)) return 0;
-  const lux = pct <= WHITE_LINEAR_PERCENT ? (pct / WHITE_LINEAR_PERCENT) * WHITE_LINEAR_LUX : 0.02307 * pct ** 2.768;
-  return Math.min(WHITE_MAX_LUX, Math.round(lux));
+  return Math.min(WHITE_MAX_LUX, Math.round(pct * WHITE_LUX_PER_PERCENT));
 }
 
 export function whiteLuxToPercent(lux) {
   const value = Math.min(WHITE_MAX_LUX, Number(lux));
   if (!(value > 0)) return 0;
-  const pct = value <= WHITE_LINEAR_LUX ? (value / WHITE_LINEAR_LUX) * WHITE_LINEAR_PERCENT : (value / 0.02307) ** (1 / 2.768);
-  return Math.min(100, pct);
+  return roundPercent(value / WHITE_LUX_PER_PERCENT);
+}
+
+/**
+ * The scale recipes used before the marker existed. A recipe percent was the firmware
+ * curve input: linear to 20% = 92 lux, then lux = 0.02307 x percent^2.768, with a 4000 lux
+ * cap near 78%. Kept only to upgrade stored recipes without changing the light they make.
+ */
+export function legacyWhitePercentToLux(percent) {
+  const pct = Math.min(100, Number(percent));
+  if (!(pct > 0)) return 0;
+  const lux = pct <= 20 ? (pct / 20) * 92 : 0.02307 * pct ** 2.768;
+  return Math.min(WHITE_MAX_LUX, Math.round(lux));
+}
+
+/** A legacy recipe percent on the current scale: the same lux, as a share of the 4000 lux maximum. */
+export function legacyWhitePercentToOutputPercent(percent) {
+  return whiteLuxToPercent(legacyWhitePercentToLux(percent));
+}
+
+/**
+ * Upgrade one recipe to the output scale. A recipe with no marker is on the legacy scale, so
+ * each white percent is converted through the old curve to lux and back to a share of 4000
+ * lux. The lux a stage produces does not change. Safe to run twice: a marked recipe is left alone.
+ */
+export function upgradeRecipeLightScale(recipe) {
+  if (!recipe || typeof recipe !== "object" || recipe.white_scale === LIGHT_SCALE) return recipe;
+  const next = { ...recipe, white_scale: LIGHT_SCALE };
+  if (recipe.phases && typeof recipe.phases === "object") {
+    next.phases = {};
+    for (const [name, phase] of Object.entries(recipe.phases)) {
+      next.phases[name] =
+        phase && typeof phase === "object" && phase.white_brightness_percent != null
+          ? { ...phase, white_brightness_percent: legacyWhitePercentToOutputPercent(phase.white_brightness_percent) }
+          : phase;
+    }
+  }
+  return next;
+}
+
+/** Same upgrade on a whole profile document. */
+export function upgradeProfileLightScale(profile) {
+  if (!profile || typeof profile !== "object" || !profile.light_recipe) return profile;
+  const recipe = upgradeRecipeLightScale(profile.light_recipe);
+  return recipe === profile.light_recipe ? profile : { ...profile, light_recipe: recipe };
 }
 
 /** Firmware 1.0.3-sl.6 uses 12 h when lux or RGB is on and duration is 0 or unset. */
@@ -132,7 +180,7 @@ function normalizeStoredPhase(phase) {
 function phaseFromStageLight(light) {
   return {
     photoperiod_hours: light.duration_hours,
-    white_brightness_percent: Math.round(whiteLuxToPercent(light.white_led_lux)),
+    white_brightness_percent: whiteLuxToPercent(light.white_led_lux),
     red_percent: light.red_percent,
     green_percent: light.green_percent,
     blue_percent: light.blue_percent,
@@ -142,7 +190,7 @@ function phaseFromStageLight(light) {
 /** Read path only: a stored profile with every stage light and recipe phase filled in. */
 export function normalizeStoredProfileLight(profile) {
   if (!profile || typeof profile !== "object") return profile;
-  const next = structuredClone(profile);
+  const next = structuredClone(upgradeProfileLightScale(profile));
   if (!Array.isArray(next.stages)) return next;
   for (const stage of next.stages) {
     if (!stage || typeof stage !== "object") continue;
@@ -825,7 +873,7 @@ export function defaultLightPhase(id) {
   const fruitingLike = id === "fruiting" || id === "pinning" || id === "flush";
   return {
     photoperiod_hours: fruitingLike ? 12 : 0,
-    white_brightness_percent: fruitingLike ? 40 : 0,
+    white_brightness_percent: fruitingLike ? 15 : 0,
     red_percent: 0,
     green_percent: 0,
     blue_percent: fruitingLike ? 80 : 0,
@@ -855,6 +903,7 @@ export function blankProfile({ id = "", name = "", pack = "culinary" } = {}) {
     affiliate_links: [],
     firmware_compat: { min_version: "1.0.0", uses_existing_entities_only: true },
     light_recipe: {
+      white_scale: LIGHT_SCALE,
       why: "Hours and mix for this chamber. Each grow phase needs its own hours and mix.",
       wavelength_note: WAVELENGTH_NOTE,
       sources: [{ title: "Grower", detail: "Recorded from this grow." }],
@@ -868,7 +917,7 @@ export function blankProfile({ id = "", name = "", pack = "culinary" } = {}) {
 }
 
 export function applyPackRules(profile, extra = {}) {
-  const next = structuredClone(profile);
+  const next = structuredClone(upgradeProfileLightScale(profile));
   if (!Array.isArray(next.tags)) next.tags = [];
   if (!Array.isArray(next.stages)) next.stages = blankProfile().stages;
   const classified = classifyTaxon(next, extra);

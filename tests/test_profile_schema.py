@@ -152,7 +152,7 @@ def test_stored_legacy_light_reads_as_dark_or_12h_but_saves_stay_strict():
     assert profile.light_recipe.phase_for("fruiting").photoperiod_hours == 12
     pinning = profile.light_recipe.phase_for("pinning")
     assert pinning.photoperiod_hours == 12
-    assert pinning.white_brightness_percent == 20
+    assert pinning.white_brightness_percent == 2.3
     assert pinning.blue_percent == 80
     once = normalize_stored_light(raw)
     assert normalize_stored_light(once) == once

@@ -119,12 +119,12 @@ export function recipeKnobs(stage = {}, stageId, caps = {}) {
 }
 
 /** Recipe knobs that differ from what the chamber runs now. */
-export function recipeChanges(recipe = {}, knobs = {}) {
+export function recipeChanges(recipe = {}, knobs = {}, caps = null) {
   const out = {};
   for (const [key, value] of Object.entries(recipe)) {
     if (key === "grow_phase") {
       if (!sameGrowPhase(knobs.grow_phase, value)) out[key] = value;
-    } else if (!readingMatchesTargets(knobs, { [key]: value })) out[key] = value;
+    } else if (!readingMatchesTargets(knobs, { [key]: value }, caps)) out[key] = value;
   }
   return out;
 }

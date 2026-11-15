@@ -1218,7 +1218,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     if (fanSteer.reason) suggestion.reasons = [...(suggestion.reasons || []), fanSteer.reason];
   }
   const recipe = caps.multi ? recipeKnobs(stage, pick.stageId, caps) : {};
-  const extras = caps.multi ? recipeChanges(recipe, knobs) : {};
+  const extras = caps.multi ? recipeChanges(recipe, knobs, caps) : {};
   const currentSetpoints = {
     temperature_c: current.temperature_setpoint ?? last.temperature_c,
     humidity_percent: current.humidity_setpoint ?? last.humidity_percent,

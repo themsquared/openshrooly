@@ -122,7 +122,8 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "No light numbers specific to P. cyanescens are known. Colonization is dark. Pinning and fruiting use the chamber default: 12 hours a day at 20% white (92 lux on this chamber) with 80% blue.",
+    "white_scale": "output",
+    "why": "No light numbers specific to P. cyanescens are known. Colonization is dark. Pinning and fruiting use the chamber default: 12 hours a day at 2.3% white (92 lux on this chamber) with 80% blue.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation, not a measured spectrum.",
     "sources": [
       {
@@ -140,14 +141,14 @@
       },
       "fruiting": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "pinning": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

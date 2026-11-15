@@ -135,6 +135,7 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
+    "white_scale": "output",
     "why": "Fruiting runs on blue only because pure blue gave fuller color, shorter stems, and more umami than white in Chen 2025.",
     "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
     "sources": [
@@ -152,21 +153,21 @@
     "phases": {
       "colonization": {
         "photoperiod_hours": 0.0,
-        "white_brightness_percent": 0.0,
+        "white_brightness_percent": 0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
       },
       "pinning": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 20.0,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "fruiting": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 0.0,
+        "white_brightness_percent": 0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 100
