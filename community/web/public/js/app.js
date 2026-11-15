@@ -20,7 +20,6 @@ import {
   lastSeenLine,
   chamberStatus,
   renderChamberStatus,
-  luxPreview,
   readingWhenLine,
   renderControls,
   renderCommandList,
@@ -38,6 +37,7 @@ import {
   speciesLine,
   stageOptionsHtml,
 } from "./device-ui.js";
+import { luxPreview, profileStageId } from "./device-adapters.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
 import { mountPhotoCheck } from "./coach-photo.js";
@@ -2325,23 +2325,46 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           return;
         }
         const payload = { request_id: newRequestId() };
-        if (action === "climate" || action === "setpoints") {
-          payload.temperature_c = numberOrUndefined(form.temperature_c.value);
-          payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
-          // A disabled fan box means this firmware can't take it; don't ask.
-          if (form.fan_speed_percent && !form.fan_speed_percent.disabled) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
+        // What the form says goes out under the apply action the server knows. Temp, Humidity and Fresh air
+        // are all setpoints; the Stage picker loads the profile's recipe when the profile has that stage.
+        let sendAs = action;
+        const has = (name) => form[name] && !form[name].disabled;
+        if (action === "temperature" || action === "humidity" || action === "air" || action === "setpoints") {
+          sendAs = "setpoints";
+          if (action === "temperature" && has("temperature_c")) payload.temperature_c = numberOrUndefined(form.temperature_c.value);
+          if (action === "humidity" && has("humidity_percent")) payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
+          if (action === "air") {
+            // A missing or disabled box means this chamber can't take it; don't ask.
+            if (has("fan_speed_percent")) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
+            if (has("air_exchange_period_min")) payload.air_exchange_period_min = numberOrUndefined(form.air_exchange_period_min.value);
+            if (has("air_exchange_run_sec")) payload.air_exchange_run_sec = numberOrUndefined(form.air_exchange_run_sec.value);
+          }
         }
         if (action === "profile") {
           payload.profile_id = form.profile_id.value;
           payload.stage = form.stage.value;
         }
-        if (action === "air") {
-          payload.air_exchange_period_min = numberOrUndefined(form.air_exchange_period_min.value);
-          payload.air_exchange_run_sec = numberOrUndefined(form.air_exchange_run_sec.value);
-        }
         if (action === "stage") {
-          if (form.grow_phase) payload.grow_phase = form.grow_phase.value;
-          if (form.grow_day) payload.grow_day = numberOrUndefined(form.grow_day.value);
+          const picked = form.grow_phase.value;
+          const profileId = form.grow_phase.dataset.profileId;
+          let ids = [];
+          try {
+            ids = JSON.parse(form.grow_phase.dataset.profileStages || "[]");
+          } catch {
+            ids = [];
+          }
+          const stageId = profileStageId(picked);
+          if (profileId && stageId && ids.includes(stageId)) {
+            sendAs = "profile";
+            payload.profile_id = profileId;
+            payload.stage = stageId;
+          } else {
+            payload.grow_phase = picked;
+          }
+        }
+        if (action === "grow_day") {
+          sendAs = "stage";
+          payload.grow_day = numberOrUndefined(form.grow_day.value);
         }
         if (action === "light") {
           const whitePct = numberOrUndefined(form.white_percent.value);
@@ -2364,7 +2387,7 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         flash(msg, "Sending...");
         const applied = await api(`/api/fleet/devices/${encodeURIComponent(id)}/apply`, {
           method: "POST",
-          jsonBody: { action: action === "climate" || action === "air" ? "setpoints" : action, payload },
+          jsonBody: { action: sendAs, payload },
         });
         const result = applied.results?.[0];
         if (!result || result.status === "failed") throw new Error(resultMessage(result));
@@ -2372,7 +2395,7 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         clearTimeout(msg._t);
         msg.textContent = resultMessage(result);
         // No profile id here: the picker can hold an Off-menu Profile. Only that a profile was sent.
-        if (action === "profile" && !device.off_menu) track("profile_apply", { source: "device" });
+        if (sendAs === "profile" && !device.off_menu) track("profile_apply", { source: "device" });
         onSent();
       } catch (err) {
         flash(msg, err.message);
