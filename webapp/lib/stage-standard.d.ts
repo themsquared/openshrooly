@@ -20,3 +20,4 @@ export const RECIPES: Record<'Colonization' | 'Pinning' | 'Fruiting', Recipe>
 export function canonicalStage(name?: string | null): Stage | null
 export function missingStages(available: readonly string[]): Stage[]
 export function missingStageNote(available: readonly string[]): string
+export function recipeFromProfile(stage: string, profileStages?: Record<string, Record<string, number | null>> | null): Recipe | null
