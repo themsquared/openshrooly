@@ -738,14 +738,29 @@ function commandAck(payload = {}) {
   return { status, reason: ack.reason ? String(ack.reason) : null };
 }
 
-/** Most recent command that named a profile stage for this chamber, including its ack. */
+/**
+ * The grower's latest say on which stage this chamber is in, newest first:
+ * - a command that named a profile stage (Start this grow, or a profile apply), or
+ * - a manual phase change with no stage (the phase box on the device page). That one
+ *   returns `{ stage: null, manualPhase: true }`, so Coach follows the chamber's own phase
+ *   instead of an older stage choice.
+ * Autopilot's own commands never count: their stage is only what Coach steered, and
+ * counting them made Coach keep steering whatever it had steered before (Fruiting) even
+ * after the grower moved the chamber back to Colonization.
+ */
 export async function latestStagedCommand(db, deviceId, profileId) {
   if (!deviceId || !profileId) return null;
   const rows = await db.all("SELECT * FROM device_commands WHERE device_id=? ORDER BY id DESC LIMIT ?", [deviceId, 50]);
   for (const row of rows || []) {
+    if (isAutopilotCommand(row)) continue;
     const payload = parseJson(row.payload, {});
     if (payload?.stage && payload.profile_id === profileId) {
       return { stage: String(payload.stage), payload, ack: commandAck(payload), row };
+    }
+    if (row.kind === "setpoints" && payload?.grow_phase && !payload.stage) {
+      const ack = commandAck(payload);
+      if (ack.status && (FAILED_ACKS.has(ack.status) || ack.status === "expired")) continue;
+      return { stage: null, manualPhase: true, payload, ack, row };
     }
   }
   return null;
@@ -763,7 +778,7 @@ export async function chosenStageFor(db, deviceId, profileId) {
  * follow that later stage. Returns the device's error, or null when Autopilot may proceed.
  */
 export function failedStageApplyBlocks(last, pick) {
-  if (!last || !FAILED_ACKS.has(last.ack?.status)) return null;
+  if (!last || !last.stage || !FAILED_ACKS.has(last.ack?.status)) return null;
   if (!pick?.stageId || last.stage === pick.stageId) return null;
   return last.ack.reason || "The last phase change failed.";
 }

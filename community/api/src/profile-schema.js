@@ -49,6 +49,7 @@ export const LIGHT_PHASE_IDS = new Set(STAGE_CATALOG.map((s) => s.id));
 export function lightChannelsOn(light = {}) {
   return (
     Number(light.white_led_lux) > 0 ||
+    Number(light.white_percent) > 0 ||
     Number(light.red_percent) > 0 ||
     Number(light.green_percent) > 0 ||
     Number(light.blue_percent) > 0
@@ -1195,6 +1196,9 @@ export function collectStageLightIssues(light = {}, prefix = "light") {
   if (light.white_led_lux != null && !inRange(light.white_led_lux, 0, 4000)) {
     addIssue(issues, `${prefix}.white_led_lux`, "White light must be 0 to 4000 lux.");
   }
+  if (light.white_percent != null && !inRange(light.white_percent, 0, 100)) {
+    addIssue(issues, `${prefix}.white_percent`, "White must be 0 to 100%.");
+  }
   for (const channel of ["red_percent", "green_percent", "blue_percent"]) {
     if (light[channel] != null && !inRange(light[channel], 0, 100)) {
       addIssue(issues, `${prefix}.${channel}`, `${channel.replace("_percent", "")} must be 0 to 100%.`);
@@ -1216,7 +1220,7 @@ export function validateStageLight(light) {
   if (!light || typeof light !== "object") throw new ValidationError("Light recipe is required.");
   const issues = collectStageLightIssues(light);
   if (issues.length) throw new ValidationError(issues[0].message);
-  return {
+  const checked = {
     sunrise_hour: light.sunrise_hour ?? null,
     duration_hours: light.duration_hours ?? null,
     white_led_lux: light.white_led_lux ?? null,
@@ -1224,6 +1228,9 @@ export function validateStageLight(light) {
     green_percent: light.green_percent ?? null,
     blue_percent: light.blue_percent ?? null,
   };
+  // A chamber that takes white as a percent (Lykyn) gets it as given, with no lux round trip.
+  if (light.white_percent != null) checked.white_percent = light.white_percent;
+  return checked;
 }
 
 export function issuesFor(issues, path) {

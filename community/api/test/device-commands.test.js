@@ -11,6 +11,8 @@ import {
   planForCapabilities,
   COMMAND_TTL_MS,
 } from "../src/device-capabilities.js";
+import { latestStagedCommand, runAutopilotForDevice, setDeviceAutopilotMode } from "../src/coach-autopilot.js";
+import { validateStageLight } from "../src/profile-schema.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
 const pearlOyster = JSON.parse(
@@ -224,7 +226,7 @@ test("a profile apply sets the active grow profile and species on the card and d
   assert.equal(card.stage.id, "fruiting");
 });
 
-test("with Autopilot steering, a profile apply is refused and sends nothing", async () => {
+test("with Autopilot steering, Start this grow still works and targets stay locked", async () => {
   const { ctx, token } = await setup("steer@example.com");
   await grantCoach(ctx, token);
   const on = await call(ctx, "POST", "/api/coach/autopilot/mode", {
@@ -232,12 +234,17 @@ test("with Autopilot steering, a profile apply is refused and sends nothing", as
     body: { device_id: "dev-1", mode: "autopilot", profile_id: pearlOyster.id },
   });
   assert.equal(on.status, 200, JSON.stringify(on.data));
-  const before = (await rows(ctx)).length;
   const res = await applyProfile(ctx, token);
   const r = res.data.results[0];
-  assert.equal(r.status, "failed", JSON.stringify(r));
-  assert.match(r.error, /coach is managing targets/i);
-  assert.equal((await rows(ctx)).length, before);
+  assert.notEqual(r.status, "failed", JSON.stringify(r));
+  assert.equal((await rows(ctx)).length, 1);
+  const locked = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
+    token,
+    body: { action: "setpoints", payload: { temperature_c: 18 } },
+  });
+  assert.equal(locked.data.results[0].status, "failed");
+  assert.match(locked.data.results[0].error, /coach is managing targets/i);
+  assert.equal((await rows(ctx)).length, 1);
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-1", { token });
   assert.equal(status.data.mode, "autopilot");
   assert.notEqual(status.data.status, "paused");
@@ -539,4 +546,223 @@ test("Lykyn fruiting apply converts 92 lux to percent and accepts a Colonization
   assert.equal(stage.data.results[0].status, "queued", JSON.stringify(stage.data));
   const q = JSON.parse((await rows(ctx))[1].payload);
   assert.equal(q.grow_phase, "Colonization");
+});
+
+
+// ---- Coach stage tracking, Start this grow under Coach, light percent ----
+
+async function addCommand(ctx, id, { kind = "setpoints", payload, issued, consumed = issued }) {
+  await ctx.db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+    id,
+    kind,
+    JSON.stringify(payload),
+    issued,
+    consumed,
+  ]);
+}
+
+const ACKED = (status = "applied") => ({ _ack: { status, reason: "ok", at: nowIso() } });
+const minutesAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
+
+async function coachOn(ctx, token, user) {
+  await grantCoach(ctx, token);
+  const on = await setDeviceAutopilotMode(ctx.db, ctx, user, { deviceId: "dev-1", mode: "autopilot", profileId: pearlOyster.id });
+  assert.equal(on.ok, true, JSON.stringify(on));
+}
+
+async function runCoach(ctx, user) {
+  return runAutopilotForDevice(ctx.db, ctx, { device: await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-1"]), user });
+}
+
+function coachRows(ctx) {
+  return rows(ctx).then((all) => all.filter((r) => JSON.parse(r.payload).source === "grow-coach-autopilot"));
+}
+
+// The real sequence: a failed Colonization apply, Coach steering Fruiting because the chamber said
+// Fruiting, then the grower sets the chamber phase to Colonization by hand with Coach off.
+async function colonizationHistory(ctx, { phase, colonizationPhase }) {
+  await addCommand(ctx, "dev-1", {
+    payload: { stage: "colonization", profile_id: pearlOyster.id, source: "fleet", grow_phase: "Colonizing", ...ACKED("failed") },
+    issued: minutesAgo(300),
+  });
+  for (let i = 0; i < 3; i += 1) {
+    await addCommand(ctx, "dev-1", {
+      payload: { stage: "fruiting", profile_id: pearlOyster.id, source: "grow-coach-autopilot", approved: true, ...ACKED() },
+      issued: minutesAgo(200 - i * 30),
+    });
+  }
+  await addCommand(ctx, "dev-1", {
+    payload: { grow_phase: colonizationPhase, source: "fleet", ...ACKED() },
+    issued: minutesAgo(20),
+  });
+  assert.ok(phase);
+}
+
+test("Lykyn: Coach keeps steering Colonization after a manual phase change, not Fruiting", async () => {
+  const { ctx, token, user } = await setupLykyn("stage-lykyn@example.com");
+  await colonizationHistory(ctx, { phase: "Colonization", colonizationPhase: "Colonization" });
+  await ctx.db.run("DELETE FROM device_telemetry WHERE device_id=?", ["dev-1"]);
+  await addReading(ctx, "dev-1", {
+    ...LYKYN_READING,
+    grow_phase: "Colonization",
+    temperature: 22,
+    temperature_c: 22,
+    temperature_setpoint: 24,
+    humidity: 90,
+    humidity_percent: 90,
+    humidity_setpoint: 90,
+    air_exchange_speed: 33,
+    air_exchange_period_min: 60,
+    air_exchange_run_sec: 15,
+    light_hours: 12,
+    white_intensity: 20,
+    color_b: 80,
+  });
+  const staged = await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id);
+  assert.equal(staged.manualPhase, true, "the manual phase change is the grower's latest say");
+  assert.equal(staged.stage, null);
+  await coachOn(ctx, token, user);
+  const result = await runCoach(ctx, user);
+  assert.notEqual(result.stage, "fruiting", JSON.stringify(result));
+  const mine = await coachRows(ctx);
+  for (const row of mine.slice(3)) {
+    const p = JSON.parse(row.payload);
+    assert.equal(p.stage, "colonization", row.payload);
+    assert.ok(!p.grow_phase || p.grow_phase === "Colonization", row.payload);
+    assert.equal(p.light_hours, 0, "colonization keeps the light off");
+  }
+  assert.ok(mine.length >= 4, "Coach corrected the lights for colonization");
+});
+
+test("Shrooly: Coach keeps steering Colonizing after a manual phase change, not Fruiting", async () => {
+  const { ctx, token, user } = await setupSl5("stage-shrooly@example.com");
+  await colonizationHistory(ctx, { phase: "Colonizing", colonizationPhase: "Colonizing" });
+  await ctx.db.run("DELETE FROM device_telemetry WHERE device_id=?", ["dev-1"]);
+  await addReading(ctx, "dev-1", {
+    ...SL5_READING,
+    grow_phase: "Colonizing",
+    grow_day: 3,
+    humidity: 90,
+    humidity_percent: 90,
+    humidity_setpoint: 90,
+    temperature: 24,
+    temperature_c: 24,
+    temperature_setpoint: 24,
+    light_hours: 12,
+    white_intensity: 92,
+    color_b: 80,
+  });
+  await coachOn(ctx, token, user);
+  const result = await runCoach(ctx, user);
+  assert.notEqual(result.stage, "fruiting", JSON.stringify(result));
+  const mine = await coachRows(ctx);
+  for (const row of mine.slice(3)) {
+    const p = JSON.parse(row.payload);
+    assert.equal(p.stage, "colonization", row.payload);
+    assert.ok(!p.grow_phase || p.grow_phase === "Colonizing", row.payload);
+  }
+  assert.ok(mine.length >= 4, "Coach corrected the lights for colonization");
+});
+
+test("Coach's own commands are not the grower's stage choice, and a newer manual phase beats an older stage", async () => {
+  const { ctx } = await setup("stage-order@example.com");
+  await addCommand(ctx, "dev-1", {
+    payload: { stage: "fruiting", profile_id: pearlOyster.id, source: "grow-coach-autopilot", ...ACKED() },
+    issued: minutesAgo(60),
+  });
+  assert.equal(await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id), null);
+  await addCommand(ctx, "dev-1", {
+    payload: { stage: "fruiting", profile_id: pearlOyster.id, source: "fleet", ...ACKED() },
+    issued: minutesAgo(50),
+  });
+  assert.equal((await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id)).stage, "fruiting");
+  await addCommand(ctx, "dev-1", { payload: { grow_phase: "Colonizing", source: "fleet", ...ACKED("failed") }, issued: minutesAgo(40) });
+  assert.equal((await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id)).stage, "fruiting", "a failed phase change changed nothing");
+  await addCommand(ctx, "dev-1", { payload: { grow_phase: "Colonizing", source: "fleet", ...ACKED() }, issued: minutesAgo(30) });
+  const last = await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id);
+  assert.equal(last.manualPhase, true);
+  assert.equal(last.stage, null);
+});
+
+test("Start this grow with Coach on sets the grow and Coach steers that stage (Lykyn and Shrooly)", async () => {
+  for (const [label, setupFn, phase] of [
+    ["lykyn", setupLykyn, "Colonization"],
+    ["shrooly", setupSl5, "Colonizing"],
+  ]) {
+    const { ctx, token, user } = await setupFn(`start-${label}@example.com`);
+    await coachOn(ctx, token, user);
+    const res = await applyProfile(ctx, token, { stage: "colonization" });
+    const r = res.data.results[0];
+    assert.equal(r.status, "queued", JSON.stringify(res.data));
+    const p = JSON.parse((await rows(ctx))[0].payload);
+    assert.equal(p.stage, "colonization");
+    assert.equal(p.grow_phase, phase);
+    assert.equal(p.light_hours, 0);
+    const mode = await ctx.db.one("SELECT * FROM coach_device_mode WHERE device_id=?", ["dev-1"]);
+    assert.equal(mode.mode, "autopilot", "Coach stays on");
+    assert.equal(mode.profile_id, pearlOyster.id);
+    const staged = await latestStagedCommand(ctx.db, "dev-1", pearlOyster.id);
+    assert.equal(staged.stage, "colonization");
+    // The chamber takes it and reports back; Coach then keeps steering colonization.
+    await ctx.db.run("UPDATE device_commands SET consumed_at=? WHERE device_id=?", [nowIso(), "dev-1"]);
+    await ctx.db.run("DELETE FROM device_telemetry WHERE device_id=?", ["dev-1"]);
+    await addReading(ctx, "dev-1", {
+      ...(label === "lykyn" ? LYKYN_READING : SL5_READING),
+      grow_phase: phase,
+      light_hours: 12,
+    });
+    const run = await runCoach(ctx, user);
+    assert.notEqual(run.stage, "fruiting", JSON.stringify(run));
+    for (const row of await coachRows(ctx)) assert.equal(JSON.parse(row.payload).stage, "colonization");
+  }
+});
+
+const lightApply = (ctx, token, light) =>
+  call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
+    token,
+    body: { action: "light", payload: { light: { sunrise_hour: 8, duration_hours: 12, red_percent: 0, green_percent: 0, blue_percent: 80, ...light } } },
+  });
+
+test("Lykyn light goes out as a percent with no lux round trip, including white 79 to 100", async () => {
+  const { ctx, token } = await setupLykyn("white-lykyn@example.com");
+  for (const white of [0, 20, 50, 78, 79, 85, 90, 99, 100]) {
+    const res = await lightApply(ctx, token, { white_percent: white });
+    assert.equal(res.data.results[0].status, "queued", JSON.stringify(res.data));
+    const all = await rows(ctx);
+    const p = JSON.parse(all[all.length - 1].payload);
+    assert.equal(p.white_intensity, white, `white ${white}`);
+    assert.equal(p.color_b, 80);
+    await ctx.db.run("UPDATE device_commands SET consumed_at=? WHERE device_id=?", [nowIso(), "dev-1"]);
+  }
+});
+
+test("Lykyn light still converts a recipe in lux, and Shrooly keeps its lux behavior", async () => {
+  const lykyn = await setupLykyn("white-recipe@example.com");
+  const a = await lightApply(lykyn.ctx, lykyn.token, { white_led_lux: 92 });
+  assert.equal(a.data.results[0].status, "queued", JSON.stringify(a.data));
+  assert.equal(JSON.parse((await rows(lykyn.ctx))[0].payload).white_intensity, 20);
+  const shrooly = await setupSl5("white-shrooly@example.com");
+  const b = await lightApply(shrooly.ctx, shrooly.token, { white_percent: 50 });
+  assert.equal(b.data.results[0].status, "queued", JSON.stringify(b.data));
+  assert.equal(JSON.parse((await rows(shrooly.ctx))[0].payload).white_intensity, 1165, "Shrooly still sends lux");
+  const c = await lightApply(shrooly.ctx, shrooly.token, { white_led_lux: 400 });
+  assert.equal(c.data.results[0].status, "queued", JSON.stringify(c.data));
+  const all = await rows(shrooly.ctx);
+  assert.equal(JSON.parse(all[all.length - 1].payload).white_intensity, 400);
+});
+
+test("validateStageLight keeps white_percent and rejects out of range", () => {
+  const ok = validateStageLight({ sunrise_hour: 8, duration_hours: 12, white_percent: 95, red_percent: 0, green_percent: 0, blue_percent: 0 });
+  assert.equal(ok.white_percent, 95);
+  assert.throws(() => validateStageLight({ sunrise_hour: 8, duration_hours: 12, white_percent: 101 }), /white/i);
+  assert.throws(() => validateStageLight({ sunrise_hour: 8, duration_hours: 0, white_percent: 20 }), /duration/i);
+  assert.equal("white_percent" in validateStageLight({ sunrise_hour: 8, duration_hours: 12, white_led_lux: 92 }), false);
+});
+
+test("Lykyn command summaries say white in percent, Shrooly in lux", () => {
+  const payload = { light_hours: 12, sunrise_hour: 8, white_intensity: 40, color_r: 0, color_g: 0, color_b: 80 };
+  const lykyn = deviceCapabilities(LYKYN_READING);
+  assert.match(commandState({ id: 1, kind: "setpoints", payload: JSON.stringify(payload), issued_at: nowIso(), consumed_at: null }, { caps: lykyn }).summary, /white 40%/);
+  const shrooly = deviceCapabilities(SL5_READING);
+  assert.match(commandState({ id: 1, kind: "setpoints", payload: JSON.stringify(payload), issued_at: nowIso(), consumed_at: null }, { caps: shrooly }).summary, /white 40 lux/);
 });
