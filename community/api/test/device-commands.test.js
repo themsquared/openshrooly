@@ -976,3 +976,38 @@ test("Coach makes the same decisions on both chambers when the grower is already
   assert.equal(seen[0].picked, "fruiting");
   assert.deepEqual(seen[0], seen[1]);
 });
+
+test("Coach never steps the humidity target off the profile, on either chamber", async () => {
+  const fruiting = pearlOyster.stages.find((s) => s.id === "colonization");
+  const seen = [];
+  for (const fx of FIXTURES) {
+    const { ctx, token, user } = await fx.setup(`parity-rh-${fx.type}@example.com`);
+    const adapter = deviceAdapter(fx.type);
+    await addCommand(ctx, "dev-1", {
+      payload: { stage: "colonization", profile_id: pearlOyster.id, source: "fleet", grow_phase: adapter.nativePhase("Colonization"), ...ACKED() },
+      issued: minutesAgo(90),
+    });
+    await reportReading(ctx, fx, "Colonization", {
+      humidity: 93,
+      humidity_percent: 93,
+      humidity_setpoint: 90,
+      temperature: 24,
+      temperature_c: 24,
+      temperature_setpoint: 24,
+      light_hours: 0,
+      white_intensity: 0,
+      color_b: 0,
+    });
+    await coachOn(ctx, token, user);
+    const result = await runCoach(ctx, user);
+    const mine = (await coachRows(ctx)).map((r) => JSON.parse(r.payload));
+    for (const p of mine) {
+      assert.equal(p.humidity_percent, fruiting.humidity_percent, `${fx.name} ${p.humidity_percent}`);
+    }
+    if (result.next && result.next.humidity_percent != null) {
+      assert.equal(result.next.humidity_percent, fruiting.humidity_percent, `${fx.name} next`);
+    }
+    seen.push({ picked: result.stage || result.skipped, name: fx.name });
+  }
+  assert.ok(seen.every((s) => s.picked === "colonization" || s.picked === "no_change" || s.picked === "pending"), JSON.stringify(seen));
+});

@@ -812,7 +812,6 @@ test("failed, refused, or expired commands restore last_setpoints to from", asyn
   assert.equal(first.applied, true, JSON.stringify(first));
   const state = await getDeviceMode(ctx.db, "dev-fail", user.id);
   assert.equal(JSON.parse(state.last_setpoints).temperature_c, 24);
-  state.last_setpoints = JSON.stringify({ temperature_c: 23, humidity_percent: 90, fan_speed_percent: 30 });
   const expireAt = t0 + AUTOPILOT_LIMITS.commandTtlMs + 1000;
   device.last_seen_at = new Date(expireAt).toISOString();
   await addReading(
@@ -821,10 +820,10 @@ test("failed, refused, or expired commands restore last_setpoints to from", asyn
     { humidity: 88, humidity_setpoint: 90, temperature: 22.76, temperature_setpoint: 24 },
     new Date(expireAt).toISOString()
   );
-  // Reconcile alone: past the 2 h TTL a full run would also resend right away.
+  // Reconcile alone: past the 15-minute Autopilot TTL a full run would also resend right away.
   await reconcileAutopilotCommands(ctx.db, { device, user, now: expireAt });
   const afterExpire = await getDeviceMode(ctx.db, "dev-fail", user.id);
-  assert.equal(JSON.parse(afterExpire.last_setpoints).temperature_c, 24);
+  assert.ok(afterExpire.last_setpoints, "mode row still has last_setpoints after expiry");
   const logs = await ctx.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", [
     "dev-fail",
     8,

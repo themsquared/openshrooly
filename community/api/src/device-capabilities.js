@@ -40,13 +40,20 @@ function settingKeys(payload = {}) {
  * and (for setpoints) sets every knob the older one sets. A stale command must never apply over it.
  */
 export function commandSupersedes(newer, older) {
-  if (!newer || !older || newer.device_id !== older.device_id || newer.kind !== older.kind) return false;
-  if (!SUPERSEDABLE_KINDS.has(older.kind) || Number(newer.id) <= Number(older.id)) return false;
+  if (!newer || !older || newer.device_id !== older.device_id || Number(newer.id) <= Number(older.id)) return false;
   const np = parseJson(newer.payload, {}) || {};
+  const op = parseJson(older.payload, {}) || {};
   const ack = String(np._ack?.status || "");
   if (["failed", "refused", "expired"].includes(ack)) return false;
+  const olderAuto = String(op.source || "").startsWith("grow-coach-autopilot");
+  const newerAuto = String(np.source || "").startsWith("grow-coach-autopilot");
+  // A later stage or profile pick from the grower drops a queued Autopilot command,
+  // even when the pick does not repeat every Autopilot knob.
+  if (olderAuto && !newerAuto && (np.grow_phase || np.stage || newer.kind === "apply_profile")) return true;
+  if (newer.kind !== older.kind) return false;
+  if (!SUPERSEDABLE_KINDS.has(older.kind)) return false;
   if (older.kind !== "setpoints") return true;
-  const mine = settingKeys(parseJson(older.payload, {}) || {});
+  const mine = settingKeys(op);
   const theirs = settingKeys(np);
   if (!mine.size) return false;
   for (const key of mine) if (!theirs.has(key)) return false;

@@ -51,8 +51,9 @@ export const AUTOPILOT_LIMITS = {
   jumpTemp: 8,
   jumpRh: 25,
   fanClamp: [15, 80],
-  // Outlives an inbox poll the chamber's connect cap defers; a newer command supersedes it sooner.
-  commandTtlMs: 2 * 60 * 60 * 1000,
+  // Short enough that a queued Autopilot change cannot apply after a stage pick or a long
+  // offline stretch. Coach can issue a fresh command on a later pass if the chamber still needs it.
+  commandTtlMs: 15 * 60 * 1000,
 };
 
 export function coachAutopilotFlagOn(env = {}) {
@@ -94,13 +95,14 @@ export function insertedId(result) {
 
 export function autopilotCommandExpired(command, now = Date.now()) {
   const payload = parseJson(command?.payload, {});
+  const issued = Date.parse(command?.issued_at || "");
+  // issued_at wins over a longer expires_at left over from the old 2-hour window.
+  if (Number.isFinite(issued) && now - issued > AUTOPILOT_LIMITS.commandTtlMs) return true;
   if (payload.expires_at) {
     const t = Date.parse(payload.expires_at);
-    if (Number.isFinite(t)) return t <= now;
+    if (Number.isFinite(t) && t <= now) return true;
   }
-  const issued = Date.parse(command?.issued_at || "");
-  if (!Number.isFinite(issued)) return false;
-  return now - issued > AUTOPILOT_LIMITS.commandTtlMs;
+  return false;
 }
 
 export function sameSetpoints(a = {}, b = {}) {
@@ -897,14 +899,14 @@ async function finalizeAutopilotCommand(db, { command, state, user, status, reas
 }
 
 /** Close an Autopilot command a newer one replaced, keeping the log and pending state honest. */
-export async function expireSupersededAutopilotCommand(db, device, command, now = Date.now()) {
+export async function expireSupersededAutopilotCommand(db, device, command, now = Date.now(), reason = "Replaced by a newer command.") {
   const state = await getDeviceMode(db, device.id, device.owner_id);
   return finalizeAutopilotCommand(db, {
     command,
     state,
     user: { id: state.user_id || device.owner_id },
     status: "expired",
-    reason: "Replaced by a newer command.",
+    reason,
     now,
   });
 }
@@ -986,7 +988,7 @@ export async function reconcileAutopilotCommands(db, { device, user, now = Date.
             state,
             user: user || { id: state.user_id },
             status: "expired",
-            reason: "Command expired.",
+            reason: "This Autopilot change sat too long, so it was dropped.",
             now,
             readings: reading,
           })

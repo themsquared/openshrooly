@@ -206,7 +206,7 @@ test("expired commands are refused", () => {
   );
   const twenty = Date.parse("2026-10-25T12:00:00Z");
   assert.equal(
-    bridgeCommandExpired({ issued_at: new Date(twenty - 20 * 60 * 1000).toISOString(), payload: "{}" }, twenty),
+    bridgeCommandExpired({ issued_at: new Date(twenty - 14 * 60 * 1000).toISOString(), payload: "{}" }, twenty),
     false
   );
   assert.equal(
