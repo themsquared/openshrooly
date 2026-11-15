@@ -4,7 +4,7 @@ import { laterIso, nowIso } from "./crypto.js";
 import { isPsilocybin, normalizeStoredProfileLight } from "./profile.js";
 import { coachAccess } from "./coach-access.js";
 import { chamberKnobs, deviceCapabilities, KNOBS, knobSupported, readingMatchesTargets, supportedSetpoints } from "./device-capabilities.js";
-import { stageIdForPhase } from "./device-adapters.js";
+import { deviceAdapter, stageIdForPhase } from "./device-adapters.js";
 import { knobTargets, pickAutopilotStage, recipeChanges, recipeKnobs, steerFan } from "./autopilot-knobs.js";
 import {
   applyJevDecision,
@@ -1298,6 +1298,8 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
         : `Grow day ${pick.grow_day ?? "?"}: moving the chamber to ${pick.phase} (${pick.stageId}).`
       : null,
     plan.reason,
+    // Said once, in plain words, when the recipe asks for more light than this chamber can make.
+    ...(extras.white_intensity != null || extras.color_b != null ? deviceAdapter(caps).light.limits(stage.light).map((l) => l.note) : []),
   ]
     .filter(Boolean)
     .join(" ");

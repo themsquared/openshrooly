@@ -6,9 +6,14 @@
  *
  * A firmware that reports its own ranges wins over the type's defaults: the adapter only
  * fills in what the chamber has not said.
+ *
+ * Light: a profile states a physical target (lux of white, optionally blue in umol/m2/s). The adapter
+ * turns it into this chamber's percent with the type's calibration (light-calibration.js), clamped at
+ * 100, and says so when the chamber cannot reach it. Everything past the adapter is percent.
  */
 
-import { roundPercent, whiteLuxToPercent, whitePercentToLux } from "./profile-schema.js";
+import { roundPercent } from "./profile-schema.js";
+import { bluePercentForUmol, calibrationFor, lightLimits, whiteLuxToPercentFor, whitePercentToLuxFor } from "./light-calibration.js";
 
 /** A percent for people: whole numbers stay whole, otherwise one decimal. */
 export function formatPercent(value) {
@@ -129,6 +134,7 @@ export function deviceAdapter(source = {}) {
   const reportedMax = num(caps.knob_ranges?.white_intensity?.[1]);
   const scale = reportedMax != null ? (reportedMax <= 100 ? "percent" : "lux") : type.whiteScale;
   const percent = scale === "percent";
+  const cal = calibrationFor(TYPES[id] ? id : DEFAULT_DEVICE_TYPE);
 
   /** The phase string this chamber takes for a canonical stage, an alias or a native name. */
   function nativePhase(name) {
@@ -151,21 +157,29 @@ export function deviceAdapter(source = {}) {
     nativePhase,
     /** Canonical stage for any phase name, or null. */
     stage: canonicalStage,
+    /** What this type puts out at 100 percent (see light-calibration.js). */
+    calibration: cal,
+    light: {
+      /** Blue percent for a stage's blue target in umol/m2/s, or null when it has none or this chamber has no blue figure. */
+      bluePercent: (light) => bluePercentForUmol(light?.blue_umol_m2s, cal),
+      /** Targets this chamber cannot reach, each with a plain note: "Wanted 600 lux of white, this chamber tops out at ...". */
+      limits: (light) => lightLimits(light, cal),
+    },
     white: {
       scale,
       unit: percent ? "%" : " lux",
       /** Knob value for a percent from the site or a profile. */
-      fromPercent: (p) => (percent ? p : whitePercentToLux(p)),
-      /** Knob value for a lux figure from a profile. */
-      fromLux: (lux) => (percent ? whiteLuxToPercent(lux) : lux),
-      /** Percent for a recipe's lux figure: the share of the 4000 lux maximum. Recipes are written in lux whatever the chamber. */
-      percentFromRecipeLux: (lux) => whiteLuxToPercent(lux),
+      fromPercent: (p) => (percent ? p : Math.min(cal.white_lux_at_100, Math.round(whitePercentToLuxFor(p, cal)))),
+      /** Knob value for a lux target from a profile: this chamber's percent of its own maximum, capped at 100. */
+      fromLux: (lux) => (percent ? whiteLuxToPercentFor(lux, cal) : lux == null ? lux : Math.min(cal.white_lux_at_100, lux)),
+      /** Percent of this chamber's maximum for a recipe's lux target. */
+      percentFromRecipeLux: (lux) => whiteLuxToPercentFor(lux, cal),
       /** Percent for a knob value the chamber reported. */
-      toPercent: (raw) => (percent ? roundPercent(raw) : whiteLuxToPercent(raw)),
+      toPercent: (raw) => (percent ? roundPercent(raw) : whiteLuxToPercentFor(raw, cal)),
       /** Lux for a knob value the chamber reported. */
-      toLux: (raw) => (percent ? whitePercentToLux(raw) : raw),
+      toLux: (raw) => (percent ? whitePercentToLuxFor(raw, cal) : raw),
       /** Plain words for a knob value. Always percent of that chamber's maximum, to one decimal. */
-      describe: (raw) => `white ${formatPercent(percent ? raw : whiteLuxToPercent(raw))}%`,
+      describe: (raw) => `white ${formatPercent(percent ? raw : whiteLuxToPercentFor(raw, cal))}%`,
     },
   };
 }

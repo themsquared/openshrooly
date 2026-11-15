@@ -92,7 +92,8 @@
         "white_led_lux": { "type": "number", "minimum": 0, "maximum": 4000 },
         "red_percent": { "type": "integer", "minimum": 0, "maximum": 100 },
         "green_percent": { "type": "integer", "minimum": 0, "maximum": 100 },
-        "blue_percent": { "type": "integer", "minimum": 0, "maximum": 100 }
+        "blue_percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "blue_umol_m2s": { "type": "number", "minimum": 0, "maximum": 200 }
       }
     },
     "lightPhase": {

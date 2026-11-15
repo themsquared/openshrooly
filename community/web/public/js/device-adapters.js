@@ -6,7 +6,7 @@
  * See docs/device-ui-standard.md.
  */
 
-import { whiteLuxToPercent } from "./profile-schema.js";
+import { calibrationFor, lightLimits, whiteLuxToPercentFor } from "./light-calibration.js";
 
 /** The four stages every chamber shows, in this order. */
 export const CANONICAL_STAGES = ["Colonization", "Pinning", "Fruiting", "Custom"];
@@ -77,6 +77,7 @@ export function deviceAdapter(device = {}) {
   const whiteMax = Number(reported.white_intensity?.[1]);
   const percentWhite = Number.isFinite(whiteMax) ? whiteMax <= 100 : type.whiteScale === "percent";
   const fanMin = Number(reported.air_exchange_speed?.[0]);
+  const cal = calibrationFor(TYPES[id] ? id : DEFAULT_DEVICE_TYPE);
   return {
     type: TYPES[id] ? id : DEFAULT_DEVICE_TYPE,
     label: type.label,
@@ -92,10 +93,16 @@ export function deviceAdapter(device = {}) {
       /** One plain line under the white box, or "" when there is nothing to say. */
       note: percentWhite ? PERCENT_WHITE_NOTE : LUX_WHITE_NOTE,
       /** A knob value as a percent of this chamber's maximum: "2.3%". A lux chamber's figure is converted here, nowhere else. */
-      describe: (raw) => `${formatPercent(percentWhite ? raw : whiteLuxToPercent(raw))}%`,
-      /** Percent from a lux figure the cloud sent (a chamber reading or a recipe): its share of the 4000 lux maximum. */
-      fromLux: (lux) => whiteLuxToPercent(lux),
-      percentFromRecipeLux: (lux) => whiteLuxToPercent(lux),
+      describe: (raw) => `${formatPercent(percentWhite ? raw : whiteLuxToPercentFor(raw, cal))}%`,
+      /** Percent from a lux figure the cloud sent (a chamber reading or a recipe): its share of this chamber's own maximum. */
+      fromLux: (lux) => whiteLuxToPercentFor(lux, cal),
+      percentFromRecipeLux: (lux) => whiteLuxToPercentFor(lux, cal),
+    },
+    /** What this chamber puts out at 100 percent. */
+    calibration: cal,
+    light: {
+      /** Light targets this chamber cannot reach, as [{ channel, wanted, max, unit, estimated, note }]. */
+      limits: (light) => lightLimits(light, cal),
     },
   };
 }

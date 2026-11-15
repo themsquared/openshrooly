@@ -638,3 +638,26 @@ test("Shrooly light controls show white in percent, with no lux anywhere", () =>
   assert.match(html, /name="white_percent"[^>]*value="2.3"/);
   assert.match(html, /name="white_percent"[^>]*step="0.1"/);
 });
+
+test("the same recipe lux is a different percent on each chamber, and a capped target is explained", () => {
+  const lykyn = deviceAdapter({ device_type: "lykyn_chamber" });
+  const shrooly = deviceAdapter({ device_type: "shrooly_chamber" });
+  assert.equal(shrooly.white.percentFromRecipeLux(92), 2.3);
+  assert.equal(lykyn.white.percentFromRecipeLux(92), 23);
+  assert.equal(lykyn.white.percentFromRecipeLux(600), 100);
+  assert.equal(lykyn.light.limits({ white_led_lux: 600 })[0].note, "Wanted 600 lux of white, this chamber tops out at about 400 lux (estimated).");
+  assert.deepEqual(shrooly.light.limits({ white_led_lux: 600 }), []);
+  const device = {
+    ...pearl,
+    device_type: "lykyn_chamber",
+    capabilities: { knob_ranges: { white_intensity: [0, 100, 0.1] } },
+    controls: { light: { supported: true, schedule: true, color: true }, stage: { supported: true, phase: true } },
+    chamber_light: { sunrise_hour: 8, duration_hours: 12, white_percent: 100, red_percent: 0, green_percent: 0, blue_percent: 80 },
+    light: { duration_hours: 12, white_led_lux: 600, white_percent: 100, limit_note: "Wanted 600 lux of white, this chamber tops out at about 400 lux (estimated)." },
+    coach: { mode: "advisor", status: "advisor" },
+  };
+  const html = renderControls(device, { profiles: [pearl.profile], canWrite: true, showCoach: true });
+  assert.match(html, /data-light-limit[^>]*>Wanted 600 lux of white, this chamber tops out at about 400 lux \(estimated\)\./);
+  const plain = renderControls({ ...device, light: { duration_hours: 12, white_percent: 23 } }, { profiles: [pearl.profile], canWrite: true, showCoach: true });
+  assert.doesNotMatch(plain, /data-light-limit/);
+});
