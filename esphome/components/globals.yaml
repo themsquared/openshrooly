@@ -15,6 +15,11 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+  - id: led_test_running
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
   - id: lights_on_flag
     type: bool
     restore_value: no  # Let lighting control manager decide at boot based on schedule

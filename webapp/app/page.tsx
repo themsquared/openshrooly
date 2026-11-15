@@ -10,6 +10,7 @@ import {
 import { DEVICE_VERSION, connectionLabel } from '../lib/setup-state'
 import type { GrowPreset } from '../lib/setup-state'
 import { addSample, lightOnSummary, rangeText, scheduleText, trendText } from '../lib/card-text'
+import { lightFromEntities, ringDarkBecauseOfDuration, writeFailedText } from '../lib/light-state'
 import type { Sample } from '../lib/card-text'
 import Icon from './components/Icon'
 import LiveGauge from './components/LiveGauge'
@@ -59,6 +60,7 @@ export default function Dashboard() {
   const [cloudGrow, setCloudGrow] = useState({ linked: false, name: '', url: '', image: '' })
   const [reachable, setReachable] = useState<boolean | undefined>(undefined)
   const [lastError, setLastError] = useState('')
+  const [writeError, setWriteError] = useState('')
   const [applyingPreset, setApplyingPreset] = useState(false)
   const [wifiMode, setWifiMode] = useState('')
   const [wifiSsid, setWifiSsid] = useState('')
@@ -255,7 +257,21 @@ export default function Dashboard() {
 
     debounceTimers.current[id] = setTimeout(async () => {
       const numberId = id.replace('number-', '')
-      await api.setNumber(numberId, value)
+      const result = await api.setNumberChecked(numberId, value)
+      if (result.ok) {
+        setWriteError('')
+        return
+      }
+      // Put the real value back so the page never shows a setting the chamber does not have.
+      const actual = result.actual
+      if (actual !== undefined) {
+        setEntities((prev) => ({ ...prev, [id]: { ...prev[id], value: actual } }))
+      }
+      setWriteError(
+        result.reason === 'rejected'
+          ? writeFailedText(api.lastWriteStatus)
+          : 'The chamber kept its old setting. That number may be outside what it allows.'
+      )
     }, 300)
   }, [])
 
@@ -311,7 +327,15 @@ export default function Dashboard() {
     }))
 
     const switchId = id.replace('switch-', '')
-    await api.setSwitch(switchId, checked)
+    const ok = await api.setSwitch(switchId, checked)
+    if (ok) setWriteError('')
+    else {
+      setEntities((prev) => ({
+        ...prev,
+        [id]: { ...prev[id], state: checked ? 'OFF' : 'ON', value: !checked },
+      }))
+      setWriteError(writeFailedText(api.lastWriteStatus))
+    }
   }
 
   const handleTimezoneChange = async (tz: string) => {
@@ -473,24 +497,13 @@ export default function Dashboard() {
     setHumiditySamples((s) => addSample(s, t, parseFloat(getSensor('humidity') as string)))
   }, [entities])
 
-  // Sync lighting state from entities
+  // Sync lighting state from entities. A real 0 stays 0 (dark stage, lights off).
   useEffect(() => {
-    const sunrise = parseFloat((getNumber('lights__sunrise_hour') || 8) as string)
-    let duration = parseFloat((getNumber('lights__duration__hours_') || 12) as string)
-    const lux = parseFloat((getNumber('white_led_intensity') || 150) as string)
-    const rgbOn =
-      parseFloat((getNumber('red_led_intensity') || 0) as string) > 0 ||
-      parseFloat((getNumber('green_led_intensity') || 0) as string) > 0 ||
-      parseFloat((getNumber('blue_led_intensity') || 0) as string) > 0
-    if ((lux > 0 || rgbOn) && !(duration > 0)) {
-      duration = 12
-      handleNumberChange('number-lights__duration__hours_', 12)
-    }
-
-    setLightSunrise(sunrise)
-    setLightDuration(duration)
-    setLightSunset((sunrise + duration) % 24)
-    setLuxValue(lux)
+    const light = lightFromEntities(getNumber, 150)
+    setLightSunrise(light.sunrise)
+    setLightDuration(light.duration)
+    setLightSunset((light.sunrise + light.duration) % 24)
+    setLuxValue(light.white)
   }, [entities])
 
   const timeOptions = Array.from({ length: 48 }, (_, i) => i * 0.5)
@@ -850,7 +863,7 @@ export default function Dashboard() {
   const blueValue = parseFloat((getNumber('blue_led_intensity') || 0) as string) || 0
   const currentColor = rgbToHex(redValue, greenValue, blueValue)
   const lightEnabled = luxValue > 0 || redValue > 0 || greenValue > 0 || blueValue > 0
-  const durationRequired = lightEnabled && !(lightDuration > 0)
+  const durationRequired = ringDarkBecauseOfDuration(lightFromEntities(getNumber, 150))
 
   return (
     <div className="dashboard">
@@ -888,6 +901,13 @@ export default function Dashboard() {
       />
 
       <FirstRun state={surface} applying={applyingPreset} onApply={applyPreset} error={lastError} />
+
+      {writeError && (
+        <div className="write-toast" role="alert">
+          <span>{writeError}</span>
+          <button type="button" className="write-toast-dismiss" onClick={() => setWriteError('')}>Dismiss</button>
+        </div>
+      )}
 
       {alerts.length > 0 && (
         <div className="alerts-banner">
@@ -1601,7 +1621,7 @@ export default function Dashboard() {
                 />
                 {durationRequired ? (
                   <div className="warning-message" role="alert" style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', color: '#856404' }}>
-                    Duration is required when the light is on. Using 12 hours.
+                    The lights are off because Duration is 0 hours. Set a duration to turn them on.
                   </div>
                 ) : null}
                 <div className="dual-slider-container">
@@ -1718,6 +1738,21 @@ export default function Dashboard() {
                     `R:${redValue} G:${greenValue} B:${blueValue}`
                   )}
                 </span>
+              </div>
+              <div className="control-group">
+                <button
+                  type="button"
+                  className="charts-button ota-button"
+                  disabled={demoMode}
+                  onClick={async () => {
+                    if (demoMode) return
+                    const ok = await api.pressButton('led_test')
+                    setWriteError(ok ? '' : writeFailedText(api.lastWriteStatus))
+                  }}
+                >
+                  LED Test
+                </button>
+                <div className="control-help">Flashes red, then green, then blue, then white on the strip, then the white light. Use this to check the lights.</div>
               </div>
             </div>
           </div>
