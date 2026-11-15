@@ -301,8 +301,7 @@ const SL5_CONTROLS = {
   profile: { supported: true, mode: "full", note: null },
 };
 
-test("a 1.0.5 chamber gets fan, fresh air, light in % with a lux preview, and its phase", async () => {
-  const { luxPreview } = await import("../public/js/device-ui.js");
+test("a 1.0.5 chamber gets fan, fresh air, light in %, and its phase", async () => {
   const device = {
     ...sl2,
     firmware: "1.0.5-sl.1",
@@ -314,14 +313,15 @@ test("a 1.0.5 chamber gets fan, fresh air, light in % with a lux preview, and it
   assert.match(tagFor(html, "air_exchange_period_min"), /value="20"/);
   assert.match(tagFor(html, "air_exchange_run_sec"), /value="60"/);
   assert.match(tagFor(html, "white_percent"), /value="50"/);
-  assert.match(html, /About 1164 lux/);
+  assert.doesNotMatch(html, /lux/i);
   assert.match(html, /<option value="Pinning" selected>/);
   assert.match(tagFor(html, "grow_day"), /value="9"/);
   for (const action of ["air", "light", "stage"]) assert.match(html, new RegExp(`data-action="${action}"`));
   assert.doesNotMatch(html, /Fan period and run time stay on the chamber/);
   assert.doesNotMatch(html, /on the chamber itself for now/);
-  assert.equal(luxPreview(20), "About 92 lux");
-  assert.match(luxPreview(100), /4000 lux \(the most/);
+  assert.equal(deviceAdapter({}).white.preview(20), "");
+  assert.match(deviceAdapter({}).white.preview(100), /brightest/);
+  assert.equal(deviceAdapter({ device_type: "lykyn_chamber" }).white.preview(100), "");
   assert.doesNotMatch(html, DASH);
   assert.match(html, /<option value="Colonization">/);
   assert.doesNotMatch(html, /Colonizing/);
@@ -592,7 +592,7 @@ test("Autopilot log line names every knob it moved", async () => {
       white_intensity: 90,
       grow_phase: "Pinning",
     }),
-    "Set 23 °C, 93% RH, fan 30%, fresh air 35 s every 15 min, light 12 h at 90 lux and phase Pinning"
+    "Set 23 °C, 93% RH, fan 30%, fresh air 35 s every 15 min, light 12 h at 20% and phase Pinning"
   );
   assert.match(autopilotSummary({ light_hours: 12, white_intensity: 20 }, { device_type: "lykyn_chamber" }), /light 12 h at 20%/);
 });
@@ -613,12 +613,12 @@ test("Lykyn light controls are a color mix in percent with no lux readout", () =
   assert.match(html, /name="white_percent"[^>]*value="20"/);
   assert.ok(html.includes(deviceAdapter(lykyn).white.note));
   assert.doesNotMatch(html, /lux/i);
-  assert.doesNotMatch(html, /data-lux-preview/);
+  assert.doesNotMatch(html, /data-white-note/);
   assert.doesNotMatch(html, /brightness/i);
   assert.doesNotMatch(deviceAdapter(lykyn).white.note, DASH);
 });
 
-test("Shrooly light controls keep the lux preview", () => {
+test("Shrooly light controls show white in percent, with no lux anywhere", () => {
   const shrooly = {
     ...pearl,
     capabilities: { knob_ranges: { white_intensity: [0, 4000, 5] } },
@@ -630,6 +630,7 @@ test("Shrooly light controls keep the lux preview", () => {
   assert.equal(deviceAdapter({}).white.percent, false);
   const html = renderControls(shrooly, { profiles: [pearl.profile], canWrite: true, showCoach: true });
   assert.match(html, /White brightness \(%\)/);
-  assert.match(html, /data-lux-preview/);
-  assert.match(html, /About 92 lux/);
+  assert.match(html, /data-white-note/);
+  assert.doesNotMatch(html, /lux/i);
+  assert.match(html, /name="white_percent"[^>]*value="20"/);
 });

@@ -24,7 +24,7 @@ import {
   rememberDeviceProfile,
   setDeviceAutopilotMode,
 } from "./coach-autopilot.js";
-import { acceptedPhase, CANONICAL_STAGES, DEFAULT_DEVICE_TYPE, deviceTypeLabel } from "./device-adapters.js";
+import { acceptedPhase, CANONICAL_STAGES, DEFAULT_DEVICE_TYPE, deviceAdapter, deviceTypeLabel } from "./device-adapters.js";
 import { fleetUiEnabled } from "./providers.js";
 import { isoSeconds, SQL as ALERT_SQL } from "./alerts/store.js";
 import { growStage, readRules } from "./alerts/rules.js";
@@ -135,6 +135,13 @@ function stageFromProfile(profile, stageId) {
   if (!profile) return {};
   const stages = profile.stages || [];
   return expandStage(stages.find((s) => s.id === stageId) || stages.find((s) => s.id === "fruiting") || stages[0] || {});
+}
+
+/** The stage light for the site: the recipe's lux as stored, plus white as a percent, which is what every chamber page shows. */
+function stageLightForSite(stage = {}, caps = {}) {
+  const light = lightFromStage(stage);
+  if (!light) return null;
+  return { ...light, white_percent: light.white_led_lux == null ? null : deviceAdapter(caps).white.percentFromRecipeLux(light.white_led_lux) };
 }
 
 function lightFromStage(stage = {}) {
@@ -380,7 +387,7 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
     // What the chamber reports it is running now (null per knob when it doesn't say).
     chamber: knobs,
     chamber_light: lightFromKnobs(knobs, caps),
-    light: lightFromStage(stage),
+    light: stageLightForSite(stage, caps),
     // The recipe band for the current stage, so pages can show readings against it.
     targets: stage.id
       ? {
