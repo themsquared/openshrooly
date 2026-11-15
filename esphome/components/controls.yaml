@@ -538,6 +538,16 @@ text_sensor:
 
 button:
   - platform: template
+    name: "LED Test"
+    id: led_test
+    icon: mdi:led-on
+    web_server:
+      sorting_group_id: grp_lights
+      sorting_weight: 90
+    on_press:
+      - script.execute: led_test_sequence
+
+  - platform: template
     name: "Beeper Test"
     icon: mdi:volume-high
     web_server:
