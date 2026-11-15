@@ -5,14 +5,37 @@ import { AUTOPILOT_LIMITS, autopilotCommandExpired } from "../src/coach-autopilo
 
 const cmd = (id, kind, payload, extra = {}) => ({ id, device_id: "d1", kind, payload: JSON.stringify(payload), ...extra });
 
-test("commands outlive a cap-deferred poll: 2 h, not 30 min", () => {
-  assert.equal(AUTOPILOT_LIMITS.commandTtlMs, 2 * 60 * 60 * 1000);
+test("Autopilot commands expire after 15 minutes; grower commands still last 2 hours", () => {
+  assert.equal(AUTOPILOT_LIMITS.commandTtlMs, 15 * 60 * 1000);
   assert.equal(COMMAND_TTL_MS, 2 * 60 * 60 * 1000);
-  const issued = Date.parse("2026-10-26T07:05:05Z");
-  const c = { issued_at: "2026-10-26T07:05:05Z", payload: JSON.stringify({ source: "grow-coach-autopilot" }) };
-  // The prod miss: the next poll came 31.5 min after issue.
-  assert.equal(autopilotCommandExpired(c, Date.parse("2026-10-26T07:36:32Z")), false);
-  assert.equal(autopilotCommandExpired(c, issued + AUTOPILOT_LIMITS.commandTtlMs + 1000), true);
+  const issued = Date.parse("2026-11-15T22:20:05Z");
+  const c = {
+    issued_at: "2026-11-15T22:20:05Z",
+    payload: JSON.stringify({
+      source: "grow-coach-autopilot",
+      // A leftover 2-hour expires_at must not keep a stale Autopilot command alive.
+      expires_at: "2026-11-16T00:20:05Z",
+    }),
+  };
+  assert.equal(autopilotCommandExpired(c, issued + 14 * 60 * 1000), false);
+  assert.equal(autopilotCommandExpired(c, issued + 15 * 60 * 1000 + 1000), true);
+});
+
+test("a later stage pick drops a queued Autopilot command even if it does not repeat every knob", () => {
+  const older = cmd(39, "setpoints", {
+    source: "grow-coach-autopilot",
+    temperature_c: 22,
+    humidity_percent: 88,
+    air_exchange_speed: 60,
+    light_hours: 12,
+    white_intensity: 20,
+    color_b: 80,
+  });
+  const stageOnly = cmd(40, "setpoints", { source: "fleet", grow_phase: "Colonization" });
+  assert.equal(commandSupersedes(stageOnly, older), true);
+  assert.equal(commandSupersedes(cmd(40, "setpoints", { source: "fleet", stage: "colonization" }), older), true);
+  assert.equal(commandSupersedes(cmd(40, "setpoints", { source: "site", color_b: 50 }), older), false, "a later color-only write does not drop Autopilot");
+  assert.equal(commandSupersedes(cmd(38, "setpoints", { source: "fleet", grow_phase: "Colonization" }), older), false, "an older stage pick does not cancel a later Autopilot command");
 });
 
 test("a newer command supersedes an older one only when it covers every knob the older one sets", () => {

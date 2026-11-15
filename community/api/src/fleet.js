@@ -24,7 +24,7 @@ import {
   rememberDeviceProfile,
   setDeviceAutopilotMode,
 } from "./coach-autopilot.js";
-import { acceptedPhase, CANONICAL_STAGES, DEFAULT_DEVICE_TYPE, deviceAdapter, deviceTypeLabel } from "./device-adapters.js";
+import { acceptedPhase, CANONICAL_STAGES, DEFAULT_DEVICE_TYPE, deviceAdapter, deviceTypeLabel, stageIdForPhase } from "./device-adapters.js";
 import { fleetUiEnabled } from "./providers.js";
 import { isoSeconds, SQL as ALERT_SQL } from "./alerts/store.js";
 import { growStage, readRules } from "./alerts/rules.js";
@@ -135,6 +135,13 @@ function stageFromProfile(profile, stageId) {
   if (!profile) return {};
   const stages = profile.stages || [];
   return expandStage(stages.find((s) => s.id === stageId) || stages.find((s) => s.id === "fruiting") || stages[0] || {});
+}
+
+/** The named profile stage, or {} if this profile has no such stage (for example Custom). Never falls back to Fruiting. */
+function exactProfileStage(profile, stageId) {
+  if (!profile || !stageId) return {};
+  const found = (profile.stages || []).find((s) => s.id === stageId);
+  return found ? expandStage(found) : {};
 }
 
 /** The stage light for the site: the recipe's lux as stored, plus white as a percent, which is what every chamber page shows. */
@@ -633,12 +640,22 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   // Trust the chamber's own grow day for the same profile, or when the user picked the stage
   // the chamber says it is already in.
   const trustReported = sameProfile || Boolean(payload.stage && current?.stage === payload.stage);
-  const stage = stageFromProfile(profile, payload.stage || defaultStage);
+  // A Stage picker send uses grow_phase, not payload.stage. Look up that phase's profile
+  // recipe. Do not fall back to Fruiting when the phase has no recipe (Custom).
+  const requestedStageId =
+    payload.stage || (payload.grow_phase ? stageIdForPhase(payload.grow_phase) : "") || defaultStage;
+  const stage =
+    action === "stage"
+      ? exactProfileStage(profile, requestedStageId)
+      : stageFromProfile(profile, requestedStageId);
   const currentSetpoints = {
     temperature_c: current?.temperature_setpoint,
     humidity_percent: current?.humidity_setpoint,
   };
   const plan = validateFleetChange({ action, payload, profile, stage, currentSetpoints });
+  if (plan.ok && plan.kind === "stage" && profile?.id && stage?.id) {
+    plan.payload = { ...plan.payload, profile_id: profile.id, stage: stage.id };
+  }
   const cloudKind = plan.ok && ["setpoints", "apply_profile", "schedule", "stage"].includes(plan.kind);
   // The chamber's grow day only carries over for the same grow. Otherwise send the grow day the
   // stage starts on, counted from 1 like the chamber does (its grow_day setter ignores 0).

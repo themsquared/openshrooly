@@ -364,13 +364,12 @@ export function suggestSetpoints(model, stage = {}, { auto = false, reading = nu
   let temperature = baseTemp;
   const reasons = [];
 
+  // Climate setpoints stay on the profile target. When RH is off, Coach drives the
+  // fan (and other actuators), not the humidity number itself.
   if ((model.humidity_droop || 0) >= 2) {
-    const bump = Math.min(bounds.humidity_delta, Math.round(model.humidity_droop));
-    humidity += bump;
     reasons.push(`Chamber lags humidity setpoint by ~${formatHumidity(model.humidity_droop)}%.`);
   }
   if ((model.humidity_error || 0) >= 3) {
-    humidity -= Math.min(bounds.humidity_delta, Math.round(model.humidity_error));
     reasons.push("Humidity runs high versus the target.");
   }
 

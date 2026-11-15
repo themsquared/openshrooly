@@ -412,6 +412,11 @@ export function applyJevDecision({ answers = {}, rules = {}, setpoints = {}, kno
     const entry = { choice, confidence, probabilities: answer?.probabilities || null, used: "rules" };
     audit.knobs[knob] = entry;
     if (!answer || !["raise", "hold", "lower"].includes(choice) || confidence < policy.minConfidence) continue;
+    // Climate setpoints stay on the profile target. Jev may still steer the fan.
+    if (knob === "temperature" || knob === "humidity") {
+      entry.used = "rules";
+      continue;
+    }
     const base = knob === "light" ? Number(knobs.white_intensity) : Number(setpoints[field]);
     if (!Number.isFinite(base)) continue;
     const step = policy.steps[field];

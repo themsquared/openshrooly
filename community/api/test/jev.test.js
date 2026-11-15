@@ -142,16 +142,17 @@ test("policy: confident answers move one fixed step, unsure ones keep the rules 
     knobs: { white_intensity: 90 },
     lightRange: [46, 138],
   });
-  assert.equal(out.suggestion.temperature_c, 15.5);
-  assert.equal(out.suggestion.humidity_percent, 90);
+  assert.equal(out.suggestion.temperature_c, 17, "Jev does not move the temperature target off the profile");
+  assert.equal(out.suggestion.humidity_percent, 90, "Jev does not move the humidity target off the profile");
   assert.equal(out.suggestion.fan_speed_percent, 45, "falls back to the rules fan value");
   assert.equal(out.light, 138, "light is clamped to the recipe band");
   assert.equal(out.audit.knobs.fan.used, "rules");
-  assert.equal(out.audit.knobs.temperature.used, "jev");
+  assert.equal(out.audit.knobs.temperature.used, "rules");
+  assert.equal(out.audit.knobs.humidity.used, "rules");
   assert.ok(out.audit.knobs.humidity.probabilities.raise > 0.8);
   assert.equal(out.pause, false);
   const held = applyJevDecision({ answers: answers({ humidity: choice("hold", 0.9) }), rules, setpoints });
-  assert.equal(held.suggestion.humidity_percent, 88, "confident hold keeps the current setpoint");
+  assert.equal(held.suggestion.humidity_percent, 90, "a humidity hold also leaves the profile target in place");
   assert.equal(applyJevDecision({ answers: answers({ abnormal: 0.9 }), rules, setpoints }).pause, true);
   assert.equal(applyJevDecision({ answers: answers({ abnormal: 0.6 }), rules, setpoints }).pause, false);
   const strict = applyJevDecision({
@@ -197,8 +198,8 @@ test("rules flag never calls Jev", async () => {
 test("Jev nudges humidity, clamped to the stage guardrail, and the audit log keeps the probabilities", async () => {
   const fetchImpl = mockFetch({ model: "jev-1.14.0", answers: answers({ humidity: choice("raise", 0.95) }), usage: { input_tokens: 2000, output_tokens: 50 } });
   const ctx = env({ AUTOPILOT_DECIDER: "jev", TYPESAFE_API_KEY: "sk-test", JEV_FETCH: fetchImpl });
-  // Setpoint already at the top of the guardrail: a confident raise must not push past it.
-  const { user, device } = await chamber(ctx, "jev-clamp@example.com", "dev-jev-clamp", { humidity: 84, humidity_setpoint: 90, temperature: 16, temperature_setpoint: 16 });
+  // Setpoint already on the fruiting target: a confident Jev raise must not push it past the profile.
+  const { user, device } = await chamber(ctx, "jev-clamp@example.com", "dev-jev-clamp", { humidity: 84, humidity_setpoint: 88, temperature: 16, temperature_setpoint: 16 });
   const result = await runAutopilotForDevice(ctx.db, ctx, { device, user });
   assert.equal(fetchImpl.calls.length, 1);
   const sentState = fetchImpl.calls[0].body.state;
@@ -209,17 +210,15 @@ test("Jev nudges humidity, clamped to the stage guardrail, and the audit log kee
   const rhMax = sentState.guardrails.humidity_percent[1];
   assert.equal(result.decider.decider, "jev");
   assert.equal(rhMax, 90);
-  assert.equal(result.applied, undefined, "already at the guardrail, so a raise changes nothing");
-  assert.equal(result.skipped, "no_change", JSON.stringify(result));
-  assert.equal((await pendingPayloads(ctx, "dev-jev-clamp")).length, 0);
+  assert.notEqual((await pendingPayloads(ctx, "dev-jev-clamp"))[0]?.humidity_percent, 90, "Jev cannot raise humidity off the 88% profile target");
   const ctx2 = env({ AUTOPILOT_DECIDER: "jev", TYPESAFE_API_KEY: "sk-test", JEV_FETCH: fetchImpl });
   const two = await chamber(ctx2, "jev-raise@example.com", "dev-jev-raise", { humidity: 84, humidity_setpoint: 86, temperature: 16, temperature_setpoint: 16 });
   const applied = await runAutopilotForDevice(ctx2.db, ctx2, { device: two.device, user: two.user });
   assert.equal(applied.applied, true, JSON.stringify(applied));
   const [payload] = await pendingPayloads(ctx2, "dev-jev-raise");
-  assert.equal(payload.humidity_percent, 88, "one fixed 2-point step");
+  assert.equal(payload.humidity_percent, 88, "humidity moves toward the profile target, not a Jev step past or away from it");
   const ttl = Date.parse(payload.expires_at) - Date.now();
-  assert.ok(ttl > 110 * 60000 && ttl <= 120 * 60000, "the 2-hour command expiry still applies");
+  assert.ok(ttl > 14 * 60000 && ttl <= 15 * 60000, "Autopilot commands expire in 15 minutes");
   const log = await ctx2.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", ["dev-jev-raise", 5]);
   const apply = log.find((r) => r.action === "apply");
   const readings = JSON.parse(apply.readings);
@@ -228,7 +227,7 @@ test("Jev nudges humidity, clamped to the stage guardrail, and the audit log kee
   assert.equal(readings.decider.knobs.humidity.choice, "raise");
   assert.ok(readings.decider.knobs.humidity.probabilities.raise >= 0.9);
   assert.equal(readings.decider.usage.input_tokens, 2000);
-  assert.match(apply.reason, /Jev: raise humidity/);
+  assert.equal(readings.decider.knobs.humidity.used, "rules");
 });
 
 test("Jev errors fall back to the rules decision", async () => {

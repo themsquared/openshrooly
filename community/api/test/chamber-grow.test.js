@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { chamberPhotoPath, chamberText } from "../src/chamber-grow.js";
+import { chamberPhotoPath, chamberProfileStages, chamberText } from "../src/chamber-grow.js";
 import { speciesPhoto } from "../../web/public/js/species-art.js";
 import { LICENSED_PHOTOS, photoRecordFor } from "../../web/public/js/species-photos.js";
 
@@ -31,4 +31,22 @@ test("chamber text is short printable ASCII with nothing that needs escaping", (
   assert.equal(chamberText("Lion's Mane", 40), "Lion's Mane");
   assert.equal(chamberText('Bad "<b>"\\ name\u00e9', 40), "Bad b name");
   assert.equal(chamberText("x".repeat(60), 40).length, 40);
+});
+
+test("chamber profile stages are the four knobs in percent, no grow day", () => {
+  const black = builtIns.find((p) => p.id === "black-oyster");
+  const stages = chamberProfileStages(black, "lykyn_chamber");
+  const colo = stages.colonization;
+  assert.equal(colo.temperature_c, 24);
+  assert.equal(colo.humidity_percent, 90);
+  assert.equal(colo.fan_speed_percent, 20);
+  assert.equal(colo.air_exchange_period_min, 60);
+  assert.equal(colo.air_exchange_run_sec, 15);
+  assert.equal(colo.light_hours, 0);
+  assert.equal(colo.white_percent, 0);
+  assert.equal(colo.blue_percent, 0);
+  assert.equal("grow_day" in colo, false);
+  const fruit = stages.fruiting;
+  assert.ok(fruit.light_hours > 0);
+  assert.equal(stages.custom, undefined);
 });

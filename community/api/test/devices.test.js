@@ -1210,6 +1210,72 @@ test("profile apply on the raw route is translated for setpoint-only firmware", 
   assert.equal(notice.status, 409);
 });
 
+test("inbox drops a queued Autopilot command after 15 minutes and writes an expiry audit", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "ttl-inbox@example.com");
+  const d = await enrollClaimIssue(ctx, token, "ttl00000000000001");
+  const issued = new Date(Date.now() - 16 * 60 * 1000).toISOString();
+  await ctx.db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+    d.deviceId,
+    "setpoints",
+    JSON.stringify({
+      source: "grow-coach-autopilot",
+      temperature_c: 22,
+      humidity_percent: 88,
+      air_exchange_speed: 60,
+      expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    }),
+    issued,
+    null,
+  ]);
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+  });
+  assert.equal(inbox.status, 200, JSON.stringify(inbox.data));
+  assert.equal(inbox.data.commands.length, 0);
+  const row = (await ctx.db.all("SELECT * FROM device_commands WHERE device_id=?", [d.deviceId]))[0];
+  const payload = JSON.parse(row.payload);
+  assert.ok(row.consumed_at);
+  assert.equal(payload._ack.status, "expired");
+  assert.match(payload._ack.reason, /sat too long/i);
+});
+
+test("inbox drops a queued Autopilot command when the grower later picks a stage", async () => {
+  const ctx = env();
+  const { token } = await register(ctx, "stage-supersede@example.com");
+  const d = await enrollClaimIssue(ctx, token, "ttl00000000000002");
+  const exp = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const add = (payload, agoMin) =>
+    ctx.db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
+      d.deviceId,
+      "setpoints",
+      JSON.stringify({ ...payload, expires_at: exp }),
+      new Date(Date.now() - agoMin * 60 * 1000).toISOString(),
+      null,
+    ]);
+  await add(
+    { source: "grow-coach-autopilot", temperature_c: 22, humidity_percent: 88, air_exchange_speed: 60, light_hours: 12 },
+    5
+  );
+  await add({ source: "fleet", grow_phase: "Colonization" }, 1);
+  const inbox = await deviceCall(ctx, "GET", `/api/devices/${d.deviceId}/inbox`, {
+    deviceId: d.deviceId,
+    key: d.pair.keys.privateKey,
+    cert: d.issued.data,
+  });
+  assert.equal(inbox.status, 200, JSON.stringify(inbox.data));
+  const shipped = inbox.data.commands.map((c) => JSON.parse(JSON.stringify(c.payload)));
+  assert.equal(shipped.length, 1);
+  assert.equal(shipped[0].grow_phase, "Colonization");
+  const rows = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? ORDER BY id", [d.deviceId]);
+  const auto = JSON.parse(rows[0].payload);
+  assert.ok(rows[0].consumed_at);
+  assert.equal(auto._ack.status, "expired");
+  assert.match(auto._ack.reason, /Replaced by a newer/);
+});
+
 test("inbox never ships a command a newer one of the same kind replaced, and retires it", async () => {
   const ctx = env();
   const { token } = await register(ctx);
@@ -1239,10 +1305,11 @@ test("inbox never ships a command a newer one of the same kind replaced, and ret
   const byPayload = (n) => rows.find((r) => JSON.parse(r.payload).air_exchange_speed === n || JSON.parse(r.payload).white_intensity === n);
   const older = byPayload(30);
   const white = byPayload(120);
-  assert.equal(shipped.length, 3);
-  assert.ok(!shipped.includes(Number(older.id)) && !shipped.includes(Number(white.id)));
-  for (const row of [older, white]) {
-    assert.ok(row.consumed_at);
+  const auto = rows.find((r) => JSON.parse(r.payload).source === "grow-coach-autopilot");
+  assert.equal(shipped.length, 2, "the later apply_profile drops the Autopilot command; the color-only write still ships");
+  assert.ok(!shipped.includes(Number(older.id)) && !shipped.includes(Number(white.id)) && !shipped.includes(Number(auto.id)));
+  for (const row of [older, white, auto]) {
+    assert.ok(row.consumed_at, JSON.stringify(row));
     assert.equal(JSON.parse(row.payload)._ack.status, "expired");
     assert.match(JSON.parse(row.payload)._ack.reason, /Replaced by a newer/);
   }
@@ -1289,9 +1356,10 @@ test("inbox tells the chamber what is growing so its own page can show it", asyn
   assert.equal(before.status, 200, JSON.stringify(before.data));
   // Nothing picked: empty strings, so the chamber clears its card. Old keys are unchanged.
   assert.deepEqual(
-    { name: before.data.grow_name, url: before.data.grow_url, image: before.data.grow_image },
-    { name: "", url: "", image: "" }
+    { name: before.data.grow_name, url: before.data.grow_url, image: before.data.grow_image, id: before.data.profile_id },
+    { name: "", url: "", image: "", id: "" }
   );
+  assert.deepEqual(before.data.profile_stages, {});
   assert.ok(Array.isArray(before.data.commands));
   assert.equal(before.data.offline_ok, true);
 
@@ -1304,6 +1372,11 @@ test("inbox tells the chamber what is growing so its own page can show it", asyn
   assert.equal(after.data.grow_name, "Lion's Mane");
   assert.equal(after.data.grow_url, `${ctx.SITE_ORIGIN}/profiles/lions-mane`);
   assert.equal(after.data.grow_image, `${ctx.SITE_ORIGIN}/img/species/species-lions-mane-640.webp`);
+  assert.equal(after.data.profile_id, "lions-mane");
+  assert.equal(after.data.profile_stages.fruiting.humidity_percent, 90);
+  assert.equal(after.data.profile_stages.colonization.temperature_c, 22);
+  assert.equal(after.data.profile_stages.fruiting.temperature_c, 17);
+  assert.equal("grow_day" in after.data.profile_stages.fruiting, false);
 });
 
 test("enroll stores a known device_type and ignores an unknown one", async () => {
