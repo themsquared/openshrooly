@@ -591,7 +591,9 @@ function autopilotSteering(env, modeRow) {
   return coachAutopilotFlagOn(env) && modeRow.mode === "autopilot" && !Number(modeRow.paused);
 }
 
-const COACH_LOCKED_KINDS = new Set(["setpoints", "apply_profile", "schedule", "stage"]);
+// Targets Coach steers. Starting a grow (apply_profile) is the grower choosing what is growing,
+// not a target edit, so it stays open: it sets the grow and stage and Coach steers that recipe.
+const COACH_LOCKED_KINDS = new Set(["setpoints", "schedule", "stage"]);
 
 function coachBlocksChange(env, modeRow, plan) {
   return Boolean(plan?.ok && COACH_LOCKED_KINDS.has(plan.kind) && autopilotSteering(env, modeRow));
@@ -601,12 +603,12 @@ function profileLabel(profile, stage) {
   return `${profile?.name || profile?.id || "Profile"}${stage?.name ? ` ${stage.name}` : ""}`;
 }
 
-function translationMessage(plan, translated, profile, stage) {
+function translationMessage(plan, translated, profile, stage, caps = {}) {
   if (!translated?.ok) return null;
   const notes = [...new Set((translated.skipped || []).map((s) => s.note).filter(Boolean))];
   if (plan.kind === "apply_profile" && translated.translated) {
     const sent = translated.commands.find((c) => c.kind === "setpoints")?.payload || {};
-    const parts = setpointParts(sent);
+    const parts = setpointParts(sent, caps);
     const what = translated.full ? `sending the whole phase in one change: ${parts.join(", ")}` : `sending ${parts.join(" and ")}`;
     return [`${profileLabel(profile, stage)}: ${what}.`, ...notes].join(" ");
   }
@@ -650,7 +652,7 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   return { modeRow, profile, stage, current, caps, plan, translated, trustReported };
 }
 
-function previewResult(device, { plan, translated, profile, stage, modeRow }, env) {
+function previewResult(device, { plan, translated, profile, stage, modeRow, caps }, env) {
   if (!plan.ok) return { device_id: device.id, name: device.name, status: "failed", error: plan.error, preview: null };
   if (coachBlocksChange(env, modeRow, plan)) {
     return { device_id: device.id, name: device.name, status: "failed", error: COACH_MANAGES_TARGETS, preview: plan.preview };
@@ -664,7 +666,7 @@ function previewResult(device, { plan, translated, profile, stage, modeRow }, en
     status: "ok",
     error: null,
     preview: translated ? { ...plan.preview, sends: translated.commands, skipped: translated.skipped } : plan.preview,
-    message: translationMessage(plan, translated, profile, stage),
+    message: translationMessage(plan, translated, profile, stage, caps),
   };
 }
 
@@ -734,7 +736,7 @@ async function applyOne(db, env, user, device, { action, payload }, now) {
     deduped,
     translated: Boolean(translated.translated),
     skipped: translated.skipped || [],
-    message: translationMessage(plan, translated, profile, stage),
+    message: translationMessage(plan, translated, profile, stage, caps),
     preview: { ...plan.preview, sends: translated.commands },
   };
 }

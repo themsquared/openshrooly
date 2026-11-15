@@ -81,7 +81,7 @@ export function growingLabels(device) {
   return { title, latin: sub, phase };
 }
 
-export const COACH_MANAGES_NOTE = "Coach is managing targets. Turn Coach off to set them yourself.";
+export const COACH_MANAGES_NOTE = "Coach is managing targets. Turn Coach off to set them yourself. Starting a grow still works, and Coach follows it.";
 
 /** Autopilot is on and not in a safety pause, so the site should not take manual target edits. */
 export function coachManagingTargets(device) {
@@ -313,7 +313,7 @@ export function commandPending(command) {
   return command?.status === "queued" || command?.status === "delivered";
 }
 
-export const SENT_MESSAGE = "Sent. Your chamber picks it up in about 15 minutes.";
+export const SENT_MESSAGE = "Sent. The chamber checks in about every 15 minutes, so this lands within 15 minutes, usually sooner.";
 
 /** What to tell the grower right after Save or Apply, from the API's per-device result. */
 export function resultMessage(result) {
@@ -395,6 +395,15 @@ export function chamberOnlyLine(controls = {}) {
  * Chamber controls, top to bottom: what is growing, the climate, then light and name.
  * Controls this chamber can't take from the cloud are left out, with one plain line saying so.
  */
+/** True when this chamber takes white as a 0-100% channel (Lykyn) instead of lux (Shrooly). */
+export function whiteIsPercentDevice(device = {}) {
+  const hi = device?.capabilities?.knob_ranges?.white_intensity?.[1];
+  return hi != null && Number(hi) <= 100;
+}
+
+export const LYKYN_LIGHT_NOTE =
+  "The ring mixes the colors below. White is added on top of red, green and blue, so blue 80 with white 20 is full blue. Raise white and lower blue to move toward white light.";
+
 /** White brightness preview: the chamber's white channel is set in lux, the site shows %. */
 export function luxPreview(percent) {
   const lux = whitePercentToLux(percent);
@@ -435,10 +444,12 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
   // Newer knobs show only when the chamber says it can take them.
   const reported = (key) => controls[key]?.supported === true;
   const chamber = device.chamber || {};
-  const profileOff = canWrite && !locked && supported("profile") ? "" : " disabled";
+  // Starting a grow is the grower's choice of what is growing, so Coach does not lock it.
+  const profileOff = canWrite && supported("profile") ? "" : " disabled";
   // What the chamber runs now wins over the stage recipe, so Save never surprises.
   const light = device.chamber_light || device.light || {};
   const whitePct = light.white_percent ?? (light.white_led_lux != null ? Math.round(whiteLuxToPercent(light.white_led_lux)) : null);
+  const percentWhite = whiteIsPercentDevice(device);
   const colorOff = controls.light?.color === false ? " disabled" : "";
   const scheduleOff = controls.light?.schedule === false ? " disabled" : "";
   const profileOptions =
@@ -539,16 +550,20 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
           <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${targetOff}${scheduleOff}>
         </label>
       </div>
-      <label>White brightness (%)
+      <label>${percentWhite ? "White added to each color (%)" : "White brightness (%)"}
         <input name="white_percent" type="number" step="1" min="0" max="100" value="${numOrBlank(whitePct)}"${targetOff}${colorOff}>
       </label>
-      <p class="muted lux-preview" data-lux-preview aria-live="polite">${escapeHtml(luxPreview(whitePct ?? 0))}</p>
+      ${
+        percentWhite
+          ? `<p class="muted">${escapeHtml(LYKYN_LIGHT_NOTE)}</p>`
+          : `<p class="muted lux-preview" data-lux-preview aria-live="polite">${escapeHtml(luxPreview(whitePct ?? 0))}</p>`
+      }
       <div class="row">
         <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${targetOff}${colorOff}></label>
         <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${targetOff}${colorOff}></label>
         <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${targetOff}${colorOff}></label>
       </div>
-      <p class="muted">Hours on 0 means dark, with brightness and colors at 0 too. A light that is on with 0 hours runs 12 hours.</p>
+      <p class="muted">Hours on 0 means dark, with ${percentWhite ? "white" : "brightness"} and colors at 0 too. A light that is on with 0 hours runs 12 hours.</p>
       <button type="submit" class="secondary" data-action="light"${targetOff}>Save light</button>
       ${controlMsg("light")}
     </fieldset>`
@@ -559,8 +574,8 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
     <fieldset id="grow">
       <legend>What's growing</legend>
       <div class="row">
-        <label>Profile <select name="profile_id"${targetOff}>${profileOptions}</select></label>
-        <label>Phase <select name="stage"${targetOff}>${stageOptions || `<option value="">Start from the beginning</option>`}</select></label>
+        <label>Profile <select name="profile_id"${profileOff}>${profileOptions}</select></label>
+        <label>Phase <select name="stage"${profileOff}>${stageOptions || `<option value="">Start from the beginning</option>`}</select></label>
       </div>
       <button type="submit" data-action="profile"${profileOff}>Start this grow</button>
       ${controlNote(controls.profile)}
