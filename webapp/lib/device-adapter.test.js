@@ -14,7 +14,7 @@ test("Shrooly says Colonizing, has no Custom, and writes the recipe from the pag
   assert.equal(by.temperature__target, RECIPES.Fruiting.temperature)
   assert.equal(by.target_humidity, RECIPES.Fruiting.humidity)
   assert.equal(by.lights__duration__hours_, 12)
-  assert.equal(by.white_led_intensity, 92, "20 percent of full is 92 lux")
+  assert.equal(by.white_led_intensity, 92, "2.3 percent of the maximum is 92 lux, the light the old 20 percent made")
   assert.equal(by.blue_led_intensity, 80)
   assert.equal(by.air_exchange__speed, 50)
   assert.equal(by.air_exchange__period__min_, 10)
@@ -46,12 +46,24 @@ test("a linked profile's stage knobs beat the built-in recipe", () => {
   assert.equal("grow_day" in by, false)
 })
 
-test("white percent to lux matches the cloud and firmware curve", () => {
+test("white percent is linear: 100 percent is 4000 lux and every whole lux round-trips", () => {
   assert.equal(adapter.whitePercentToLux(0), 0)
-  assert.equal(adapter.whitePercentToLux(20), 92)
-  assert.equal(adapter.whitePercentToLux(10), 46)
+  assert.equal(adapter.whitePercentToLux(2.3), 92)
+  assert.equal(adapter.whitePercentToLux(10), 400)
+  assert.equal(adapter.whitePercentToLux(50), 2000)
   assert.equal(adapter.whitePercentToLux(100), 4000)
-  assert.equal(adapter.WHITE_UNIT, "lux")
+  assert.equal(adapter.whitePercentToLux(150), 4000)
+  assert.equal(adapter.WHITE_UNIT, "%")
+  for (let lux = 0; lux <= 4000; lux += 1) {
+    assert.equal(adapter.whitePercentToLux(adapter.whiteLuxToPercent(lux)), lux)
+  }
+})
+
+test("the Light card shows percent of the maximum with one decimal", () => {
+  assert.equal(adapter.whiteDisplay(92), 2.3)
+  assert.equal(adapter.whiteDisplay(150), 3.8)
+  assert.equal(adapter.whiteDisplay(4000), 100)
+  assert.equal(adapter.whiteDisplay(0), 0)
 })
 
 test("the current stage is read back through the canonical name", () => {

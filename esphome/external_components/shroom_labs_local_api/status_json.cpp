@@ -41,14 +41,9 @@ const char *canonical_stage(const char *native) {
 float white_lux_to_percent(float lux) {
   if (!(lux > 0))
     return 0;
-  if (lux > 4000.0f)
-    lux = 4000.0f;
-  if (lux <= 92.0f)
-    return (lux / 92.0f) * 20.0f;
-  float pct = std::pow(lux / 0.02307f, 1.0f / 2.768f);
-  if (pct > 100.0f)
+  if (lux > kWhiteMaxLux)
     return 100.0f;
-  return pct;
+  return lux / (kWhiteMaxLux / 100.0f);
 }
 
 std::string escape_json(const std::string &in) {
@@ -138,6 +133,14 @@ static void add_opt_i(std::string &o, const char *key, const OptI &v, bool *firs
     add_i(o, key, v.value, first);
 }
 
+static float clamp_pct1(float v) {
+  if (v < 0)
+    return 0;
+  if (v > 100.0f)
+    return 100.0f;
+  return std::roundf(v * 10.0f) / 10.0f;
+}
+
 static int clamp_pct(float v) {
   int n = static_cast<int>(std::lroundf(v));
   if (n < 0)
@@ -152,6 +155,14 @@ static void add_pct(std::string &o, const char *key, const OptF &v, bool *first)
     add_null(o, key, first);
   else
     add_i(o, key, clamp_pct(v.value), first);
+}
+
+// Light mix channels are percent of the chamber's maximum, one decimal, so 2.3 stays 2.3.
+static void add_pct1(std::string &o, const char *key, const OptF &v, bool *first) {
+  if (!finite_num(v))
+    add_null(o, key, first);
+  else
+    add_fixed(o, key, clamp_pct1(v.value), 1, first);
 }
 
 static void add_opt_str(std::string &o, const char *key, const std::string &v, bool *first) {
@@ -290,10 +301,10 @@ std::string status_json(const Snapshot &s) {
   } else {
     o += ",\"rgba\":{";
     bool rfirst = true;
-    add_pct(o, "r", s.light_r, &rfirst);
-    add_pct(o, "g", s.light_g, &rfirst);
-    add_pct(o, "b", s.light_b, &rfirst);
-    add_pct(o, "a", white_as_percent(s), &rfirst);
+    add_pct1(o, "r", s.light_r, &rfirst);
+    add_pct1(o, "g", s.light_g, &rfirst);
+    add_pct1(o, "b", s.light_b, &rfirst);
+    add_pct1(o, "a", white_as_percent(s), &rfirst);
     o += '}';
     lfirst = false;
   }
@@ -350,7 +361,7 @@ std::string status_json(const Snapshot &s) {
   return o;
 }
 
-static const char *const kSchema = R"({"api_version":1,"units":{"temperature":"celsius","humidity":"percent","fan.speed_pct":"0-100","fan.every_min":"minutes","fan.run_s":"seconds","light.rgba":"0-100 integers, A is the white channel"},"stage_names":["Colonization","Pinning","Fruiting","Custom"],"chamber_types":["shrooly_chamber","lykyn_chamber"],"fields":["chamber_name","chamber_type","growing","stage","temperature","humidity","fan","light","detail","health"]})";
+static const char *const kSchema = R"({"api_version":1,"units":{"temperature":"celsius","humidity":"percent","fan.speed_pct":"0-100","fan.every_min":"minutes","fan.run_s":"seconds","light.rgba":"0-100 percent of this chamber's maximum, one decimal, A is the white channel"},"stage_names":["Colonization","Pinning","Fruiting","Custom"],"chamber_types":["shrooly_chamber","lykyn_chamber"],"fields":["chamber_name","chamber_type","growing","stage","temperature","humidity","fan","light","detail","health"]})";
 
 const char *status_schema_json() { return kSchema; }
 

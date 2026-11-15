@@ -129,12 +129,13 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 26% white, mapped from Jozifek et al. 2025 additional tests at 200 lux on a 12 h cycle, which produced white basidiocarps. Their main 500 lux treatment was 24 h continuous light and caused pink stress coloring, so that schedule is not used. RGB is the general blue mix; that paper used white fluorescent, not a measured blue ratio.",
+    "white_scale": "output",
+    "why": "Colonization is dark to limit early pins. Fruiting uses 12 h and 4.75% white, mapped from Jozifek et al. 2025 additional tests at 200 lux on a 12 h cycle, which produced white basidiocarps. Their main 500 lux treatment was 24 h continuous light and caused pink stress coloring, so that schedule is not used. RGB is the general blue mix; that paper used white fluorescent, not a measured blue ratio.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
         "title": "Jozifek et al. 2025",
-        "detail": "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). The main cultivation used 500 lux for 24 h continuous light and caused pink stress coloring. Additional tests at 200 lux or lower on a 12 h cycle produced white basidiocarps. This recipe uses that 200 lux, 12 h schedule. 200 lux maps to 26% white.",
+        "detail": "Miroslav Jozifek et al., Selenium Uptake by Hericium erinaceus Basidiocarps, Agriculture 15 (2025). The main cultivation used 500 lux for 24 h continuous light and caused pink stress coloring. Additional tests at 200 lux or lower on a 12 h cycle produced white basidiocarps. This recipe uses that 200 lux, 12 h schedule. 200 lux maps to 4.75% white.",
         "url": "https://doi.org/10.3390/agriculture15050460"
       },
       {
@@ -157,14 +158,14 @@
       },
       "fruiting": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 26,
+        "white_brightness_percent": 4.75,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "pinning": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 26,
+        "white_brightness_percent": 4.75,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

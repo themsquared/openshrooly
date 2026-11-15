@@ -125,6 +125,7 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
+    "white_scale": "output",
     "why": "A. bisporus does not need light to fruit. Penn State rooms usually run without it. Both phases stay at 0 h and 0% on this strip.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [

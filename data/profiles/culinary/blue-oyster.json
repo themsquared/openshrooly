@@ -126,12 +126,13 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "why": "Colonization stays dark, as in Penn State spawn-run rooms. Fruiting uses 12 h and a blue-heavy mix because P. ostreatus aggregates and forms caps under 440 to 470 nm light. White 20% is 92 lux on this strip, inside the Penn State 50 to 300 lux band.",
+    "white_scale": "output",
+    "why": "Colonization stays dark, as in Penn State spawn-run rooms. Fruiting uses 12 h and a blue-heavy mix because P. ostreatus aggregates and forms caps under 440 to 470 nm light. White 2.3% is 92 lux on this strip, inside the Penn State 50 to 300 lux band.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
         "title": "Penn State oyster production",
-        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
+        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 2.3% white to 92 lux, inside that 50 to 300 lux band.",
         "url": "https://mushroomcompany.com/resources/oyster/paoyster.pdf"
       },
       {
@@ -164,14 +165,14 @@
       },
       "fruiting": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "pinning": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
