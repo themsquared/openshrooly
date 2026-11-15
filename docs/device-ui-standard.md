@@ -92,3 +92,13 @@ Coach itself reads no device type. The leaks sit around it:
 ## Adding a chamber type later
 
 Write its firmware to the spec above. If it cannot, write one adapter with the four functions. Nothing in Coach, the site or the pages changes.
+
+## Status, 2026-11-15
+
+Steps 2 and 3 are built.
+
+- Cloud adapters: `community/api/src/device-adapters.js` and `community/web/public/js/device-adapters.js`. The API adapter holds phase names, white as lux or percent, Custom, known ranges (the Lykyn fan floor of 33) and labels. `device-capabilities.js`, `fleet.js`, `device-ui.js` and `app.js` no longer check the device type. The interface grew past the four functions only where a pure lookup was cleaner: `nativePhase`, `stage`, `white.*`, `knobRanges`, `phaseOptions`.
+- Parity: `device-commands.test.js` runs the same grow on a Shrooly and a Lykyn fixture and asserts the same commands and the same Coach decisions through the adapter. Fan figures are compared at the coarsest chamber's floor and step.
+- Cloud device page order: What is growing, Stage, Temp, Humidity, Light, Fresh air. The Stage picker lists the four stages always. With a profile that has the stage it loads that stage's recipe (the Start this grow path). Custom, or no profile, only sets the phase. A chamber that lacks a control keeps the card and shows one note line.
+- On-device pages: `webapp/lib/stage-standard.js`, `StagePicker.tsx` and the picker CSS are identical in both repos. Each repo has its own `webapp/lib/device-adapter.js`. Lykyn lets the firmware load the recipe when the stage select changes. Shrooly has no presets in firmware, so its adapter writes the recipe from the page. The recipes in `stage-standard.js` are the stock Black Oyster band the Lykyn firmware ships. A linked cloud profile is authoritative.
+- Not done yet: steps 4 to 6 (entity renames, `canonical.v1`). The on-device Light modal on the Shrooly still edits white in lux.
