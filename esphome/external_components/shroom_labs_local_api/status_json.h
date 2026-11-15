@@ -7,9 +7,15 @@ namespace sl_local {
 
 constexpr int kApiVersion = 1;
 
-// Normalized grow stage shared by every Shroom Labs device.
-// Device-native names stay in Snapshot::stage_native.
-const char *normalize_stage(const char *native);
+// Canonical stage names: Colonization, Pinning, Fruiting, Custom.
+// "Colonizing" (Shrooly native) maps to Colonization.
+// Returns nullptr when the native name is not one of those four (Idle, Harvest, empty, unknown).
+const char *canonical_stage(const char *native);
+
+// Same curve as community/api/src/profile-schema.js whiteLuxToPercent.
+// 0-92 lux is linear to 0-20%. Above that, percent = (lux / 0.02307) ^ (1/2.768), cap 100.
+// 4000 lux (the Shrooly white entity max) is about 78%.
+float white_lux_to_percent(float lux);
 
 struct OptF {
   bool has = false;
@@ -49,6 +55,10 @@ struct Snapshot {
   std::string firmware;
   OptU uptime_s;
 
+  std::string growing_id;
+  std::string growing_name;
+  std::string growing_image_url;
+
   Reading temperature_c;
   Reading humidity_pct;
   Reading fan_rpm;
@@ -71,6 +81,7 @@ struct Snapshot {
   OptF light_white;
   OptF light_brightness;
   OptS light_status;
+  bool light_white_is_lux = false;
 
   OptF fan_in_pct;
   OptF fan_out_pct;
@@ -104,5 +115,7 @@ struct Snapshot {
 
 std::string status_json(const Snapshot &s);
 const char *status_schema_json();
+
+std::string escape_json(const std::string &in);
 
 }  // namespace sl_local

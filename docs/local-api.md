@@ -1,181 +1,169 @@
-# Shroom Labs local discovery and status API
+# Local discovery and status API
 
-A shared, read-only LAN contract for every Shroom Labs chamber (Shrooly, Lykyn, and future devices). In-network tools such as Muse can find a chamber and report what it is doing, without writing targets or seeing secrets.
+Every Shroom Labs chamber (Shrooly, Lykyn, and later types) advertises itself on the LAN
+and serves the same read-only status document. In-network tools such as Muse home link
+use this to find a chamber and report on it. The grower, the site, Coach, and Muse all
+see one model: a stage plus four settings. How a given chamber hits those settings is
+firmware work, not part of this contract.
 
-This document is the source of truth. Firmware copies live in:
-
-- openshrooly: `docs/local-api.md`
-- lykyn-firmware: `docs/local-api.md`
-
-Schema version 1 is stable. New devices implement this same shape. New fields may be added in a later version. Existing keys keep their meaning. A capability the device does not have is JSON `null`, not omitted, so a client can rely on the keys.
-
-## What already existed
-
-These are still there. This API does not replace them.
-
-Shrooly (OpenShrooly firmware):
-
-- mDNS `_esphomelib._tcp` from ESPHome, used by Home Assistant and the native API.
-- mDNS `_http._tcp` when the web server is on, port 80.
-- ESPHome web server REST for entities (`/sensor/...`, `/number/...`, and the same for other domains). Those routes can change state on POST (and some GET actions).
-- The on-device dashboard is an SPA. Its catch-all would claim unknown two-segment paths, which is why `/api/status` is registered first.
-- `GET /cloud` and `GET /grow` are cloud-link helpers, not chamber climate status. `/cloud` can include a claim code and is treated as sensitive on Shrooly.
-- Device security leaves ordinary GET reads open on the home network. Writes need the chamber web login. `GET /api/status` is a read, so it stays open.
-
-Lykyn:
-
-- mDNS was enabled with no extra services, so it only advertised the default ESPHome records (`_esphomelib._tcp` when the native API is on, plus `_http._tcp` for the web server).
-- ESPHome web server REST, same entity names the OpenShrooly hub already polls. Private builds (`lykyn-home.yaml`, `lykyn-provision.yaml`) protect those entity routes with basic auth. The public installer build does not.
-- A compact `Status JSON` text sensor at `GET /text_sensor/Status%20JSON` (or `status_json`), refreshed every 5 seconds. Useful, but it is not versioned, not identical across devices, and on private builds it sits behind the web password.
-- `GET /cloud` and `GET /grow` work the same way as on Shrooly.
-- The on-device dashboard is at `/`. The stock ESPHome entity table is at `/esp`.
-
-Neither device had a `_shroomlabs._tcp` broadcast or a shared, unauthenticated, versioned `GET /api/status`.
+This is the companion to `docs/device-ui-standard.md` (the shared stage and four knobs).
+The names and units here match that layer. Fan is the fresh-air knob: speed plus how
+often and how long the box airs out.
 
 ## Discovery
 
-Browse mDNS service `_shroomlabs._tcp` on the local network. The service runs on port 80. The hostname is the device's mDNS name (`openshrooly-xxxxxx.local` or `lykyn.local`).
+mDNS service: `_shroomlabs._tcp` on port 80.
 
-TXT keys:
+TXT records:
 
-| Key | Example | Meaning |
-| --- | --- | --- |
-| `type` | `shrooly_chamber` or `lykyn_chamber` | Stable device type. Future devices add their own value, same pattern. |
-| `model` | `OpenShrooly` or `Lykyn` | Human-readable model. |
-| `fw` | `1.0.6-sl.2` | Firmware version string. |
-| `api` | `1` | Status schema version. |
-| `path` | `/api/status` | Path to the status document. |
+- `type`: `shrooly_chamber` or `lykyn_chamber` (same values the cloud already uses)
+- `model`: short model string, for example `OpenShrooly` or `Lykyn`
+- `fw`: firmware version
+- `api`: schema version, currently `1`
+- `path`: `/api/status`
 
-Example browse (Avahi):
+Existing ESPHome (`_esphomelib._tcp`) and HTTP (`_http._tcp`) advertisements stay as they are.
+
+Example:
 
 ```
 avahi-browse -r _shroomlabs._tcp
-```
-
-Example read, once you have the host or address:
-
-```
 curl -sS http://lykyn.local/api/status
-curl -sS http://openshrooly-xxxxxx.local/api/status
 curl -sS http://lykyn.local/api/status/schema
 ```
 
-Default ESPHome advertisements (`_esphomelib._tcp`, `_http._tcp`) stay as they are. Tools that already speak ESPHome do not need this service. New tools should prefer `_shroomlabs._tcp`.
+## Endpoints
 
-## Status API
+- `GET /api/status` returns application/json. Versioned, read-only snapshot.
+- `GET /api/status/schema` returns a short description of the document: units, stage
+  names, chamber types, and the top-level field list.
+- `OPTIONS` on either path is allowed (CORS).
+- Any other method returns 405.
 
-`GET /api/status` returns `application/json`. Cache-Control is `no-store`.
+The document is open on the LAN even when the on-device UI or entity REST is
+passworded. It never includes secrets, Wi-Fi credentials, MAC addresses, claim
+codes, or customer names.
 
-`GET /api/status/schema` returns a compact field guide for the same keys.
+CORS is `Access-Control-Allow-Origin: *`.
 
-`OPTIONS` on both paths is allowed, for browser CORS preflight.
+## Units
 
-Any other method on those paths returns 405 with `Allow: GET, OPTIONS`. There is no write interface here. To change a target, use the existing ESPHome entity routes (and their auth) or the cloud inbox, not this API.
+Light mix is RGBA on a 0-100 scale, integers. `r`, `g`, and `b` are the color
+channels. `a` is the white channel, not opacity. This matches the 0-100 light mix
+in the device UI standard.
 
-### Auth and CORS
+Shrooly's white entity is stored as lux (0-4000). The API maps that onto 0-100
+with the same curve the site uses (`whiteLuxToPercent` in profile-schema.js):
+0-92 lux is linear to 0-20%; above that, percent = (lux / 0.02307) ^ (1/2.768),
+capped at 100. 4000 lux is about 78%. The raw lux value is also in `detail.white_lux`
+on Shrooly only. Lykyn already stores white as 0-100, so no conversion is applied.
 
-`GET /api/status` and `GET /api/status/schema` are open on the LAN, even when the web UI or entity REST API is passworded. The payload has no secrets, no Wi-Fi credentials, no MAC address, and no claim code.
+Temperature is Celsius. Humidity, fan speed, and light brightness are percent.
+Fan cycle timing is `every_min` (minutes between airings) and `run_s` (seconds
+the fans run each cycle).
 
-CORS allows GET from any origin (`Access-Control-Allow-Origin: *`, methods `GET, OPTIONS`).
+Missing values are JSON `null`. Keys are always present, so a client can rely on
+the shape.
 
-Do not put write actions on this path later without revisiting auth.
+## Document shape
 
-### JSON shape
-
-`api_version` is `1`. Top-level objects are always present.
-
-```
+```json
 {
   "api_version": 1,
-  "device": {
-    "type": "lykyn_chamber",
-    "model": "Lykyn",
-    "name": "lykyn",
-    "firmware": "0.2.0",
-    "uptime_s": 3600
-  },
-  "readings": {
-    "temperature_c": {"value": 21.40, "age_ms": 1200, "ts_unix": 1763236800},
-    "humidity_pct": {"value": 87.20, "age_ms": 1200, "ts_unix": 1763236800},
-    "fan_rpm": {"value": null, "age_ms": null, "ts_unix": null},
-    "co2_ppm": {"value": null, "age_ms": null, "ts_unix": null}
-  },
-  "targets": {
-    "temperature_c": 24.0,
-    "temperature_tolerance_c": 2.0,
-    "humidity_pct": 90.0,
-    "humidity_tolerance_pct": 3.0
+  "chamber_name": "Kitchen Lykyn",
+  "chamber_type": "lykyn_chamber",
+  "growing": {
+    "id": "black-oyster",
+    "name": "Black Oyster",
+    "image_url": "https://shroomlabs.io/img/species/species-oyster-640.webp"
   },
   "stage": {
-    "normalized": "colonization",
+    "name": "Colonization",
     "native": "Colonization"
   },
-  "light": {
-    "enabled": true,
-    "on": false,
-    "schedule": {"sunrise_hour": 8, "hours": 12},
-    "mix": {"r": 0, "g": 0, "b": 80, "white": 20, "brightness": 50},
-    "status": "off"
+  "temperature": {
+    "target_c": 24.0,
+    "tolerance_c": 2.0,
+    "actual_c": 21.4,
+    "age_ms": 800
   },
-  "fans": {
-    "in_pct": 0,
-    "out_pct": 0,
-    "speed_set_pct": 33,
-    "on": false,
-    "boost": false,
-    "status": "OFF"
+  "humidity": {
+    "target_pct": 90.0,
+    "tolerance_pct": 3.0,
+    "actual_pct": 87.2,
+    "age_ms": 800
   },
-  "humidifier": {
-    "on": false,
-    "level_pct": 40,
-    "status": "OFF"
-  },
-  "fae": {
+  "fan": {
+    "speed_pct": 33,
+    "actual_speed_pct": 0,
     "every_min": 30,
-    "run_s": 60,
-    "speed_pct": 33
+    "run_s": 60
   },
-  "climate": {
-    "mode": "SMART",
-    "fan_boost": false
-  },
-  "coach": {
-    "linked": true,
+  "light": {
+    "on": false,
     "enabled": true,
-    "remote_apply": true,
-    "state": "linked",
-    "last_check_in_age_s": null
+    "rgba": { "r": 0, "g": 0, "b": 80, "a": 20 },
+    "sunrise_hour": 8,
+    "hours": 12,
+    "brightness_pct": 60
   },
-  "health": {
-    "sensor_stale": false,
-    "wifi_connected": true,
-    "wifi_rssi_dbm": -52,
-    "errors": []
-  }
+  "detail": {},
+  "health": {}
 }
 ```
 
-### Field notes
+### Top-level fields
 
-- Temperatures are Celsius. Humidity and fan or light mix values are percent.
-- A reading's `age_ms` is milliseconds since the last good sensor sample, when the firmware tracks that. `ts_unix` is only set when the device clock is synced (SNTP). If the clock is not synced, `ts_unix` is `null`.
-- `stage.normalized` is one of: `colonization`, `pinning`, `fruiting`, `harvest`, `idle`, `custom`, `unknown`. `stage.native` is the device's own label. Lykyn uses `Colonization`. Shrooly uses `Colonizing`. Both normalize to `colonization`.
-- `light.mix` is the configured color mix, 0 to 100 per channel, plus brightness when the device has it.
-- `fans.boost` and `climate.fan_boost` are the firmware over-temperature or over-humidity boost (Lykyn). Devices without that loop report `null`.
-- `coach.state` is a short summary: `linked`, `enabled`, or `off`. Detailed claim-code state stays on `GET /cloud`, which may require a login. `last_check_in_age_s` is reserved. Version 1 reports `null` until firmware exposes a last successful telemetry time.
-- `health.errors` is an array of short strings. It is `[]` when there is nothing to report. The firmware does not include Wi-Fi SSIDs or addresses here.
-- `device.type` values in use: `shrooly_chamber`, `lykyn_chamber`. A new device picks a new `*_chamber` type and keeps the rest of the schema.
+- `chamber_name`: the user-facing name (ESPHome friendly name, else the hostname).
+- `chamber_type`: `shrooly_chamber` or `lykyn_chamber`.
+- `growing.id`: profile id (for example `black-oyster`). Null until the cloud
+  inbox includes `profile_id` (see below).
+- `growing.name`: display name (for example `Black Oyster`).
+- `growing.image_url`: public https image on shroomlabs.io. Null if unknown.
+- `stage.name`: one of `Colonization`, `Pinning`, `Fruiting`, `Custom`. Null when
+  the chamber is in a native-only state such as Idle or Harvest.
+- `stage.native`: the firmware's own stage string. Shrooly colonization is
+  `Colonizing`; the canonical name is still `Colonization`.
+- `temperature` / `humidity`: `target_*`, `tolerance_*`, `actual_*`, and `age_ms`
+  of the last good reading.
+- `fan.speed_pct`: the fresh-air speed setpoint, 0-100.
+- `fan.actual_speed_pct`: what the fans are doing now. On Lykyn this is the
+  higher of the inlet and outlet levels. On Shrooly it is the setpoint while a
+  cycle is running, otherwise 0.
+- `fan.every_min` / `fan.run_s`: the fresh-air cycle.
+- `light.on` / `light.enabled`: whether the schedule currently has the lights on,
+  and whether the light output is enabled at all.
+- `light.rgba`: the mix, 0-100, `a` = white.
+- `light.sunrise_hour` / `light.hours` / `light.brightness_pct`: schedule and
+  overall brightness. Brightness is omitted as null on chambers that have no
+  separate brightness knob (Shrooly).
+- `detail`: mechanism only. Coach and Muse should not need it. Includes model,
+  firmware, uptime, per-fan levels, fan boost, humidifier/mister state, climate
+  mode, coach link flags, wifi RSSI, and (on Shrooly) raw `white_lux`.
+- `health`: `sensor_stale`, `wifi_connected`, and `errors` (an array of strings).
 
-## For a new device
+## Grow identity
 
-1. Advertise `_shroomlabs._tcp` on port 80 with the TXT keys above (`api=1`, `path=/api/status`).
-2. Serve `GET /api/status` and `GET /api/status/schema` with the JSON in this document. Leave unused readings and knobs as `null`.
-3. Keep the endpoint read-only and free of secrets. Allow CORS for GET.
-4. Reuse the shared component when the device is ESPHome-based: `shroom_labs_local_api` in this repository (OpenShrooly `esphome/external_components/shroom_labs_local_api`, copied into lykyn-firmware `external_components/shroom_labs_local_api`). Keep the two copies in sync. The JSON builder in `status_json.cpp` is the schema implementation, and the host test should pass in both repos.
+When a grow is applied from the cloud inbox, firmware stores the profile id
+(when present), the display name, and the image URL in NVS so they survive a
+reboot and a temporary unlink. The same fields are used if a later local apply
+path writes them.
+
+The inbox already sends `grow_name`, `grow_url`, and `grow_image` (see
+`community/api/src/chamber-grow.js`). It does not yet send `profile_id`. Needed
+cloud change, not done in this firmware work: add `profile_id` to the object
+`chamberGrow()` returns, and include that key in the inbox body. Until that
+ships, `growing.id` stays null even when the name and image are present.
 
 ## What this is not
 
-- Not a substitute for Coach or the cloud inbox.
-- Not a write API. Do not send setpoints here.
-- Not a replacement for Home Assistant or the ESPHome native API.
-- Not reachable off the LAN. There is no authentication because the payload is intentionally boring, so do not port-forward it.
+This API does not accept writes. Setpoints still go through the on-device page,
+the cloud, or ESPHome's own (often passworded) entity REST.
+
+`GET /cloud` and `GET /grow` remain cloud-link helpers. They are not this
+status document. `/cloud` can include a claim code and should be treated as
+sensitive.
+
+Lykyn still has a compact `Status JSON` text sensor at
+`GET /text_sensor/Status%20JSON`. That blob is unversioned, sits behind basic
+auth on private builds, and is not the contract in-network tools should use.

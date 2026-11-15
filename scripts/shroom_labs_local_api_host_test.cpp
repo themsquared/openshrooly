@@ -1,15 +1,11 @@
 #include "status_json.h"
 #include "status_paths.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
-
-using sl_local::Snapshot;
-using sl_local::status_json;
-using sl_local::status_schema_json;
-using sl_local::normalize_stage;
 
 static int failed = 0;
 
@@ -24,47 +20,55 @@ static bool contains(const std::string &hay, const char *needle) {
   return hay.find(needle) != std::string::npos;
 }
 
-static void test_paths() {
-  expect(sl_local::status_url("/api/status"), "owns /api/status");
-  expect(sl_local::schema_url("/api/status/schema"), "owns schema");
-  expect(sl_local::owns_url("/api/status"), "owns_url status");
-  expect(sl_local::owns_url("/api/status/schema"), "owns_url schema");
-  expect(!sl_local::owns_url("/api"), "does not own /api");
-  expect(!sl_local::owns_url("/api/status/"), "does not own trailing slash");
-  expect(!sl_local::owns_url("/api/status/extra"), "does not own extra segment");
-  expect(!sl_local::owns_url("/cloud"), "does not own /cloud");
-  expect(!sl_local::owns_url("/text_sensor/status_json"), "does not own entity route");
-  expect(!sl_local::owns_url(nullptr), "null url");
-}
+static bool excludes(const std::string &hay, const char *needle) { return !contains(hay, needle); }
 
-static void test_stages() {
-  expect(std::strcmp(normalize_stage("Colonization"), "colonization") == 0, "Lykyn Colonization");
-  expect(std::strcmp(normalize_stage("Colonizing"), "colonization") == 0, "Shrooly Colonizing");
-  expect(std::strcmp(normalize_stage("colonizing"), "colonization") == 0, "case insensitive");
-  expect(std::strcmp(normalize_stage("Pinning"), "pinning") == 0, "Pinning");
-  expect(std::strcmp(normalize_stage("Fruiting"), "fruiting") == 0, "Fruiting");
-  expect(std::strcmp(normalize_stage("Harvest"), "harvest") == 0, "Harvest");
-  expect(std::strcmp(normalize_stage("Idle"), "idle") == 0, "Idle");
-  expect(std::strcmp(normalize_stage("Custom"), "custom") == 0, "Custom");
-  expect(std::strcmp(normalize_stage("SomethingElse"), "unknown") == 0, "unknown native");
-  expect(std::strcmp(normalize_stage(""), "unknown") == 0, "empty");
-  expect(std::strcmp(normalize_stage(nullptr), "unknown") == 0, "null native");
-}
+int main() {
+  expect(sl_local::status_url("/api/status"), "status path");
+  expect(sl_local::schema_url("/api/status/schema"), "schema path");
+  expect(sl_local::owns_url("/api/status") && sl_local::owns_url("/api/status/schema"), "owns both");
+  expect(!sl_local::owns_url("/api/status/"), "no trailing slash");
+  expect(!sl_local::owns_url("/cloud") && !sl_local::owns_url("/grow"), "cloud helpers are not this API");
+  expect(!sl_local::owns_url("/text_sensor/Status%20JSON"), "legacy status json is not this API");
 
-static Snapshot lykyn_colonization() {
-  Snapshot s;
+  expect(std::strcmp(sl_local::canonical_stage("Colonization"), "Colonization") == 0, "Colonization");
+  expect(std::strcmp(sl_local::canonical_stage("colonization"), "Colonization") == 0, "colonization");
+  expect(std::strcmp(sl_local::canonical_stage("Colonizing"), "Colonization") == 0, "Colonizing");
+  expect(std::strcmp(sl_local::canonical_stage("colonizing"), "Colonization") == 0, "colonizing");
+  expect(std::strcmp(sl_local::canonical_stage("Pinning"), "Pinning") == 0, "Pinning");
+  expect(std::strcmp(sl_local::canonical_stage("fruiting"), "Fruiting") == 0, "fruiting");
+  expect(std::strcmp(sl_local::canonical_stage("Custom"), "Custom") == 0, "Custom");
+  expect(sl_local::canonical_stage("Idle") == nullptr, "Idle is not canonical");
+  expect(sl_local::canonical_stage("Harvest") == nullptr, "Harvest is not canonical");
+  expect(sl_local::canonical_stage("") == nullptr, "empty stage");
+  expect(sl_local::canonical_stage(nullptr) == nullptr, "null stage");
+
+  expect(sl_local::white_lux_to_percent(0) == 0, "0 lux");
+  expect(std::fabs(sl_local::white_lux_to_percent(92) - 20.0f) < 0.01f, "92 lux is 20%");
+  expect(std::lroundf(sl_local::white_lux_to_percent(150)) == 24, "150 lux is 24%");
+  expect(std::lroundf(sl_local::white_lux_to_percent(4000)) == 78, "4000 lux is 78%");
+  expect(sl_local::white_lux_to_percent(8000) <= 100.0f, "lux cap");
+
+  expect(sl_local::escape_json("A\"B\\C") == "A\\\"B\\\\C", "escape quotes and slashes");
+  expect(sl_local::escape_json("ok") == "ok", "plain text");
+
+  sl_local::Snapshot s;
   s.device_type = "lykyn_chamber";
   s.model = "Lykyn";
-  s.name = "lykyn";
+  s.name = "Kitchen Lykyn";
   s.firmware = "0.2.0";
   s.uptime_s.has = true;
   s.uptime_s.value = 3600;
+  s.growing_id = "black-oyster";
+  s.growing_name = "Black Oyster";
+  s.growing_image_url = "https://shroomlabs.io/img/species/species-oyster-640.webp";
+  s.stage_native.has = true;
+  s.stage_native.value = "Colonization";
   s.temperature_c.value.has = true;
-  s.temperature_c.value.value = 24.15f;
+  s.temperature_c.value.value = 21.4f;
   s.temperature_c.age_ms.has = true;
   s.temperature_c.age_ms.value = 800;
   s.humidity_pct.value.has = true;
-  s.humidity_pct.value.value = 89.6f;
+  s.humidity_pct.value.value = 87.2f;
   s.humidity_pct.age_ms.has = true;
   s.humidity_pct.age_ms.value = 800;
   s.temperature_target_c.has = true;
@@ -75,105 +79,124 @@ static Snapshot lykyn_colonization() {
   s.humidity_target_pct.value = 90.0f;
   s.humidity_tolerance_pct.has = true;
   s.humidity_tolerance_pct.value = 3.0f;
-  s.stage_native.has = true;
-  s.stage_native.value = "Colonization";
-  s.light_enabled.has = true;
-  s.light_enabled.value = true;
+  s.fae_speed_pct.has = true;
+  s.fae_speed_pct.value = 33;
+  s.fan_in_pct.has = true;
+  s.fan_in_pct.value = 0;
+  s.fan_out_pct.has = true;
+  s.fan_out_pct.value = 0;
+  s.fae_every_min.has = true;
+  s.fae_every_min.value = 30;
+  s.fae_run_s.has = true;
+  s.fae_run_s.value = 60;
   s.light_on.has = true;
   s.light_on.value = false;
+  s.light_enabled.has = true;
+  s.light_enabled.value = true;
+  s.light_r.has = true;
+  s.light_r.value = 0;
+  s.light_g.has = true;
+  s.light_g.value = 0;
+  s.light_b.has = true;
+  s.light_b.value = 80;
+  s.light_white.has = true;
+  s.light_white.value = 20;
   s.sunrise_hour.has = true;
   s.sunrise_hour.value = 8;
   s.light_hours.has = true;
-  s.light_hours.value = 0;
-  s.fan_boost.has = true;
-  s.fan_boost.value = false;
-  s.climate_mode.has = true;
-  s.climate_mode.value = "SMART";
-  s.coach_linked.has = true;
-  s.coach_linked.value = true;
-  s.coach_enabled.has = true;
-  s.coach_enabled.value = true;
-  s.coach_remote_apply.has = true;
-  s.coach_remote_apply.value = true;
-  s.coach_state.has = true;
-  s.coach_state.value = "linked";
+  s.light_hours.value = 12;
+  s.light_brightness.has = true;
+  s.light_brightness.value = 60;
   s.sensor_stale.has = true;
   s.sensor_stale.value = false;
   s.wifi_connected.has = true;
   s.wifi_connected.value = true;
   s.wifi_rssi_dbm.has = true;
   s.wifi_rssi_dbm.value = -52;
-  return s;
-}
+  s.coach_linked.has = true;
+  s.coach_linked.value = true;
 
-static void test_lykyn_json() {
-  const std::string js = status_json(lykyn_colonization());
-  expect(contains(js, "\"api_version\":1"), "api_version 1");
-  expect(contains(js, "\"type\":\"lykyn_chamber\""), "type");
-  expect(contains(js, "\"normalized\":\"colonization\""), "normalized colonization");
-  expect(contains(js, "\"native\":\"Colonization\""), "native Colonization");
-  expect(contains(js, "\"humidity_pct\":{\"value\":89.60"), "humidity value");
-  expect(contains(js, "\"age_ms\":800"), "age_ms");
-  expect(contains(js, "\"ts_unix\":null"), "no clock, ts_unix null");
-  expect(contains(js, "\"fan_rpm\":{\"value\":null"), "missing fan_rpm is null");
-  expect(contains(js, "\"co2_ppm\":{\"value\":null"), "missing co2 is null");
-  expect(contains(js, "\"last_check_in_age_s\":null"), "reserved last check-in is null");
-  expect(contains(js, "\"fan_boost\":false"), "fan_boost false");
-  expect(contains(js, "\"errors\":[]"), "no errors");
-  expect(!contains(js, "mac"), "no mac key");
-  expect(!contains(js, "ssid"), "no ssid");
-  expect(!contains(js, "password"), "no password");
-  expect(!contains(js, "claim_code"), "no claim code");
-  expect(!contains(js, "-----BEGIN"), "no pem");
-}
+  const std::string js = sl_local::status_json(s);
+  expect(contains(js, "\"api_version\":1"), "api version");
+  expect(contains(js, "\"chamber_name\":\"Kitchen Lykyn\""), "chamber name");
+  expect(contains(js, "\"chamber_type\":\"lykyn_chamber\""), "chamber type");
+  expect(contains(js, "\"id\":\"black-oyster\""), "growing id");
+  expect(contains(js, "\"name\":\"Black Oyster\""), "growing name");
+  expect(contains(js, "\"image_url\":\"https://shroomlabs.io/img/species/species-oyster-640.webp\""), "image");
+  expect(contains(js, "\"stage\":{\"name\":\"Colonization\",\"native\":\"Colonization\"}"), "stage");
+  expect(contains(js, "\"target_c\":24.0"), "temp target");
+  expect(contains(js, "\"actual_c\":21.4"), "temp actual");
+  expect(contains(js, "\"target_pct\":90.0"), "rh target");
+  expect(contains(js, "\"actual_pct\":87.2"), "rh actual");
+  expect(contains(js, "\"speed_pct\":33"), "fan speed");
+  expect(contains(js, "\"actual_speed_pct\":0"), "fan actual");
+  expect(contains(js, "\"every_min\":30"), "fae period");
+  expect(contains(js, "\"run_s\":60"), "fae run");
+  expect(contains(js, "\"rgba\":{\"r\":0,\"g\":0,\"b\":80,\"a\":20}"), "rgba 0-100");
+  expect(contains(js, "\"brightness_pct\":60"), "brightness");
+  expect(contains(js, "\"coach_linked\":true"), "coach in detail");
+  expect(contains(js, "\"wifi_rssi_dbm\":-52"), "rssi in detail");
+  expect(contains(js, "\"errors\":[]"), "empty errors");
+  expect(excludes(js, "mac"), "no mac");
+  expect(excludes(js, "ssid"), "no ssid");
+  expect(excludes(js, "password"), "no password");
+  expect(excludes(js, "claim_code"), "no claim code");
+  expect(excludes(js, "\"readings\""), "old readings block gone");
+  expect(excludes(js, "\"targets\""), "old targets block gone");
+  expect(excludes(js, "\"device\":"), "old device block gone");
 
-static void test_shrooly_stage_and_escape() {
-  Snapshot s;
-  s.device_type = "shrooly_chamber";
-  s.model = "OpenShrooly";
-  s.name = "openshrooly";
-  s.firmware = "1.0.6-sl.2";
-  s.stage_native.has = true;
-  s.stage_native.value = "Colonizing";
-  s.health_errors.has = true;
-  s.health_errors.value = "sensor \"A\" offline";
-  const std::string js = status_json(s);
-  expect(contains(js, "\"normalized\":\"colonization\""), "Shrooly Colonizing normalizes");
-  expect(contains(js, "\"native\":\"Colonizing\""), "Shrooly native kept");
-  expect(contains(js, "\"type\":\"shrooly_chamber\""), "shrooly type");
-  expect(contains(js, "sensor \\\"A\\\" offline"), "errors are escaped");
-  expect(contains(js, "\"errors\":[\"sensor \\\"A\\\" offline\"]"), "plain error becomes array");
-}
+  sl_local::Snapshot idle;
+  idle.stage_native.has = true;
+  idle.stage_native.value = "Idle";
+  const std::string idle_js = sl_local::status_json(idle);
+  expect(contains(idle_js, "\"name\":null"), "Idle has null canonical name");
+  expect(contains(idle_js, "\"native\":\"Idle\""), "Idle keeps native");
+  expect(contains(idle_js, "\"growing\":{\"id\":null,\"name\":null,\"image_url\":null}"), "empty growing");
+  expect(contains(idle_js, "\"rgba\":null"), "no light mix");
 
-static void test_nan_and_schema() {
-  Snapshot s;
-  s.device_type = "lykyn_chamber";
-  s.model = "Lykyn";
-  s.name = "lykyn";
-  s.firmware = "0.2.0";
-  s.temperature_c.value.has = true;
-  s.temperature_c.value.value = 0.0f / 0.0f;  // NaN
-  const std::string js = status_json(s);
-  expect(contains(js, "\"temperature_c\":{\"value\":null"), "NaN reading is null");
-  expect(!contains(js, "nan"), "no nan token");
-  expect(!contains(js, "NaN"), "no NaN token");
+  sl_local::Snapshot sh;
+  sh.device_type = "shrooly_chamber";
+  sh.name = "OpenShrooly";
+  sh.stage_native.has = true;
+  sh.stage_native.value = "Colonizing";
+  sh.light_r.has = true;
+  sh.light_r.value = 0;
+  sh.light_g.has = true;
+  sh.light_g.value = 0;
+  sh.light_b.has = true;
+  sh.light_b.value = 80;
+  sh.light_white.has = true;
+  sh.light_white.value = 150;  // lux
+  sh.light_white_is_lux = true;
+  sh.fae_speed_pct.has = true;
+  sh.fae_speed_pct.value = 40;
+  sh.fan_on.has = true;
+  sh.fan_on.value = false;
+  const std::string sh_js = sl_local::status_json(sh);
+  expect(contains(sh_js, "\"name\":\"Colonization\",\"native\":\"Colonizing\""), "Shrooly stage map");
+  expect(contains(sh_js, "\"rgba\":{\"r\":0,\"g\":0,\"b\":80,\"a\":24}"), "Shrooly 150 lux -> 24");
+  expect(contains(sh_js, "\"white_lux\":150"), "raw lux in detail");
+  expect(contains(sh_js, "\"actual_speed_pct\":0"), "Shrooly actual is 0 when FAE is off");
 
-  const char *schema = status_schema_json();
-  expect(schema != nullptr && std::strstr(schema, "\"api_version\":1") != nullptr, "schema api_version");
-  expect(std::strstr(schema, "last_check_in_age_s") != nullptr, "schema mentions last check-in");
-  expect(std::strstr(schema, "read_only") != nullptr, "schema says read_only");
-}
+  sh.fan_on.value = true;
+  const std::string sh_on = sl_local::status_json(sh);
+  expect(contains(sh_on, "\"actual_speed_pct\":40"), "Shrooly actual follows setpoint when FAE is on");
 
-int main() {
-  test_paths();
-  test_stages();
-  test_lykyn_json();
-  test_shrooly_stage_and_escape();
-  test_nan_and_schema();
-  if (failed != 0) {
+  sl_local::Snapshot nan;
+  nan.temperature_c.value.has = true;
+  nan.temperature_c.value.value = NAN;
+  const std::string nan_js = sl_local::status_json(nan);
+  expect(contains(nan_js, "\"actual_c\":null"), "NaN becomes null");
+
+  const char *schema = sl_local::status_schema_json();
+  expect(contains(schema, "0-100"), "schema documents 0-100");
+  expect(contains(schema, "Colonization"), "schema lists stages");
+  expect(contains(schema, "lykyn_chamber"), "schema lists types");
+
+  if (failed) {
     std::fprintf(stderr, "%d checks failed\n", failed);
     return 1;
   }
-  std::puts("shroom_labs_local_api host tests passed");
+  std::printf("ok\n");
   return 0;
 }

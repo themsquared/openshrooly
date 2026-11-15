@@ -90,6 +90,7 @@ class ShroomLabsLocalApi : public Component {
   void set_fan_boost(bool *v) { fan_boost_ = v; }
   void set_fan_in_pct(float *v) { fan_in_pct_ = v; }
   void set_fan_out_pct(float *v) { fan_out_pct_ = v; }
+  void set_light_white_is_lux(bool v) { light_white_is_lux_ = v; }
 
   std::string status_body() const;
 
@@ -143,6 +144,7 @@ class ShroomLabsLocalApi : public Component {
   bool *fan_boost_{nullptr};
   float *fan_in_pct_{nullptr};
   float *fan_out_pct_{nullptr};
+  bool light_white_is_lux_{false};
 };
 
 }  // namespace shroom_labs_local_api

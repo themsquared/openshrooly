@@ -29,6 +29,7 @@ shroom_labs_local_api:
   light_g: color_g
   light_b: color_b
   light_white: white_intensity
+  light_white_is_lux: true
   light_on: grow_lights_on
   light_status: lights_status
   humidifier_on: humidifier_on

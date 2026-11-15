@@ -224,7 +224,13 @@ std::string ShroomLabsLocalApi::status_body() const {
   snap.device_type = this->device_type_;
   snap.model = this->model_;
   snap.name = App.get_name();
+  {
+    const auto friendly = App.get_friendly_name();
+    if (friendly.size() > 0)
+      snap.name.assign(friendly.c_str(), friendly.size());
+  }
   snap.firmware = this->firmware_;
+  snap.light_white_is_lux = this->light_white_is_lux_;
   snap.uptime_s.has = true;
   snap.uptime_s.value = millis() / 1000;
 
@@ -310,6 +316,9 @@ std::string ShroomLabsLocalApi::status_body() const {
       snap.coach_state.value = "enabled";
     else
       snap.coach_state.value = "off";
+    snap.growing_id = this->cloud_->grow_id();
+    snap.growing_name = this->cloud_->grow_name();
+    snap.growing_image_url = this->cloud_->grow_image_url();
   }
 #endif
 

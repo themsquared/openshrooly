@@ -64,6 +64,7 @@ CONF_SENSOR_STALE_AFTER_MS = "sensor_stale_after_ms"
 CONF_FAN_BOOST = "fan_boost"
 CONF_FAN_IN_PCT = "fan_in_pct"
 CONF_FAN_OUT_PCT = "fan_out_pct"
+CONF_LIGHT_WHITE_IS_LUX = "light_white_is_lux"
 
 SENSOR_KEYS = {
     CONF_TEMPERATURE: "set_temperature",
@@ -138,6 +139,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FAN_BOOST): _global_id,
         cv.Optional(CONF_FAN_IN_PCT): _global_id,
         cv.Optional(CONF_FAN_OUT_PCT): _global_id,
+        cv.Optional(CONF_LIGHT_WHITE_IS_LUX, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -180,3 +182,4 @@ async def to_code(config):
         cg.add(var.set_fan_in_pct(cg.RawExpression(f"&id({config[CONF_FAN_IN_PCT]})")))
     if CONF_FAN_OUT_PCT in config:
         cg.add(var.set_fan_out_pct(cg.RawExpression(f"&id({config[CONF_FAN_OUT_PCT]})")))
+    cg.add(var.set_light_white_is_lux(config[CONF_LIGHT_WHITE_IS_LUX]))
