@@ -1212,7 +1212,9 @@ select {
 
 /* Stage picker: the same four buttons on every chamber. */
 .stage-picker {
-  margin: 0 0 16px;
+  max-width: var(--sl-max);
+  margin: 0 auto 14px;
+  width: calc(100% - 32px);
 }
 
 .stage-picker-row {
