@@ -43,11 +43,16 @@ const TYPES = {
   },
 };
 
-/** The shared scale's percent at which a lux chamber reaches its 4000 lux maximum. */
-const WHITE_MAX_PERCENT = 79
+/** A percent for people: whole numbers stay whole, otherwise one decimal. */
+export function formatPercent(value) {
+  const n = Math.round(Number(value) * 10) / 10;
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+const LUX_WHITE_NOTE = "100% is the brightest white this chamber makes. Percent means the same share of the maximum on every chamber.";
 
 const PERCENT_WHITE_NOTE =
-  "The ring mixes the colors below. White is added on top of red, green and blue, so blue 80 with white 20 is full blue. Raise white and lower blue to move toward white light.";
+  "100% is the full ring. The ring mixes the colors below. White is added on top of red, green and blue, so blue 80 with white 20 is full blue. Raise white and lower blue to move toward white light.";
 
 export function deviceTypeLabel(type) {
   const id = String(type || DEFAULT_DEVICE_TYPE);
@@ -85,17 +90,12 @@ export function deviceAdapter(device = {}) {
       percent: percentWhite,
       label: percentWhite ? "White added to each color (%)" : "White brightness (%)",
       /** One plain line under the white box, or "" when there is nothing to say. */
-      note: percentWhite ? PERCENT_WHITE_NOTE : "",
-      /**
-       * One line under the white box when the chamber can't go brighter than a percent below 100,
-       * else "". A lux chamber tops out at 4000 lux, about 79 percent of the shared scale.
-       */
-      preview: (percent) => (!percentWhite && Number(percent) >= WHITE_MAX_PERCENT ? "At this setting the chamber is at its brightest." : ""),
-      /** A knob value as a percent: "20%". A lux chamber's figure is converted here, nowhere else. */
-      describe: (raw) => `${percentWhite ? Math.round(Number(raw)) : Math.round(whiteLuxToPercent(raw))}%`,
-      /** Percent from a lux figure the cloud sent (a chamber reading or a recipe). */
-      fromLux: (lux) => Math.round(whiteLuxToPercent(lux)),
-      percentFromRecipeLux: (lux) => Math.round(whiteLuxToPercent(lux)),
+      note: percentWhite ? PERCENT_WHITE_NOTE : LUX_WHITE_NOTE,
+      /** A knob value as a percent of this chamber's maximum: "2.3%". A lux chamber's figure is converted here, nowhere else. */
+      describe: (raw) => `${formatPercent(percentWhite ? raw : whiteLuxToPercent(raw))}%`,
+      /** Percent from a lux figure the cloud sent (a chamber reading or a recipe): its share of the 4000 lux maximum. */
+      fromLux: (lux) => whiteLuxToPercent(lux),
+      percentFromRecipeLux: (lux) => whiteLuxToPercent(lux),
     },
   };
 }

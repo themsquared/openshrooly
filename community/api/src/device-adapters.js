@@ -8,7 +8,13 @@
  * fills in what the chamber has not said.
  */
 
-import { whiteLuxToPercent, whitePercentToLux } from "./profile-schema.js";
+import { roundPercent, whiteLuxToPercent, whitePercentToLux } from "./profile-schema.js";
+
+/** A percent for people: whole numbers stay whole, otherwise one decimal. */
+export function formatPercent(value) {
+  const n = Math.round(Number(value) * 10) / 10;
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
 
 /** The four stages every chamber shares, in the order the pages show them. */
 export const CANONICAL_STAGES = ["Colonization", "Pinning", "Fruiting", "Custom"];
@@ -55,7 +61,7 @@ const TYPES = {
     nativeName: {},
     whiteScale: "percent",
     // Used until the chamber reports its own ranges: the fan never runs below 33%, and white is 0-100%.
-    knobRanges: { air_exchange_speed: [33, 100, 1], white_intensity: [0, 100, 1] },
+    knobRanges: { air_exchange_speed: [33, 100, 1], white_intensity: [0, 100, 0.1] },
   },
 };
 
@@ -152,14 +158,14 @@ export function deviceAdapter(source = {}) {
       fromPercent: (p) => (percent ? p : whitePercentToLux(p)),
       /** Knob value for a lux figure from a profile. */
       fromLux: (lux) => (percent ? whiteLuxToPercent(lux) : lux),
-      /** Percent for a recipe's lux figure. Recipes are written in lux whatever the chamber. */
-      percentFromRecipeLux: (lux) => Math.round(whiteLuxToPercent(lux)),
+      /** Percent for a recipe's lux figure: the share of the 4000 lux maximum. Recipes are written in lux whatever the chamber. */
+      percentFromRecipeLux: (lux) => whiteLuxToPercent(lux),
       /** Percent for a knob value the chamber reported. */
-      toPercent: (raw) => (percent ? raw : whiteLuxToPercent(raw)),
+      toPercent: (raw) => (percent ? roundPercent(raw) : whiteLuxToPercent(raw)),
       /** Lux for a knob value the chamber reported. */
       toLux: (raw) => (percent ? whitePercentToLux(raw) : raw),
-      /** Plain words for a knob value. Always percent: a lux chamber's figure is converted here and nowhere else. */
-      describe: (raw) => `white ${Math.round(percent ? raw : whiteLuxToPercent(raw))}%`,
+      /** Plain words for a knob value. Always percent of that chamber's maximum, to one decimal. */
+      describe: (raw) => `white ${formatPercent(percent ? raw : whiteLuxToPercent(raw))}%`,
     },
   };
 }

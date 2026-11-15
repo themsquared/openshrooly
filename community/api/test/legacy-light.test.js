@@ -43,12 +43,12 @@ function stage(doc, id) {
   return doc.stages.find((s) => s.id === id);
 }
 
-test("white percent to lux follows the firmware curve, same as mapping.py", () => {
-  const points = { 0: 0, 10: 46, 20: 92, 26: 190, 37: 506, 51: 1229, 78: 3984, 79: 4000, 100: 4000 };
+test("white percent to lux is linear to 4000 lux at 100%, same as mapping.py", () => {
+  const points = { 0: 0, 1: 40, 2.3: 92, 10: 400, 50: 2000, 78: 3120, 79: 3160, 100: 4000, 150: 4000 };
   for (const [pct, lux] of Object.entries(points)) assert.equal(whitePercentToLux(Number(pct)), lux, `${pct}%`);
-  assert.equal(whiteLuxToPercent(92), 20);
-  assert.equal(Math.round(whiteLuxToPercent(whitePercentToLux(37))), 37);
-  assert.ok(whiteLuxToPercent(4000) > 78 && whiteLuxToPercent(4000) < 78.5);
+  assert.equal(whiteLuxToPercent(92), 2.3);
+  assert.equal(whiteLuxToPercent(4000), 100);
+  assert.equal(whiteLuxToPercent(9000), 100);
   const synced = syncStageLightFromRecipe(structuredClone(pearl));
   assert.equal(stage(synced, "fruiting").light.white_led_lux, 92);
   assert.equal(stage(synced, "fruiting").light.white_led_lux, stage(pearl, "fruiting").light.white_led_lux);
@@ -73,7 +73,7 @@ test("stored legacy light reads as dark or 12 h, and saves stay strict", () => {
   assert.equal(read.light_recipe.phases.fruiting.photoperiod_hours, 12);
   assert.deepEqual(read.light_recipe.phases.pinning, {
     photoperiod_hours: 12,
-    white_brightness_percent: 20,
+    white_brightness_percent: 2.3,
     red_percent: 0,
     green_percent: 0,
     blue_percent: 80,

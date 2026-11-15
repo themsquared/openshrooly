@@ -307,7 +307,7 @@ test("a 1.0.5 chamber gets fan, fresh air, light in %, and its phase", async () 
     firmware: "1.0.5-sl.1",
     controls: SL5_CONTROLS,
     chamber: { air_exchange_period_min: 20, air_exchange_run_sec: 60, grow_phase: "Pinning", grow_day: 9 },
-    chamber_light: { sunrise_hour: 7, duration_hours: 12, white_led_lux: 1165, white_percent: 50, red_percent: 0, green_percent: 0, blue_percent: 80 },
+    chamber_light: { sunrise_hour: 7, duration_hours: 12, white_led_lux: 2000, white_percent: 50, red_percent: 0, green_percent: 0, blue_percent: 80 },
   };
   const html = renderControls(device, { canWrite: true });
   assert.match(tagFor(html, "air_exchange_period_min"), /value="20"/);
@@ -319,9 +319,11 @@ test("a 1.0.5 chamber gets fan, fresh air, light in %, and its phase", async () 
   for (const action of ["air", "light", "stage"]) assert.match(html, new RegExp(`data-action="${action}"`));
   assert.doesNotMatch(html, /Fan period and run time stay on the chamber/);
   assert.doesNotMatch(html, /on the chamber itself for now/);
-  assert.equal(deviceAdapter({}).white.preview(20), "");
-  assert.match(deviceAdapter({}).white.preview(100), /brightest/);
-  assert.equal(deviceAdapter({ device_type: "lykyn_chamber" }).white.preview(100), "");
+  assert.match(deviceAdapter({}).white.note, /100% is the brightest white this chamber makes/);
+  assert.match(deviceAdapter({ device_type: "lykyn_chamber" }).white.note, /100% is the full ring/);
+  assert.equal(deviceAdapter({}).white.fromLux(92), 2.3);
+  assert.equal(deviceAdapter({}).white.fromLux(4000), 100, "no cap below 100%");
+  assert.equal(deviceAdapter({}).white.describe(92), "2.3%");
   assert.doesNotMatch(html, DASH);
   assert.match(html, /<option value="Colonization">/);
   assert.doesNotMatch(html, /Colonizing/);
@@ -592,7 +594,7 @@ test("Autopilot log line names every knob it moved", async () => {
       white_intensity: 90,
       grow_phase: "Pinning",
     }),
-    "Set 23 °C, 93% RH, fan 30%, fresh air 35 s every 15 min, light 12 h at 20% and phase Pinning"
+    "Set 23 °C, 93% RH, fan 30%, fresh air 35 s every 15 min, light 12 h at 2.3% and phase Pinning"
   );
   assert.match(autopilotSummary({ light_hours: 12, white_intensity: 20 }, { device_type: "lykyn_chamber" }), /light 12 h at 20%/);
 });
@@ -623,14 +625,16 @@ test("Shrooly light controls show white in percent, with no lux anywhere", () =>
     ...pearl,
     capabilities: { knob_ranges: { white_intensity: [0, 4000, 5] } },
     controls: { light: { supported: true, schedule: true, color: true } },
-    chamber_light: { sunrise_hour: 8, duration_hours: 12, white_percent: 20, white_led_lux: 92, red_percent: 0, green_percent: 0, blue_percent: 80 },
+    chamber_light: { sunrise_hour: 8, duration_hours: 12, white_percent: 2.3, white_led_lux: 92, red_percent: 0, green_percent: 0, blue_percent: 80 },
     coach: { mode: "advisor", status: "advisor" },
   };
   assert.equal(deviceAdapter(shrooly).white.percent, false);
   assert.equal(deviceAdapter({}).white.percent, false);
   const html = renderControls(shrooly, { profiles: [pearl.profile], canWrite: true, showCoach: true });
   assert.match(html, /White brightness \(%\)/);
-  assert.match(html, /data-white-note/);
+  assert.match(html, /100% is the brightest white this chamber makes/);
+  assert.doesNotMatch(html, /data-white-note/);
   assert.doesNotMatch(html, /lux/i);
-  assert.match(html, /name="white_percent"[^>]*value="20"/);
+  assert.match(html, /name="white_percent"[^>]*value="2.3"/);
+  assert.match(html, /name="white_percent"[^>]*step="0.1"/);
 });

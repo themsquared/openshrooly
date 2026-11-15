@@ -116,7 +116,7 @@ test("chamber cards show status, growing, readings against targets, check-in, an
   assert.match(html, /20.3 °C/);
   assert.match(html, /set 17 °C, recipe 15 to 18 °C/);
   assert.match(html, /Fan/);
-  assert.match(html, /10 h, 26% white/);
+  assert.match(html, /10 h, 5% white/);
   assert.match(html, /Paused. The chamber looks offline./);
   assert.match(html, /data-mode="autopilot"/);
   assert.doesNotMatch(html, DASHES);

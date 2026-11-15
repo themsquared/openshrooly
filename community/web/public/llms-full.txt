@@ -2213,15 +2213,15 @@ A: Long stems, small caps, and oyster clusters that look like coral or trumpets.
 
 URL: https://shroomlabs.io/profiles/beech-shimeji
 Species: Hypsizygus tessulatus
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Beech / Buna Shimeji (Hypsizygus tessulatus), also called brown beech mushroom or buna shimeji, takes about 40 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 90% humidity with moderate fresh air and 12 h of light a day. Clustered beech mushroom. Cool, humid, and a little less fresh air than oysters.
 
 ### Conditions by stage
 
 - Colonization: 21 days, 22 °C (72 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 7 days, 16 °C (61 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 12 days, 15 °C (59 °F), 90% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 7 days, 16 °C (61 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 12 days, 15 °C (59 °F), 90% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### FAQ
 
@@ -2235,7 +2235,7 @@ Q: How long does Beech / Buna Shimeji take to grow?
 A: About 40 days with this profile: 21 days of colonization, 7 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Beech / Buna Shimeji need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Beech / Buna Shimeji need?
 A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization runs with little fresh air.
@@ -2246,15 +2246,15 @@ A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/black-oyster
 Species: Pleurotus ostreatus
-Updated: 2026-10-30
+Updated: 2026-11-15
 
 Black Oyster (Pleurotus ostreatus) takes about 28 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with plenty of fresh air and 12 h of light a day. Dark-capped oyster strain. Cool fruiting and plenty of fresh air keep caps dark and stems short.
 
 ### Conditions by stage
 
 - Colonization: 14 days, 24 °C (75 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 5 days, 17 °C (63 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 9 days, 16 °C (61 °F), 88% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. Cooler fruiting keeps caps darker.
+- Pinning: 5 days, 17 °C (63 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 9 days, 16 °C (61 °F), 88% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 2.3%, blue 80%. Cooler fruiting keeps caps darker.
 
 ### Notes
 
@@ -2272,7 +2272,7 @@ Q: How long does Black Oyster take to grow?
 A: About 28 days with this profile: 14 days of colonization, 5 days of pinning, 9 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Black Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Black Oyster need?
 A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
@@ -2286,15 +2286,15 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/blue-oyster
 Species: Pleurotus ostreatus var. columbinus
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Blue Oyster (Pleurotus ostreatus var. columbinus), also called Pleurotus columbinus, takes about 25 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Cool-preferring oyster. Deep color holds better below 18 °C.
 
 ### Conditions by stage
 
 - Colonization: 12 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 4 days, 15 °C (59 °F), 94% humidity, moderate fresh air: fan runs 40 s every 12 min, light 12 h a day, white 20%, blue 80%. Cooler pinning keeps blue tones.
-- Fruiting: 9 days, 14 °C (57 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 4 days, 15 °C (59 °F), 94% humidity, moderate fresh air: fan runs 40 s every 12 min, light 12 h a day, white 2.3%, blue 80%. Cooler pinning keeps blue tones.
+- Fruiting: 9 days, 14 °C (57 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### Notes
 
@@ -2312,7 +2312,7 @@ Q: How long does Blue Oyster take to grow?
 A: About 25 days with this profile: 12 days of colonization, 4 days of pinning, 9 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Blue Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Blue Oyster need?
 A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
@@ -2326,7 +2326,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/button-cremini
 Species: Agaricus bisporus
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Button / Cremini (Agaricus bisporus), also called white button or cremini, takes about 36 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and no light. Compost + casing species. Low light, cool fruiting, casing required.
 
@@ -2366,15 +2366,15 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/chestnut
 Species: Pholiota adiposa
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Chestnut Mushroom (Pholiota adiposa), also called fat Pholiota, takes about 34 days to grow at home, from spawn to the end of the first harvest. Colonize at 23 °C (73 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. Clustered woodlover. Cool fruiting and high humidity keep caps glossy.
 
 ### Conditions by stage
 
 - Colonization: 18 days, 23 °C (73 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 6 days, 16 °C (61 °F), 95% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 10 days, 15 °C (59 °F), 92% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 6 days, 16 °C (61 °F), 95% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 10 days, 15 °C (59 °F), 92% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### FAQ
 
@@ -2388,7 +2388,7 @@ Q: How long does Chestnut Mushroom take to grow?
 A: About 34 days with this profile: 18 days of colonization, 6 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Chestnut Mushroom need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Chestnut Mushroom need?
 A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization runs with little fresh air.
@@ -2399,15 +2399,15 @@ A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/cordyceps-militaris
 Species: Cordyceps militaris
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Cordyceps militaris, also called scarlet caterpillar club, takes about 57 days to grow at home, from spawn to the end of the first harvest. Colonize at 20 °C (68 °F) in the dark, then fruit at 18 °C (64 °F) and 84% humidity with moderate fresh air and 12 h of light a day. Grown on supplemented grain/rice, not logs. Wants 12/12 light once orange initials show.
 
 ### Conditions by stage
 
 - Colonization: 12 days, 20 °C (68 °F), 82% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Dark. Do not start light until the surface is colonized.
-- Orange initials: 10 days, 18 °C (64 °F), 86% humidity, moderate fresh air: fan runs 20 s every 30 min, light 12 h a day, white 51%, blue 80%. Bright, cooler light helps stroma form.
-- Stroma: 35 days, 18 °C (64 °F), 84% humidity, moderate fresh air: fan runs 20 s every 25 min, light 12 h a day, white 51%, blue 80%.
+- Orange initials: 10 days, 18 °C (64 °F), 86% humidity, moderate fresh air: fan runs 20 s every 30 min, light 12 h a day, white 30.725%, blue 80%. Bright, cooler light helps stroma form.
+- Stroma: 35 days, 18 °C (64 °F), 84% humidity, moderate fresh air: fan runs 20 s every 25 min, light 12 h a day, white 30.725%, blue 80%.
 
 ### Notes
 
@@ -2425,7 +2425,7 @@ Q: How long does Cordyceps militaris take to grow?
 A: About 57 days with this profile: 12 days of colonization, 10 days of orange initials, 35 days of stroma. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Cordyceps militaris need?
-A: Colonization: dark. Orange initials: 12 h a day, white 51%, blue 80%. Stroma: 12 h a day, white 51%, blue 80%.
+A: Colonization: dark. Orange initials: 12 h a day, white 30.725%, blue 80%. Stroma: 12 h a day, white 30.725%, blue 80%.
 
 Q: How much fresh air does Cordyceps militaris need?
 A: Moderate fresh air: fan runs 20 s every 25 min while fruiting. Colonization runs with little fresh air.
@@ -2439,15 +2439,15 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/elm-oyster
 Species: Hypsizygus ulmarius
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Elm Oyster (Hypsizygus ulmarius), also called elm leech, takes about 31 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 86% humidity with moderate fresh air and 12 h of light a day. Not a true Pleurotus. Cooler fruiting, meaty single fruits more than oyster clusters.
 
 ### Conditions by stage
 
 - Colonization: 16 days, 22 °C (72 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 5 days, 16 °C (61 °F), 92% humidity, moderate fresh air: fan runs 30 s every 16 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 10 days, 15 °C (59 °F), 86% humidity, moderate fresh air: fan runs 30 s every 14 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 5 days, 16 °C (61 °F), 92% humidity, moderate fresh air: fan runs 30 s every 16 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 10 days, 15 °C (59 °F), 86% humidity, moderate fresh air: fan runs 30 s every 14 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### FAQ
 
@@ -2461,7 +2461,7 @@ Q: How long does Elm Oyster take to grow?
 A: About 31 days with this profile: 16 days of colonization, 5 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Elm Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Elm Oyster need?
 A: Moderate fresh air: fan runs 30 s every 14 min while fruiting. Colonization runs with little fresh air.
@@ -2475,7 +2475,7 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/enoki
 Species: Flammulina velutipes
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Enoki (Flammulina velutipes), also called enokitake or golden needle mushroom, takes about 43 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 93% humidity with little fresh air and no light. Needs cold fruiting and little fresh air for supermarket-long stems.
 
@@ -2515,15 +2515,15 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/golden-enoki
 Species: Flammulina velutipes
-Updated: 2026-10-30
+Updated: 2026-11-15
 
 Golden Enoki (Flammulina velutipes) takes about 39 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 92% humidity with moderate fresh air and 12 h of light a day. Golden Enoki is the wild-type, gold-capped form of enoki. Same species as white enoki, grown with more light and air for shorter stems and amber caps.
 
 ### Conditions by stage
 
 - Colonization: 18 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 7 days, 16 °C (61 °F), 95% humidity, little fresh air: fan runs 15 s every 60 min, light 12 h a day, white 20%, blue 80%. Keep still and wet to pile up pins.
-- Fruiting: 14 days, 15 °C (59 °F), 92% humidity, moderate fresh air: fan runs 20 s every 45 min, light 12 h a day, white 20%, blue 80%. Light brings out the gold cap color.
+- Pinning: 7 days, 16 °C (61 °F), 95% humidity, little fresh air: fan runs 15 s every 60 min, light 12 h a day, white 2.3%, blue 80%. Keep still and wet to pile up pins.
+- Fruiting: 14 days, 15 °C (59 °F), 92% humidity, moderate fresh air: fan runs 20 s every 45 min, light 12 h a day, white 2.3%, blue 80%. Light brings out the gold cap color.
 
 ### Notes
 
@@ -2541,7 +2541,7 @@ Q: How long does Golden Enoki take to grow?
 A: About 39 days with this profile: 18 days of colonization, 7 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Golden Enoki need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Golden Enoki need?
 A: Moderate fresh air: fan runs 20 s every 45 min while fruiting. Colonization runs with little fresh air.
@@ -2555,15 +2555,15 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/golden-oyster
 Species: Pleurotus citrinopileatus
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Golden Oyster (Pleurotus citrinopileatus), also called yellow oyster or tamogitake, takes about 24 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Warm oyster with dense golden clusters. Needs plenty of fresh air to keep stems short.
 
 ### Conditions by stage
 
 - Colonization: 12 days, 25 °C (77 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 4 days, 22 °C (72 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 8 days, 21 °C (70 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. More light helps hold gold color.
+- Pinning: 4 days, 22 °C (72 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 8 days, 21 °C (70 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 2.3%, blue 80%. More light helps hold gold color.
 
 ### FAQ
 
@@ -2577,7 +2577,7 @@ Q: How long does Golden Oyster take to grow?
 A: About 24 days with this profile: 12 days of colonization, 4 days of pinning, 8 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Golden Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Golden Oyster need?
 A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
@@ -2588,15 +2588,15 @@ A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization 
 
 URL: https://shroomlabs.io/profiles/king-oyster
 Species: Pleurotus eryngii
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 King Oyster (Pleurotus eryngii), also called king trumpet or French horn mushroom, takes about 38 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 15 °C (59 °F) and 82% humidity with moderate fresh air and 12 h of light a day. Thick-stem oyster. Cooler, slightly drier, and less fresh air than cluster oysters.
 
 ### Conditions by stage
 
 - Colonization: 18 days, 22 °C (72 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 6 days, 16 °C (61 °F), 90% humidity, moderate fresh air: fan runs 25 s every 25 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 14 days, 15 °C (59 °F), 82% humidity, moderate fresh air: fan runs 25 s every 25 min, light 12 h a day, white 20%, blue 80%. Let stems elongate before caps flare if you want steak-cut kings.
+- Pinning: 6 days, 16 °C (61 °F), 90% humidity, moderate fresh air: fan runs 25 s every 25 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 14 days, 15 °C (59 °F), 82% humidity, moderate fresh air: fan runs 25 s every 25 min, light 12 h a day, white 2.3%, blue 80%. Let stems elongate before caps flare if you want steak-cut kings.
 
 ### Notes
 
@@ -2614,7 +2614,7 @@ Q: How long does King Oyster take to grow?
 A: About 38 days with this profile: 18 days of colonization, 6 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does King Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does King Oyster need?
 A: Moderate fresh air: fan runs 25 s every 25 min while fruiting. Colonization runs with little fresh air.
@@ -2625,15 +2625,15 @@ A: Moderate fresh air: fan runs 25 s every 25 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/lions-mane
 Species: Hericium erinaceus
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Lion's Mane (Hericium erinaceus), also called bearded tooth or pom pom mushroom, takes about 33 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 90% humidity with moderate fresh air and 12 h of light a day. Tooth fungus. Moderate fresh air, since too much air yellows the spines.
 
 ### Conditions by stage
 
 - Colonization: 16 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 5 days, 18 °C (64 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 26%, blue 80%. Look for dense white primordia, not fuzzy overlay.
-- Fruiting: 12 days, 17 °C (63 °F), 90% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 26%, blue 80%. Harvest when spines elongate but before they yellow.
+- Pinning: 5 days, 18 °C (64 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 4.75%, blue 80%. Look for dense white primordia, not fuzzy overlay.
+- Fruiting: 12 days, 17 °C (63 °F), 90% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 4.75%, blue 80%. Harvest when spines elongate but before they yellow.
 
 ### Notes
 
@@ -2651,7 +2651,7 @@ Q: How long does Lion's Mane take to grow?
 A: About 33 days with this profile: 16 days of colonization, 5 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Lion's Mane need?
-A: Colonization: dark. Pinning: 12 h a day, white 26%, blue 80%. Fruiting: 12 h a day, white 26%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 4.75%, blue 80%. Fruiting: 12 h a day, white 4.75%, blue 80%.
 
 Q: How much fresh air does Lion's Mane need?
 A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization runs with little fresh air.
@@ -2665,15 +2665,15 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/maitake
 Species: Grifola frondosa
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Maitake (Grifola frondosa), also called hen of the woods or sheep's head, takes about 54 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. Slow woodlover. Primordia look like brains; do not dry them out.
 
 ### Conditions by stage
 
 - Colonization: 28 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Primordia: 10 days, 17 °C (63 °F), 93% humidity, moderate fresh air: fan runs 20 s every 25 min, light 12 h a day, white 37%.
-- Fruiting: 16 days, 16 °C (61 °F), 88% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 37%.
+- Primordia: 10 days, 17 °C (63 °F), 93% humidity, moderate fresh air: fan runs 20 s every 25 min, light 12 h a day, white 12.65%.
+- Fruiting: 16 days, 16 °C (61 °F), 88% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 12.65%.
 
 ### FAQ
 
@@ -2687,7 +2687,7 @@ Q: How long does Maitake take to grow?
 A: About 54 days with this profile: 28 days of colonization, 10 days of primordia, 16 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Maitake need?
-A: Colonization: dark. Primordia: 12 h a day, white 37%. Fruiting: 12 h a day, white 37%.
+A: Colonization: dark. Primordia: 12 h a day, white 12.65%. Fruiting: 12 h a day, white 12.65%.
 
 Q: How much fresh air does Maitake need?
 A: Moderate fresh air: fan runs 25 s every 20 min while fruiting. Colonization runs with little fresh air.
@@ -2701,15 +2701,15 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/morel
 Species: Morchella importuna
-Updated: 2026-10-30
+Updated: 2026-11-15
 
 Morel (Morchella importuna) takes about 45 days to grow at home, from spawn to the end of the first harvest. Colonize at 20 °C (68 °F) in the dark, then fruit at 15 °C (59 °F) and 88% humidity with moderate fresh air and 12 h of light a day. Prized spring mushroom. Usually grown outdoors in beds, so this is a best-effort chamber climate, not a proven indoor recipe.
 
 ### Conditions by stage
 
 - Colonization: 21 days, 20 °C (68 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Dark. Soil or casing layer recommended.
-- Pinning: 10 days, 14 °C (57 °F), 92% humidity, moderate fresh air: fan runs 25 s every 30 min, light 12 h a day, white 20%, blue 80%. A cold drop helps trigger primordia.
-- Fruiting: 14 days, 15 °C (59 °F), 88% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 10 days, 14 °C (57 °F), 92% humidity, moderate fresh air: fan runs 25 s every 30 min, light 12 h a day, white 2.3%, blue 80%. A cold drop helps trigger primordia.
+- Fruiting: 14 days, 15 °C (59 °F), 88% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### Notes
 
@@ -2727,7 +2727,7 @@ Q: How long does Morel take to grow?
 A: About 45 days with this profile: 21 days of colonization, 10 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Morel need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Morel need?
 A: Moderate fresh air: fan runs 30 s every 20 min while fruiting. Colonization runs with little fresh air.
@@ -2741,15 +2741,15 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/nameko
 Species: Pholiota microspora
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Nameko (Pholiota microspora), also called butterscotch mushroom, takes about 39 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 14 °C (57 °F) and 93% humidity with moderate fresh air and 12 h of light a day. Cool, very wet fruiting. The slime coat is normal.
 
 ### Conditions by stage
 
 - Colonization: 20 days, 22 °C (72 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 7 days, 15 °C (59 °F), 95% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 12 days, 14 °C (57 °F), 93% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 7 days, 15 °C (59 °F), 95% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 12 days, 14 °C (57 °F), 93% humidity, moderate fresh air: fan runs 25 s every 18 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### FAQ
 
@@ -2763,7 +2763,7 @@ Q: How long does Nameko take to grow?
 A: About 39 days with this profile: 20 days of colonization, 7 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Nameko need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Nameko need?
 A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization runs with little fresh air.
@@ -2774,15 +2774,15 @@ A: Moderate fresh air: fan runs 25 s every 18 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/pearl-oyster
 Species: Pleurotus ostreatus
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Pearl Oyster (Pleurotus ostreatus), also called oyster mushroom or hiratake, takes about 29 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 88% humidity with moderate fresh air and 12 h of light a day. Forgiving beginner oyster. Fast, lots of fresh air, cool-to-room fruiting.
 
 ### Conditions by stage
 
 - Colonization: 14 days, 24 °C (75 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Dark, little fresh air until the block is white.
-- Pinning: 5 days, 18 °C (64 °F), 93% humidity, moderate fresh air: fan runs 35 s every 15 min, light 12 h a day, white 20%, blue 80%. Drop temperature and add fresh air to trigger clusters.
-- Fruiting: 10 days, 16 °C (61 °F), 88% humidity, moderate fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. Harvest when caps flatten and edges just begin to upturn.
+- Pinning: 5 days, 18 °C (64 °F), 93% humidity, moderate fresh air: fan runs 35 s every 15 min, light 12 h a day, white 2.3%, blue 80%. Drop temperature and add fresh air to trigger clusters.
+- Fruiting: 10 days, 16 °C (61 °F), 88% humidity, moderate fresh air: fan runs 40 s every 10 min, light 12 h a day, white 2.3%, blue 80%. Harvest when caps flatten and edges just begin to upturn.
 
 ### Notes
 
@@ -2800,7 +2800,7 @@ Q: How long does Pearl Oyster take to grow?
 A: About 29 days with this profile: 14 days of colonization, 5 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Pearl Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Pearl Oyster need?
 A: Moderate fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
@@ -2814,15 +2814,15 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/pink-oyster
 Species: Pleurotus djamor
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Pink Oyster (Pleurotus djamor), also called flamingo oyster or salmon oyster, takes about 20 days to grow at home, from spawn to the end of the first harvest. Colonize at 27 °C (81 °F) in the dark, then fruit at 24 °C (75 °F) and 86% humidity with plenty of fresh air and 12 h of light a day. Tropical oyster. Wants warmth; stalls and fades in a cold room.
 
 ### Conditions by stage
 
 - Colonization: 10 days, 27 °C (81 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 3 days, 24 °C (75 °F), 92% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 7 days, 24 °C (75 °F), 86% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. Color fades as fruits mature; harvest while still vivid.
+- Pinning: 3 days, 24 °C (75 °F), 92% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 7 days, 24 °C (75 °F), 86% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 2.3%, blue 80%. Color fades as fruits mature; harvest while still vivid.
 
 ### Notes
 
@@ -2840,7 +2840,7 @@ Q: How long does Pink Oyster take to grow?
 A: About 20 days with this profile: 10 days of colonization, 3 days of pinning, 7 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Pink Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Pink Oyster need?
 A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.
@@ -2854,15 +2854,15 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/pioppino
 Species: Cyclocybe aegerita
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Pioppino (Cyclocybe aegerita), also called black poplar mushroom or Agrocybe aegerita, takes about 31 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 16 °C (61 °F) and 86% humidity with moderate fresh air and 12 h of light a day. Black poplar mushroom. Cool fruiting; keep the surface less wet than oysters.
 
 ### Conditions by stage
 
 - Colonization: 16 days, 25 °C (77 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 5 days, 17 °C (63 °F), 92% humidity, moderate fresh air: fan runs 30 s every 18 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 10 days, 16 °C (61 °F), 86% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%. Ease humidity so caps stay dry enough to open cleanly.
+- Pinning: 5 days, 17 °C (63 °F), 92% humidity, moderate fresh air: fan runs 30 s every 18 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 10 days, 16 °C (61 °F), 86% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 2.3%, blue 80%. Ease humidity so caps stay dry enough to open cleanly.
 
 ### FAQ
 
@@ -2876,7 +2876,7 @@ Q: How long does Pioppino take to grow?
 A: About 31 days with this profile: 16 days of colonization, 5 days of pinning, 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Pioppino need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Pioppino need?
 A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization runs with little fresh air.
@@ -2887,15 +2887,15 @@ A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/reishi
 Species: Ganoderma lucidum
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Reishi (Ganoderma lucidum), also called lingzhi or varnished conk, takes about 77 days to grow at home, from spawn to the end of the first harvest. Colonize at 27 °C (81 °F) in the dark, then fruit at 23 °C (73 °F) and 85% humidity with moderate fresh air and 12 h of light a day. Antlers under high CO2, then consoles when fresh air increases.
 
 ### Conditions by stage
 
 - Colonization: 21 days, 27 °C (81 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Antler / primordia: 21 days, 24 °C (75 °F), 90% humidity, little fresh air: fan runs 20 s every 90 min, light 12 h a day, white 37%, blue 80%. Little fresh air keeps growth as antlers.
-- Console formation: 35 days, 23 °C (73 °F), 85% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 37%, blue 80%. Increase fresh air and light to flatten antlers into consoles.
+- Antler / primordia: 21 days, 24 °C (75 °F), 90% humidity, little fresh air: fan runs 20 s every 90 min, light 12 h a day, white 12.65%, blue 80%. Little fresh air keeps growth as antlers.
+- Console formation: 35 days, 23 °C (73 °F), 85% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 12.65%, blue 80%. Increase fresh air and light to flatten antlers into consoles.
 
 ### Notes
 
@@ -2913,7 +2913,7 @@ Q: How long does Reishi take to grow?
 A: About 77 days with this profile: 21 days of colonization, 21 days of antler / primordia, 35 days of console formation. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Reishi need?
-A: Colonization: dark. Antler / primordia: 12 h a day, white 37%, blue 80%. Console formation: 12 h a day, white 37%, blue 80%.
+A: Colonization: dark. Antler / primordia: 12 h a day, white 12.65%, blue 80%. Console formation: 12 h a day, white 12.65%, blue 80%.
 
 Q: How much fresh air does Reishi need?
 A: Moderate fresh air: fan runs 30 s every 20 min while fruiting. Colonization runs with little fresh air.
@@ -2927,16 +2927,16 @@ A: It is one of the harder species in this library. Try an oyster first if you h
 
 URL: https://shroomlabs.io/profiles/shiitake
 Species: Lentinula edodes
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Shiitake (Lentinula edodes), also called black forest mushroom or xiang gu, takes about 74 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 16 °C (61 °F) and 85% humidity with moderate fresh air and 12 h of light a day. Needs a full colonize + browning rest, then a cold shock before fruiting.
 
 ### Conditions by stage
 
 - Colonization: 42 days, 24 °C (75 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark. Wait for full white, then browning: do not fruit early.
-- Browning / skin: 21 days, 21 °C (70 °F), 80% humidity, little fresh air: fan runs 20 s every 45 min, light 12 h a day, white 26%, blue 80%. Block forms a protective brown skin. Keep it a bit drier.
+- Browning / skin: 21 days, 21 °C (70 °F), 80% humidity, little fresh air: fan runs 20 s every 45 min, light 12 h a day, white 4.75%, blue 80%. Block forms a protective brown skin. Keep it a bit drier.
 - Cold shock (off-device): 1 days, 16 °C (61 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark. The chamber can't get fridge cold. Shock 12 to 24 h at 5 to 10 °C, then apply fruiting.
-- Fruiting: 10 days, 16 °C (61 °F), 85% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
+- Fruiting: 10 days, 16 °C (61 °F), 85% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### Notes
 
@@ -2954,7 +2954,7 @@ Q: How long does Shiitake take to grow?
 A: About 74 days with this profile: 42 days of colonization, 21 days of browning / skin, 1 day of cold shock (off-device), 10 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Shiitake need?
-A: Colonization: dark. Browning / skin: 12 h a day, white 26%, blue 80%. Cold shock (off-device): dark. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Browning / skin: 12 h a day, white 4.75%, blue 80%. Cold shock (off-device): dark. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Shiitake need?
 A: Moderate fresh air: fan runs 35 s every 12 min while fruiting. Colonization runs with little fresh air.
@@ -2965,15 +2965,15 @@ A: Moderate fresh air: fan runs 35 s every 12 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/turkey-tail
 Species: Trametes versicolor
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Turkey Tail (Trametes versicolor), also called Coriolus versicolor or yun zhi, takes about 78 days to grow at home, from spawn to the end of the first harvest. Colonize at 24 °C (75 °F) in the dark, then fruit at 20 °C (68 °F) and 86% humidity with moderate fresh air and 12 h of light a day. Thin polypore. Long fruiting, lots of fresh air, not a thick-fleshed edible.
 
 ### Conditions by stage
 
 - Colonization: 28 days, 24 °C (75 °F), 88% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Primordia: 10 days, 21 °C (70 °F), 90% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%.
-- Brackets: 40 days, 20 °C (68 °F), 86% humidity, moderate fresh air: fan runs 30 s every 12 min, light 12 h a day, white 20%, blue 80%.
+- Primordia: 10 days, 21 °C (70 °F), 90% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 2.3%, blue 80%.
+- Brackets: 40 days, 20 °C (68 °F), 86% humidity, moderate fresh air: fan runs 30 s every 12 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### FAQ
 
@@ -2987,7 +2987,7 @@ Q: How long does Turkey Tail take to grow?
 A: About 78 days with this profile: 28 days of colonization, 10 days of primordia, 40 days of brackets. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Turkey Tail need?
-A: Colonization: dark. Primordia: 12 h a day, white 20%, blue 80%. Brackets: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Primordia: 12 h a day, white 2.3%, blue 80%. Brackets: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Turkey Tail need?
 A: Moderate fresh air: fan runs 30 s every 12 min while fruiting. Colonization runs with little fresh air.
@@ -2998,15 +2998,15 @@ A: Moderate fresh air: fan runs 30 s every 12 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/wine-cap
 Species: Stropharia rugosoannulata
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Wine Cap (Stropharia rugosoannulata), also called garden giant or king stropharia, takes about 40 days to grow at home, from spawn to the end of the first harvest. Colonize at 22 °C (72 °F) in the dark, then fruit at 17 °C (63 °F) and 85% humidity with moderate fresh air and 12 h of light a day. Best as an outdoor bed mushroom. Indoor profile is a climate approximation only.
 
 ### Conditions by stage
 
 - Colonization: 21 days, 22 °C (72 °F), 85% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 7 days, 18 °C (64 °F), 90% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 12 days, 17 °C (63 °F), 85% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 7 days, 18 °C (64 °F), 90% humidity, moderate fresh air: fan runs 30 s every 20 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 12 days, 17 °C (63 °F), 85% humidity, moderate fresh air: fan runs 30 s every 15 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### Notes
 
@@ -3024,7 +3024,7 @@ Q: How long does Wine Cap take to grow?
 A: About 40 days with this profile: 21 days of colonization, 7 days of pinning, 12 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Wine Cap need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Wine Cap need?
 A: Moderate fresh air: fan runs 30 s every 15 min while fruiting. Colonization runs with little fresh air.
@@ -3038,15 +3038,15 @@ A: Yes. It is tagged beginner in this library, which means it is one of the more
 
 URL: https://shroomlabs.io/profiles/wood-ear
 Species: Auricularia auricula-judae
-Updated: 2026-10-27
+Updated: 2026-11-15
 
 Wood Ear (Auricularia auricula-judae), also called jelly ear or black fungus, takes about 38 days to grow at home, from spawn to the end of the first harvest. Colonize at 26 °C (79 °F) in the dark, then fruit at 24 °C (75 °F) and 92% humidity with moderate fresh air and 12 h of light a day. Warm, wet jelly fungus. High humidity matters more than light intensity.
 
 ### Conditions by stage
 
 - Colonization: 18 days, 26 °C (79 °F), 90% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 6 days, 24 °C (75 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 14 days, 24 °C (75 °F), 92% humidity, moderate fresh air: fan runs 25 s every 16 min, light 12 h a day, white 20%, blue 80%.
+- Pinning: 6 days, 24 °C (75 °F), 94% humidity, moderate fresh air: fan runs 25 s every 20 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 14 days, 24 °C (75 °F), 92% humidity, moderate fresh air: fan runs 25 s every 16 min, light 12 h a day, white 2.3%, blue 80%.
 
 ### FAQ
 
@@ -3060,7 +3060,7 @@ Q: How long does Wood Ear take to grow?
 A: About 38 days with this profile: 18 days of colonization, 6 days of pinning, 14 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Wood Ear need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Wood Ear need?
 A: Moderate fresh air: fan runs 25 s every 16 min while fruiting. Colonization runs with little fresh air.
@@ -3071,15 +3071,15 @@ A: Moderate fresh air: fan runs 25 s every 16 min while fruiting. Colonization r
 
 URL: https://shroomlabs.io/profiles/yellow-oyster
 Species: Pleurotus citrinopileatus
-Updated: 2026-10-30
+Updated: 2026-11-15
 
 Yellow Oyster (Pleurotus citrinopileatus) takes about 24 days to grow at home, from spawn to the end of the first harvest. Colonize at 25 °C (77 °F) in the dark, then fruit at 21 °C (70 °F) and 87% humidity with plenty of fresh air and 12 h of light a day. Yellow Oyster is the common trade name for Golden Oyster. Same species, same warm climate, needs lots of fresh air.
 
 ### Conditions by stage
 
 - Colonization: 12 days, 25 °C (77 °F), 92% humidity, little fresh air: fan runs 15 s every 60 min, light dark.
-- Pinning: 4 days, 22 °C (72 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 20%, blue 80%.
-- Fruiting: 8 days, 21 °C (70 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 20%, blue 80%. More light helps hold yellow color.
+- Pinning: 4 days, 22 °C (72 °F), 93% humidity, moderate fresh air: fan runs 35 s every 12 min, light 12 h a day, white 2.3%, blue 80%.
+- Fruiting: 8 days, 21 °C (70 °F), 87% humidity, plenty of fresh air: fan runs 40 s every 10 min, light 12 h a day, white 2.3%, blue 80%. More light helps hold yellow color.
 
 ### FAQ
 
@@ -3093,7 +3093,7 @@ Q: How long does Yellow Oyster take to grow?
 A: About 24 days with this profile: 12 days of colonization, 4 days of pinning, 8 days of fruiting. Real blocks vary, so move on when the block is ready, not only when the days run out.
 
 Q: How much light does Yellow Oyster need?
-A: Colonization: dark. Pinning: 12 h a day, white 20%, blue 80%. Fruiting: 12 h a day, white 20%, blue 80%.
+A: Colonization: dark. Pinning: 12 h a day, white 2.3%, blue 80%. Fruiting: 12 h a day, white 2.3%, blue 80%.
 
 Q: How much fresh air does Yellow Oyster need?
 A: Plenty of fresh air: fan runs 40 s every 10 min while fruiting. Colonization runs with little fresh air.

@@ -299,7 +299,7 @@ test("Colonizing and Colonization are the same stage, named for the chamber", ()
   assert.equal(growPhaseForStage("colonization"), "Colonizing");
   assert.equal(growPhaseForStage("Colonization"), "Colonizing");
   assert.equal(growPhaseForStage("colonizing"), "Colonizing");
-  const lykyn = deviceCapabilities({ firmware_version: "0.2.0", capabilities: CAPS_105, ranges: { white_intensity: [0, 100, 1], air_exchange_speed: [33, 100, 1] } }, "lykyn_chamber");
+  const lykyn = deviceCapabilities({ firmware_version: "0.2.0", capabilities: CAPS_105, ranges: { white_intensity: [0, 100, 0.1], air_exchange_speed: [33, 100, 1] } }, "lykyn_chamber");
   assert.equal(growPhaseForStage("colonization", lykyn), "Colonization");
   assert.equal(growPhaseForStage("Colonizing", lykyn), "Colonization");
   assert.equal(sameGrowPhase("Colonizing", "Colonization"), true);
@@ -314,7 +314,7 @@ test("Colonizing and Colonization are the same stage, named for the chamber", ()
   assert.equal(knobs.white_intensity, 0);
   assert.equal(knobs.light_hours, 0);
   const fruiting = pearl.stages.find((st) => st.id === "fruiting");
-  assert.equal(recipeKnobs(fruiting, "fruiting", lykyn).white_intensity, 20);
+  assert.equal(recipeKnobs(fruiting, "fruiting", lykyn).white_intensity, 2.3, "92 lux is 2.3% of the maximum");
   assert.equal(recipeKnobs(fruiting, "fruiting", caps105).white_intensity, 92);
   assert.equal(recipeKnobs(col, "colonization", caps105).grow_phase, "Colonizing");
 });

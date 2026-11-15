@@ -243,7 +243,7 @@ export function lightFromKnobs(knobs = {}, caps = {}) {
   const raw = knobs.white_intensity;
   const white = deviceAdapter(caps).white;
   const lux = raw == null ? null : white.toLux(raw);
-  const percent = raw == null ? null : Math.round(white.toPercent(raw));
+  const percent = raw == null ? null : white.toPercent(raw);
   return {
     sunrise_hour: knobs.sunrise_hour,
     duration_hours: knobs.light_hours,
@@ -453,11 +453,19 @@ export function planForCapabilities(plan, caps, { stage = {}, requested = {}, cu
   return { ok: false, error: "Unknown change.", skipped: [] };
 }
 
+/** The step a chamber takes this knob in: its own report, else its type's, else the generic one. */
+function knobStep(reading, caps, knob) {
+  const own = num(caps?.knob_ranges?.[knob.key]?.[2]) ?? num(reading?.ranges?.[knob.key]?.[2]);
+  if (own != null) return own;
+  const typed = reading?.device_type ? num(deviceAdapter(reading.device_type).knobRanges?.[knob.key]?.[2]) : null;
+  return typed ?? knob.range[2];
+}
+
 /**
  * Whether a reading shows every target in a setpoints command. Temperature and RH use the
  * firmware's read-back tolerance; knobs half a step; the phase must match exactly.
  */
-export function readingMatchesTargets(reading = {}, target = {}) {
+export function readingMatchesTargets(reading = {}, target = {}, caps = null) {
   if (!target || !hasTargets(target)) return false;
   const reportedTemp = num(reading.temperature_setpoint ?? reading.temperature_target ?? reading.target_temperature);
   const reportedRh = num(reading.humidity_setpoint ?? reading.target_humidity);
@@ -469,7 +477,7 @@ export function readingMatchesTargets(reading = {}, target = {}) {
     const want = num(target[knob.key]);
     if (want == null) continue;
     const got = num(reading[knob.key]);
-    if (got == null || Math.abs(got - want) > Math.max(0.15, knob.range[2] / 2)) return false;
+    if (got == null || Math.abs(got - want) > Math.max(0.15, knobStep(reading, caps, knob) / 2)) return false;
   }
   if (target.grow_phase && !sameGrowPhase(reading.grow_phase, target.grow_phase)) return false;
   return true;
