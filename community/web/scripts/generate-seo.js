@@ -1118,6 +1118,20 @@ function hubHead(profiles) {
 }
 
 /** One long-form guide from scripts/guides. Sections are trusted HTML written in this repo. */
+
+function howtoGraph(url, howto) {
+  if (!howto?.steps?.length) return [];
+  return [
+    {
+      "@type": "HowTo",
+      "@id": `${url}#howto`,
+      name: howto.name,
+      description: howto.description,
+      step: howto.steps.map((text, i) => ({ "@type": "HowToStep", position: i + 1, text })),
+    },
+  ];
+}
+
 export function renderGuidePage(guide) {
   const url = `${SITE}/guides/${guide.slug}`;
   const sections = guide.sections.map((sec) => `<h2>${escapeHtml(sec.h2)}</h2>${sec.html}`).join("\n      ");
@@ -1146,6 +1160,7 @@ export function renderGuidePage(guide) {
             },
           ]
         : []),
+      ...howtoGraph(url, guide.howto),
       breadcrumbs([["Home", `${SITE}/`], ["Grow guides", `${SITE}/grow`], [guide.h1, url]]),
     ],
   };
@@ -1380,6 +1395,7 @@ export function renderChamberPage(page) {
         "@id": `${url}#faq`,
         mainEntity: faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
       },
+      ...howtoGraph(url, page.howto),
       breadcrumbs(crumbs.map(([name, href]) => [name, href ? `${SITE}${href}` : url])),
     ],
   };
@@ -1683,6 +1699,7 @@ export const PAGES = {
     active: "docs",
     sitemap: true,
     path: "/docs",
+    updated: "2026-11-15",
     title: "Docs · Shroom Labs",
     description: "What Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.",
     jsonLd: { "@context": "https://schema.org", ...breadcrumbs([["Home", `${SITE}/`], ["Docs", `${SITE}/docs`]]) },
