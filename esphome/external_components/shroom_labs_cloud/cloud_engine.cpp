@@ -567,8 +567,22 @@ std::string CloudEngine::grow_json() const {
   out += show ? grow_.url : "";
   out += "\",\"grow_image\":\"";
   out += show ? grow_.image : "";
-  out += "\"}";
+  out += "\",\"profile_id\":\"";
+  out += show ? grow_.id : "";
+  out += "\",\"profile_stages\":";
+  out += show ? profile_stages_json(grow_) : "{}";
+  out += "}";
   return out;
+}
+
+InboxGrow CloudEngine::grow() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return grow_;
+}
+
+void CloudEngine::restore_grow(const InboxGrow &grow) {
+  std::lock_guard<std::mutex> g(lock_);
+  grow_ = grow;
 }
 
 std::string CloudEngine::status_json() const {
@@ -1065,6 +1079,14 @@ bool CloudEngine::process_inbox_(const std::string &body) {
     InboxGrow grow;
     if (parse_inbox_grow(body.c_str(), &grow)) {
       std::lock_guard<std::mutex> g(lock_);
+      // An older server has no profile_stages key; keep the recipes already stored
+      // for this same profile. A new profile, or an explicit empty stages object,
+      // replaces them.
+      if (!grow.stages_present && grow.id == grow_.id && !grow_.id.empty()) {
+        grow.colonization = grow_.colonization;
+        grow.pinning = grow_.pinning;
+        grow.fruiting = grow_.fruiting;
+      }
       grow_ = grow;
     }
   }

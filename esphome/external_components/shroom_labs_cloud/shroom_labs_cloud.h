@@ -91,6 +91,13 @@ class ShroomLabsCloud : public Component {
   std::string claim_url() const { return engine_.claim_url(); }
   std::string status_json() const;
   std::string grow_json() const { return this->engine_.grow_json(); }
+  std::string grow_id() const { return this->engine_.grow().id; }
+  std::string grow_name() const { return this->engine_.grow().name; }
+  /** The linked profile's recipe for this stage name, or false to use the built-in. */
+  bool stage_recipe(const char *name, StageRecipe *out) const {
+    return stage_recipe_for(this->engine_.grow(), name, out);
+  }
+  std::string grow_image_url() const { return this->engine_.grow().image; }
   std::string display_code() const { return engine_.display_code(); }
   std::string display_hint() const { return engine_.display_hint(); }
   std::string display_expiry() const { return engine_.display_expiry(); }
@@ -163,6 +170,14 @@ class ShroomLabsCloud : public Component {
 
   void attach_local_watchers_();
   void persist_remote_apply_(bool on);
+  void load_saved_grow_();
+  void persist_grow_if_changed_();
+  std::string saved_grow_id_;
+  std::string saved_grow_name_;
+  std::string saved_grow_url_;
+  std::string saved_grow_image_;
+  std::string saved_grow_stages_;
+  bool grow_loaded_{false};
 };
 
 extern ShroomLabsCloud *global_shroom_labs_cloud;  // NOLINT

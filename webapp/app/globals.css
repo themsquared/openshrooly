@@ -1181,3 +1181,83 @@ select {
 .brand-name { font-weight: 600; }
 
 .first-run p.first-run-error { color: var(--sl-bad); }
+
+.write-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  max-width: min(92vw, 520px);
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #7a2a22;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: var(--sl-shadow);
+}
+
+.write-toast-dismiss {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+/* Stage picker: the same four buttons on every chamber. */
+.stage-picker {
+  max-width: var(--sl-max);
+  margin: 0 auto 14px;
+  width: calc(100% - 32px);
+}
+
+.stage-picker-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.stage-pick {
+  background: var(--sl-bg-2);
+  border: 1px solid var(--sl-line);
+  border-radius: 12px;
+  color: inherit;
+  font: inherit;
+  padding: 12px 6px;
+  cursor: pointer;
+}
+
+.stage-pick.is-current {
+  border-color: var(--sl-line-strong);
+  box-shadow: 0 0 0 1px var(--sl-spore-deep);
+}
+
+.stage-pick:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stage-picker-note {
+  color: var(--sl-muted);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.stage-picker-error {
+  color: var(--sl-heat);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+@media (max-width: 480px) {
+  .stage-picker-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

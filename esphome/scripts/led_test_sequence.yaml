@@ -1,0 +1,51 @@
+# LED Test: strip red, green, blue, white, then the white light, 2 s each.
+# The lighting manager skips its work while this runs, then the script puts both
+# lights back to what the schedule says.
+- id: led_test_sequence
+  mode: single
+  then:
+    - lambda: 'id(led_test_running) = true;'
+    - light.turn_on: {id: white_led, brightness: 0%, transition_length: 0s}
+    - light.turn_on: {id: rgb_led_strip, red: 100%, green: 0%, blue: 0%, brightness: 60%, transition_length: 0s}
+    - delay: 2s
+    - light.turn_on: {id: rgb_led_strip, red: 0%, green: 100%, blue: 0%, brightness: 60%, transition_length: 0s}
+    - delay: 2s
+    - light.turn_on: {id: rgb_led_strip, red: 0%, green: 0%, blue: 100%, brightness: 60%, transition_length: 0s}
+    - delay: 2s
+    - light.turn_on: {id: rgb_led_strip, red: 100%, green: 100%, blue: 100%, brightness: 60%, transition_length: 0s}
+    - delay: 2s
+    - light.turn_off: {id: rgb_led_strip, transition_length: 0s}
+    - light.turn_on: {id: white_led, brightness: 50%, transition_length: 0s}
+    - delay: 2s
+    - lambda: |-
+        // Back to the schedule. Same lux curve and color mix as the lighting manager.
+        auto lux_to_brightness = [](float lux) -> float {
+          if (lux <= 0) return 0.0f;
+          if (lux <= 92.0f) return (lux / 92.0f) * 20.0f;
+          float b = pow(lux / 0.02307f, 1.0f / 2.768f);
+          return b > 100.0f ? 100.0f : b;
+        };
+        id(led_test_running) = false;
+        if (id(lights_on_flag)) {
+          const float b = lux_to_brightness(id(white_intensity).state);
+          auto w = id(white_led).turn_on();
+          w.set_brightness(b / 100.0f);
+          w.set_transition_length(0);
+          w.perform();
+          const float r = id(color_r).state / 100.0f;
+          const float g = id(color_g).state / 100.0f;
+          const float bl = id(color_b).state / 100.0f;
+          const float maxc = std::max(r, std::max(g, bl));
+          auto c = id(rgb_led_strip).turn_on();
+          if (maxc <= 0.0005f) {
+            c.set_brightness(0.0f);
+          } else {
+            c.set_rgb(r / maxc, g / maxc, bl / maxc);
+            c.set_brightness(maxc);
+          }
+          c.set_transition_length(0);
+          c.perform();
+        } else {
+          id(white_led).turn_off().set_transition_length(0).perform();
+          id(rgb_led_strip).turn_off().set_transition_length(0).perform();
+        }

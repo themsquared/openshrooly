@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "export": "next build",
-    "test": "node --test lib/setup-state.test.js lib/ui-copy.test.js lib/card-text.test.js lib/cloud-claim.test.js"
+    "test": "node --test lib/setup-state.test.js lib/ui-copy.test.js lib/card-text.test.js lib/cloud-claim.test.js lib/light-state.test.js lib/stage-standard.test.js lib/device-adapter.test.js"
   },
   "keywords": [],
   "author": "",

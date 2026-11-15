@@ -428,6 +428,7 @@ void ShroomLabsCloud::setup() {
   this->nvs_encrypted_ = this->flash_encrypted_;
 #endif
   this->engine_.load();
+  this->load_saved_grow_();
 #if SHL_CLOUD_REMOTE_APPLY != 0
   nvs_handle_t h;
   if (nvs_open(NVS_NS, NVS_READONLY, &h) == ESP_OK) {
@@ -446,6 +447,7 @@ void ShroomLabsCloud::setup() {
 }
 
 void ShroomLabsCloud::loop() {
+  this->persist_grow_if_changed_();
   if (!this->watchers_on_)
     this->attach_local_watchers_();
   if (this->busy_)
@@ -691,6 +693,67 @@ uint32_t EspChamber::last_local_change_ms() { return cloud_->last_local_change_m
 EntityRange EspChamber::knob_range(uint8_t k) { return cloud_->knob_range(k); }
 bool EspChamber::write_knob(uint8_t k, float v) { return cloud_->write_knob(k, v); }
 bool EspChamber::write_grow_phase(const std::string &phase) { return cloud_->write_grow_phase(phase); }
+
+
+void ShroomLabsCloud::load_saved_grow_() {
+  nvs_handle_t h;
+  if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK)
+    return;
+  InboxGrow g;
+  char buf[192];
+  size_t len = sizeof(buf);
+  if (nvs_get_str(h, "grow_id", buf, &len) == ESP_OK)
+    g.id = buf;
+  len = sizeof(buf);
+  if (nvs_get_str(h, "grow_nm", buf, &len) == ESP_OK)
+    g.name = buf;
+  len = sizeof(buf);
+  if (nvs_get_str(h, "grow_url", buf, &len) == ESP_OK)
+    g.url = buf;
+  len = sizeof(buf);
+  if (nvs_get_str(h, "grow_img", buf, &len) == ESP_OK)
+    g.image = buf;
+  char stages[1536];
+  size_t stages_len = sizeof(stages);
+  if (nvs_get_str(h, "grow_st", stages, &stages_len) == ESP_OK) {
+    std::string wrapped = std::string("{\"profile_stages\":") + stages + "}";
+    parse_profile_stages(wrapped.c_str(), &g);
+  }
+  nvs_close(h);
+  this->saved_grow_id_ = g.id;
+  this->saved_grow_name_ = g.name;
+  this->saved_grow_url_ = g.url;
+  this->saved_grow_image_ = g.image;
+  this->saved_grow_stages_ = profile_stages_json(g);
+  this->grow_loaded_ = true;
+  if (!g.id.empty() || !g.name.empty())
+    this->engine_.restore_grow(g);
+}
+
+void ShroomLabsCloud::persist_grow_if_changed_() {
+  const InboxGrow g = this->engine_.grow();
+  const std::string stages = profile_stages_json(g);
+  if (this->grow_loaded_ && g.id == this->saved_grow_id_ && g.name == this->saved_grow_name_ &&
+      g.url == this->saved_grow_url_ && g.image == this->saved_grow_image_ && stages == this->saved_grow_stages_)
+    return;
+  nvs_handle_t h;
+  if (nvs_open(NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+    nvs_set_str(h, "grow_id", g.id.c_str());
+    nvs_set_str(h, "grow_nm", g.name.c_str());
+    nvs_set_str(h, "grow_url", g.url.c_str());
+    nvs_set_str(h, "grow_img", g.image.c_str());
+    if (stages.size() < 1536)
+      nvs_set_str(h, "grow_st", stages.c_str());
+    nvs_commit(h);
+    nvs_close(h);
+  }
+  this->saved_grow_id_ = g.id;
+  this->saved_grow_name_ = g.name;
+  this->saved_grow_url_ = g.url;
+  this->saved_grow_image_ = g.image;
+  this->saved_grow_stages_ = stages;
+  this->grow_loaded_ = true;
+}
 
 }  // namespace shroom_labs
 }  // namespace esphome

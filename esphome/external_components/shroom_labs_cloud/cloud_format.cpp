@@ -587,17 +587,152 @@ static std::string grow_link(const std::string &in) {
   return s.compare(0, 8, "https://") == 0 && s.find(' ') == std::string::npos ? s : std::string();
 }
 
+bool parse_stage_recipe(const char *obj, StageRecipe *out) {
+  if (out == nullptr || obj == nullptr)
+    return false;
+  *out = StageRecipe{};
+  auto set = [&](const char *key, float *dest, uint16_t bit) {
+    double v = 0;
+    if (json_get_double_top(obj, key, &v)) {
+      *dest = static_cast<float>(v);
+      out->mask |= bit;
+    }
+  };
+  set("temperature_c", &out->temperature_c, 1u << 0);
+  set("humidity_percent", &out->humidity_percent, 1u << 1);
+  set("temperature_hysteresis", &out->temperature_hysteresis, 1u << 2);
+  set("humidity_hysteresis", &out->humidity_hysteresis, 1u << 3);
+  set("fan_speed_percent", &out->fan_speed_percent, 1u << 4);
+  set("air_exchange_period_min", &out->air_exchange_period_min, 1u << 5);
+  set("air_exchange_run_sec", &out->air_exchange_run_sec, 1u << 6);
+  set("sunrise_hour", &out->sunrise_hour, 1u << 7);
+  set("light_hours", &out->light_hours, 1u << 8);
+  set("white_percent", &out->white_percent, 1u << 9);
+  set("red_percent", &out->red_percent, 1u << 10);
+  set("green_percent", &out->green_percent, 1u << 11);
+  set("blue_percent", &out->blue_percent, 1u << 12);
+  set("humidifier_speed_percent", &out->humidifier_speed_percent, 1u << 13);
+  out->present = out->mask != 0;
+  return out->present;
+}
+
+static void load_named_recipe(const char *obj, const char *key, StageRecipe *dest) {
+  const char *p = find_key_top(obj, key);
+  if (p == nullptr)
+    return;
+  p = skip_ws(p);
+  std::string one;
+  if (*p == '{' && extract_balanced(p, '{', '}', &one))
+    parse_stage_recipe(one.c_str(), dest);
+}
+
+bool parse_profile_stages(const char *json, InboxGrow *out) {
+  if (out == nullptr || json == nullptr)
+    return false;
+  const char *stages = find_key_top(json, "profile_stages");
+  if (stages == nullptr)
+    return false;
+  stages = skip_ws(stages);
+  std::string obj;
+  if (*stages != '{' || !extract_balanced(stages, '{', '}', &obj))
+    return false;
+  out->stages_present = true;
+  load_named_recipe(obj.c_str(), "colonization", &out->colonization);
+  load_named_recipe(obj.c_str(), "pinning", &out->pinning);
+  load_named_recipe(obj.c_str(), "fruiting", &out->fruiting);
+  return true;
+}
+
 bool parse_inbox_grow(const char *json, InboxGrow *out) {
-  std::string name, url, image;
+  std::string name, url, image, id;
   if (out == nullptr || !json_get_string_top(json, "grow_name", &name))
     return false;
   json_get_string_top(json, "grow_url", &url);
   json_get_string_top(json, "grow_image", &image);
+  json_get_string_top(json, "profile_id", &id);
+  *out = InboxGrow{};
   out->name = grow_text(name, 48);
   out->url = out->name.empty() ? std::string() : grow_link(url);
   out->image = out->name.empty() ? std::string() : grow_link(image);
+  out->id = out->name.empty() ? std::string() : grow_text(id, 64);
+  if (!out->name.empty())
+    parse_profile_stages(json, out);
   return true;
 }
+
+bool stage_recipe_for(const InboxGrow &grow, const char *name, StageRecipe *out) {
+  if (out == nullptr || name == nullptr)
+    return false;
+  std::string key;
+  for (const char *p = name; *p; p++) {
+    char c = *p;
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c - 'A' + 'a');
+    key.push_back(c);
+  }
+  const StageRecipe *r = nullptr;
+  if (key == "colonization" || key == "colonizing")
+    r = &grow.colonization;
+  else if (key == "pinning")
+    r = &grow.pinning;
+  else if (key == "fruiting")
+    r = &grow.fruiting;
+  if (r == nullptr || !r->present)
+    return false;
+  *out = *r;
+  return true;
+}
+
+static void append_recipe_json(std::string &out, const char *id, const StageRecipe &r, bool *any) {
+  if (!r.present)
+    return;
+  if (*any)
+    out += ",";
+  *any = true;
+  out += "\"";
+  out += id;
+  out += "\":{";
+  bool first = true;
+  auto num = [&](const char *k, float v, uint16_t bit) {
+    if (!(r.mask & bit))
+      return;
+    if (!first)
+      out += ",";
+    first = false;
+    out += "\"";
+    out += k;
+    out += "\":";
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%g", static_cast<double>(v));
+    out += buf;
+  };
+  num("temperature_c", r.temperature_c, 1u << 0);
+  num("humidity_percent", r.humidity_percent, 1u << 1);
+  num("temperature_hysteresis", r.temperature_hysteresis, 1u << 2);
+  num("humidity_hysteresis", r.humidity_hysteresis, 1u << 3);
+  num("fan_speed_percent", r.fan_speed_percent, 1u << 4);
+  num("air_exchange_period_min", r.air_exchange_period_min, 1u << 5);
+  num("air_exchange_run_sec", r.air_exchange_run_sec, 1u << 6);
+  num("sunrise_hour", r.sunrise_hour, 1u << 7);
+  num("light_hours", r.light_hours, 1u << 8);
+  num("white_percent", r.white_percent, 1u << 9);
+  num("red_percent", r.red_percent, 1u << 10);
+  num("green_percent", r.green_percent, 1u << 11);
+  num("blue_percent", r.blue_percent, 1u << 12);
+  num("humidifier_speed_percent", r.humidifier_speed_percent, 1u << 13);
+  out += "}";
+}
+
+std::string profile_stages_json(const InboxGrow &grow) {
+  std::string out = "{";
+  bool any = false;
+  append_recipe_json(out, "colonization", grow.colonization, &any);
+  append_recipe_json(out, "pinning", grow.pinning, &any);
+  append_recipe_json(out, "fruiting", grow.fruiting, &any);
+  out += "}";
+  return out;
+}
+
 
 size_t parse_inbox_commands(const char *json, InboxCommand *out, size_t max) {
   if (json == nullptr || out == nullptr || max == 0)

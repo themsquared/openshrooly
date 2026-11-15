@@ -2,6 +2,8 @@
   mode: queued
   then:
   - lambda: |-
+      if (id(led_test_running)) return;  // LED Test owns the lights until it ends
+
       // Function to convert lux to brightness percentage based on measurements
       auto lux_to_brightness = [](float lux) -> float {
         if (lux <= 0) {

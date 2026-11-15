@@ -10,16 +10,23 @@ import {
 import { DEVICE_VERSION, connectionLabel } from '../lib/setup-state'
 import type { GrowPreset } from '../lib/setup-state'
 import { addSample, lightOnSummary, rangeText, scheduleText, trendText } from '../lib/card-text'
+import { lightFromEntities, ringDarkBecauseOfDuration, writeFailedText } from '../lib/light-state'
 import type { Sample } from '../lib/card-text'
 import Icon from './components/Icon'
 import LiveGauge from './components/LiveGauge'
 import LightTimeline from './components/LightTimeline'
 import ProfileStrip from './components/ProfileStrip'
+import StagePicker from './components/StagePicker'
 import ConnectionBanner from './components/ConnectionBanner'
 import FirstRun from './components/FirstRun'
 import CloudSettings from './components/CloudSettings'
 import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
 import type { EntityState } from './entity-types'
+import { STAGES_AVAILABLE, WHITE_UNIT, currentStage, stageWrites } from '../lib/device-adapter'
+import { CARDS } from '../lib/stage-standard'
+
+/** Card names come from the standard, so every chamber says the same words. */
+const CARD_LABEL = Object.fromEntries(CARDS.map((card) => [card.id, card.label])) as Record<string, string>
 
 interface ModalState {
   type: 'humidity' | 'temperature' | 'air' | 'light' | 'water' | 'settings' | 'calibrate' | null
@@ -56,10 +63,13 @@ export default function Dashboard() {
   const [updateRequestError, setUpdateRequestError] = useState<string>('')
   const [demoMode, setDemoMode] = useState(false)
   // What is growing, from shroomlabs.io while linked. GET /cloud needs no sign-in.
-  const [cloudGrow, setCloudGrow] = useState({ linked: false, name: '', url: '', image: '' })
+  const [cloudGrow, setCloudGrow] = useState({ linked: false, name: '', url: '', image: '', stages: {} as Record<string, Record<string, number | null>> })
   const [reachable, setReachable] = useState<boolean | undefined>(undefined)
   const [lastError, setLastError] = useState('')
+  const [writeError, setWriteError] = useState('')
   const [applyingPreset, setApplyingPreset] = useState(false)
+  const [stageBusy, setStageBusy] = useState(false)
+  const [stageError, setStageError] = useState('')
   const [wifiMode, setWifiMode] = useState('')
   const [wifiSsid, setWifiSsid] = useState('')
 
@@ -228,6 +238,21 @@ export default function Dashboard() {
     }
   }, [])
 
+  const pickStage = async (stage: string) => {
+    if (stageBusy) return
+    setStageBusy(true)
+    setStageError('')
+    const writes = stageWrites(stage, cloudGrow.stages)
+    const ok = demoMode ? true : await api.applyWrites(writes)
+    if (ok) {
+      setEntities((prev) => ({ ...prev, ...entityPatchFromWrites(writes) }))
+      setReachable(true)
+    } else {
+      setStageError('The chamber did not take that stage. Try again.')
+    }
+    setStageBusy(false)
+  }
+
   const applyPreset = async (preset: GrowPreset) => {
     if (applyingPreset) return
     setApplyingPreset(true)
@@ -255,7 +280,21 @@ export default function Dashboard() {
 
     debounceTimers.current[id] = setTimeout(async () => {
       const numberId = id.replace('number-', '')
-      await api.setNumber(numberId, value)
+      const result = await api.setNumberChecked(numberId, value)
+      if (result.ok) {
+        setWriteError('')
+        return
+      }
+      // Put the real value back so the page never shows a setting the chamber does not have.
+      const actual = result.actual
+      if (actual !== undefined) {
+        setEntities((prev) => ({ ...prev, [id]: { ...prev[id], value: actual } }))
+      }
+      setWriteError(
+        result.reason === 'rejected'
+          ? writeFailedText(api.lastWriteStatus)
+          : 'The chamber kept its old setting. That number may be outside what it allows.'
+      )
     }, 300)
   }, [])
 
@@ -311,7 +350,15 @@ export default function Dashboard() {
     }))
 
     const switchId = id.replace('switch-', '')
-    await api.setSwitch(switchId, checked)
+    const ok = await api.setSwitch(switchId, checked)
+    if (ok) setWriteError('')
+    else {
+      setEntities((prev) => ({
+        ...prev,
+        [id]: { ...prev[id], state: checked ? 'OFF' : 'ON', value: !checked },
+      }))
+      setWriteError(writeFailedText(api.lastWriteStatus))
+    }
   }
 
   const handleTimezoneChange = async (tz: string) => {
@@ -473,24 +520,13 @@ export default function Dashboard() {
     setHumiditySamples((s) => addSample(s, t, parseFloat(getSensor('humidity') as string)))
   }, [entities])
 
-  // Sync lighting state from entities
+  // Sync lighting state from entities. A real 0 stays 0 (dark stage, lights off).
   useEffect(() => {
-    const sunrise = parseFloat((getNumber('lights__sunrise_hour') || 8) as string)
-    let duration = parseFloat((getNumber('lights__duration__hours_') || 12) as string)
-    const lux = parseFloat((getNumber('white_led_intensity') || 150) as string)
-    const rgbOn =
-      parseFloat((getNumber('red_led_intensity') || 0) as string) > 0 ||
-      parseFloat((getNumber('green_led_intensity') || 0) as string) > 0 ||
-      parseFloat((getNumber('blue_led_intensity') || 0) as string) > 0
-    if ((lux > 0 || rgbOn) && !(duration > 0)) {
-      duration = 12
-      handleNumberChange('number-lights__duration__hours_', 12)
-    }
-
-    setLightSunrise(sunrise)
-    setLightDuration(duration)
-    setLightSunset((sunrise + duration) % 24)
-    setLuxValue(lux)
+    const light = lightFromEntities(getNumber, 150)
+    setLightSunrise(light.sunrise)
+    setLightDuration(light.duration)
+    setLightSunset((light.sunrise + light.duration) % 24)
+    setLuxValue(light.white)
   }, [entities])
 
   const timeOptions = Array.from({ length: 48 }, (_, i) => i * 0.5)
@@ -733,6 +769,7 @@ export default function Dashboard() {
           name: String(body.grow_name || ''),
           url: String(body.grow_url || ''),
           image: String(body.grow_image || ''),
+          stages: body.profile_stages && typeof body.profile_stages === 'object' ? body.profile_stages : {},
         })
       } catch {
         // No cloud on this chamber, or offline: the card falls back to the local stage.
@@ -850,7 +887,7 @@ export default function Dashboard() {
   const blueValue = parseFloat((getNumber('blue_led_intensity') || 0) as string) || 0
   const currentColor = rgbToHex(redValue, greenValue, blueValue)
   const lightEnabled = luxValue > 0 || redValue > 0 || greenValue > 0 || blueValue > 0
-  const durationRequired = lightEnabled && !(lightDuration > 0)
+  const durationRequired = ringDarkBecauseOfDuration(lightFromEntities(getNumber, 150))
 
   return (
     <div className="dashboard">
@@ -888,6 +925,13 @@ export default function Dashboard() {
       />
 
       <FirstRun state={surface} applying={applyingPreset} onApply={applyPreset} error={lastError} />
+
+      {writeError && (
+        <div className="write-toast" role="alert">
+          <span>{writeError}</span>
+          <button type="button" className="write-toast-dismiss" onClick={() => setWriteError('')}>Dismiss</button>
+        </div>
+      )}
 
       {alerts.length > 0 && (
         <div className="alerts-banner">
@@ -958,6 +1002,14 @@ export default function Dashboard() {
         stages={demoMode || profileName || cloudGrow.name || (stageName && stageName !== 'Idle') ? DEMO_STAGES : []}
       />
 
+      <StagePicker
+        current={currentStage(growPhase)}
+        available={STAGES_AVAILABLE}
+        busy={stageBusy}
+        error={stageError}
+        onPick={pickStage}
+      />
+
       <LightTimeline
         sunrise={lightSunrise}
         sunset={lightSunset}
@@ -967,11 +1019,10 @@ export default function Dashboard() {
       />
 
       <div className="main-grid">
-        {/* Row 1 */}
         <div className="card card-temp" onClick={() => setModal({ type: 'temperature' })}>
           {heatRequested && <div className="status-rectangle heating-badge">HEATING</div>}
           <div className="card-icon"><Icon name="thermometer" /></div>
-          <div className="card-label">Temperature</div>
+          <div className="card-label">{CARD_LABEL.temperature}</div>
           <div className="card-value card-value-text">{trendText(tempSamples, 0.3)}</div>
           <div className="card-range">{tempRange ?? 'Range for today shows up soon'}</div>
         </div>
@@ -979,34 +1030,33 @@ export default function Dashboard() {
         <div className="card card-humidity" onClick={() => setModal({ type: 'humidity' })}>
           {humidifierOn && <div className="status-rectangle humidifying-badge">HUMIDIFYING</div>}
           <div className="card-icon"><Icon name="droplet" /></div>
-          <div className="card-label">Humidity</div>
+          <div className="card-label">{CARD_LABEL.humidity}</div>
           <div className="card-value card-value-text">{trendText(humiditySamples, 1)}</div>
           <div className="card-target">{humidityRange ?? 'Range for today shows up soon'}</div>
+        </div>
+
+        <div className="card card-light" onClick={() => setModal({ type: 'light' })}>
+          <div className="card-icon"><Icon name={lightsOn ? 'sun' : 'moon'} /></div>
+          <div className="card-label">{CARD_LABEL.light}</div>
+          <div className="card-value">
+            {lightsOn ? getNumber('white_led_intensity') : 'OFF'}
+            {lightsOn && <span className="card-unit">{WHITE_UNIT}</span>}
+          </div>
+          <div className="card-schedule">
+            {lightOnSummary(lightSunrise, lightDuration)}
+          </div>
         </div>
 
         <div className="card card-air" onClick={() => setModal({ type: 'air' })}>
           {airExchangeOn && <div className="status-rectangle running-badge">RUNNING</div>}
           <div className="card-icon"><Icon name="air" /></div>
-          <div className="card-label">Air Exchange</div>
+          <div className="card-label">{CARD_LABEL.air}</div>
           <div className="card-value">
             {getNumber('air_exchange__period__min_')}
             <span className="card-unit">min</span>
           </div>
           <div className="card-detail">
             {getNumber('air_exchange__run_duration__s_')}s @ {getNumber('air_exchange__speed')}%
-          </div>
-        </div>
-
-        {/* Row 2 */}
-        <div className="card card-light" onClick={() => setModal({ type: 'light' })}>
-          <div className="card-icon"><Icon name={lightsOn ? 'sun' : 'moon'} /></div>
-          <div className="card-label">Lighting</div>
-          <div className="card-value">
-            {lightsOn ? getNumber('white_led_intensity') : 'OFF'}
-            {lightsOn && <span className="card-unit">lux</span>}
-          </div>
-          <div className="card-schedule">
-            {lightOnSummary(lightSunrise, lightDuration)}
           </div>
         </div>
 
@@ -1601,7 +1651,7 @@ export default function Dashboard() {
                 />
                 {durationRequired ? (
                   <div className="warning-message" role="alert" style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', color: '#856404' }}>
-                    Duration is required when the light is on. Using 12 hours.
+                    The lights are off because Duration is 0 hours. Set a duration to turn them on.
                   </div>
                 ) : null}
                 <div className="dual-slider-container">
@@ -1718,6 +1768,21 @@ export default function Dashboard() {
                     `R:${redValue} G:${greenValue} B:${blueValue}`
                   )}
                 </span>
+              </div>
+              <div className="control-group">
+                <button
+                  type="button"
+                  className="charts-button ota-button"
+                  disabled={demoMode}
+                  onClick={async () => {
+                    if (demoMode) return
+                    const ok = await api.pressButton('led_test')
+                    setWriteError(ok ? '' : writeFailedText(api.lastWriteStatus))
+                  }}
+                >
+                  LED Test
+                </button>
+                <div className="control-help">Flashes red, then green, then blue, then white on the strip, then the white light. Use this to check the lights.</div>
               </div>
             </div>
           </div>

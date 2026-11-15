@@ -3,7 +3,7 @@
 const GROW_PRESETS = [
   {
     id: "colonizing",
-    label: "Colonizing, 14 days",
+    label: "Colonization, 14 days",
     phase: "Colonizing",
     day: 1,
     total: 14,
