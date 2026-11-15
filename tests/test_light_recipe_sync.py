@@ -15,8 +15,8 @@ from openshrooly_lib.light_recipes import (
 from openshrooly_lib.schema import is_https_source_url
 from openshrooly_lib.mapping import (
     apply_recipe_to_profile,
-    brightness_percent_to_lux,
-    lux_to_brightness_percent,
+    white_percent_to_lux,
+    lux_to_white_percent,
     stage_to_commands,
 )
 
@@ -28,11 +28,11 @@ def _cmd(commands, field):
 
 
 def test_firmware_white_curve_round_trip():
-    assert brightness_percent_to_lux(0) == 0
-    assert brightness_percent_to_lux(20) == 92
-    assert 1200 <= brightness_percent_to_lux(51) <= 1300
-    assert abs(lux_to_brightness_percent(92) - 20) < 0.01
-    assert abs(lux_to_brightness_percent(brightness_percent_to_lux(37)) - 37) < 0.6
+    assert white_percent_to_lux(0) == 0
+    assert white_percent_to_lux(2.3) == 92
+    assert white_percent_to_lux(100) == 4000
+    assert lux_to_white_percent(92) == 2.3
+    assert lux_to_white_percent(4000) == 100
 
 
 def test_recipe_maps_to_existing_light_entities():
@@ -70,7 +70,7 @@ def test_variety_specific_and_dark_recipes_sync():
     cordyceps = load_profile_by_id("cordyceps-militaris", ROOT / "data")
     commands = stage_to_commands(cordyceps.stage_by_id("fruiting"), cordyceps.light_recipe)
     assert _cmd(commands, "light_hours").value == 12
-    assert _cmd(commands, "white_led_lux").value == brightness_percent_to_lux(51)
+    assert _cmd(commands, "white_led_lux").value == 1229
     assert _cmd(commands, "blue").value == 80
 
     button = load_profile_by_id("button-cremini", ROOT / "data")
@@ -95,7 +95,7 @@ def test_every_seed_recipe_has_a_source_and_matches_catalog():
         phase = profile.light_recipe.phase_for("fruiting")
         assert fruiting.light.duration_hours == phase.photoperiod_hours
         assert fruiting.light.blue_percent == phase.blue_percent
-        assert fruiting.light.white_led_lux == brightness_percent_to_lux(phase.white_brightness_percent)
+        assert fruiting.light.white_led_lux == white_percent_to_lux(phase.white_brightness_percent)
 
 
 def test_source_urls_must_be_https():
@@ -150,15 +150,6 @@ def test_corrected_citations_match_the_papers():
     assert "PLOS ONE" not in catalog
     lions = recipe_for("lions-mane")
     assert lions.phases["fruiting"].photoperiod_hours == 12
-    assert lions.phases["fruiting"].white_brightness_percent == 26
+    assert lions.phases["fruiting"].white_brightness_percent == 4.75
     assert "Firth" not in lions.why
     assert all("Firth" not in note.title and "Firth" not in note.detail for note in lions.sources)
-
-
-def test_white_curve_matches_the_web_builder_and_clamps_to_the_entity_max():
-    # Same points as whitePercentToLux in community/api/test/profile.test.js.
-    expected = {0: 0, 10: 46, 20: 92, 26: 190, 37: 506, 51: 1229, 78: 3984, 79: 4000, 100: 4000}
-    for pct, lux in expected.items():
-        assert brightness_percent_to_lux(pct) == lux
-    assert 78 < lux_to_brightness_percent(4000) < 78.5
-    assert lux_to_brightness_percent(10000) == lux_to_brightness_percent(4000)

@@ -125,12 +125,13 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
+    "white_scale": "output",
     "why": "P. citrinopileatus has no variety-specific lux in the sources below. The recipe is the P. ostreatus oyster default and is labeled as such.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
         "title": "Penn State oyster production",
-        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
+        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 2.3% white to 92 lux, inside that 50 to 300 lux band.",
         "url": "https://mushroomcompany.com/resources/oyster/paoyster.pdf"
       },
       {
@@ -149,7 +150,7 @@
       },
       {
         "title": "General default",
-        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 20% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
+        "detail": "No variety-specific photoperiod or lux was found for this species. Colonization is dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled default, not a page-cited Stamets value, and 2.3% white, which is 92 lux on this chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the 440 to 470 nm finding. This is a labeled default, not a measured value for this variety."
       }
     ],
     "phases": {
@@ -162,14 +163,14 @@
       },
       "fruiting": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "pinning": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 20,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

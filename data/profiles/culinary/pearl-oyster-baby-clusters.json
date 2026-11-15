@@ -134,12 +134,13 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
+    "white_scale": "output",
     "why": "Light stays at the free card default. This profile changes air and timing, not light.",
     "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
     "sources": [
       {
         "title": "Penn State oyster production",
-        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
+        "detail": "Daniel J. Royse, Cultivation of Oyster Mushrooms, Penn State College of Agricultural Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, and maps 2.3% white to 92 lux, inside that 50 to 300 lux band.",
         "url": "https://mushroomcompany.com/resources/oyster/paoyster.pdf"
       },
       {
@@ -151,21 +152,21 @@
     "phases": {
       "colonization": {
         "photoperiod_hours": 0.0,
-        "white_brightness_percent": 0.0,
+        "white_brightness_percent": 0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
       },
       "pinning": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 20.0,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "fruiting": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 20.0,
+        "white_brightness_percent": 2.3,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

@@ -316,7 +316,7 @@ export class ProfileBuilder extends HTMLElement {
       h("p", { class: "muted" }, recipe.wavelength_note || WAVELENGTH_NOTE),
       this.slider("photoperiod", "Hours on", current.photoperiod_hours, { ...RANGES.photoperiod_hours, step: 0.5 }, `light_recipe.phases.${name}.photoperiod_hours`, issues),
       h("div", { class: "pb-clock", "aria-hidden": "true" }, h("span", { style: { left: "0%", width: `${width}%` } })),
-      this.slider("white", "White brightness", current.white_brightness_percent, { ...RANGES.white_brightness_percent, step: 1 }, `light_recipe.phases.${name}.white_brightness_percent`, issues),
+      this.slider("white", "White (% of the chamber's maximum)", current.white_brightness_percent, { ...RANGES.white_brightness_percent, step: 0.1 }, `light_recipe.phases.${name}.white_brightness_percent`, issues),
       h("div", { class: "pb-row pb-row-3" },
         this.slider("red", "Red", current.red_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.red_percent`, issues),
         this.slider("green", "Green", current.green_percent, { ...RANGES.rgb_percent, step: 1 }, `light_recipe.phases.${name}.green_percent`, issues),
@@ -606,7 +606,7 @@ export class ProfileBuilder extends HTMLElement {
         recipe.phases[stage.id] = recipe.phases[stage.id] || defaultLightPhase(stage.id);
         const phase = recipe.phases[stage.id];
         if (key === "duration_hours") phase.photoperiod_hours = Number(raw);
-        if (key === "white_led_lux") phase.white_brightness_percent = Math.round(whiteLuxToPercent(raw));
+        if (key === "white_led_lux") phase.white_brightness_percent = whiteLuxToPercent(raw);
         if (key === "red_percent" || key === "green_percent" || key === "blue_percent") phase[key] = Number(raw);
       }
     }
