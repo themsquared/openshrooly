@@ -201,13 +201,23 @@ static OptF actual_fan_speed(const Snapshot &s) {
   return {};
 }
 
+// A chamber with a master brightness knob (Lykyn) drives each channel at value x brightness / 100.
+// Report that, so 100 in the mix is 100 percent of the chamber's maximum only when it really is.
+static OptF driven(const OptF &channel, const OptF &master) {
+  if (!finite_num(channel) || !finite_num(master))
+    return channel;
+  OptF out = channel;
+  out.value = channel.value * (master.value < 0 ? 0.0f : (master.value > 100.0f ? 100.0f : master.value)) / 100.0f;
+  return out;
+}
+
 static OptF white_as_percent(const Snapshot &s) {
   if (!finite_num(s.light_white))
     return {};
   OptF out;
   out.has = true;
   out.value = s.light_white_is_lux ? white_lux_to_percent(s.light_white.value) : s.light_white.value;
-  return out;
+  return driven(out, s.light_brightness);
 }
 
 static void write_errors(std::string &o, const Snapshot &s, bool *first) {
@@ -301,9 +311,9 @@ std::string status_json(const Snapshot &s) {
   } else {
     o += ",\"rgba\":{";
     bool rfirst = true;
-    add_pct1(o, "r", s.light_r, &rfirst);
-    add_pct1(o, "g", s.light_g, &rfirst);
-    add_pct1(o, "b", s.light_b, &rfirst);
+    add_pct1(o, "r", driven(s.light_r, s.light_brightness), &rfirst);
+    add_pct1(o, "g", driven(s.light_g, s.light_brightness), &rfirst);
+    add_pct1(o, "b", driven(s.light_b, s.light_brightness), &rfirst);
     add_pct1(o, "a", white_as_percent(s), &rfirst);
     o += '}';
     lfirst = false;
