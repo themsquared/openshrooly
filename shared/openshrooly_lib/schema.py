@@ -171,6 +171,10 @@ def validate_profile(data: dict[str, Any] | MushroomProfile) -> MushroomProfile:
         _require(0 <= stage.light.sunrise_hour <= 23, f"stage {stage.id} sunrise_hour invalid")
         _require(0 <= stage.light.duration_hours <= 24, f"stage {stage.id} light duration invalid")
         _require(0 <= stage.light.white_led_lux <= 4000, f"stage {stage.id} white_led_lux invalid")
+        _require(
+            stage.light.blue_umol_m2s is None or 0 <= stage.light.blue_umol_m2s <= 200,
+            f"stage {stage.id} blue_umol_m2s invalid",
+        )
         light_on = (
             stage.light.white_led_lux > 0
             or stage.light.red_percent > 0

@@ -538,7 +538,7 @@ test("Lykyn fruiting apply converts 92 lux to percent and accepts a Colonization
   assert.equal(res.data.results[0].status, "queued", JSON.stringify(res.data));
   const p = JSON.parse((await rows(ctx))[0].payload);
   assert.equal(p.grow_phase, "Fruiting");
-  assert.equal(p.white_intensity, 2.3, "92 lux is 2.3% of the maximum");
+  assert.equal(p.white_intensity, 23, "92 lux is 23% of the Lykyn ring (estimated 400 lux at 100%)");
   assert.equal(p.light_hours, fruiting.light.duration_hours);
   const stage = await call(ctx, "POST", "/api/fleet/devices/dev-1/apply", {
     token,
@@ -782,7 +782,7 @@ test("Lykyn light still converts a recipe in lux, and Shrooly keeps its lux beha
   const lykyn = await setupLykyn("white-recipe@example.com");
   const a = await lightApply(lykyn.ctx, lykyn.token, { white_led_lux: 92 });
   assert.equal(a.data.results[0].status, "queued", JSON.stringify(a.data));
-  assert.equal(JSON.parse((await rows(lykyn.ctx))[0].payload).white_intensity, 2.3);
+  assert.equal(JSON.parse((await rows(lykyn.ctx))[0].payload).white_intensity, 23, "92 lux is 23% of the Lykyn ring");
   const shrooly = await setupSl5("white-shrooly@example.com");
   const b = await lightApply(shrooly.ctx, shrooly.token, { white_percent: 50 });
   assert.equal(b.data.results[0].status, "queued", JSON.stringify(b.data));
@@ -826,8 +826,11 @@ test("white converts to percent and back inside the adapter, exactly, all the wa
   assert.equal(shrooly.fromPercent(78), 3120);
   assert.equal(shrooly.toPercent(4000), 100);
   assert.equal(lykyn.fromPercent(100), 100);
-  assert.equal(shrooly.percentFromRecipeLux(150), lykyn.percentFromRecipeLux(150));
+  // The same lux target is a different percent on each chamber: lux / 40 on the Shrooly, lux / 4 on the Lykyn estimate.
+  assert.equal(shrooly.percentFromRecipeLux(150), 3.75);
+  assert.equal(lykyn.percentFromRecipeLux(150), 37.5);
   assert.equal(shrooly.percentFromRecipeLux(92), 2.3);
+  assert.equal(lykyn.percentFromRecipeLux(92), 23);
 });
 
 
@@ -840,10 +843,10 @@ test("white converts to percent and back inside the adapter, exactly, all the wa
 
 const FIXTURES = [
   { name: "Shrooly", type: "shrooly_chamber", setup: setupSl5, base: SL5_READING, white: 92 },
-  { name: "Lykyn", type: "lykyn_chamber", setup: setupLykyn, base: LYKYN_READING, white: 2.3 },
+  { name: "Lykyn", type: "lykyn_chamber", setup: setupLykyn, base: LYKYN_READING, white: 23 },
 ];
+const LUX_STEP = 5;
 const FAN_FLOOR = 33; // the strictest chamber's minimum: below it both chambers end up at the floor
-const WHITE_STEP = 0.125; // the Shrooly takes white in 5 lux steps, which is 0.125 percent
 const FAN_STEP = 5; // the coarsest chamber's step: the chambers snap a fan figure to their own step
 
 function canonicalCommand(adapter, p) {
@@ -856,7 +859,8 @@ function canonicalCommand(adapter, p) {
     period: p.air_exchange_period_min ?? null,
     run: p.air_exchange_run_sec ?? null,
     light_hours: p.light_hours ?? null,
-    white_percent: p.white_intensity == null ? null : Math.round(adapter.white.toPercent(p.white_intensity) / WHITE_STEP) * WHITE_STEP,
+    // The physical target is the same on every chamber, so compare lux (to the Shrooly's 5 lux step), not percent.
+    white_lux: p.white_intensity == null ? null : Math.round(adapter.white.toLux(p.white_intensity) / LUX_STEP) * LUX_STEP,
     rgb: ["color_r", "color_g", "color_b"].map((k) => p[k] ?? null),
   };
   return out;

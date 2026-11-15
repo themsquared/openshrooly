@@ -148,7 +148,14 @@ function exactProfileStage(profile, stageId) {
 function stageLightForSite(stage = {}, caps = {}) {
   const light = lightFromStage(stage);
   if (!light) return null;
-  return { ...light, white_percent: light.white_led_lux == null ? null : deviceAdapter(caps).white.percentFromRecipeLux(light.white_led_lux) };
+  const adapter = deviceAdapter(caps);
+  const limits = adapter.light.limits(stage.light);
+  return {
+    ...light,
+    white_percent: light.white_led_lux == null ? null : adapter.white.percentFromRecipeLux(light.white_led_lux),
+    blue_percent: adapter.light.bluePercent(light) ?? light.blue_percent,
+    ...(limits.length ? { limits, limit_note: limits.map((l) => l.note).join(" ") } : {}),
+  };
 }
 
 function lightFromStage(stage = {}) {
@@ -161,6 +168,7 @@ function lightFromStage(stage = {}) {
     red_percent: light.red_percent ?? null,
     green_percent: light.green_percent ?? null,
     blue_percent: light.blue_percent ?? null,
+    ...(light.blue_umol_m2s != null ? { blue_umol_m2s: light.blue_umol_m2s } : {}),
   };
 }
 

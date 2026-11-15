@@ -317,7 +317,7 @@ test("Colonizing and Colonization are the same stage, named for the chamber", ()
   assert.equal(knobs.white_intensity, 0);
   assert.equal(knobs.light_hours, 0);
   const fruiting = pearl.stages.find((st) => st.id === "fruiting");
-  assert.equal(recipeKnobs(fruiting, "fruiting", lykyn).white_intensity, 2.3, "92 lux is 2.3% of the maximum");
+  assert.equal(recipeKnobs(fruiting, "fruiting", lykyn).white_intensity, 23, "92 lux is 23% of the Lykyn ring (estimated)");
   assert.equal(recipeKnobs(fruiting, "fruiting", caps105).white_intensity, 92);
   assert.equal(recipeKnobs(col, "colonization", caps105).grow_phase, "Colonizing");
 });

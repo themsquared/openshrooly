@@ -1110,6 +1110,10 @@ export function collectProfileIssues(profile, extra = {}) {
         addIssue(issues, `stages.${stage.id}.light.${channel}`, `${label} ${channel.replace("_percent", "")} must be 0 to 100%.`);
       }
     }
+    // Optional physical blue target. Chambers with a blue calibration turn it into their own blue percent.
+    if (light.blue_umol_m2s != null && !inRange(light.blue_umol_m2s, 0, 200)) {
+      addIssue(issues, `stages.${stage.id}.light.blue_umol_m2s`, `${label} blue target must be 0 to 200 umol/m2/s.`);
+    }
     if (lightChannelsOn(light) && !(Number(light.duration_hours) > 0)) {
       addIssue(
         issues,
