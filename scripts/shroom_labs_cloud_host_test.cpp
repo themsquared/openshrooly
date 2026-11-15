@@ -772,12 +772,13 @@ int main() {
   expect(!eng.wiping(), "engine not wiping when linked");
 
   // What is growing rides on the inbox and shows on the chamber's own page while linked.
-  expect(eng.grow_json() == "{\"linked\":true,\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\"}", "no grow before inbox");
+  expect(eng.grow_json() == "{\"linked\":true,\"grow_name\":\"\",\"grow_url\":\"\",\"grow_image\":\"\",\"profile_id\":\"\"}", "no grow before inbox");
   expect(eng.status_json().find("grow_name") == std::string::npos, "grow not in the login-only status");
   tr.steps = {{"/inbox", ok_body(200,
       "{\"commands\":[],\"cloud_enabled\":true,\"offline_ok\":true,\"grow_name\":\"Lion's Mane\","
       "\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\","
-      "\"grow_image\":\"https://shroomlabs.io/img/species/species-lions-mane-640.webp\"}")}};
+      "\"grow_image\":\"https://shroomlabs.io/img/species/species-lions-mane-640.webp\","
+      "\"profile_id\":\"lions-mane\"}")}};
   tr.i = 0;
   eng.probe_now();
   {
@@ -785,6 +786,8 @@ int main() {
     expect(js.find("\"grow_name\":\"Lion's Mane\"") != std::string::npos, "grow name in status");
     expect(js.find("\"grow_url\":\"https://shroomlabs.io/profiles/lions-mane\"") != std::string::npos, "grow url in status");
     expect(js.find("species-lions-mane-640.webp\"") != std::string::npos, "grow image in status");
+    expect(js.find("\"profile_id\":\"lions-mane\"") != std::string::npos, "profile id in status");
+    expect(eng.grow().id == "lions-mane", "engine grow id");
   }
   // An older server sends no grow keys: keep what the page shows.
   tr.steps = {{"/inbox", ok_body(200, "{\"commands\":[]}")}};
@@ -806,6 +809,12 @@ int main() {
     expect(g.url.empty() && g.image.empty(), "grow links https only");
     expect(parse_inbox_grow("{\"grow_name\":\"\",\"grow_url\":\"https://shroomlabs.io/x\"}", &g) && g.url.empty(),
            "no link without a name");
+    expect(parse_inbox_grow("{\"grow_name\":\"Black Oyster\",\"profile_id\":\"black-oyster\","
+                           "\"grow_image\":\"https://shroomlabs.io/img/x.webp\"}", &g) &&
+               g.id == "black-oyster" && g.name == "Black Oyster" && !g.image.empty(),
+           "profile id stored with name and image");
+    expect(parse_inbox_grow("{\"grow_name\":\"\",\"profile_id\":\"black-oyster\"}", &g) && g.id.empty(),
+           "no profile id without a name");
   }
 
   tr.steps = {{"/rotate", ok_body(429, "{}", true, 120)}};

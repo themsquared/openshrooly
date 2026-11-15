@@ -567,8 +567,20 @@ std::string CloudEngine::grow_json() const {
   out += show ? grow_.url : "";
   out += "\",\"grow_image\":\"";
   out += show ? grow_.image : "";
+  out += "\",\"profile_id\":\"";
+  out += show ? grow_.id : "";
   out += "\"}";
   return out;
+}
+
+InboxGrow CloudEngine::grow() const {
+  std::lock_guard<std::mutex> g(lock_);
+  return grow_;
+}
+
+void CloudEngine::restore_grow(const InboxGrow &grow) {
+  std::lock_guard<std::mutex> g(lock_);
+  grow_ = grow;
 }
 
 std::string CloudEngine::status_json() const {
