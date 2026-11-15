@@ -24,6 +24,7 @@ import {
   rememberDeviceProfile,
   setDeviceAutopilotMode,
 } from "./coach-autopilot.js";
+import { acceptedPhase, CANONICAL_STAGES, DEFAULT_DEVICE_TYPE, deviceTypeLabel } from "./device-adapters.js";
 import { fleetUiEnabled } from "./providers.js";
 import { isoSeconds, SQL as ALERT_SQL } from "./alerts/store.js";
 import { growStage, readRules } from "./alerts/rules.js";
@@ -35,8 +36,6 @@ import {
   chamberKnobs,
   controlSupport,
   deviceCapabilities,
-  GROW_PHASE_OPTIONS,
-  growPhaseForStage,
   KNOB_KEYS,
   lightFromKnobs,
   setpointParts,
@@ -47,7 +46,7 @@ import {
 export const FLEET_ONLINE_MS = READINGS_STALE_MS;
 export const FLEET_COMMAND_TTL_MS = COMMAND_TTL_MS;
 export const RECENT_COMMANDS_SQL = "SELECT * FROM device_commands WHERE device_id=? ORDER BY id DESC LIMIT ?";
-export const DEFAULT_DEVICE_TYPE = "shrooly_chamber";
+export { DEFAULT_DEVICE_TYPE };
 
 /** Commands the local chamber UI can do that the cloud channel cannot send yet. */
 export const LOCAL_ONLY_CONTROLS = [
@@ -75,12 +74,7 @@ export const CLOUD_CONTROLS = [
   { id: "grow", label: "Grow start day" },
 ];
 
-export function deviceTypeLabel(type) {
-  const id = String(type || DEFAULT_DEVICE_TYPE);
-  if (id === "shrooly_chamber") return "Shrooly chamber";
-  if (id === "lykyn_chamber") return "Lykyn Chamber";
-  return id.replaceAll("_", " ");
-}
+export { deviceTypeLabel };
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -485,8 +479,8 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
   if (action === "stage") {
     const out = {};
     if (payload.grow_phase != null && payload.grow_phase !== "") {
-      const phase = growPhaseForStage(String(payload.grow_phase));
-      if (!phase) return { ok: false, error: `Phase must be one of ${GROW_PHASE_OPTIONS.join(", ")}.` };
+      const phase = acceptedPhase(String(payload.grow_phase));
+      if (!phase) return { ok: false, error: `Stage must be one of ${CANONICAL_STAGES.join(", ")}.` };
       out.grow_phase = phase;
     }
     if (payload.grow_day != null && payload.grow_day !== "") {
