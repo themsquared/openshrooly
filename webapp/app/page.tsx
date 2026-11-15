@@ -16,11 +16,17 @@ import Icon from './components/Icon'
 import LiveGauge from './components/LiveGauge'
 import LightTimeline from './components/LightTimeline'
 import ProfileStrip from './components/ProfileStrip'
+import StagePicker from './components/StagePicker'
 import ConnectionBanner from './components/ConnectionBanner'
 import FirstRun from './components/FirstRun'
 import CloudSettings from './components/CloudSettings'
 import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
 import type { EntityState } from './entity-types'
+import { STAGES_AVAILABLE, WHITE_UNIT, currentStage, stageWrites } from '../lib/device-adapter'
+import { CARDS } from '../lib/stage-standard'
+
+/** Card names come from the standard, so every chamber says the same words. */
+const CARD_LABEL = Object.fromEntries(CARDS.map((card) => [card.id, card.label])) as Record<string, string>
 
 interface ModalState {
   type: 'humidity' | 'temperature' | 'air' | 'light' | 'water' | 'settings' | 'calibrate' | null
@@ -62,6 +68,8 @@ export default function Dashboard() {
   const [lastError, setLastError] = useState('')
   const [writeError, setWriteError] = useState('')
   const [applyingPreset, setApplyingPreset] = useState(false)
+  const [stageBusy, setStageBusy] = useState(false)
+  const [stageError, setStageError] = useState('')
   const [wifiMode, setWifiMode] = useState('')
   const [wifiSsid, setWifiSsid] = useState('')
 
@@ -229,6 +237,21 @@ export default function Dashboard() {
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer))
     }
   }, [])
+
+  const pickStage = async (stage: string) => {
+    if (stageBusy) return
+    setStageBusy(true)
+    setStageError('')
+    const writes = stageWrites(stage)
+    const ok = demoMode ? true : await api.applyWrites(writes)
+    if (ok) {
+      setEntities((prev) => ({ ...prev, ...entityPatchFromWrites(writes) }))
+      setReachable(true)
+    } else {
+      setStageError('The chamber did not take that stage. Try again.')
+    }
+    setStageBusy(false)
+  }
 
   const applyPreset = async (preset: GrowPreset) => {
     if (applyingPreset) return
@@ -978,6 +1001,14 @@ export default function Dashboard() {
         stages={demoMode || profileName || cloudGrow.name || (stageName && stageName !== 'Idle') ? DEMO_STAGES : []}
       />
 
+      <StagePicker
+        current={currentStage(growPhase)}
+        available={STAGES_AVAILABLE}
+        busy={stageBusy}
+        error={stageError}
+        onPick={pickStage}
+      />
+
       <LightTimeline
         sunrise={lightSunrise}
         sunset={lightSunset}
@@ -987,11 +1018,10 @@ export default function Dashboard() {
       />
 
       <div className="main-grid">
-        {/* Row 1 */}
         <div className="card card-temp" onClick={() => setModal({ type: 'temperature' })}>
           {heatRequested && <div className="status-rectangle heating-badge">HEATING</div>}
           <div className="card-icon"><Icon name="thermometer" /></div>
-          <div className="card-label">Temperature</div>
+          <div className="card-label">{CARD_LABEL.temperature}</div>
           <div className="card-value card-value-text">{trendText(tempSamples, 0.3)}</div>
           <div className="card-range">{tempRange ?? 'Range for today shows up soon'}</div>
         </div>
@@ -999,34 +1029,33 @@ export default function Dashboard() {
         <div className="card card-humidity" onClick={() => setModal({ type: 'humidity' })}>
           {humidifierOn && <div className="status-rectangle humidifying-badge">HUMIDIFYING</div>}
           <div className="card-icon"><Icon name="droplet" /></div>
-          <div className="card-label">Humidity</div>
+          <div className="card-label">{CARD_LABEL.humidity}</div>
           <div className="card-value card-value-text">{trendText(humiditySamples, 1)}</div>
           <div className="card-target">{humidityRange ?? 'Range for today shows up soon'}</div>
+        </div>
+
+        <div className="card card-light" onClick={() => setModal({ type: 'light' })}>
+          <div className="card-icon"><Icon name={lightsOn ? 'sun' : 'moon'} /></div>
+          <div className="card-label">{CARD_LABEL.light}</div>
+          <div className="card-value">
+            {lightsOn ? getNumber('white_led_intensity') : 'OFF'}
+            {lightsOn && <span className="card-unit">{WHITE_UNIT}</span>}
+          </div>
+          <div className="card-schedule">
+            {lightOnSummary(lightSunrise, lightDuration)}
+          </div>
         </div>
 
         <div className="card card-air" onClick={() => setModal({ type: 'air' })}>
           {airExchangeOn && <div className="status-rectangle running-badge">RUNNING</div>}
           <div className="card-icon"><Icon name="air" /></div>
-          <div className="card-label">Air Exchange</div>
+          <div className="card-label">{CARD_LABEL.air}</div>
           <div className="card-value">
             {getNumber('air_exchange__period__min_')}
             <span className="card-unit">min</span>
           </div>
           <div className="card-detail">
             {getNumber('air_exchange__run_duration__s_')}s @ {getNumber('air_exchange__speed')}%
-          </div>
-        </div>
-
-        {/* Row 2 */}
-        <div className="card card-light" onClick={() => setModal({ type: 'light' })}>
-          <div className="card-icon"><Icon name={lightsOn ? 'sun' : 'moon'} /></div>
-          <div className="card-label">Lighting</div>
-          <div className="card-value">
-            {lightsOn ? getNumber('white_led_intensity') : 'OFF'}
-            {lightsOn && <span className="card-unit">lux</span>}
-          </div>
-          <div className="card-schedule">
-            {lightOnSummary(lightSunrise, lightDuration)}
           </div>
         </div>
 

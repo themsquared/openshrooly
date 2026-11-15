@@ -1209,3 +1209,53 @@ select {
   padding: 4px 10px;
   cursor: pointer;
 }
+
+/* Stage picker: the same four buttons on every chamber. */
+.stage-picker {
+  margin: 0 0 16px;
+}
+
+.stage-picker-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.stage-pick {
+  background: var(--sl-bg-2);
+  border: 1px solid var(--sl-line);
+  border-radius: 12px;
+  color: inherit;
+  font: inherit;
+  padding: 12px 6px;
+  cursor: pointer;
+}
+
+.stage-pick.is-current {
+  border-color: var(--sl-line-strong);
+  box-shadow: 0 0 0 1px var(--sl-spore-deep);
+}
+
+.stage-pick:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stage-picker-note {
+  color: var(--sl-muted);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.stage-picker-error {
+  color: var(--sl-heat);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+@media (max-width: 480px) {
+  .stage-picker-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
