@@ -125,13 +125,12 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "white_scale": "output",
-    "why": "Colonization stays dark. Fruiting uses 12 h and 30.725% white, mapped from 1250 lux (cordycepin optimum in Wu 2016; 1750 lux gave more dry weight). RGB is blue-heavy from later LED work on compound levels, not from a yield result or a measured spectrum on this strip.",
+    "why": "Colonization stays dark. Fruiting uses 12 h and 51% white, mapped from 1250 lux (cordycepin optimum in Wu 2016; 1750 lux gave more dry weight). RGB is blue-heavy from later LED work on compound levels, not from a yield result or a measured spectrum on this strip.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [
       {
         "title": "Wu 2016 Cordyceps militaris",
-        "detail": "Chiu-Yeh Wu et al., Effects of Illumination Pattern during Cultivation of Fruiting Body and Bioactive Compound Production by Cordyceps militaris, Int. J. Med. Mushrooms 18 (2016). Colonization in a spawn room without a stated photoperiod. Primordia and fruiting at 12 h per day. Highest dry yield at 1750 plus or minus 250 lux. Highest cordycepin at 1250 plus or minus 250 lux. This recipe maps 30.725% white to about 1250 lux.",
+        "detail": "Chiu-Yeh Wu et al., Effects of Illumination Pattern during Cultivation of Fruiting Body and Bioactive Compound Production by Cordyceps militaris, Int. J. Med. Mushrooms 18 (2016). Colonization in a spawn room without a stated photoperiod. Primordia and fruiting at 12 h per day. Highest dry yield at 1750 plus or minus 250 lux. Highest cordycepin at 1250 plus or minus 250 lux. This recipe maps 51% white to about 1250 lux.",
         "url": "https://doi.org/10.1615/intjmedmushrooms.v18.i7.40"
       },
       {
@@ -150,14 +149,14 @@
       },
       "fruiting": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 30.725,
+        "white_brightness_percent": 51,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "pinning": {
         "photoperiod_hours": 12,
-        "white_brightness_percent": 30.725,
+        "white_brightness_percent": 51,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80

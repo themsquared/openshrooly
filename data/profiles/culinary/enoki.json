@@ -125,7 +125,6 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "white_scale": "output",
     "why": "Commercial long-stem enoki is grown with little light. Sakamoto 2004 showed a cold dark room makes long pale pinhead fruits; light then forms a cap. This recipe keeps both phases at 0 h so stems stay long. That is a morphology choice from the paper, not a lux number.",
     "wavelength_note": "WS2812 blue is roughly 465 to 475 nm. The RGB mix is an approximation of cited wavelengths, not a measured spectrum.",
     "sources": [

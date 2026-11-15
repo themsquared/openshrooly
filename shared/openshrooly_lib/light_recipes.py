@@ -9,26 +9,25 @@ from __future__ import annotations
 
 from .models import LightPhase, LightRecipe, SourceNote, WAVELENGTH_NOTE
 
-# White percent is a share of the chamber's maximum output: on the Shrooly, lux = 40 x percent,
-# so 2.3% is 92 lux. These values are the lux the recipes made before the scale change
-# (the firmware curve at 20%, 26%, 37%, 51% and so on) divided by 40, so no light changed.
+# Firmware white channel: 20% is 92 lux (lighting_control_manager.yaml).
+# These percents are the inverse of that curve, rounded to whole numbers.
 DARK = LightPhase(0, 0, 0, 0, 0)
-# Penn State oyster rooms: 50 to 300 lux. 2.3% white is 92 lux on this strip.
-OYSTER_FRUITING = LightPhase(12, 2.3, 0, 0, 80)
-# 500 lux cited for reishi and maitake yield maps to 12.65% white.
-LUX_500 = LightPhase(12, 12.65, 0, 0, 80)
+# Penn State oyster rooms: 50 to 300 lux. 20% white is 92 lux on this strip.
+OYSTER_FRUITING = LightPhase(12, 20, 0, 0, 80)
+# 500 lux cited for reishi and maitake yield maps to 37% white.
+LUX_500 = LightPhase(12, 37, 0, 0, 80)
 # Chi 2008: white outyielded blue, so maitake uses white only at that 500 lux.
-MAITAKE_FRUITING = LightPhase(12, 12.65, 0, 0, 0)
-# 200 lux maps to 4.75% white. Jozifek 2025 additional tests used 200 lux on a 12 h cycle.
-LUX_200 = LightPhase(12, 4.75, 0, 0, 80)
-# Cordyceps 1250 lux (cordycepin optimum in Wu 2016) maps to 30.725% white.
-CORDYCEPS_FRUITING = LightPhase(12, 30.725, 0, 0, 80)
+MAITAKE_FRUITING = LightPhase(12, 37, 0, 0, 0)
+# 200 lux maps to 26% white. Jozifek 2025 additional tests used 200 lux on a 12 h cycle.
+LUX_200 = LightPhase(12, 26, 0, 0, 80)
+# Cordyceps 1250 lux (cordycepin optimum in Wu 2016) maps to 51% white.
+CORDYCEPS_FRUITING = LightPhase(12, 51, 0, 0, 80)
 # Commercial long-stem enoki: keep light off so caps stay small.
 ENOKI_FRUITING = LightPhase(0, 0, 0, 0, 0)
 # Button mushroom: light is not required for fruiting.
 AGARICUS_FRUITING = LightPhase(0, 0, 0, 0, 0)
 # General default when no variety-specific lux exists: same 12 h / 20% / blue mix.
-GENERAL_FRUITING = LightPhase(12, 2.3, 0, 0, 80)
+GENERAL_FRUITING = LightPhase(12, 20, 0, 0, 80)
 
 
 def _src(title: str, detail: str, url: str | None = None) -> SourceNote:
@@ -74,7 +73,7 @@ PENN_STATE_OYSTER = _src(
     "Sciences. First 12 to 21 days of spawn run may be completed without artificial lighting. "
     "After spawn run, 4 h of cool white fluorescent light at 50 to 300 lux may be provided. "
     "This recipe uses 12 h as a labeled default photoperiod, not a page-cited Stamets value, "
-    "and maps 2.3% white to 92 lux, inside that 50 to 300 lux band.",
+    "and maps 20% white to 92 lux, inside that 50 to 300 lux band.",
     "https://mushroomcompany.com/resources/oyster/paoyster.pdf",
 )
 RICHARTZ_1987 = _src(
@@ -151,7 +150,7 @@ JOZIFEK_2025 = _src(
     "Agriculture 15 (2025). The main cultivation used 500 lux for 24 h continuous light "
     "and caused pink stress coloring. Additional tests at 200 lux or lower on a 12 h "
     "cycle produced white basidiocarps. This recipe uses that 200 lux, 12 h schedule. "
-    "200 lux maps to 4.75% white.",
+    "200 lux maps to 26% white.",
     "https://doi.org/10.3390/agriculture15050460",
 )
 SAKAMOTO_ENOKI = _src(
@@ -168,7 +167,7 @@ WU_2016_CORDYCEPS = _src(
     "Body and Bioactive Compound Production by Cordyceps militaris, Int. J. Med. Mushrooms "
     "18 (2016). Colonization in a spawn room without a stated photoperiod. Primordia and "
     "fruiting at 12 h per day. Highest dry yield at 1750 plus or minus 250 lux. Highest "
-    "cordycepin at 1250 plus or minus 250 lux. This recipe maps 30.725% white to about 1250 lux.",
+    "cordycepin at 1250 plus or minus 250 lux. This recipe maps 51% white to about 1250 lux.",
     "https://doi.org/10.1615/intjmedmushrooms.v18.i7.40",
 )
 LIN_2024 = _src(
@@ -199,7 +198,7 @@ CHI_2008 = _src(
     "Jeong-Hyun Chi et al., Studies on Favorable Light Condition for Artificial "
     "Cultivation of Grifola frondosa, Korean J. Mycology 36 (2008). White light "
     "outyielded blue and green. Primordia formed best at 200 lux. Yield was best at "
-    "500 lux. 500 lux maps to 12.65% white.",
+    "500 lux. 500 lux maps to 37% white.",
     "https://doi.org/10.4489/kjm.2008.36.1.031",
 )
 KURAHASHI_2015 = _src(
@@ -215,7 +214,7 @@ REISHI_PHD = _src(
     "Corvinus University reishi thesis",
     "Petra Maszlaver, Cultivation possibilities for production of reishi mushroom "
     "Ganoderma lucidum, Corvinus University of Budapest PhD (2011). Literature table: "
-    "200 to 500 lux in early fruiting, 500 to 1000 lux later. 500 lux maps to 12.65% white.",
+    "200 to 500 lux in early fruiting, 500 to 1000 lux later. 500 lux maps to 37% white.",
     "https://phd.lib.uni-corvinus.hu/319/3/maszlaver_petra_ten.pdf",
 )
 REISHI_2024 = _src(
@@ -251,7 +250,7 @@ GENERAL_DEFAULT = _src(
     "General default",
     "No variety-specific photoperiod or lux was found for this species. Colonization is "
     "dark (Sakamoto 2018; Penn State oyster spawn run). Fruiting uses 12 h as a labeled "
-    "default, not a page-cited Stamets value, and 2.3% white, which is 92 lux on this "
+    "default, not a page-cited Stamets value, and 20% white, which is 92 lux on this "
     "chamber, inside the Penn State oyster 50 to 300 lux band. Blue 80% approximates the "
     "440 to 470 nm finding. This is a labeled default, not a measured value for this "
     "variety.",
@@ -260,11 +259,11 @@ GENERAL_DEFAULT = _src(
 OYSTER_WHY = (
     "Colonization stays dark, as in Penn State spawn-run rooms. Fruiting uses 12 h and a "
     "blue-heavy mix because P. ostreatus aggregates and forms caps under 440 to 470 nm light. "
-    "White 2.3% is 92 lux on this strip, inside the Penn State 50 to 300 lux band."
+    "White 20% is 92 lux on this strip, inside the Penn State 50 to 300 lux band."
 )
 GENERAL_WHY = (
     "No variety-specific light numbers were found. Colonization is dark. Fruiting uses the "
-    "general default: 12 h, 2.3% white (92 lux on this chamber), and 80% blue as a WS2812 "
+    "general default: 12 h, 20% white (92 lux on this chamber), and 80% blue as a WS2812 "
     "stand-in for 440 to 470 nm."
 )
 
@@ -280,7 +279,7 @@ OFF_MENU_NOTE = _src(
 )
 CUBENSIS_WHY = (
     "P. cubensis needs light to start pins, and blue light works for that. Colonization is "
-    "dark. Pinning and fruiting get 12 hours a day at 2.3% white (92 lux on this chamber) "
+    "dark. Pinning and fruiting get 12 hours a day at 20% white (92 lux on this chamber) "
     "with 80% blue."
 )
 
@@ -288,7 +287,7 @@ CUBENSIS_WHY = (
 def _off_menu_species_why(species: str) -> str:
     return (
         f"No light numbers specific to {species} are known. Colonization is dark. Pinning and "
-        "fruiting use the chamber default: 12 hours a day at 2.3% white (92 lux on this "
+        "fruiting use the chamber default: 12 hours a day at 20% white (92 lux on this "
         "chamber) with 80% blue."
     )
 
@@ -311,7 +310,7 @@ def _king() -> LightRecipe:
     return _recipe(
         "Same dark spawn run as other oysters. Fruiting is blue-heavy because P. eryngii "
         "primordia respond to blue light. Hours and white percent are the oyster default "
-        "(12 h, 2.3% / 92 lux). No king-oyster-specific lux was found.",
+        "(12 h, 20% / 92 lux). No king-oyster-specific lux was found.",
         [XIE_2018, PENN_STATE_OYSTER, STAMETS_BOOK, SAKAMOTO_2018],
         OYSTER_FRUITING,
     )
@@ -323,7 +322,7 @@ RECIPES: dict[str, LightRecipe] = {
     "black-oyster": _oyster(),
     "pink-oyster": _recipe(
         "P. djamor has no variety-specific lux in the sources below. The recipe is the "
-        "P. ostreatus oyster default (dark colonize, 12 h, 2.3% white, blue-heavy RGB) "
+        "P. ostreatus oyster default (dark colonize, 12 h, 20% white, blue-heavy RGB) "
         "and is labeled as such.",
         [PENN_STATE_OYSTER, RICHARTZ_1987, WANG_2020, STAMETS_BOOK, GENERAL_DEFAULT],
         OYSTER_FRUITING,
@@ -343,7 +342,7 @@ RECIPES: dict[str, LightRecipe] = {
     "king-oyster": _king(),
     "king-oyster-thick-stem": _king(),
     "lions-mane": _recipe(
-        "Colonization is dark to limit early pins. Fruiting uses 12 h and 4.75% white, "
+        "Colonization is dark to limit early pins. Fruiting uses 12 h and 26% white, "
         "mapped from Jozifek et al. 2025 additional tests at 200 lux on a 12 h cycle, "
         "which produced white basidiocarps. Their main 500 lux treatment was 24 h "
         "continuous light and caused pink stress coloring, so that schedule is not used. "
@@ -354,12 +353,12 @@ RECIPES: dict[str, LightRecipe] = {
     ),
     "shiitake": _recipe(
         "Colonization stays dark (mycelium grows faster without strong light). The "
-        "browning rest gets low light: 12 h at 4.75% white (about 200 lux) with the "
+        "browning rest gets low light: 12 h at 26% white (about 200 lux) with the "
         "general blue mix. Browning of the block skin is light induced (Yoo 2019). Kim "
         "2024 browned blocks under 40 to 60 days of blue or white light and cites high "
         "browning efficiency at 200 lux. Koo 2018 saw less browning at the highest "
         "intensities tested. Cold shock stays dark. Fruiting uses 12 h and the general "
-        "2.3% white / blue mix. Leatham found blue helped only on high-calcium media and "
+        "20% white / blue mix. Leatham found blue helped only on high-calcium media and "
         "suppressed fruiting on low-calcium media. Kim 2024 applied blue during "
         "incubation, not fruiting. No shiitake-specific fruiting lux for this chamber "
         "was found.",
@@ -377,7 +376,7 @@ RECIPES: dict[str, LightRecipe] = {
         cold_shock=DARK,
     ),
     "reishi": _recipe(
-        "Colonization is dark. Fruiting uses 12 h and 12.65% white, mapped from 500 lux in "
+        "Colonization is dark. Fruiting uses 12 h and 37% white, mapped from 500 lux in "
         "the Corvinus literature table (200 to 500 lux early, 500 to 1000 lux later). "
         "Blue is the general photomorphogenesis mix. A 2024 paper found green raised "
         "weight and red delayed caps; we do not invent a green-heavy mix from that.",
@@ -403,7 +402,7 @@ RECIPES: dict[str, LightRecipe] = {
         ENOKI_FRUITING,
     ),
     "maitake": _recipe(
-        "Colonization is dark. Fruiting uses 12 h (Kurahashi 2015) and 12.65% white, mapped "
+        "Colonization is dark. Fruiting uses 12 h (Kurahashi 2015) and 37% white, mapped "
         "from the 500 lux yield optimum in Chi 2008. That trial found white outyielded "
         "blue and green, so RGB stays off and the white channel carries the light. Blue "
         "is not used because it conflicted with that yield result.",
@@ -411,7 +410,7 @@ RECIPES: dict[str, LightRecipe] = {
         MAITAKE_FRUITING,
     ),
     "cordyceps-militaris": _recipe(
-        "Colonization stays dark. Fruiting uses 12 h and 30.725% white, mapped from 1250 lux "
+        "Colonization stays dark. Fruiting uses 12 h and 51% white, mapped from 1250 lux "
         "(cordycepin optimum in Wu 2016; 1750 lux gave more dry weight). RGB is blue-heavy "
         "from later LED work on compound levels, not from a yield result or a measured "
         "spectrum on this strip.",

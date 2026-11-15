@@ -7,7 +7,7 @@ import math
 from typing import Any
 from urllib.parse import urlparse
 
-from .mapping import lux_to_white_percent, upgrade_recipe_scale
+from .mapping import lux_to_brightness_percent
 from .models import MushroomProfile
 
 PROFILE_SCHEMA_VERSION = 1
@@ -116,8 +116,6 @@ def normalize_stored_light(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         return data
     out = copy.deepcopy(data)
-    if isinstance(out.get("light_recipe"), dict):
-        out["light_recipe"] = upgrade_recipe_scale(out["light_recipe"])
     stages = out.get("stages")
     if not isinstance(stages, list):
         return out
@@ -135,7 +133,9 @@ def normalize_stored_light(data: dict[str, Any]) -> dict[str, Any]:
                 light = stage["light"]
                 phases[stage["id"]] = {
                     "photoperiod_hours": light["duration_hours"],
-                    "white_brightness_percent": lux_to_white_percent(light["white_led_lux"]),
+                    "white_brightness_percent": int(
+                        math.floor(lux_to_brightness_percent(light["white_led_lux"]) + 0.5)
+                    ),
                     "red_percent": light["red_percent"],
                     "green_percent": light["green_percent"],
                     "blue_percent": light["blue_percent"],

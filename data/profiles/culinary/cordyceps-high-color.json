@@ -125,7 +125,6 @@
     "uses_existing_entities_only": true
   },
   "light_recipe": {
-    "white_scale": "output",
     "why": "Initials keep the free card light. Stroma growth uses red at twice the blue drive level to approximate the two thirds red, one third blue pink light in Dong 2013. White is off because daylight did poorly in that trial.",
     "wavelength_note": "WS2812 red is roughly 620 to 630 nm and blue roughly 465 to 475 nm. The RGB mix is an approximation of the cited wavelengths, not a measured spectrum. RGB percent is LED drive level, not a photon ratio.",
     "sources": [
@@ -136,7 +135,7 @@
       },
       {
         "title": "Wu 2016 Cordyceps militaris",
-        "detail": "Chiu-Yeh Wu et al., Effects of Illumination Pattern during Cultivation of Fruiting Body and Bioactive Compound Production by Cordyceps militaris, Int. J. Med. Mushrooms 18 (2016). Colonization in a spawn room without a stated photoperiod. Primordia and fruiting at 12 h per day. Highest dry yield at 1750 plus or minus 250 lux. Highest cordycepin at 1250 plus or minus 250 lux. This recipe maps 30.725% white to about 1250 lux.",
+        "detail": "Chiu-Yeh Wu et al., Effects of Illumination Pattern during Cultivation of Fruiting Body and Bioactive Compound Production by Cordyceps militaris, Int. J. Med. Mushrooms 18 (2016). Colonization in a spawn room without a stated photoperiod. Primordia and fruiting at 12 h per day. Highest dry yield at 1750 plus or minus 250 lux. Highest cordycepin at 1250 plus or minus 250 lux. This recipe maps 51% white to about 1250 lux.",
         "url": "https://doi.org/10.1615/intjmedmushrooms.v18.i7.40"
       },
       {
@@ -148,21 +147,21 @@
     "phases": {
       "colonization": {
         "photoperiod_hours": 0.0,
-        "white_brightness_percent": 0,
+        "white_brightness_percent": 0.0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 0
       },
       "pinning": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 30.725,
+        "white_brightness_percent": 51.0,
         "red_percent": 0,
         "green_percent": 0,
         "blue_percent": 80
       },
       "fruiting": {
         "photoperiod_hours": 12.0,
-        "white_brightness_percent": 0,
+        "white_brightness_percent": 0.0,
         "red_percent": 100,
         "green_percent": 0,
         "blue_percent": 50

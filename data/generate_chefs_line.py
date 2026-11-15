@@ -229,7 +229,6 @@ def build(pid, base, *, name, strain, tags, price, summary, notes, chamber, sour
     d["stages"] = out_stages
     kept = [s for s in d["light_recipe"]["sources"] if s["title"] in keep_base_recipe_sources]
     d["light_recipe"] = {
-        "white_scale": "output",
         "why": why,
         "wavelength_note": WAVES,
         "sources": recipe_sources + kept,
@@ -259,8 +258,8 @@ def profiles():
             ("fruiting", dict(duration_days=10, temperature_c=16, humidity_percent=90, fan=(10, 40, 40),
                               notes="Cut 7 to 12 days after the head appears, before the spines lengthen.")),
         ],
-        phases={"colonization": DARK, "pinning": phase(12, 1.15, blue=80), "fruiting": phase(12, 1.15, blue=80)},
-        why="Dim light because the source says lion's mane grows best in shade. 1.15% white is about 46 lux. Blue stays at the free card level.",
+        phases={"colonization": DARK, "pinning": phase(12, 10, blue=80), "fruiting": phase(12, 10, blue=80)},
+        why="Dim light because the source says lion's mane grows best in shade. 10% white is about 46 lux. Blue stays at the free card level.",
         recipe_sources=[MM_LIONS], keep_base_recipe_sources=("Jozifek et al. 2025", "Sakamoto 2018"),
     ))
     shiitake_common = [
@@ -282,9 +281,9 @@ def profiles():
             ("fruiting", dict(name="Dry forcing", duration_days=12, temperature_c=14, humidity_percent=60,
                               fan=(10, 60, 60), notes="Dry air hardens the cap skin while the flesh grows. Mist nothing.")),
         ],
-        phases={"colonization": DARK, "browning": phase(12, 4.75, blue=80), "cold_shock": DARK,
-                "pinning": phase(12, 12.65, blue=80), "fruiting": phase(12, 30.725, blue=80)},
-        why="Shiitake caps need 500 to 2,000 lux in the cited table, and less than 500 lux gives long stems. 12.65% white is about 506 lux and 30.725% is about 1,229 lux. Browning keeps the free card light.",
+        phases={"colonization": DARK, "browning": phase(12, 26, blue=80), "cold_shock": DARK,
+                "pinning": phase(12, 37, blue=80), "fruiting": phase(12, 51, blue=80)},
+        why="Shiitake caps need 500 to 2,000 lux in the cited table, and less than 500 lux gives long stems. 37% white is about 506 lux and 51% is about 1,229 lux. Browning keeps the free card light.",
         recipe_sources=[CHEN_SHIITAKE],
         keep_base_recipe_sources=("Koo 2018 shiitake browning LED", "Kim 2024 shiitake blue light"),
     ))
@@ -302,9 +301,9 @@ def profiles():
             ("fruiting", dict(name="Slow cool caps", duration_days=14, temperature_c=15, humidity_percent=75,
                               fan=(12, 35, 40), notes="Pick under 70% open.")),
         ],
-        phases={"colonization": DARK, "browning": phase(12, 4.75, blue=80), "cold_shock": DARK,
-                "pinning": phase(12, 12.65, blue=80), "fruiting": phase(12, 12.65, blue=80)},
-        why="Shiitake caps need 500 to 2,000 lux in the cited table, and less than 500 lux gives long stems. 12.65% white is about 506 lux. Browning keeps the free card light.",
+        phases={"colonization": DARK, "browning": phase(12, 26, blue=80), "cold_shock": DARK,
+                "pinning": phase(12, 37, blue=80), "fruiting": phase(12, 37, blue=80)},
+        why="Shiitake caps need 500 to 2,000 lux in the cited table, and less than 500 lux gives long stems. 37% white is about 506 lux. Browning keeps the free card light.",
         recipe_sources=[CHEN_SHIITAKE],
         keep_base_recipe_sources=("Koo 2018 shiitake browning LED", "Kim 2024 shiitake blue light"),
     ))
@@ -321,7 +320,7 @@ def profiles():
             ("pinning", {}),
             ("fruiting", dict(name="Stroma, pink light", notes="Red and blue only. White stays off.")),
         ],
-        phases={"colonization": DARK, "pinning": phase(12, 30.725, blue=80), "fruiting": phase(12, 0, red=100, blue=50)},
+        phases={"colonization": DARK, "pinning": phase(12, 51, blue=80), "fruiting": phase(12, 0, red=100, blue=50)},
         why="Initials keep the free card light. Stroma growth uses red at twice the blue drive level to approximate the two thirds red, one third blue pink light in Dong 2013. White is off because daylight did poorly in that trial.",
         recipe_sources=[DONG_CORDY], keep_base_recipe_sources=("Wu 2016 Cordyceps militaris", "Lin et al. 2024 Cordyceps LED"),
     ))
@@ -339,7 +338,7 @@ def profiles():
             ("fruiting", dict(name="Baby fruiting", duration_days=6, temperature_c=15, humidity_percent=88, fan=(8, 60, 50),
                               notes="Strong but not maximum air. Too much air movement also deforms fruits.")),
         ],
-        phases={"colonization": DARK, "pinning": phase(12, 2.3, blue=80), "fruiting": phase(12, 2.3, blue=80)},
+        phases={"colonization": DARK, "pinning": phase(12, 20, blue=80), "fruiting": phase(12, 20, blue=80)},
         why="Light stays at the free card default. This profile changes air and timing, not light.",
         recipe_sources=[], keep_base_recipe_sources=("Penn State oyster production", "Wang 2020 blue versus red"),
     ))
@@ -356,8 +355,8 @@ def profiles():
             ("pinning", dict(duration_days=5, temperature_c=15, humidity_percent=93, fan=(12, 40, 45))),
             ("fruiting", dict(name="Cool dark caps", duration_days=10, temperature_c=13, humidity_percent=87, fan=(10, 45, 45))),
         ],
-        phases={"colonization": DARK, "pinning": phase(12, 4.75, blue=80), "fruiting": phase(12, 4.75, blue=80)},
-        why="4.75% white is about 190 lux: above the 120 lux that gave dark caps in Scientia Agricola 2003 and inside the 60 to 300 lux band in the MAPA leaflet.",
+        phases={"colonization": DARK, "pinning": phase(12, 26, blue=80), "fruiting": phase(12, 26, blue=80)},
+        why="26% white is about 190 lux: above the 120 lux that gave dark caps in Scientia Agricola 2003 and inside the 60 to 300 lux band in the MAPA leaflet.",
         recipe_sources=[BRAZIL_OYSTER, MAPA_OYSTER], keep_base_recipe_sources=("De Bonis 2024 LED wavelengths",),
     ))
     P.append(build(
@@ -373,7 +372,7 @@ def profiles():
             ("pinning", {}),
             ("fruiting", dict(name="Blue fruiting", fan=(15, 35, 40))),
         ],
-        phases={"colonization": DARK, "pinning": phase(12, 2.3, blue=80), "fruiting": phase(12, 0, blue=100)},
+        phases={"colonization": DARK, "pinning": phase(12, 20, blue=80), "fruiting": phase(12, 0, blue=100)},
         why="Fruiting runs on blue only because pure blue gave fuller color, shorter stems, and more umami than white in Chen 2025.",
         recipe_sources=[FRONT_GOLDEN, IJMM_GOLDEN],
     ))
@@ -407,8 +406,8 @@ def profiles():
             ("pinning", dict(name="Dim pinning")),
             ("fruiting", dict(name="Bright fruiting", temperature_c=15, humidity_percent=90)),
         ],
-        phases={"colonization": phase(12, 1.275), "pinning": phase(12, 0.125), "fruiting": phase(12, 12.65)},
-        why="1.275% white is about 51 lux in spawn run. 0.125% white is about 5 lux, the dimmest step near the 2 lux that gave the most primordia. 12.65% white is about 506 lux, where caps were largest and yield peaked.",
+        phases={"colonization": phase(12, 11), "pinning": phase(12, 1), "fruiting": phase(12, 37)},
+        why="11% white is about 51 lux in spawn run. 1% white is about 5 lux, the dimmest step near the 2 lux that gave the most primordia. 37% white is about 506 lux, where caps were largest and yield peaked.",
         recipe_sources=[INATOMI_SHIMEJI],
     ))
     P.append(build(
@@ -424,7 +423,7 @@ def profiles():
             ("pinning", {}),
             ("fruiting", dict(name="Red fruiting", temperature_c=15, humidity_percent=93)),
         ],
-        phases={"colonization": DARK, "pinning": phase(12, 2.3, blue=80), "fruiting": phase(12, 0, red=100)},
+        phases={"colonization": DARK, "pinning": phase(12, 20, blue=80), "fruiting": phase(12, 0, red=100)},
         why="Pure red gave 78.4% more stipe growth and 90% more fruit mass than white in Liu 2024. Pinning keeps the free card light.",
         recipe_sources=[LIU_CHESTNUT],
     ))
@@ -441,8 +440,8 @@ def profiles():
             ("pinning", {}),
             ("fruiting", dict(name="Bright fruiting")),
         ],
-        phases={"colonization": DARK, "pinning": phase(12, 2.3, blue=80), "fruiting": phase(12, 60.125, blue=100)},
-        why="60.125% white is about 2,400 lux plus full blue. Darker ears came with more light in Qiu 2023 and with blue light in the 2026 study. The chamber is far below the top intensity in Qiu 2023, so this is the brightest practical setting, not a match.",
+        phases={"colonization": DARK, "pinning": phase(12, 20, blue=80), "fruiting": phase(12, 65, blue=100)},
+        why="65% white is about 2,400 lux plus full blue. Darker ears came with more light in Qiu 2023 and with blue light in the 2026 study. The chamber is far below the top intensity in Qiu 2023, so this is the brightest practical setting, not a match.",
         recipe_sources=[CELLS_WOODEAR, AGRI_WOODEAR],
     ))
     return P

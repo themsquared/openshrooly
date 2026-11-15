@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-from .light_scale import LIGHT_SCALE, upgrade_recipe_scale
-
 PaymentKind = Literal["free", "paid"]
 PackId = Literal["culinary", "psilocybin"]
 StageId = Literal["colonization", "pinning", "fruiting", "rest", "flush", "cold_shock", "browning"]
@@ -115,7 +113,6 @@ class LightRecipe:
     def to_dict(self) -> dict[str, Any]:
         return {
             "why": self.why,
-            "white_scale": LIGHT_SCALE,
             "wavelength_note": self.wavelength_note,
             "sources": [note.to_dict() for note in self.sources],
             "phases": {name: phase.to_dict() for name, phase in self.phases.items()},
@@ -125,7 +122,6 @@ class LightRecipe:
     def from_dict(cls, data: dict[str, Any] | None) -> "LightRecipe | None":
         if not data:
             return None
-        data = upgrade_recipe_scale(data)
         phases = {
             name: LightPhase.from_dict(phase) for name, phase in (data.get("phases") or {}).items()
         }
