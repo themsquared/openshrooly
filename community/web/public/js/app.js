@@ -38,7 +38,7 @@ import {
   speciesLine,
   stageOptionsHtml,
 } from "./device-ui.js";
-import { collectStageLightIssues, lightOnSummary, whitePercentToLux } from "./profile-schema.js";
+import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
 import { mountPhotoCheck } from "./coach-photo.js";
 import { mountFeed } from "./feed.js";
@@ -363,7 +363,7 @@ async function renderGrowThis(profile) {
       if (!result || result.status === "failed") throw new Error(resultMessage(result));
       confirmRow.classList.add("hidden");
       if (!isOffMenu(profile)) track("profile_apply", { item_id: profile.id, item_category: detailItem(profile).item_category, source: "profile" });
-      const when = result.status === "queued" ? "Your chamber picks it up in about 15 minutes." : "Your chamber has it.";
+      const when = result.status === "queued" ? "The chamber checks in about every 15 minutes, so it lands within 15 minutes, usually sooner." : "Your chamber has it.";
       msg.innerHTML = `Sent. ${when} <a href="/device?id=${encodeURIComponent(deviceId)}">Open the chamber</a>`;
     } catch (err) {
       yes.disabled = false;
@@ -2348,7 +2348,8 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           payload.light = {
             sunrise_hour: numberOrUndefined(form.sunrise_hour.value),
             duration_hours: numberOrUndefined(form.duration_hours.value),
-            white_led_lux: whitePct == null ? undefined : whitePercentToLux(whitePct),
+            // Percent goes out as a percent. The server converts it for a chamber that takes lux.
+            white_percent: whitePct,
             red_percent: numberOrUndefined(form.red_percent.value),
             green_percent: numberOrUndefined(form.green_percent.value),
             blue_percent: numberOrUndefined(form.blue_percent.value),
@@ -2645,7 +2646,7 @@ async function renderFleet() {
       const light = {};
       if ($("#bulk-sunrise").value) light.sunrise_hour = Number($("#bulk-sunrise").value);
       if ($("#bulk-duration").value) light.duration_hours = Number($("#bulk-duration").value);
-      if ($("#bulk-white").value) light.white_led_lux = whitePercentToLux(Number($("#bulk-white").value));
+      if ($("#bulk-white").value) light.white_percent = Number($("#bulk-white").value);
       if ($("#bulk-red").value) light.red_percent = Number($("#bulk-red").value);
       if ($("#bulk-green").value) light.green_percent = Number($("#bulk-green").value);
       if ($("#bulk-blue").value) light.blue_percent = Number($("#bulk-blue").value);

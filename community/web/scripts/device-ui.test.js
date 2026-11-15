@@ -20,6 +20,9 @@ import {
   commandStatusLabel,
   commandPending,
   newRequestId,
+  whiteIsPercentDevice,
+  SENT_MESSAGE,
+  LYKYN_LIGHT_NOTE,
 } from "../public/js/device-ui.js";
 
 const DASH = /[\u2013\u2014]/;
@@ -80,8 +83,6 @@ test("Coach Autopilot locks every target field and leaves mode and name editable
     "temperature_c",
     "humidity_percent",
     "fan_speed_percent",
-    "profile_id",
-    "stage",
     "sunrise_hour",
     "duration_hours",
     "white_percent",
@@ -90,7 +91,11 @@ test("Coach Autopilot locks every target field and leaves mode and name editable
   }
   assert.match(html, /data-action="climate"[^>]*disabled/);
   assert.match(html, /data-action="light"[^>]*disabled/);
-  assert.match(html, /data-action="profile"[^>]*disabled/);
+  // Starting a grow is the grower's choice of what is growing, so it stays open under Coach.
+  assert.doesNotMatch(html, /name="profile_id"[^>]*disabled/);
+  assert.doesNotMatch(html, /name="stage"[^>]*disabled/);
+  assert.doesNotMatch(html, /data-action="profile"[^>]*disabled/);
+  assert.match(html, /Starting a grow still works/);
   assert.doesNotMatch(html, /name="coach_mode"[^>]*disabled/);
   assert.doesNotMatch(html, /name="device_name"[^>]*disabled/);
   assert.doesNotMatch(html, /data-action="name"[^>]*disabled/);
@@ -318,7 +323,10 @@ test("command states read plainly and queued is never called applied", () => {
   assert.match(html, /Applied, confirmed by the chamber/);
   assert.match(renderCommandList([]), /Nothing sent from the cloud yet/);
   const queued = resultMessage({ status: "queued", command_id: 5 });
-  assert.equal(queued, "Sent. Your chamber picks it up in about 15 minutes.");
+  assert.equal(queued, SENT_MESSAGE);
+  assert.match(queued, /about every 15 minutes/);
+  assert.match(queued, /within 15 minutes/);
+  assert.doesNotMatch(queued, DASH);
   assert.doesNotMatch(queued.replace(/shows as applied only after/, ""), /applied/i);
   assert.match(resultMessage({ status: "queued", deduped: true }), /already sent/);
   assert.match(resultMessage({ status: "failed", error: "No light from the cloud." }), /No light/);
@@ -544,4 +552,41 @@ test("Autopilot log line names every knob it moved", async () => {
     }),
     "Set 23 °C, 93% RH, fan 30%, fresh air 35 s every 15 min, light 12 h at 90 lux and phase Pinning"
   );
+});
+
+
+test("Lykyn light controls are a color mix in percent with no lux readout", () => {
+  const lykyn = {
+    ...pearl,
+    device_type: "lykyn_chamber",
+    capabilities: { knob_ranges: { white_intensity: [0, 100, 1] } },
+    controls: { light: { supported: true, schedule: true, color: true }, stage: { supported: true, phase: true } },
+    chamber_light: { sunrise_hour: 8, duration_hours: 12, white_percent: 20, red_percent: 0, green_percent: 0, blue_percent: 80 },
+    coach: { mode: "advisor", status: "advisor" },
+  };
+  assert.equal(whiteIsPercentDevice(lykyn), true);
+  const html = renderControls(lykyn, { profiles: [pearl.profile], canWrite: true, showCoach: true });
+  assert.match(html, /White added to each color \(%\)/);
+  assert.match(html, /name="white_percent"[^>]*value="20"/);
+  assert.ok(html.includes(LYKYN_LIGHT_NOTE));
+  assert.doesNotMatch(html, /lux/i);
+  assert.doesNotMatch(html, /data-lux-preview/);
+  assert.doesNotMatch(html, /brightness/i);
+  assert.doesNotMatch(LYKYN_LIGHT_NOTE, DASH);
+});
+
+test("Shrooly light controls keep the lux preview", () => {
+  const shrooly = {
+    ...pearl,
+    capabilities: { knob_ranges: { white_intensity: [0, 4000, 5] } },
+    controls: { light: { supported: true, schedule: true, color: true } },
+    chamber_light: { sunrise_hour: 8, duration_hours: 12, white_percent: 20, white_led_lux: 92, red_percent: 0, green_percent: 0, blue_percent: 80 },
+    coach: { mode: "advisor", status: "advisor" },
+  };
+  assert.equal(whiteIsPercentDevice(shrooly), false);
+  assert.equal(whiteIsPercentDevice({}), false);
+  const html = renderControls(shrooly, { profiles: [pearl.profile], canWrite: true, showCoach: true });
+  assert.match(html, /White brightness \(%\)/);
+  assert.match(html, /data-lux-preview/);
+  assert.match(html, /About 92 lux/);
 });

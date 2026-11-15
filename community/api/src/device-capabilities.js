@@ -615,7 +615,7 @@ export function commandState(command, { device = {}, caps = deviceCapabilities({
     } else if (status === "delivered") {
       reason = "Waiting for the chamber to confirm.";
     } else {
-      reason = "Waiting for the chamber to check in (about every 15 minutes).";
+      reason = "Waiting for the chamber to check in. It checks in about every 15 minutes.";
     }
   }
   return {
@@ -627,7 +627,7 @@ export function commandState(command, { device = {}, caps = deviceCapabilities({
     issued_at: command.issued_at,
     expires_at: expiresAt,
     source: payload.source || null,
-    summary: commandSummary(command.kind, payload),
+    summary: commandSummary(command.kind, payload, caps),
     runnable,
   };
 }
@@ -639,7 +639,7 @@ function hourLabel(h) {
 }
 
 /** Plain words for what a setpoints payload changes. */
-export function setpointParts(payload = {}) {
+export function setpointParts(payload = {}, caps = {}) {
   const parts = [];
   const fan = payload.air_exchange_speed ?? payload.fan_speed_percent;
   if (payload.temperature_c != null) parts.push(`${payload.temperature_c} °C`);
@@ -657,7 +657,7 @@ export function setpointParts(payload = {}) {
       const bits = [];
       if (payload.light_hours != null) bits.push(`${payload.light_hours} h`);
       if (payload.sunrise_hour != null) bits.push(`from ${hourLabel(Number(payload.sunrise_hour))}`);
-      if (payload.white_intensity != null) bits.push(`white ${payload.white_intensity} lux`);
+      if (payload.white_intensity != null) bits.push(whiteIsPercent(caps) ? `white ${payload.white_intensity}%` : `white ${payload.white_intensity} lux`);
       const rgb = ["color_r", "color_g", "color_b"].map((k) => payload[k]);
       if (rgb.some((v) => v != null)) bits.push(`RGB ${rgb.map((v) => v ?? "-").join("/")}%`);
       parts.push(`light ${bits.join(" ")}`.trim());
@@ -668,9 +668,9 @@ export function setpointParts(payload = {}) {
   return parts;
 }
 
-export function commandSummary(kind, payload = {}) {
+export function commandSummary(kind, payload = {}, caps = {}) {
   if (kind === "setpoints") {
-    const parts = setpointParts(payload);
+    const parts = setpointParts(payload, caps);
     const base = parts.length ? `Set ${parts.join(", ")}` : "Set climate targets";
     return payload.translated_from === "apply_profile" && payload.profile_id
       ? `${base} (from ${payload.profile_id}${payload.stage ? ` ${payload.stage}` : ""})`
