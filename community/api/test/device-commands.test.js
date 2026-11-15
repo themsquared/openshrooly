@@ -760,12 +760,29 @@ test("validateStageLight keeps white_percent and rejects out of range", () => {
   assert.equal("white_percent" in validateStageLight({ sunrise_hour: 8, duration_hours: 12, white_led_lux: 92 }), false);
 });
 
-test("Lykyn command summaries say white in percent, Shrooly in lux", () => {
+test("command summaries say white in percent on every chamber", () => {
   const payload = { light_hours: 12, sunrise_hour: 8, white_intensity: 40, color_r: 0, color_g: 0, color_b: 80 };
   const lykyn = deviceCapabilities(LYKYN_READING);
   assert.match(commandState({ id: 1, kind: "setpoints", payload: JSON.stringify(payload), issued_at: nowIso(), consumed_at: null }, { caps: lykyn }).summary, /white 40%/);
   const shrooly = deviceCapabilities(SL5_READING);
-  assert.match(commandState({ id: 1, kind: "setpoints", payload: JSON.stringify(payload), issued_at: nowIso(), consumed_at: null }, { caps: shrooly }).summary, /white 40 lux/);
+  assert.match(commandState({ id: 1, kind: "setpoints", payload: JSON.stringify(payload), issued_at: nowIso(), consumed_at: null }, { caps: shrooly }).summary, /white 9%/, "40 lux is 9 percent of full");
+  // The same light, in each chamber's own unit, reads the same.
+  const same = (caps, raw) => commandState({ id: 1, kind: "setpoints", payload: JSON.stringify({ ...payload, white_intensity: raw }), issued_at: nowIso(), consumed_at: null }, { caps }).summary;
+  assert.equal(same(shrooly, 92), same(lykyn, 20));
+  assert.doesNotMatch(same(shrooly, 92), /lux/);
+});
+
+test("white converts to percent and back inside the adapter, with nothing lost up to the chamber's maximum", () => {
+  const shrooly = deviceAdapter("shrooly_chamber").white;
+  const lykyn = deviceAdapter("lykyn_chamber").white;
+  for (let pct = 0; pct <= 78; pct += 1) {
+    assert.equal(Math.round(shrooly.toPercent(shrooly.fromPercent(pct))), pct, `${pct}%`);
+    assert.equal(lykyn.toPercent(lykyn.fromPercent(pct)), pct);
+  }
+  for (let pct = 79; pct <= 100; pct += 1) assert.equal(shrooly.fromPercent(pct), 4000, `${pct}% is the chamber maximum`);
+  assert.equal(lykyn.fromPercent(100), 100);
+  assert.equal(Math.round(shrooly.toPercent(4000)), 78);
+  assert.equal(shrooly.percentFromRecipeLux(150), lykyn.percentFromRecipeLux(150));
 });
 
 
@@ -839,7 +856,7 @@ test("adapters name the same four stages and hide each chamber's own words", () 
   assert.equal(lykyn.white.fromPercent(20), 20);
   assert.equal(Math.round(shrooly.white.toPercent(92)), 20);
   assert.equal(lykyn.white.describe(20), "white 20%");
-  assert.equal(shrooly.white.describe(92), "white 92 lux");
+  assert.equal(shrooly.white.describe(92), "white 20%", "a lux chamber is described in percent too");
   assert.deepEqual(lykyn.knobRanges.air_exchange_speed, [33, 100, 1]);
   assert.equal(deviceCapabilities({}, "lykyn_chamber").knob_ranges.air_exchange_speed[0], 33, "fan floor before the chamber reports");
   assert.equal(deviceCapabilities({}, "lykyn_chamber").knob_ranges.white_intensity[1], 100);
