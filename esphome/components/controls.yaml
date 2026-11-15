@@ -536,9 +536,13 @@ text_sensor:
 
 # Heat requested binary sensor moved to components/alerts_simple.yaml for earlier loading
 
+# The LED Test button in this list is not the one the chamber serves.
+# <<: !include merge drops this button: key. The live button is the
+# led_test package in openshrooly.yaml.
 button:
   - platform: template
     name: "LED Test"
+
     id: led_test
     icon: mdi:led-on
     web_server:
