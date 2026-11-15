@@ -2,9 +2,9 @@
 
 import { speciesArt } from "./species-art.js";
 import { escapeHtml, safeDisplay } from "./safe-markdown.js";
-import { DEFAULT_DEVICE_TYPE, deviceAdapter, deviceTypeLabel, luxPreview } from "./device-adapters.js";
+import { DEFAULT_DEVICE_TYPE, deviceAdapter, deviceTypeLabel } from "./device-adapters.js";
 
-export { DEFAULT_DEVICE_TYPE, deviceTypeLabel, luxPreview };
+export { DEFAULT_DEVICE_TYPE, deviceTypeLabel };
 
 function rangeAttr(range, index, fallback) {
   const n = Array.isArray(range) ? Number(range[index]) : NaN;
@@ -536,7 +536,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       ${
         adapter.white.percent
           ? `<p class="muted">${escapeHtml(adapter.white.note)}</p>`
-          : `<p class="muted lux-preview" data-lux-preview aria-live="polite">${escapeHtml(adapter.white.preview(whitePct ?? 0))}</p>`
+          : `<p class="muted" data-white-note aria-live="polite">${escapeHtml(adapter.white.preview(whitePct ?? 0))}</p>`
       }
       <div class="row">
         <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${targetOff}${colorOff}></label>

@@ -152,12 +152,14 @@ export function deviceAdapter(source = {}) {
       fromPercent: (p) => (percent ? p : whitePercentToLux(p)),
       /** Knob value for a lux figure from a profile. */
       fromLux: (lux) => (percent ? whiteLuxToPercent(lux) : lux),
+      /** Percent for a recipe's lux figure. Recipes are written in lux whatever the chamber. */
+      percentFromRecipeLux: (lux) => Math.round(whiteLuxToPercent(lux)),
       /** Percent for a knob value the chamber reported. */
       toPercent: (raw) => (percent ? raw : whiteLuxToPercent(raw)),
       /** Lux for a knob value the chamber reported. */
       toLux: (raw) => (percent ? whitePercentToLux(raw) : raw),
-      /** Plain words for a knob value, "white 20%" or "white 92 lux". */
-      describe: (raw) => `white ${raw}${percent ? "%" : " lux"}`,
+      /** Plain words for a knob value. Always percent: a lux chamber's figure is converted here and nowhere else. */
+      describe: (raw) => `white ${Math.round(percent ? raw : whiteLuxToPercent(raw))}%`,
     },
   };
 }

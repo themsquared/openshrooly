@@ -37,7 +37,7 @@ import {
   speciesLine,
   stageOptionsHtml,
 } from "./device-ui.js";
-import { luxPreview, profileStageId } from "./device-adapters.js";
+import { deviceAdapter, profileStageId } from "./device-adapters.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
 import { mountPhotoCheck } from "./coach-photo.js";
@@ -90,7 +90,7 @@ function lightFromForm(form) {
   return {
     sunrise_hour: num("[name=sunrise_hour]", "#detail-sunrise"),
     duration_hours: num("[name=duration_hours]", "#detail-duration"),
-    white_led_lux: num("[name=white_led_lux]", "#detail-lux"),
+    white_percent: num("[name=white_percent]", "#detail-white"),
     red_percent: num("[name=red_percent]", "#detail-red"),
     green_percent: num("[name=green_percent]", "#detail-green"),
     blue_percent: num("[name=blue_percent]", "#detail-blue"),
@@ -101,7 +101,7 @@ function fillLightInputs(light, fields) {
   if (!light || !fields) return;
   if (fields.sunrise && light.sunrise_hour != null) fields.sunrise.value = light.sunrise_hour;
   if (fields.duration && light.duration_hours != null) fields.duration.value = light.duration_hours;
-  if (fields.lux && light.white_led_lux != null) fields.lux.value = light.white_led_lux;
+  if (fields.white && light.white_percent != null) fields.white.value = light.white_percent;
   if (fields.red && light.red_percent != null) fields.red.value = light.red_percent;
   if (fields.green && light.green_percent != null) fields.green.value = light.green_percent;
   if (fields.blue && light.blue_percent != null) fields.blue.value = light.blue_percent;
@@ -2285,11 +2285,11 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
   const form = $("#device-controls");
   const generalMsg = $("#device-controls-msg");
   // Picking a different profile resets the phase to its first stage (a new grow starts at day 1).
-  // Live lux preview under the white % box.
+  // The note under the white % box follows what is typed (a chamber with a brightest setting says so).
   form?.addEventListener("input", (ev) => {
     if (ev.target?.name !== "white_percent") return;
-    const out = form.querySelector("[data-lux-preview]");
-    if (out) out.textContent = luxPreview(Number(ev.target.value) || 0);
+    const out = form.querySelector("[data-white-note]");
+    if (out) out.textContent = deviceAdapter(currentDevice() || {}).white.preview(Number(ev.target.value) || 0);
   });
   form?.addEventListener("change", (ev) => {
     if (ev.target?.name !== "profile_id" || !form.stage) return;
@@ -2488,7 +2488,7 @@ async function renderFleet() {
     fillLightInputs(d.light, {
       sunrise: $("#detail-sunrise"),
       duration: $("#detail-duration"),
-      lux: $("#detail-lux"),
+      white: $("#detail-white"),
       red: $("#detail-red"),
       green: $("#detail-green"),
       blue: $("#detail-blue"),
@@ -2573,9 +2573,6 @@ async function renderFleet() {
     }
   };
   $("#bulk-action")?.addEventListener("change", showBulkFields);
-  $("#bulk-white")?.addEventListener("input", (ev) => {
-    $("#bulk-lux-preview").textContent = ev.target.value === "" ? "" : luxPreview(Number(ev.target.value) || 0);
-  });
   showBulkFields();
   loadDeviceCatalog()
     .then((catalog) => {

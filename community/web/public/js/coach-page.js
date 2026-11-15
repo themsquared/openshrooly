@@ -1,6 +1,7 @@
 /** Grow Coach page for people who can use Coach: recommendations, the decision feed, and chamber status. */
 
 import { chamberStatus, growDayLine, identityArt, MUSHROOM_ICON, phaseLine, readingWhenLine, renderChamberStatus } from "./device-ui.js";
+import { deviceAdapter } from "./device-adapters.js";
 import { escapeHtml } from "./safe-markdown.js";
 
 const GLUED_UNITS = new Set(["%", ":00"]);
@@ -192,13 +193,14 @@ export function modeText(autopilot) {
   return "Advisor. Coach suggests, you approve.";
 }
 
-function lightText(light) {
+function lightText(light, adapter) {
   if (!light) return "";
   const hours = light.duration_hours;
-  const lux = light.white_led_lux;
+  // White is a percent on every chamber. A recipe's lux figure is converted for display.
+  const white = light.white_percent ?? (light.white_led_lux != null ? adapter.white.percentFromRecipeLux(light.white_led_lux) : null);
   const parts = [];
   if (hours != null) parts.push(`${round(hours)} h`);
-  if (lux != null) parts.push(`${round(lux)} lux`);
+  if (white != null) parts.push(`${round(white)}% white`);
   return parts.join(", ");
 }
 
@@ -225,8 +227,8 @@ export function renderCoachGauges(device) {
     </div>`;
   const fanNow = device.reading?.fan_speed ?? device.chamber?.air_exchange_speed ?? sp.fan_speed_percent;
   const light = device.chamber_light;
-  const lightNow = lightText(light);
-  const lightGoal = lightText(device.light);
+  const lightNow = lightText(light, deviceAdapter(device));
+  const lightGoal = lightText(device.light, deviceAdapter(device));
   return `<div class="device-gauges coach-gauges" aria-label="Live readings">
     ${cell("Temperature", device.reading?.temperature, "°C", target(sp.temperature_c, rangeText(t.temperature_min, t.temperature_max, "°C"), "°C"))}
     ${cell("Humidity", device.reading?.humidity, "%", target(sp.humidity_percent, rangeText(t.humidity_min, t.humidity_max, "%"), "%"))}
