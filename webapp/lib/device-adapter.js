@@ -20,8 +20,7 @@ const WHITE_UNIT = "%"
 /** The white entity tops out at 4000 lux, which is 100 percent. Same rule as the cloud adapter. */
 const WHITE_MAX_LUX = 4000
 
-/** The fan never runs below 15 percent. */
-const FAN_MIN_PERCENT = 15
+const FAN_MIN_PERCENT = 0
 
 /** White lux for a percent of the maximum: linear, 40 lux per percent, 100 percent is 4000 lux. */
 function whitePercentToLux(percent) {
@@ -48,7 +47,7 @@ function stageWrites(stage, profileStages) {
   const writes = [{ kind: "select", id: "grow_phase", value: native }]
   const r = recipeFromProfile(stage, profileStages) || RECIPES[stage]
   if (!r) return writes
-  const fan = Math.max(r.fanSpeed, FAN_MIN_PERCENT)
+  const fan = Math.max(0, Math.min(100, r.fanSpeed))
   writes.push(
     { kind: "number", id: "temperature__target", value: r.temperature },
     { kind: "number", id: "target_humidity", value: r.humidity },
