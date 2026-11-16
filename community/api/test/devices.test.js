@@ -1210,11 +1210,11 @@ test("profile apply on the raw route is translated for setpoint-only firmware", 
   assert.equal(notice.status, 409);
 });
 
-test("inbox drops a queued Autopilot command after 15 minutes and writes an expiry audit", async () => {
+test("inbox drops a queued Autopilot command after 35 minutes and writes an expiry audit", async () => {
   const ctx = env();
   const { token } = await register(ctx, "ttl-inbox@example.com");
   const d = await enrollClaimIssue(ctx, token, "ttl00000000000001");
-  const issued = new Date(Date.now() - 16 * 60 * 1000).toISOString();
+  const issued = new Date(Date.now() - 36 * 60 * 1000).toISOString();
   await ctx.db.run("INSERT INTO device_commands (device_id, kind, payload, issued_at, consumed_at) VALUES (?, ?, ?, ?, ?)", [
     d.deviceId,
     "setpoints",
