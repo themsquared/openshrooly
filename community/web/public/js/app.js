@@ -5,7 +5,7 @@ import { renderProfileCards } from "./profile-cards.js";
 import { INDEXED_PROFILES } from "./indexed-profiles.js";
 import { startHero } from "./hero.js";
 import { bindMobileNav, setCoachNav } from "./chrome.js";
-import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
+import { isOffMenu, packLabel, profileIdFromUrl, PSI_LEGAL_NOTICE, PSI_RESEARCH_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "./pack.js";
 import { encodePhotoForUpload, fetchAuthedImageUrl, resolveMediaUrl, revokeTrackedBlobUrls } from "./photo-upload.js";
 import { queueItemHtml } from "./moderate-queue.js";
 import { escapeHtml, renderSafeMarkdown, safeDisplay } from "./safe-markdown.js";
@@ -414,7 +414,11 @@ async function renderProfile() {
   }
   const legal = $("#legal");
   if (legal && (off || p.legal_notice)) {
-    legal.textContent = off ? PSI_LEGAL_NOTICE : p.legal_notice;
+    if (off) {
+      legal.innerHTML = `<p>${escapeHtml(PSI_RESEARCH_NOTICE)}</p><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p>`;
+    } else {
+      legal.textContent = p.legal_notice;
+    }
     legal.classList.remove("hidden");
     legal.classList.add("legal-prominent");
   }

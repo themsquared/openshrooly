@@ -104,7 +104,7 @@ All grow numbers on this site come from the published grow profiles. Temperature
 
 ## Off-menu research profiles
 
-Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products. Spore laws vary by state and country, and some US states ban spores outright. Where they are sold, spores are sold for microscopy only.
+For research and microscopy purposes only. This page lists published environmental conditions for reference. It is not cultivation instructions, and you are responsible for following the laws where you live. Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products. Spore laws vary by state and country, and some US states ban spores outright. Where they are sold, spores are sold for microscopy only.
 
 - [Acadian Coast (Psilocybe cubensis)](https://shroomlabs.io/profiles/acadian-coast): fruits at 22 °C (72 °F) and 90% humidity, about 32 days from start to fruit.
 - [B+ (Psilocybe cubensis)](https://shroomlabs.io/profiles/b-plus): fruits at 21 °C (70 °F) and 89% humidity, about 32 days from start to fruit.
