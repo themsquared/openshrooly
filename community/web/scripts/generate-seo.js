@@ -732,7 +732,7 @@ export const PWA_HEAD = [
   `<meta name="apple-mobile-web-app-capable" content="yes">`,
   `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`,
   `<meta name="apple-mobile-web-app-title" content="Shroom Labs">`,
-  `<script src="/js/pwa.js" defer></script>`,
+  `<script src="/js/pwa.js?v=2" defer></script>`,
 ].join("\n  ");
 
 /** Insert or refresh the PWA head tags without duplicating them. */
