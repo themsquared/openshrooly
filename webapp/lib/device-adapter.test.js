@@ -23,12 +23,12 @@ test("Shrooly says Colonizing, has no Custom, and writes the recipe from the pag
   assert.deepEqual(adapter.stageWrites("Custom"), [])
 })
 
-test("Colonization keeps the light off and the fan at or above this chamber's floor", () => {
+test("Colonization keeps the light off and sends the profile fan", () => {
   const by = Object.fromEntries(adapter.stageWrites("Colonization").map((w) => [w.id, w.value]))
   assert.equal(by.grow_phase, "Colonizing")
   assert.equal(by.lights__duration__hours_, 0)
   assert.equal(by.white_led_intensity, 0)
-  assert.ok(by.air_exchange__speed >= adapter.FAN_MIN_PERCENT)
+  assert.equal(by.air_exchange__speed, 20)
   assert.equal("grow_day" in by, false, "changing stage must not reset the start date")
 })
 
