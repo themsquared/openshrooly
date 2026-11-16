@@ -2217,11 +2217,7 @@ async function renderDevice() {
     swap("#dev-commands", renderCommandList(device.commands || []));
     swap("#dev-notes", renderReadonlyNotes(device));
     const alerts = snap.alerts;
-    const status = $("#device-status");
     if (alerts) {
-      const notice = deliveryNotice(alerts);
-      status.innerHTML = notice ? `${escapeHtml(notice)} <a href="/account#alerts">Alert settings</a>` : "";
-      status.classList.toggle("hidden", !notice);
       showStates(alerts.states);
       if (!view.rulesFilled && !form.contains(document.activeElement)) {
         fillRules(alerts.rules, alerts.profiles);
@@ -2230,7 +2226,6 @@ async function renderDevice() {
       swap("#device-alerts", alertItems(alerts.alerts || []));
       $("#device-body")?.classList.add("hidden");
     } else if (!cached) {
-      status.classList.add("hidden");
       $("#device-body")?.classList.add("hidden");
     }
     if (!cached) liveCache.set(cacheKey, snap);
