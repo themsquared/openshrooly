@@ -3,6 +3,7 @@
 import { chamberStatus, growDayLine, identityArt, MUSHROOM_ICON, phaseLine, readingWhenLine, renderChamberStatus } from "./device-ui.js";
 import { deviceAdapter } from "./device-adapters.js";
 import { escapeHtml } from "./safe-markdown.js";
+import { formatTemp, formatTempValue, tempUnit } from "./temp-unit.js";
 
 const GLUED_UNITS = new Set(["%", ":00"]);
 
@@ -21,7 +22,20 @@ export function withUnit(value, unit = "") {
 }
 
 /** "Temperature 18 to 17 °C". A first value with no earlier one reads "set to". */
+function isTempUnit(unit) {
+  return unit === "°C" || unit === "°F";
+}
+
+function tempText(c, style = "reading") {
+  return formatTemp(c, tempUnit(), { style });
+}
+
 export function changeText(change) {
+  if (isTempUnit(change.unit)) {
+    const to = tempText(change.to);
+    if (change.from == null || change.from === "") return / at$/.test(change.label) ? `${change.label} ${to}` : `${change.label} set to ${to}`;
+    return `${change.label} ${formatTempValue(change.from, tempUnit(), { style: "reading" })} to ${to}`;
+  }
   const to = withUnit(change.to, change.unit);
   if (change.from == null || change.from === "") return / at$/.test(change.label) ? `${change.label} ${to}` : `${change.label} set to ${to}`;
   const from = change.unit && !GLUED_UNITS.has(change.unit) ? round(change.from) : withUnit(change.from, change.unit);
@@ -97,7 +111,7 @@ function clock(iso) {
 /** "17 °C, 90% humidity, fan 25%". */
 export function setpointText(s = {}) {
   return [
-    s.temperature_c != null ? withUnit(s.temperature_c, "°C") : "",
+    s.temperature_c != null ? tempText(s.temperature_c, "target") : "",
     s.humidity_percent != null ? `${withUnit(s.humidity_percent, "%")} humidity` : "",
     s.fan_speed_percent != null ? `fan ${withUnit(s.fan_speed_percent, "%")}` : "",
   ]
@@ -107,14 +121,15 @@ export function setpointText(s = {}) {
 
 function suggestionLines(suggestion, current = {}) {
   const rows = [
-    ["Temperature", suggestion.temperature_c, current.temperature_c, "°C"],
+    ["Temperature", suggestion.temperature_c, current.temperature_c, "temp"],
     ["Humidity", suggestion.humidity_percent, current.humidity_percent, "%"],
     ["Fan", suggestion.fan_speed_percent, current.fan_speed_percent, "%"],
   ].filter(([, to]) => to != null);
   return rows
     .map(([label, to, from, unit]) => {
-      const now = from == null ? "" : ` <span class="muted">(now ${escapeHtml(withUnit(from, unit))})</span>`;
-      return `<li>${escapeHtml(label)} <strong>${escapeHtml(withUnit(to, unit))}</strong>${now}</li>`;
+      const show = (v) => (unit === "temp" ? tempText(v) : withUnit(v, unit));
+      const now = from == null ? "" : ` <span class="muted">(now ${escapeHtml(show(from))})</span>`;
+      return `<li>${escapeHtml(label)} <strong>${escapeHtml(show(to))}</strong>${now}</li>`;
     })
     .join("");
 }
@@ -206,6 +221,12 @@ function lightText(light, adapter) {
 
 function rangeText(min, max, unit) {
   if (min == null && max == null) return null;
+  if (unit === "temp") {
+    if (min != null && max != null && Number(min) !== Number(max)) {
+      return `${formatTempValue(min, tempUnit(), { style: "reading" })} to ${tempText(max)}`;
+    }
+    return tempText(min ?? max);
+  }
   if (min != null && max != null && Number(min) !== Number(max)) return `${round(min)} to ${withUnit(max, unit)}`;
   return withUnit(min ?? max, unit);
 }
@@ -230,7 +251,7 @@ export function renderCoachGauges(device) {
   const lightNow = lightText(light, deviceAdapter(device));
   const lightGoal = lightText(device.light, deviceAdapter(device));
   return `<div class="device-gauges coach-gauges" aria-label="Live readings">
-    ${cell("Temperature", device.reading?.temperature, "°C", target(sp.temperature_c, rangeText(t.temperature_min, t.temperature_max, "°C"), "°C"))}
+    ${cell("Temperature", device.reading?.temperature == null ? null : tempText(device.reading.temperature), "", target(sp.temperature_c == null ? null : tempText(sp.temperature_c, "target"), rangeText(t.temperature_min, t.temperature_max, "temp"), ""))}
     ${cell("Humidity", device.reading?.humidity, "%", target(sp.humidity_percent, rangeText(t.humidity_min, t.humidity_max, "%"), "%"))}
     ${cell("Fan", fanNow, "%", t.fan_speed_percent != null ? `recipe ${withUnit(t.fan_speed_percent, "%")}` : "")}
     <div class="device-gauge">

@@ -10,8 +10,8 @@ test("safeDisplay escapes numeric and string fleet fields", () => {
   assert.equal(safeDisplay(null, "?"), "?");
   assert.equal(safeDisplay(`<img src=x onerror="alert(1)">`), `&lt;img src=x onerror=&quot;alert(1)&quot;&gt;`);
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/js/app.js"), "utf8");
-  assert.match(src, /safeDisplay\(d\.reading\.temperature/);
-  assert.match(src, /safeDisplay\(d\.setpoints\?\.temperature_c/);
+  assert.match(src, /safeDisplay\(formatTemp\(d\.reading\.temperature/);
+  assert.match(src, /safeDisplay\(formatTemp\(d\.setpoints\??\.temperature_c/);
   assert.doesNotMatch(src, /\$\{d\.reading\.temperature \?\?/);
 });
 

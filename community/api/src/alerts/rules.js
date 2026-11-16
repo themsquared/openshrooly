@@ -82,6 +82,7 @@ export function readPrefs(doc) {
   const cd = Number(data.cooldown_minutes);
   if (Number.isInteger(cd) && cd >= 30 && cd <= 1440) out.cooldown_minutes = cd;
   if (data.unsubscribed_at) out.unsubscribed_at = String(data.unsubscribed_at);
+  if (data.temp_unit === "C" || data.temp_unit === "F") out.temp_unit = data.temp_unit;
   return out;
 }
 
@@ -106,6 +107,10 @@ export function updatePrefs(current, body) {
     };
   }
   if ("cooldown_minutes" in body) out.cooldown_minutes = intIn(body.cooldown_minutes, 30, 1440, "cooldown minutes");
+  if ("temp_unit" in body) {
+    if (body.temp_unit !== "C" && body.temp_unit !== "F") throw new ValidationError("temperature unit must be C or F");
+    out.temp_unit = body.temp_unit;
+  }
   return out;
 }
 

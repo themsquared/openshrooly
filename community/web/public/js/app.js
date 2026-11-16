@@ -39,6 +39,7 @@ import {
   stageOptionsHtml,
 } from "./device-ui.js";
 import { deviceAdapter } from "./device-adapters.js";
+import { formatTemp, fromDisplayTemp, setTempUnit, tempDisplayField, tempUnit, UNIT_CHANGE } from "./temp-unit.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
 import { mountPhotoCheck } from "./coach-photo.js";
@@ -153,10 +154,32 @@ function safeNext(value, fallback = "/account") {
 /** Grow Coach visibility comes from the server (`grow_coach.available` on /api/me). Hidden by default. */
 let coachAvailablePromise = null;
 let coachOffMenuPage = false;
+function persistTempUnit(unit) {
+  if (!isSignedIn()) return;
+  api("/api/alerts/prefs", { method: "PUT", jsonBody: { temp_unit: unit === "F" ? "F" : "C" } }).catch(() => {});
+}
+
+function applyAccountTempUnit(me) {
+  const u = me?.prefs?.temp_unit;
+  if (u === "C" || u === "F") {
+    if (tempUnit() !== u) setTempUnit(u);
+    return;
+  }
+  persistTempUnit(tempUnit());
+}
+
+if (!globalThis.__slTempUnitBound) {
+  globalThis.__slTempUnitBound = true;
+  globalThis.addEventListener?.(UNIT_CHANGE, (ev) => persistTempUnit(ev.detail));
+}
+
 function coachAvailable() {
   if (!isSignedIn()) return Promise.resolve(false);
   coachAvailablePromise ||= api("/api/me")
-    .then((me) => Boolean(me?.grow_coach?.available))
+    .then((me) => {
+      applyAccountTempUnit(me);
+      return Boolean(me?.grow_coach?.available);
+    })
     .catch(() => false);
   return coachAvailablePromise;
 }
@@ -492,7 +515,7 @@ async function renderProfile() {
     .map(
       (s) => `<li>
         <strong>${escapeHtml(s.name)}</strong>
-        <span class="muted"> ${s.duration_days} d · ${s.temperature_c} °C · ${s.humidity_percent}% humidity · ${s.light?.duration_hours || 0} h light · fan ${s.fan?.speed_percent || 0}%</span>
+        <span class="muted"> ${s.duration_days} d · ${formatTemp(s.temperature_c, tempUnit(), { style: "target" })} · ${s.humidity_percent}% humidity · ${s.light?.duration_hours || 0} h light · fan ${s.fan?.speed_percent || 0}%</span>
         <p>${escapeHtml(s.notes || "")}</p>
         <div class="viz" aria-hidden="true"><span style="width:${Math.max(8, (Number(s.duration_days) / total) * 100)}%"></span></div>
       </li>`
@@ -720,6 +743,20 @@ async function renderAccount() {
     return;
   }
   const me = await api("/api/me");
+  applyAccountTempUnit(me);
+  const paintTempUnit = () => {
+    const unit = tempUnit();
+    for (const btn of document.querySelectorAll("[data-account-temp-unit]")) {
+      btn.setAttribute("aria-pressed", String(btn.dataset.accountTempUnit === unit));
+    }
+  };
+  paintTempUnit();
+  document.getElementById("display")?.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-account-temp-unit]");
+    if (!btn) return;
+    setTempUnit(btn.dataset.accountTempUnit);
+    paintTempUnit();
+  });
   $("#who").textContent = me.user.email || me.user.username;
   $("#verified").textContent = me.user.email_verified
     ? "Email verified. You can publish and buy."
@@ -2131,7 +2168,7 @@ async function renderDevice() {
     const canWrite = canWriteDevice(device);
     const showCoach = showCoachFor(snap);
     const profiles = view.catalog?.profiles || (device.profile?.id ? [device.profile] : []);
-    const key = JSON.stringify([canWrite, showCoach, device.name, device.profile?.id, device.stage, device.setpoints, device.light, device.controls, device.coach, device.capabilities, profiles.length]);
+    const key = JSON.stringify([canWrite, showCoach, device.name, device.profile?.id, device.stage, device.setpoints, device.light, device.controls, device.coach, device.capabilities, profiles.length, tempUnit()]);
     if (!force && key === view.controlsKey) return;
     if (!force && controlsBusy()) return;
     view.controlsKey = key;
@@ -2146,6 +2183,11 @@ async function renderDevice() {
     });
     bindUnlink();
   };
+
+  if (!view.unitBound) {
+    view.unitBound = true;
+    globalThis.addEventListener?.(UNIT_CHANGE, () => paintControls(true));
+  }
 
   const swap = (sel, html) => {
     const el = $(sel);
@@ -2340,6 +2382,12 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
   const generalMsg = $("#device-controls-msg");
   if (!form) return;
   form.querySelectorAll("input[data-sync]").forEach((slider) => syncKnobPair(form, slider.dataset.sync));
+  form.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-temp-unit]");
+    if (!btn) return;
+    ev.preventDefault();
+    setTempUnit(btn.dataset.tempUnit);
+  });
   form.addEventListener("change", (ev) => {
     if (ev.target?.name === "profile_id") {
       const btn = form.querySelector("[data-grow-btn]");
@@ -2381,7 +2429,10 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
         const has = (name) => form[name] && !form[name].disabled;
         if (action === "temperature" || action === "humidity" || action === "air" || action === "setpoints") {
           sendAs = "setpoints";
-          if (action === "temperature" && has("temperature_c")) payload.temperature_c = numberOrUndefined(form.temperature_c.value);
+          if (action === "temperature" && has("temperature_c")) {
+            const unit = form.temperature_c.dataset.displayUnit || tempUnit();
+            payload.temperature_c = fromDisplayTemp(form.temperature_c.value, unit);
+          }
           if (action === "humidity" && has("humidity_percent")) payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
           if (action === "air") {
             if (has("fan_speed_percent")) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
@@ -2519,10 +2570,10 @@ async function renderFleet() {
         ["Growing", d.profile || speciesLine(d) ? grow.title : "Nothing selected", ""],
         ...(grow.latin ? [["Species", grow.latin, ""]] : []),
         ...(grow.phase ? [["Phase", grow.phase, ""]] : []),
-        ["Temperature", d.reading?.temperature, "°C"],
+        ["Temperature", d.reading?.temperature == null ? null : formatTemp(d.reading.temperature), ""],
         ["Humidity", d.reading?.humidity, "%"],
         ...(d.reading?.water_level != null ? [["Water", d.reading.water_level, "%"]] : []),
-        ["Temp target", d.setpoints?.temperature_c, "°C"],
+        ["Temp target", d.setpoints?.temperature_c == null ? null : formatTemp(d.setpoints.temperature_c, tempUnit(), { style: "target" }), ""],
         ["Humidity target", d.setpoints?.humidity_percent, "%"],
         ...(d.coach ? [["Coach", coachLabel(d), ""]] : []),
       ]
@@ -2673,7 +2724,20 @@ async function renderFleet() {
     return [...document.querySelectorAll("#fleet-rows input[type=checkbox]:checked")].map((el) => el.value);
   }
 
+  function syncFleetTempFields() {
+    const unit = tempUnit();
+    const field = tempDisplayField(unit);
+    for (const el of document.querySelectorAll("[data-temp-unit-label]")) el.textContent = field.unit;
+    const bulk = $("#bulk-temp");
+    if (bulk) {
+      bulk.min = field.min;
+      bulk.max = field.max;
+      bulk.step = field.step;
+    }
+  }
+
   function paint() {
+    syncFleetTempFields();
     const q = ($("#fleet-filter").value || "").toLowerCase();
     const groupId = $("#fleet-group-filter").value;
     const sort = $("#fleet-sort").value;
@@ -2695,9 +2759,9 @@ async function renderFleet() {
             <td><label class="cell-check"><input type="checkbox" value="${escapeHtml(d.id)}" aria-label="Select ${escapeHtml(d.name)}"></label></td>
             <td><a href="/fleet?id=${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a></td>
             <td>${escapeHtml(chamberStatus(d).label)}<br><span class="muted">${escapeHtml(lastSeenLine(d))}</span></td>
-            <td>${d.reading ? `${safeDisplay(d.reading.temperature, "not reported")} °C · ${safeDisplay(d.reading.humidity, "not reported")}%` : "No reading"}</td>
+            <td>${d.reading ? `${d.reading.temperature == null ? "not reported" : safeDisplay(formatTemp(d.reading.temperature))} · ${safeDisplay(d.reading.humidity, "not reported")}%` : "No reading"}</td>
             <td>${escapeHtml(d.profile?.name || "None")}${d.profile?.species ? `<br><span class="muted">${escapeHtml(d.profile.species)}</span>` : ""}${d.stage ? `<br><span class="muted">${escapeHtml(d.stage.name)}</span>` : ""}</td>
-            <td>${safeDisplay(d.setpoints?.temperature_c, "?")} °C · ${safeDisplay(d.setpoints?.humidity_percent, "?")}%</td>
+            <td>${d.setpoints?.temperature_c == null ? "?" : safeDisplay(formatTemp(d.setpoints.temperature_c, tempUnit(), { style: "target" }))} · ${safeDisplay(d.setpoints?.humidity_percent, "?")}%</td>
             ${showCoachColumn ? `<td>${escapeHtml(coachLabel(d))}</td>` : ""}
             <td>${(d.alerts || []).map((a) => escapeHtml(a.message)).join(" ") || "None"}</td>
           </tr>`
@@ -2705,6 +2769,10 @@ async function renderFleet() {
         .join("") || `<tr><td colspan="${showCoachColumn ? 8 : 7}" class="muted">No chambers yet.</td></tr>`;
   }
 
+  globalThis.addEventListener?.(UNIT_CHANGE, () => {
+    paint();
+    if (typeof paintRows === "function") paintRows();
+  });
   $("#fleet-filter").addEventListener("input", paint);
   $("#fleet-sort").addEventListener("change", paint);
   $("#fleet-group-filter").addEventListener("change", paint);
@@ -2723,7 +2791,7 @@ async function renderFleet() {
     const action = $("#bulk-action").value;
     const payload = {};
     if (action === "setpoints") {
-      if ($("#bulk-temp").value) payload.temperature_c = Number($("#bulk-temp").value);
+      if ($("#bulk-temp").value) payload.temperature_c = fromDisplayTemp($("#bulk-temp").value, tempUnit());
       if ($("#bulk-rh").value) payload.humidity_percent = Number($("#bulk-rh").value);
     }
     if (action === "profile" || action === "light" || action === "coach_mode") {
