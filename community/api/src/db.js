@@ -1054,6 +1054,12 @@ function dispatch(mode, tables, ids, sql, params) {
       .sort((a, b) => Number(b.id) - Number(a.id))
       .slice(0, Number(params[1]));
   }
+  if (q.startsWith("SELECT * FROM device_commands WHERE device_id=? AND id>? AND kind='setpoints'")) {
+    return tables.device_commands
+      .filter((c) => c.device_id === params[0] && Number(c.id) > Number(params[1]) && c.kind === "setpoints")
+      .sort((x, y) => Number(x.id) - Number(y.id))
+      .slice(0, 20);
+  }
   if (q.startsWith("SELECT * FROM device_commands WHERE device_id=")) {
     return tables.device_commands.filter((c) => c.device_id === params[0]);
   }

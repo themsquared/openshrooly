@@ -1067,6 +1067,15 @@ export async function reconcileAutopilotCommands(db, { device, user, now = Date.
 
 const ACK_STATUSES = new Set(["applied", "failed", "refused", "expired"]);
 
+/** True when a later setpoint command that is not Autopilot's (a manual edit) exists for the same chamber. */
+async function supersededByManualEdit(db, command) {
+  const later = await db.all("SELECT * FROM device_commands WHERE device_id=? AND id>? AND kind='setpoints' ORDER BY id ASC LIMIT 20", [
+    command.device_id,
+    command.id,
+  ]);
+  return (later || []).some((row) => !isAutopilotCommand(row));
+}
+
 export async function noteAutopilotCommandAck(db, device, commandId, ackStatus = "applied", extra = {}, now = Date.now()) {
   if (!device?.id || !commandId) return null;
   try {
@@ -1075,13 +1084,22 @@ export async function noteAutopilotCommandAck(db, device, commandId, ackStatus =
     if (!isAutopilotCommand(command)) return null;
     const state = await getDeviceMode(db, device.id, device.owner_id);
     const raw = String(ackStatus || "");
-    const status = ACK_STATUSES.has(raw) ? raw : "failed";
+    let status = ACK_STATUSES.has(raw) ? raw : "failed";
+    let replaced = false;
+    // A newer manual edit replaced this change before its ack arrived. The ack is true of the chamber at
+    // that moment but not of what the grower wants now: do not adopt it as Coach's baseline.
+    if (status === "applied" && (await supersededByManualEdit(db, command))) {
+      status = "expired";
+      replaced = true;
+    }
     return finalizeAutopilotCommand(db, {
       command,
       state,
       user: { id: device.owner_id },
       status,
-      reason: extra.ack_reason || extra.reason || (status === "applied" ? "Device acknowledged the command." : `Device reported ${status}.`),
+      reason: replaced
+        ? "Replaced by a newer manual change before the chamber reported."
+        : extra.ack_reason || extra.reason || (status === "applied" ? "Device acknowledged the command." : `Device reported ${status}.`),
       now,
       readings: extra,
     });
