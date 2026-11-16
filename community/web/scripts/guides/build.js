@@ -129,9 +129,9 @@ const lykynOutsideControl = {
       html: `<p>It reads the SHT3x for temperature and humidity, runs a local climate loop with no cloud required, and drives both PWM fans, the ultrasonic mister, and the 16 pixel grow ring.</p>
 <ul>
 <li>Humidity targets: 30 to 95 percent relative humidity, in 0.5 steps.</li>
-<li>Fans: 33 to 100 percent duty. The firmware will not run them below 33 percent. A profile that asks for 20 percent is clamped to 33, and the apply still succeeds.</li>
+<li>Fans: 0 to 100 percent PWM on the inlet and outlet.</li>
 <li>Stages: Fruiting, Pinning, Colonization, and Custom. Colonization lights stay off.</li>
-<li>There is no heater or cooler. Over-temperature or over-humidity boosts the fans. If the sensor is lost for 60 seconds, the mister turns off and the fans sit at 33 percent.</li>
+<li>There is no heater or cooler. Over-temperature or over-humidity boosts the fans. If the sensor is lost for 60 seconds, the mister turns off and the fans keep some air moving.</li>
 </ul>
 <p>Cloud is optional. A cloud failure does not change the local loop.</p>`,
     },

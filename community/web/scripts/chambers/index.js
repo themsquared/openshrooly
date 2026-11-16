@@ -392,12 +392,12 @@ const lykyn = {
     {
       h2: "What hardware is inside the Lykyn?",
       answer: "An ESP32-C3 runs the box, with an SHT3x temperature and humidity sensor, two PWM fans, an ultrasonic mister, and a 16 pixel grow ring.",
-      html: `<p>The fan duty never goes below 33 percent. Humidity targets are 30 to 95 percent relative humidity in 0.5 steps. There is no heater or cooler; temperature targets are tracked, and over-temperature only boosts the fans. There is no water-level sensor in this firmware. Debug access is ordinary: native USB-Serial/JTAG and download mode for flashing. The pin map is in the firmware repo.</p>`,
+      html: `<p>Fans are 0 to 100 percent PWM. Humidity targets are 0 to 100 percent relative humidity. There is no heater or cooler; temperature targets are tracked, and over-temperature only boosts the fans. There is no water-level sensor in this firmware. Debug access is ordinary: native USB-Serial/JTAG and download mode for flashing. The pin map is in the firmware repo.</p>`,
     },
     {
       h2: "What can I set, and what are the grow stages?",
       answer: "You can set temperature and humidity targets, fan speed and fresh-air timing, mist level, and the light schedule and mix. Stages are Fruiting, Pinning, Colonization, and Custom.",
-      html: `<p>Use Colonization, not Colonizing, on a Lykyn. A Shrooly chamber uses Colonizing for the same stage, and the cloud treats both names as one stage. Colonization lights stay off. A profile fan of 20 percent is raised to the 33 percent minimum so the apply still succeeds. Control modes are SMART, MANUAL, and OFF.</p>`,
+      html: `<p>Use Colonization, not Colonizing, on a Lykyn. A Shrooly chamber uses Colonizing for the same stage, and the cloud treats both names as one stage. Colonization lights stay off. Control modes are SMART, MANUAL, and OFF.</p>`,
     },
     {
       h2: "How do I install the firmware?",

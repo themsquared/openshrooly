@@ -33,13 +33,13 @@ const TYPES = {
     // Stages the chamber's own select has, by canonical name. Custom is not one of them.
     stages: { Colonization: "Colonizing", Pinning: "Pinning", Fruiting: "Fruiting" },
     whiteScale: "lux",
-    fanMin: 15,
+    fanMin: 0,
   },
   lykyn_chamber: {
     label: "Lykyn Chamber",
     stages: { Colonization: "Colonization", Pinning: "Pinning", Fruiting: "Fruiting", Custom: "Custom" },
     whiteScale: "percent",
-    fanMin: 33,
+    fanMin: 0,
   },
 };
 
