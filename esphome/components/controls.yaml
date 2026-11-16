@@ -363,9 +363,9 @@ number:
     name: "Air Exchange: Speed"
     unit_of_measurement: "%"
     icon: mdi:fan
-    min_value: 15  # Minimum 15% to ensure proper airflow
+    min_value: 0
     max_value: 100
-    step: 5
+    step: 1
     web_server:
       sorting_group_id: grp_air
       sorting_weight: 25

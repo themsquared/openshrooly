@@ -17,8 +17,7 @@ const PRESETS_ON_DEVICE = false
 /** White is lux on this chamber. */
 const WHITE_UNIT = "lux"
 
-/** The fan never runs below 15 percent. */
-const FAN_MIN_PERCENT = 15
+const FAN_MIN_PERCENT = 0
 
 /** White lux for a percent of full. Same curve as the cloud and the firmware: linear to 20 percent, then a power law. */
 function whitePercentToLux(percent) {
@@ -39,7 +38,7 @@ function stageWrites(stage, profileStages) {
   const writes = [{ kind: "select", id: "grow_phase", value: native }]
   const r = recipeFromProfile(stage, profileStages) || RECIPES[stage]
   if (!r) return writes
-  const fan = Math.max(r.fanSpeed, FAN_MIN_PERCENT)
+  const fan = Math.max(0, Math.min(100, r.fanSpeed))
   writes.push(
     { kind: "number", id: "temperature__target", value: r.temperature },
     { kind: "number", id: "target_humidity", value: r.humidity },
