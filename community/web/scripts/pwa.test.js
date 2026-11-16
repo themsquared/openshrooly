@@ -64,7 +64,19 @@ test("stampPwa adds manifest and iOS tags once", () => {
   assert.match(once, /name="theme-color" content="#07110e"/);
   assert.match(once, /name="apple-mobile-web-app-capable" content="yes"/);
   assert.match(once, /name="apple-mobile-web-app-title" content="Shroom Labs"/);
-  assert.match(once, /src="\/js\/pwa\.js"/);
+  assert.match(once, /src="\/js\/pwa\.js\?v=2"/);
   assert.equal(once.split("rel=\"manifest\"").length - 1, 1);
   assert.match(PWA_HEAD, /theme-color/);
+});
+
+test("installed apps pick up new code: JS and CSS go network first and the cache name is versioned", () => {
+  const sw = readFileSync(join(PUBLIC, "sw.js"), "utf8");
+  const pwa = readFileSync(join(PUBLIC, "js/pwa.js"), "utf8");
+  assert.match(sw, /const CACHE = "sl-pwa-v[2-9]\d*"/);
+  assert.match(sw, /function isCodeAsset/);
+  assert.match(sw, /isCodeAsset\(url\)\) \{\s*event\.respondWith\(networkFirstAsset\(request\)\)/);
+  assert.match(sw, /skipWaiting/);
+  assert.match(sw, /clients\.claim/);
+  assert.match(pwa, /controllerchange/);
+  assert.match(pwa, /location\.reload/);
 });

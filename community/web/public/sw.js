@@ -1,6 +1,8 @@
 /* Shroom Labs service worker: installability and a conservative offline shell.
    API traffic and live chamber data stay on the network and are never cached. */
-const CACHE = "sl-pwa-v1";
+// Bump this on any change to how assets are cached. activate() deletes every other cache name,
+// so an installed PWA drops whatever the previous worker stored.
+const CACHE = "sl-pwa-v2";
 const SHELL = [
   "/",
   "/devices",
@@ -26,6 +28,12 @@ function isApiRequest(request, url) {
   if (url.protocol === "ws:" || url.protocol === "wss:") return true;
   if (request.headers.has("authorization")) return true;
   return false;
+}
+
+// Code and styles change on every deploy, so they go to the network first. Only the cache fallback is used offline.
+// Fonts, icons and images are fingerprint-stable enough to serve from the cache first.
+function isCodeAsset(url) {
+  return url.pathname.startsWith("/js/") || url.pathname.startsWith("/css/") || /\.(?:css|js|mjs)$/.test(url.pathname);
 }
 
 function isStaticAsset(url) {
@@ -72,6 +80,21 @@ async function networkFirst(request) {
   }
 }
 
+async function networkFirstAsset(request) {
+  try {
+    const fresh = await fetch(request, { cache: "no-cache" });
+    if (fresh.ok && fresh.type === "basic") {
+      const cache = await caches.open(CACHE);
+      cache.put(request, fresh.clone());
+    }
+    return fresh;
+  } catch (err) {
+    const hit = await caches.match(request);
+    if (hit) return hit;
+    throw err;
+  }
+}
+
 async function cacheFirst(request) {
   const hit = await caches.match(request);
   if (hit) return hit;
@@ -91,6 +114,10 @@ self.addEventListener("fetch", (event) => {
   if (!sameOrigin(url)) return;
   if (request.mode === "navigate" || request.destination === "document") {
     event.respondWith(networkFirst(request));
+    return;
+  }
+  if (isCodeAsset(url)) {
+    event.respondWith(networkFirstAsset(request));
     return;
   }
   if (isStaticAsset(url)) event.respondWith(cacheFirst(request));
