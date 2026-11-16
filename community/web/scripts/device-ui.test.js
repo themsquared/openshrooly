@@ -672,3 +672,13 @@ test("Set stage sends the stage action, never apply_profile, so the start date s
   assert.match(html, /name="grow_phase"[^>]*data-autosave="stage"/);
   assert.doesNotMatch(html, /data-profile-stages|data-profile-id/);
 });
+
+test("online status is just the dot and the word, and the chart slot always has words while there is no line", async () => {
+  const { chamberStatus, renderChamberStatus, chartEmptyText, chartReady } = await import("../public/js/device-ui.js");
+  const online = { online: true, last_seen_at: new Date().toISOString() };
+  assert.equal(chamberStatus(online).detail, "");
+  assert.doesNotMatch(renderChamberStatus(online), /Checked in|about every 15 minutes/);
+  assert.match(chartEmptyText(null), /Loading/);
+  assert.match(chartEmptyText([]), /after the chamber has checked in twice/);
+  assert.equal(chartReady([{ temperature: 20 }, { temperature: 21 }]), true);
+});

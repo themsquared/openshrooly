@@ -702,6 +702,11 @@ button.nav-toggle {
 .fleet-table td { text-align: left; padding: 0.55rem 0.65rem; border-bottom: 1px solid var(--sl-line); vertical-align: top; }
 .fleet-table a { font-weight: 700; }
 .fleet-chart { padding: 0.8rem 1rem 1rem; margin: 1rem 0; }
+.device-chart-state p { margin: 0.5rem 0 0; font-size: 0.9rem; }
+.device-chart-skeleton { height: 150px; border-radius: 12px; background: linear-gradient(100deg, var(--sl-line) 30%, rgba(255,255,255,0.08) 50%, var(--sl-line) 70%); background-size: 200% 100%; animation: device-chart-shimmer 1.4s linear infinite; }
+.device-chart-skeleton.is-empty { animation: none; height: 90px; opacity: 0.5; }
+@keyframes device-chart-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .device-chart-skeleton { animation: none; } }
 .fleet-chart figcaption { margin: 0 0 0.4rem; color: var(--sl-muted); font-size: 0.9rem; }
 .fleet-chart svg { width: 100%; height: auto; display: block; }
 .action-list { list-style: none; padding: 0; margin: 0.8rem 0 0; }
