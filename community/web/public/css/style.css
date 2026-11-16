@@ -1375,8 +1375,8 @@ button.small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 .rc-legend .muted { font-size: 0.8rem; }
 .rc-sw { width: 14px; height: 3px; border-radius: 2px; background: var(--c); display: inline-block; }
 .rc-ln { color: var(--sl-ink-dim); }
-.rc-event { margin: 0.4rem 0 0; font-size: 0.85rem; display: grid; gap: 0.3rem; min-height: 2.6em; align-content: start; }
-.rc-event.is-hint { color: var(--sl-muted); font-size: 0.8rem; }
+.rc-event { margin: 0.4rem 0 0; font-size: 0.85rem; display: grid; gap: 0.3rem; align-content: start; }
+.rc-event:empty { display: none; }
 .rc-ev-row { display: flex; gap: 0.45rem; align-items: flex-start; }
 .rc-ev-badge { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--c); color: var(--c); font-size: 0.7rem; font-weight: 700; display: inline-grid; place-items: center; line-height: 1; }
 .rc-plot { width: 100%; overflow: hidden; }
@@ -1392,19 +1392,9 @@ button.small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 .rc-ev-line { stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.55; }
 .rc-ev-t { font-size: 10px; font-weight: 700; }
 .rc-cross-line { stroke: rgba(232, 243, 234, 0.6); stroke-width: 1; }
-.rc-key { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem; margin: 0.35rem 0 0; font-size: 0.78rem; }
-.rc-key span { display: inline-block; width: 16px; height: 9px; border-radius: 2px; margin-left: 0.4rem; }
-.rc-key span:first-child { margin-left: 0; }
-.rc-key-band { background: rgba(94, 228, 255, 0.2); }
-.rc-key-dash { border-top: 1.5px dashed var(--sl-ink-dim); height: 0 !important; }
-.rc-key-off { background: repeating-linear-gradient(45deg, rgba(255, 107, 107, 0.35) 0 1.5px, rgba(255, 107, 107, 0.07) 1.5px 5px); }
 .rc-msg:empty { display: none; }
 .rc-msg { margin: 0.3rem 0 0; font-size: 0.85rem; }
 .rc-sum { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-.rc-events { margin-top: 0.6rem; font-size: 0.88rem; }
-.rc-events summary { cursor: pointer; color: var(--sl-ink-dim); padding: 0.3rem 0; }
-.rc-events.rc-empty summary { cursor: default; list-style: none; color: var(--sl-muted); }
-.rc-events ol { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.15rem; max-height: 22rem; overflow-y: auto; }
 .rc-ev-item { all: unset; box-sizing: border-box; display: flex; gap: 0.5rem; width: 100%; padding: 0.4rem 0.3rem; border-radius: 8px; cursor: pointer; line-height: 1.35; }
 .rc-ev-item:hover, .rc-ev-item:focus-visible { background: rgba(125, 255, 179, 0.07); }
 .rc-ev-item:focus-visible { outline: 2px solid var(--sl-spore); }

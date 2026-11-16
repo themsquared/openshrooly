@@ -18,7 +18,7 @@ const GAP_FLOOR_MS = 20 * 60 * 1000;
 export const SERIES = [
   { key: "temperature", setpoint: "temperature_setpoint", name: "Temperature", color: "#ff8a6a", main: true, band: ["temperature_min", "temperature_max"] },
   { key: "humidity", setpoint: "humidity_setpoint", name: "Humidity", unit: "%", color: "#5ee4ff", main: true, band: ["humidity_min", "humidity_max"], clamp: [0, 100] },
-  { key: "fan_speed", name: "Fan setting", unit: "%", color: "#c9a7ff", step: true, clamp: [0, 100] },
+  { key: "fan_speed", setpoint: "fan_setpoint", name: "Fan", unit: "%", color: "#c9a7ff", step: true, clamp: [0, 100] },
   { key: "water_level", name: "Water", unit: "%", color: "#8fb8ff", clamp: [0, 100] },
   { key: "co2", name: "CO2", unit: "ppm", color: "#f5d76e" },
 ];
@@ -252,10 +252,8 @@ export function mountReadingChart(root, opts = {}) {
       <p class="rc-event"></p>
     </div>
     <div class="rc-plot"><svg class="rc-svg" tabindex="0" role="img" aria-labelledby="${id}-sum" focusable="true"></svg></div>
-    <p class="rc-key muted"><span class="rc-key-band"></span> Stage target <span class="rc-key-dash"></span> Setpoint <span class="rc-key-off"></span> No readings</p>
     <p class="rc-sum visually-hidden" id="${id}-sum"></p>
-    <p class="rc-msg muted" role="status"></p>
-    <details class="rc-events"><summary>Events in this range</summary><ol></ol></details>`;
+    <p class="rc-msg muted" role="status"></p>`;
   const $ = (s) => root.querySelector(s);
   const svg = $(".rc-svg");
   let layout = null;
@@ -384,7 +382,8 @@ export function mountReadingChart(root, opts = {}) {
         label.textContent = String(Math.round(tick * 10) / 10);
         g.append(label);
       }
-      if (s.setpoint) {
+      const spDiffers = s.setpoint && v.points.some((pt) => num(pt[s.setpoint]) != null && num(pt[s.setpoint]) !== num(pt[s.key]));
+      if (spDiffers) {
         for (const run of segments(v.points.map((pt) => ({ t: pt.t, v: conv(pt[s.setpoint]) })), "v", { gap, offline })) {
           g.append(el("path", { d: pathFor(run, xOf, yOf, true), class: "rc-sp", stroke: s.color }));
         }
@@ -425,7 +424,6 @@ export function mountReadingChart(root, opts = {}) {
     layout.cross = el("g", { class: "rc-cross", visibility: "hidden" });
     svg.append(layout.cross);
 
-    renderEventList(v);
     summary(v);
     readout();
   }
@@ -435,24 +433,8 @@ export function mountReadingChart(root, opts = {}) {
     const parts = layout.series.map((s) => `${s.name} ${valueText(s, num(last?.[s.key]), state.unit)}`);
     const range = RANGES.find((r) => r.hours === state.hours)?.label || `${state.hours}h`;
     $(".rc-sum").textContent = last
-      ? `Chart of the last ${range}. Latest at ${timeText(last.t)}: ${parts.join(", ")}. ${v.events.length} events in this range, listed below the chart.`
+      ? `Chart of the last ${range}. Latest at ${timeText(last.t)}: ${parts.join(", ")}.`
       : `No readings in the last ${range}.`;
-  }
-
-  function renderEventList(v) {
-    const list = $(".rc-events ol");
-    const items = v.events.slice().reverse();
-    $(".rc-events summary").textContent = items.length ? `Events in this range (${items.length})` : "No events in this range";
-    $(".rc-events").classList.toggle("rc-empty", !items.length);
-    list.innerHTML = items
-      .map((e, i) => {
-        const k = EVENT_KINDS[e.type] || EVENT_KINDS.setpoint;
-        return `<li><button type="button" class="rc-ev-item" data-i="${v.events.length - 1 - i}">
-          <span class="rc-ev-badge" style="--c:${k.color}" aria-hidden="true">${esc(k.letter)}</span>
-          <span><strong>${esc(e.title)}</strong> <time datetime="${esc(e.at)}">${esc(timeText(e.t, { range: 168 }))}</time>
-          ${e.detail ? `<br><span class="muted">${esc(e.detail)}</span>` : ""}</span></button></li>`;
-      })
-      .join("");
   }
 
   function readout() {
@@ -483,16 +465,15 @@ export function mountReadingChart(root, opts = {}) {
       .join("");
     const evBox = $(".rc-event");
     const near = state.cursor != null ? nearEvents(state.cursor) : [];
-    evBox.classList.toggle("is-hint", !near.length);
     evBox.innerHTML = !near.length
-      ? `<span>Hover or tap the chart to read any time. Lettered markers show changes.</span>`
+      ? ""
       : near
       .slice(0, 2)
       .map((e) => {
         const k = EVENT_KINDS[e.type] || EVENT_KINDS.setpoint;
         return `<span class="rc-ev-row"><span class="rc-ev-badge" style="--c:${k.color}" aria-hidden="true">${esc(k.letter)}</span><span><strong>${esc(e.title)}</strong> ${esc(timeText(e.t, { range: 168 }))}${e.detail ? `. ${esc(e.detail)}` : ""}</span></span>`;
       })
-      .join("") + (near.length > 2 ? `<span class="muted">And ${near.length - 2} more in the list below.</span>` : "");
+      .join("") + (near.length > 2 ? `<span class="muted">And ${near.length - 2} more here.</span>` : "");
   }
 
   /** Events under the cursor: the marker cluster within reach, or an offline span it is inside. */
@@ -560,16 +541,6 @@ export function mountReadingChart(root, opts = {}) {
     }
   });
   root.addEventListener("click", async (ev) => {
-    const item = ev.target.closest(".rc-ev-item");
-    if (item) {
-      const e = view().events[Number(item.dataset.i)];
-      if (e) {
-        state.cursor = e.t;
-        readout();
-        svg.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-      }
-      return;
-    }
     const unitBtn = ev.target.closest("[data-unit]");
     if (unitBtn) {
       state.unit = unitBtn.dataset.unit === "F" ? "F" : "C";
