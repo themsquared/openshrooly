@@ -83,7 +83,11 @@ test("installer key matches the key compiled into the device", () => {
 test("installer page loads nothing from other sites and has plain copy", () => {
   const html = readFileSync(join(pub, "install.html"), "utf8");
   for (const m of html.matchAll(/<script[^>]*src="([^"]+)"/g)) assert.ok(m[1].startsWith("/"), m[1]);
-  assert.doesNotMatch(html, /unpkg|github|[\u2013\u2014]|firmware|\bOTA\b|manifest\.json|Ed25519|ESP Web Tools/i);
+  assert.doesNotMatch(html, /<(script|link|img|iframe)[^>]*(unpkg|github)/i);
+  assert.doesNotMatch(html, /unpkg|[\u2013\u2014]|firmware|\bOTA\b|manifest\.json|Ed25519|ESP Web Tools/i);
+  assert.match(html, /href="https:\/\/github.com\/grahamsz\/openshrooly"/);
+  assert.match(html, /href="https:\/\/github.com\/grahamsz"/);
+  assert.match(html, /Graham Stewart/);
   const toml = readFileSync(join(here, "..", "netlify.toml"), "utf8");
   const csp = toml.split('for = "/install"')[1].split("[[headers]]")[0];
   assert.doesNotMatch(csp, /unpkg|github/);

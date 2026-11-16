@@ -10,7 +10,7 @@ import { speciesArt } from "../public/js/species-art.js";
 import { profileItem, renderProfileCards } from "../public/js/profile-cards.js";
 import { lightRecipeLine } from "../public/js/light-line.js";
 import { photoRecordFor, speciesImageObject } from "../public/js/species-photos.js";
-import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
+import { isOffMenu, PSI_LEGAL_NOTICE, PSI_RESEARCH_NOTICE, PSI_RESOURCE_DISCLAIMER, PSI_RESOURCES, PSI_SPORE_LAW } from "../../api/src/pack.js";
 import { INDEXNOW_KEY } from "../../api/src/indexnow.js";
 import { GUIDES } from "./guides/index.js";
 import { blogLlms, blogLlmsFull, blogRedirects, blogSitemapEntries, publishedPosts, writeBlogFiles } from "./blog/index.js";
@@ -217,7 +217,8 @@ let datesChanged = false;
 
 export function lastUpdated(profile) {
   if (!profile?.id) return TODAY;
-  const hash = createHash("sha256").update(PAGE_LAYOUT).update(JSON.stringify(profile)).digest("hex").slice(0, 16);
+  const layout = isOffMenu(profile) ? `${PAGE_LAYOUT}-research-notice` : PAGE_LAYOUT;
+  const hash = createHash("sha256").update(layout).update(JSON.stringify(profile)).digest("hex").slice(0, 16);
   const known = PAGE_DATES[profile.id];
   if (known?.hash === hash) return known.date;
   PAGE_DATES[profile.id] = { hash, date: TODAY };
@@ -644,6 +645,10 @@ function resourceList() {
   ).join("");
 }
 
+export function offMenuNoticeHtml() {
+  return `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_RESEARCH_NOTICE)}</p><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside>\n      `;
+}
+
 export function microscopySection() {
   return `<section class="resources" aria-labelledby="microscopy-heading">
     <h2 id="microscopy-heading">Microscopy and research resources</h2>
@@ -872,9 +877,7 @@ export function renderProfilePage(profile, profiles = []) {
           }</li>`
     )
     .join("");
-  const legal = psi
-    ? `<aside class="legal legal-prominent" role="note"><p>${escapeHtml(PSI_LEGAL_NOTICE)}</p></aside>`
-    : "";
+  const legal = psi ? offMenuNoticeHtml() : "";
   const tools = `/profile?id=${encodeURIComponent(profile.id)}`;
   const cta = paid
     ? `<p class="actions"><a class="button" href="${tools}">Buy for ${price(profile)}</a></p>`
@@ -884,11 +887,11 @@ export function renderProfilePage(profile, profiles = []) {
   const viewItem = psi ? "" : ` data-sl-view-item="${escapeHtml(JSON.stringify(profileItem(profile)))}"`;
   const body = `
     <article class="profile-page"${viewItem}>
-      ${art ? `<div class="card profile-page-art">${art}</div>` : ""}
+      ${legal}${art ? `<div class="card profile-page-art">${art}</div>` : ""}
       <p class="eyebrow">${psi ? "Off-menu Profile" : isChef(profile) ? `<a href="/chefs-line">Chef's line</a>` : paid ? "Paid culinary Profile" : "Culinary Profile"}</p>
       <h1>${escapeHtml(profile.name)}</h1>
       <p class="muted">${escapeHtml(profile.species || "")}${profile.strain ? `, ${escapeHtml(profile.strain)}` : ""}</p>
-      ${legal}
+      
       <p class="lede answer-first">${escapeHtml(setpointLine(profile))}</p>
       ${profile.summary ? `<p>${escapeHtml(profile.summary)}</p>` : ""}
       <h2>${paid ? "Stages" : "Grow parameters"}</h2>
@@ -1488,7 +1491,7 @@ function offMenuLlms(profiles) {
   };
   return `## Off-menu research profiles
 
-${PSI_LEGAL_NOTICE} ${PSI_SPORE_LAW}
+${PSI_RESEARCH_NOTICE} ${PSI_LEGAL_NOTICE} ${PSI_SPORE_LAW}
 
 ${psi.map(row).join("\n")}
 
@@ -1751,6 +1754,7 @@ export const PAGES = {
     // The installer loads nothing from other sites (see install-verify.test.js), so no analytics.
     analytics: false,
     sitemap: true,
+    updated: "2026-11-15",
     path: "/install",
     title: "Install on your Shrooly: free OpenShrooly software over USB",
     description: "Shrooly app not working? Put free OpenShrooly software on your Shrooly from Chrome or Edge with a USB-C cable in about 5 minutes. Signed releases only.",
@@ -1867,7 +1871,7 @@ export function writeBlog(dir, profiles, posts = publishedPosts(), siteDir = dir
     if (known.has(clean)) return true;
     return [`${clean}.html`, `${clean}/index.html`, clean].some((f) => existsSync(join(siteDir, f)) && statSync(join(siteDir, f)).isFile());
   };
-  return writeBlogFiles(dir, { SITE, shell, crumbsHtml, breadcrumbs, ORG_REF, profiles, exists, legalNotice: PSI_LEGAL_NOTICE }, posts);
+  return writeBlogFiles(dir, { SITE, shell, crumbsHtml, breadcrumbs, ORG_REF, profiles, exists, legalNotice: PSI_LEGAL_NOTICE, researchNotice: PSI_RESEARCH_NOTICE }, posts);
 }
 
 export function writeSeoFiles(dir = PUBLIC) {

@@ -6,6 +6,7 @@ import {
   isOffMenu,
   packLabel,
   PSI_LEGAL_NOTICE,
+  PSI_RESEARCH_NOTICE,
   PSI_RESOURCES,
   PSI_SPORE_LAW,
 } from "../src/pack.js";
@@ -92,10 +93,15 @@ test("generated Off-menu HTML carries legal notice, microscopy, and no commerce"
   const gt = profiles.find((p) => p.id === "golden-teacher");
   assert.ok(gt);
   const html = renderProfilePage(gt);
+  const articleAt = html.indexOf("<article");
+  const researchAt = html.indexOf(PSI_RESEARCH_NOTICE);
   const legalAt = html.indexOf(PSI_LEGAL_NOTICE);
+  const h1At = html.indexOf("<h1>");
   const paramsAt = html.indexOf("Grow parameters");
   const microAt = html.indexOf("Microscopy and research resources");
-  assert.ok(legalAt > 0 && paramsAt > legalAt, "legal notice sits above grow parameters");
+  assert.ok(researchAt > articleAt && researchAt < h1At, "research notice sits at the top of the page, before the title");
+  assert.ok(legalAt > researchAt && legalAt < h1At, "legal notice follows the research notice, still before the title");
+  assert.ok(paramsAt > legalAt, "legal notice sits above grow parameters");
   assert.ok(microAt > paramsAt, "microscopy section follows grow parameters");
   assert.match(html, /rel="nofollow noopener"/);
   assert.match(html, /https:\/\/pnwspore\.com\//);
@@ -125,6 +131,7 @@ test("Off-menu profiles are indexed, in the sitemap and a research section of ll
   const hub = renderHubPage(profiles);
   assert.match(sitemap, /\/profiles\/pearl-oyster</);
   const research = llms.slice(llms.indexOf("## Off-menu research profiles"), llms.indexOf("## Help"));
+  assert.ok(research.includes(PSI_RESEARCH_NOTICE));
   assert.ok(research.includes(PSI_LEGAL_NOTICE));
   assert.doesNotMatch(research, /\$|Coach|Chef|buy|price/i);
   for (const p of profiles.filter(isOffMenu)) {
@@ -135,6 +142,11 @@ test("Off-menu profiles are indexed, in the sitemap and a research section of ll
     assert.match(page, /<meta name="robots" content="index,follow">/);
     assert.match(page, new RegExp(`<link rel="canonical" href="https://shroomlabs\\.io/profiles/${p.id}">`));
     assert.doesNotMatch(page, /application\/ld\+json|googletagmanager|data-sl-view-item/);
+    const articleAt = page.indexOf("<article");
+    const researchAt = page.indexOf(PSI_RESEARCH_NOTICE);
+    const h1At = page.indexOf("<h1>");
+    assert.ok(researchAt > articleAt && researchAt < h1At, `${p.id} has the research notice at the top`);
+    assert.ok(page.includes(PSI_LEGAL_NOTICE), `${p.id} still carries the legal notice`);
   }
   for (const text of [full, faq, hub]) assert.doesNotMatch(text, /Off-menu|psilocyb|Golden Teacher/i);
   for (const text of [llms, full, faq, hub]) assert.doesNotMatch(text, DASH);

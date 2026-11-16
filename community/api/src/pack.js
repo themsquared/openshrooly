@@ -9,6 +9,9 @@ export const PACK_LABELS = {
   psilocybin: "Off-menu",
 };
 
+export const PSI_RESEARCH_NOTICE =
+  "For research and microscopy purposes only. This page lists published environmental conditions for reference. It is not cultivation instructions, and you are responsible for following the laws where you live.";
+
 export const PSI_LEGAL_NOTICE =
   "Psilocybin mushrooms are illegal to grow, possess, or sell in most countries and under US federal law. This information is published for educational, research and harm-reduction purposes only. Check the laws where you live. Shroom Labs does not sell spores, cultures or psilocybin products.";
 
