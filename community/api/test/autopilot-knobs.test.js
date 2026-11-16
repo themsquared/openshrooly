@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { nowIso } from "../src/crypto.js";
-import { fanRangeForStage, pickAutopilotStage, recipeKnobs, steerFan } from "../src/autopilot-knobs.js";
+import { fanEscalateRangeForStage, fanRangeForStage, pickAutopilotStage, recipeKnobs, steerFan } from "../src/autopilot-knobs.js";
 import { deviceCapabilities, growPhaseForStage, sameGrowPhase } from "../src/device-capabilities.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
@@ -93,6 +93,37 @@ test("fan guardrail is the stage fan +/- 20; Coach moves the fan only when humid
   // No band to judge by, or no reading: the recipe.
   assert.equal(steerFan({ fan: { speed_percent: 30 } }, { humidity: 50 }, caps105).fan, 30);
   assert.equal(steerFan(stage, {}, caps105).fan, recipeFan);
+});
+
+test("if humidity stays out of band without improving, Coach takes another fan step, up to the cap, and still returns to the recipe at target", () => {
+  const stage = { fan: { speed_percent: 25 }, humidity_percent: 90, humidity_hysteresis: 2 };
+  const now = Date.parse("2026-11-16T15:00:00Z");
+  const series = (rows) => rows.map(([minutesAgo, humidity]) => ({ created_at: new Date(now - minutesAgo * 60000).toISOString(), humidity }));
+  const wet = { humidity: 94, air_exchange_speed: 35 };
+  // After a short hold, still just the first step.
+  const early = steerFan(stage, wet, caps105, { now, samples: series([[0, 94], [15, 94], [30, 93.9]]) });
+  assert.equal(early.fan, 35, "not enough of a hold window yet");
+  // A full hour out of band, barely moving: one more step the right way.
+  const stuck = series([[0, 94], [15, 94.1], [30, 93.8], [45, 94], [60, 94.2]]);
+  const second = steerFan(stage, wet, caps105, { now, samples: stuck });
+  assert.equal(second.fan, 45, "second step after the hold window");
+  assert.match(second.reason, /another step faster/);
+  // Improving toward the target over the hour: hold the first step.
+  const drying = series([[0, 93.3], [15, 93.6], [30, 93.9], [45, 94.1], [60, 94.5]]);
+  const held = steerFan(stage, { humidity: 93.3, air_exchange_speed: 35 }, caps105, { now, samples: drying });
+  assert.equal(held.fan, 35, "no escalation while humidity is moving toward the target");
+  assert.equal(held.reason, null);
+  // Cap: recipe 25 + 30 = 55, inside 0-100.
+  assert.deepEqual(fanEscalateRangeForStage(stage, caps105), [0, 55]);
+  const atCap = steerFan(stage, { humidity: 94, air_exchange_speed: 55 }, caps105, { now, samples: stuck });
+  assert.equal(atCap.fan, 55, "does not step past the cap");
+  // Still never the wrong way, and never inside the band.
+  const inside = steerFan(stage, { humidity: 90, air_exchange_speed: 45 }, caps105, { now, samples: stuck });
+  assert.equal(inside.fan, 25, "inside the band at the target: back to the recipe, even from an escalated fan");
+  const holdInBand = steerFan(stage, { humidity: 91, air_exchange_speed: 45 }, caps105, { now, samples: stuck });
+  assert.equal(holdInBand.fan, 45, "inside the band but not yet at target: hold the escalated step");
+  const dryWrong = steerFan(stage, { humidity: 86, air_exchange_speed: 45 }, caps105, { now, samples: series([[0, 86], [60, 86]]) });
+  assert.equal(dryWrong.fan, 15, "too dry: first step slower, never faster");
 });
 
 test("recipe knobs are only the ones this chamber reports", () => {

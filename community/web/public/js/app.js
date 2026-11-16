@@ -2182,6 +2182,9 @@ async function renderDevice() {
       },
     });
     bindUnlink();
+    // Rebuilding the form replaces #device-chart-slot. Put the live chart box back in the new slot
+    // so a Coach or catalog repaint never leaves the graph missing.
+    if (view.snapshot?.device) placeDeviceChart(view.snapshot, view.snapshot.device);
   };
 
   if (!view.unitBound) {

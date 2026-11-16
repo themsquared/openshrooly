@@ -12,6 +12,12 @@ export const FAN_CLAMP = [0, 80];
 export const FAN_STEP = 10;
 /** Hold the fan step until RH is within this many points of the stage humidity target. */
 export const FAN_IN_BAND = 1;
+/** If humidity stays out of band without improving, Coach may step this far from the recipe, inside 0-100 and FAN_CLAMP. */
+export const FAN_ESCALATE_BAND = 30;
+/** Wait this long out of band, not improving, before taking another fan step. */
+export const FAN_ESCALATE_HOLD_MS = 60 * 60 * 1000;
+/** RH must move at least this many points toward the target over the hold window to count as improving. */
+export const FAN_ESCALATE_IMPROVE = 0.5;
 
 /** Knobs Autopilot sets straight from the stage recipe when the chamber can take them. */
 export const RECIPE_KEYS = ["air_exchange_period_min", "air_exchange_run_sec", "sunrise_hour", "light_hours", "white_intensity", "color_r", "color_g", "color_b"];
@@ -117,6 +123,48 @@ export function fanRangeForStage(stage = {}, caps = {}) {
   return lo <= hi ? [lo, hi] : [Math.max(FAN_CLAMP[0], chamber[0]), Math.min(FAN_CLAMP[1], chamber[1])];
 }
 
+/** Wider guardrail used when a stuck out-of-band reading needs another fan step: recipe +/- FAN_ESCALATE_BAND, inside 0-100, FAN_CLAMP, and the chamber's range. */
+export function fanEscalateRangeForStage(stage = {}, caps = {}) {
+  const base = num(stage.fan?.speed_percent ?? stage.fan_speed_percent);
+  const chamber = caps.knob_ranges?.air_exchange_speed || [0, 100, 1];
+  let lo = Math.max(0, FAN_CLAMP[0], chamber[0]);
+  let hi = Math.min(100, FAN_CLAMP[1], chamber[1]);
+  if (base != null) {
+    lo = Math.max(lo, base - FAN_ESCALATE_BAND);
+    hi = Math.min(hi, base + FAN_ESCALATE_BAND);
+  }
+  return lo <= hi ? [lo, hi] : [Math.max(0, FAN_CLAMP[0], chamber[0]), Math.min(100, FAN_CLAMP[1], chamber[1])];
+}
+
+/** Whether RH moved toward the stage target over the hold window. Not enough history means "not yet." */
+export function rhTowardTarget(samples = [], { now = Date.now(), windowMs = FAN_ESCALATE_HOLD_MS, center, minImprove = FAN_ESCALATE_IMPROVE } = {}) {
+  const tCut = now - windowMs;
+  const pts = [];
+  for (const s of samples || []) {
+    if (!s || typeof s !== "object") continue;
+    let rh = num(s.humidity ?? s.humidity_percent);
+    if (rh == null && s.document) {
+      try {
+        const doc = typeof s.document === "string" ? JSON.parse(s.document) : s.document;
+        rh = num(doc?.humidity ?? doc?.humidity_percent);
+      } catch {
+        rh = null;
+      }
+    }
+    const t = Date.parse(s.created_at || s.at || 0);
+    if (rh == null || !Number.isFinite(t) || t < tCut || t > now) continue;
+    pts.push({ t, rh });
+  }
+  pts.sort((a, b) => a.t - b.t);
+  if (pts.length < 2 || center == null) return { enough: false, improving: false, spanMs: 0 };
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  const spanMs = last.t - first.t;
+  const enough = spanMs >= windowMs * 0.8;
+  const improved = Math.abs(center - first.rh) - Math.abs(center - last.rh) >= minImprove;
+  return { enough, improving: Boolean(enough && improved), spanMs };
+}
+
 /** The humidity band the stage allows: its own min and max, or the target plus or minus its hysteresis. */
 export function humidityBandForStage(stage = {}) {
   const center = num(stage.humidity_percent);
@@ -132,22 +180,54 @@ export function humidityBandForStage(stage = {}) {
  * Fan target for this stage. The recipe speed while humidity is inside the stage's band. Outside the band
  * the fan goes one step the right way (less air when it is too dry, more when it is too wet), straight to
  * that value. It holds that step until humidity is back at the target, so it never flaps at the band edge,
- * and it never moves while humidity is inside the band. Always inside fanRangeForStage.
+ * and it never moves while humidity is inside the band. If humidity stays outside the band for
+ * FAN_ESCALATE_HOLD_MS without moving toward the target, it takes one more step the right way, up to
+ * recipe +/- FAN_ESCALATE_BAND inside 0-100 (and FAN_CLAMP). It still returns to the recipe once
+ * humidity is at the target. Never steps inside the band, never moves the wrong way.
  */
-export function steerFan(stage = {}, reading = {}, caps = {}) {
-  const range = fanRangeForStage(stage, caps);
+export function steerFan(stage = {}, reading = {}, caps = {}, { samples = [], now = Date.now() } = {}) {
+  const range = fanEscalateRangeForStage(stage, caps);
   const base = clip(num(stage.fan?.speed_percent ?? stage.fan_speed_percent) ?? 30, range);
   const rh = num(reading?.humidity);
   const band = humidityBandForStage(stage);
+  const current = num(reading?.air_exchange_speed ?? reading?.fan_speed_percent);
   if (rh == null || !band) return { fan: base, range, reason: null };
-  const slower = clip(base - FAN_STEP, range);
-  const faster = clip(base + FAN_STEP, range);
-  if (rh < band.lo) return { fan: slower, range, reason: "Humidity is below the stage range, so the fan runs a step slower." };
-  if (rh > band.hi) return { fan: faster, range, reason: "Humidity is above the stage range, so the fan runs a step faster." };
-  const now = num(reading?.air_exchange_speed ?? reading?.fan_speed_percent);
-  if (now != null && now === slower && slower !== base && rh < band.center) return { fan: now, range, reason: null };
-  if (now != null && now === faster && faster !== base && rh > band.center) return { fan: now, range, reason: null };
-  return { fan: base, range, reason: null };
+
+  // Only a fan value on this stage's step ladder counts as a corrective hold. A leftover speed
+  // from a previous stage is not held; we go to the recipe (in band) or the first step (out of band).
+  const steps = current != null && Number.isInteger((current - base) / FAN_STEP) ? (current - base) / FAN_STEP : null;
+
+  const holdCorrective = () => {
+    if (steps != null && steps < 0 && rh < band.center) return { fan: current, range, reason: null };
+    if (steps != null && steps > 0 && rh > band.center) return { fan: current, range, reason: null };
+    return { fan: base, range, reason: null };
+  };
+
+  if (rh >= band.lo && rh <= band.hi) return holdCorrective();
+
+  const dir = rh < band.lo ? -1 : 1;
+  const first = clip(base + dir * FAN_STEP, range);
+  const onCorrective = steps != null && Math.sign(steps) === dir;
+  if (!onCorrective) {
+    return {
+      fan: first,
+      range,
+      reason: dir < 0
+        ? "Humidity is below the stage range, so the fan runs a step slower."
+        : "Humidity is above the stage range, so the fan runs a step faster.",
+    };
+  }
+  const trend = rhTowardTarget(samples, { now, center: band.center });
+  if (!trend.enough || trend.improving) return { fan: current, range, reason: null };
+  const next = clip(current + dir * FAN_STEP, range);
+  if (next === current) return { fan: current, range, reason: null };
+  return {
+    fan: next,
+    range,
+    reason: dir < 0
+      ? "Humidity has stayed below the stage range without improving, so the fan takes another step slower."
+      : "Humidity has stayed above the stage range without improving, so the fan takes another step faster.",
+  };
 }
 
 /** Stage recipe knobs (fresh air, light, phase) this chamber can take, firmware keys. */
