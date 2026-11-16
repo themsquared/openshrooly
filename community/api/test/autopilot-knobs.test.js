@@ -64,22 +64,35 @@ test("grow day moves Autopilot forward through the profile, never back", () => {
   assert.equal(pickAutopilotStage(pearl, { grow_day: 3 }, legacyCaps).stageId, "fruiting");
 });
 
-test("fan guardrail is the stage fan +/- 20, inside 15 to 80, and RH steers one step", () => {
+test("fan guardrail is the stage fan +/- 20; Coach moves the fan only when humidity is outside the stage band, the right way", () => {
   const fruiting = pearl.stages.find((s) => s.id === "fruiting");
   assert.deepEqual(fanRangeForStage(fruiting, caps105), [25, 65]);
   const colonization = pearl.stages.find((s) => s.id === "colonization");
   assert.deepEqual(fanRangeForStage(colonization, caps105), [15, 40]);
-  const stage = { ...fruiting, humidity_target_min: 85, humidity_target_max: 91 };
-  assert.equal(steerFan(stage, { humidity: 88 }, caps105).fan, 45);
-  const wet = steerFan(stage, { humidity: 95 }, caps105);
-  assert.equal(wet.fan, 55);
-  assert.match(wet.reason, /high/);
-  assert.equal(steerFan(stage, { humidity: 80 }, caps105).fan, 35);
-  // Still a few points under the 88 target: keep the lower fan, even though 86.83 is inside the 85-91 hysteresis band.
-  const short = steerFan(stage, { humidity: 86.83 }, caps105);
-  assert.equal(short.fan, 35);
-  assert.match(short.reason, /low/);
-  assert.equal(steerFan({ fan: { speed_percent: 75 }, humidity_percent: 80 }, { humidity: 99 }, caps105).fan, 80);
+  const stage = { ...fruiting, humidity_percent: 88, humidity_target_min: 85, humidity_target_max: 91 };
+  const recipeFan = fruiting.fan.speed_percent;
+  // Inside the band, anywhere in it: the recipe fan, no reason, nothing to change.
+  for (const humidity of [85, 85.5, 86.83, 88, 90.9, 91]) {
+    const out = steerFan(stage, { humidity }, caps105);
+    assert.equal(out.fan, recipeFan, `humidity ${humidity} is inside the band`);
+    assert.equal(out.reason, null);
+  }
+  const dry = steerFan(stage, { humidity: 84.9 }, caps105);
+  assert.equal(dry.fan, recipeFan - 10, "too dry: less air");
+  assert.match(dry.reason, /slower/);
+  const wet = steerFan(stage, { humidity: 91.1 }, caps105);
+  assert.equal(wet.fan, recipeFan + 10, "too wet: more air");
+  assert.match(wet.reason, /faster/);
+  // Back inside the band but not yet at the target: hold the step, so it does not flap at the edge.
+  assert.equal(steerFan(stage, { humidity: 86, air_exchange_speed: recipeFan - 10 }, caps105).fan, recipeFan - 10);
+  assert.equal(steerFan(stage, { humidity: 89.5, air_exchange_speed: recipeFan + 10 }, caps105).fan, recipeFan + 10);
+  // At or past the target: back to the recipe.
+  assert.equal(steerFan(stage, { humidity: 88, air_exchange_speed: recipeFan - 10 }, caps105).fan, recipeFan);
+  assert.equal(steerFan(stage, { humidity: 88.5, air_exchange_speed: recipeFan - 10 }, caps105).fan, recipeFan);
+  assert.equal(steerFan({ fan: { speed_percent: 75 }, humidity_percent: 80, humidity_hysteresis: 2 }, { humidity: 99 }, caps105).fan, 80);
+  // No band to judge by, or no reading: the recipe.
+  assert.equal(steerFan({ fan: { speed_percent: 30 } }, { humidity: 50 }, caps105).fan, 30);
+  assert.equal(steerFan(stage, {}, caps105).fan, recipeFan);
 });
 
 test("recipe knobs are only the ones this chamber reports", () => {
@@ -148,7 +161,7 @@ test("on 1.0.5 Autopilot moves the grow to pinning by day: one command with fan,
   assert.equal(cmd.source, "grow-coach-autopilot");
   assert.equal(cmd.grow_phase, "Pinning");
   assert.equal(cmd.temperature_c, 18, "temperature goes straight to the pinning target, never in steps");
-  assert.equal(cmd.air_exchange_speed, 25, "RH 91 is under the pinning 93 target, so the fan steps toward a reduced 25, not the full 35");
+  assert.equal(cmd.air_exchange_speed, 35, "the pinning recipe fan, whatever the humidity");
   assert.equal(cmd.fan_speed_percent, undefined, "firmware keys only");
   assert.equal(cmd.air_exchange_period_min, 15);
   assert.equal(cmd.air_exchange_run_sec, 35);
@@ -345,7 +358,7 @@ test("a Shrooly colonization grow still lands Colonizing, not Fruiting", async (
   const cmd = (await openCommands(ctx, "dev-k-colo")).at(-1);
   assert.equal(cmd.grow_phase, "Colonizing");
   assert.equal(cmd.temperature_c, 24, "temperature goes straight to the colonization target, never in steps");
-  assert.equal(cmd.air_exchange_speed, 15, "RH 86 is under the 90 target: fan goes straight to one step under the colonization 20, no staircase");
+  assert.equal(cmd.air_exchange_speed, 15, "RH 86 is under the 88-92 band: one step slower than the colonization 20, clipped to the 15 floor, sent straight");
   assert.equal(cmd.air_exchange_period_min, 60);
   assert.equal(cmd.light_hours, 0);
   assert.equal(cmd.white_intensity, 0);

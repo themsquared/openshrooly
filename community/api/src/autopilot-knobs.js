@@ -115,29 +115,37 @@ export function fanRangeForStage(stage = {}, caps = {}) {
   return lo <= hi ? [lo, hi] : [Math.max(FAN_CLAMP[0], chamber[0]), Math.min(FAN_CLAMP[1], chamber[1])];
 }
 
+/** The humidity band the stage allows: its own min and max, or the target plus or minus its hysteresis. */
+export function humidityBandForStage(stage = {}) {
+  const center = num(stage.humidity_percent);
+  const lo = num(stage.humidity_target_min);
+  const hi = num(stage.humidity_target_max);
+  if (lo != null && hi != null && lo <= hi) return { lo, hi, center: center ?? (lo + hi) / 2 };
+  if (center == null) return null;
+  const h = num(stage.humidity_hysteresis) ?? FAN_IN_BAND;
+  return { lo: center - h, hi: center + h, center };
+}
+
 /**
- * Fan target for this stage: the recipe speed, one step more when RH is above the stage
- * humidity target, one step less when it is below. The step is held until RH is back
- * within FAN_IN_BAND of the target, so a chamber a few points short keeps the lower fan.
- * Always inside fanRangeForStage.
+ * Fan target for this stage. The recipe speed while humidity is inside the stage's band. Outside the band
+ * the fan goes one step the right way (less air when it is too dry, more when it is too wet), straight to
+ * that value. It holds that step until humidity is back at the target, so it never flaps at the band edge,
+ * and it never moves while humidity is inside the band. Always inside fanRangeForStage.
  */
 export function steerFan(stage = {}, reading = {}, caps = {}) {
   const range = fanRangeForStage(stage, caps);
-  const base = num(stage.fan?.speed_percent ?? stage.fan_speed_percent) ?? 30;
+  const base = clip(num(stage.fan?.speed_percent ?? stage.fan_speed_percent) ?? 30, range);
   const rh = num(reading?.humidity);
-  const lo = num(stage.humidity_target_min);
-  const hi = num(stage.humidity_target_max);
-  const center = num(stage.humidity_percent) ?? (lo != null && hi != null ? (lo + hi) / 2 : lo ?? hi);
-  let target = base;
-  let reason = null;
-  if (rh != null && center != null && rh > center + FAN_IN_BAND) {
-    target = base + FAN_STEP;
-    reason = `Humidity is running high, so the fan runs a step faster.`;
-  } else if (rh != null && center != null && rh < center - FAN_IN_BAND) {
-    target = base - FAN_STEP;
-    reason = `Humidity is running low, so the fan runs a step slower.`;
-  }
-  return { fan: clip(target, range), range, reason };
+  const band = humidityBandForStage(stage);
+  if (rh == null || !band) return { fan: base, range, reason: null };
+  const slower = clip(base - FAN_STEP, range);
+  const faster = clip(base + FAN_STEP, range);
+  if (rh < band.lo) return { fan: slower, range, reason: "Humidity is below the stage range, so the fan runs a step slower." };
+  if (rh > band.hi) return { fan: faster, range, reason: "Humidity is above the stage range, so the fan runs a step faster." };
+  const now = num(reading?.air_exchange_speed ?? reading?.fan_speed_percent);
+  if (now != null && now === slower && slower !== base && rh < band.center) return { fan: now, range, reason: null };
+  if (now != null && now === faster && faster !== base && rh > band.center) return { fan: now, range, reason: null };
+  return { fan: base, range, reason: null };
 }
 
 /** Stage recipe knobs (fresh air, light, phase) this chamber can take, firmware keys. */

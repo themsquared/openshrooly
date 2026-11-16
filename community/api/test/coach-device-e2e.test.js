@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COACH_MANAGES_TARGETS, getAutopilotStatus, runAutopilotPass } from "../src/coach-autopilot.js";
 import { deviceAdapter } from "../src/device-adapters.js";
+import { humidityBandForStage } from "../src/autopilot-knobs.js";
 import { FakeChamber } from "./fake-chamber.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
 
@@ -120,7 +121,7 @@ test("harness: three chambers pair through the real endpoints and report", async
 
 const RECIPE_KEYS = ["air_exchange_period_min", "air_exchange_run_sec", "sunrise_hour", "light_hours", "color_r", "color_g", "color_b"];
 
-function assertRecipe(chamber, stageId, label = chamber.kind) {
+function assertRecipe(chamber, stageId, label = chamber.kind, { skipFan = false } = {}) {
   const s = STAGE[stageId];
   const adapter = deviceAdapter(chamber.kind === "lykyn" ? "lykyn_chamber" : "shrooly_chamber");
   assert.equal(chamber.targets.temperature_c, s.temperature_c, `${label} temperature`);
@@ -133,11 +134,25 @@ function assertRecipe(chamber, stageId, label = chamber.kind) {
   assert.equal(chamber.knobs.color_b, s.light.blue_percent, `${label} blue`);
   // Fan: the profile percent, raised only to what this chamber's fan can do.
   const floor = chamber.p.ranges.air_exchange_speed[0];
-  assert.equal(chamber.knobs.air_exchange_speed, Math.max(floor, s.fan.speed_percent), `${label} fan`);
+  if (!skipFan) assert.equal(chamber.knobs.air_exchange_speed, Math.max(floor, s.fan.speed_percent), `${label} fan`);
   // White: percent of this chamber's maximum, in this chamber's own unit.
   const white = s.light.white_led_lux;
   if (chamber.kind === "lykyn") assert.equal(chamber.knobs.white_intensity, adapter.white.fromLux(white), `${label} white percent`);
   else assert.equal(chamber.knobs.white_intensity, Math.round(adapter.white.fromLux(white) / 5) * 5, `${label} white lux`);
+}
+
+/** The fan is on the recipe, or one step the right way for how far humidity was outside the stage band. Never the wrong way. */
+function assertFanSteered(chamber, stageId, rh, label) {
+  const s = STAGE[stageId];
+  const floor = chamber.p.ranges.air_exchange_speed[0];
+  const recipe = Math.max(floor, s.fan.speed_percent);
+  const band = humidityBandForStage(s);
+  const fan = chamber.knobs.air_exchange_speed;
+  if (rh == null) return assert.equal(fan, recipe, `${label}: Coach never acted on humidity, so the fan is the recipe`);
+  if (rh >= band.lo && rh <= band.hi) return; // a step held from earlier is allowed inside the band
+  if (rh != null && rh < band.lo) assert.ok(fan <= recipe, `${label}: too dry (${rh}) but the fan is ${fan}, above the recipe ${recipe}`);
+  if (rh != null && rh > band.hi) assert.ok(fan >= recipe, `${label}: too wet (${rh}) but the fan is ${fan}, below the recipe ${recipe}`);
+  assert.ok(Math.abs(fan - recipe) <= 10, `${label}: fan ${fan} is more than one step from the recipe ${recipe}`);
 }
 
 for (const stage of ["colonization", "pinning", "fruiting"]) {
@@ -177,13 +192,19 @@ for (const stage of ["colonization", "pinning", "fruiting"]) {
       await c.cycle();
       await coachOn(c);
     }
+    const lastRh = new Map();
     for (let i = 0; i < 6; i += 1) {
       tick(15 * MIN);
       for (const c of [lykyn, shrooly, generic]) {
         // Readings wander around the target, both ways.
         drift(c, { dt: i % 2 ? 1.5 : -1.5, dh: i % 3 === 0 ? -6 : 4 });
         await c.cycle();
+        // Humidity swings above and below the band every cycle. Everything but the fan must stay on the recipe,
+        // and the fan may only be where steering for the humidity Coach last saw would put it.
+        assertRecipe(c, stage, `${c.kind} on cycle ${i}`, { skipFan: true });
+        if (c.kind !== "generic") assertFanSteered(c, stage, lastRh.get(c.kind), `${c.kind} on cycle ${i}`);
         const out = await coachPass(c);
+        if (out.applied) lastRh.set(c.kind, c.sensor.humidity); // the humidity Coach acted on
         if (c.kind !== "generic") {
           assert.equal(CANON[c.knobs.grow_phase], stage, `${c.kind} device stage on cycle ${i}`);
         }
@@ -344,9 +365,9 @@ for (const kind of ["lykyn", "shrooly"]) {
     tick(MIN);
     const id = await coachCommand(c);
     const targetsBefore = { ...c.targets };
-    // The chamber is offline for 20 minutes (queued Autopilot changes live for 15), then reconnects.
+    // The chamber is offline for 40 minutes (queued Autopilot changes live for 35), then reconnects.
     c.offline = true;
-    tick(20 * MIN);
+    tick(40 * MIN);
     c.offline = false;
     const handed = await c.poll();
     assert.deepEqual(handed.map((h) => h.id), [], "nothing stale is handed to the chamber");
@@ -385,11 +406,11 @@ test("a change the chamber pulled in time but reported one check-in later is rec
   const out = await coachPass(lykyn);
   assert.equal(out.applied, true, JSON.stringify(out));
   const id = out.command_id;
-  tick(14 * MIN);
-  const handed = await lykyn.poll(); // pulled at minute 14, applied, report not sent yet
+  tick(34 * MIN);
+  const handed = await lykyn.poll(); // pulled at minute 34, applied, report not sent yet
   assert.deepEqual(handed.map((h) => h.id), [id]);
   tick(2 * MIN);
-  // The cloud's sweep runs past the 15 minute mark while the report is still on its way.
+  // The cloud's sweep runs past the 35 minute mark while the report is still on its way.
   const sweep = await coachPass(lykyn);
   assert.notEqual(sweep.error, true);
   assert.equal((await commands(lykyn)).find((x) => x.id === id).payload._ack?.status, undefined, "not written off while the chamber holds it");
@@ -654,4 +675,107 @@ test("Coach on, off, and on again leaves one consistent stage and no stale comma
   }
   const open = (await commands(shrooly)).filter((x) => !x.consumed_at);
   assert.equal(open.length <= 1, true);
+});
+
+// ---- When Coach may act: only when climate is out of range, and only the right way -----------------
+
+async function coachCommandsAfter(chamber, count) {
+  return (await commands(chamber)).filter((x) => x.payload.source === "grow-coach-autopilot").slice(count);
+}
+
+test("inside the stage band Coach changes nothing: no commands, no fan move, targets stay the recipe", async () => {
+  const { lykyn, shrooly } = await world(["lykyn", "shrooly"]);
+  for (const c of [lykyn, shrooly]) {
+    await growStage(c, "colonization");
+    await c.cycle();
+    c.sensor = { temperature: STAGE.colonization.temperature_c, humidity: STAGE.colonization.humidity_percent };
+    await c.cycle();
+    await coachOn(c);
+    const band = humidityBandForStage(STAGE.colonization);
+    const before = (await coachCommandsAfter(c, 0)).length;
+    const targets = { ...c.targets };
+    const knobs = { ...c.knobs };
+    for (let i = 0; i < 10; i += 1) {
+      tick(15 * MIN);
+      // Wander across the whole band, both ways, and the temperature around its target.
+      c.sensor = { temperature: STAGE.colonization.temperature_c + (i % 2 ? 0.8 : -0.8), humidity: i % 2 ? band.hi - 0.1 : band.lo + 0.1 };
+      await c.cycle();
+      const out = await coachPass(c);
+      assert.ok(!out.applied, `${c.kind} cycle ${i}: Coach acted inside the band: ${JSON.stringify(out)}`);
+    }
+    assert.equal((await coachCommandsAfter(c, 0)).length, before, `${c.kind}: no Coach commands`);
+    assert.deepEqual(c.targets, targets);
+    assert.deepEqual(c.knobs, knobs);
+  }
+});
+
+test("too dry: Coach slows the fan (less air), one step, straight there, targets untouched, and goes back to the recipe once humidity is at target", async () => {
+  const { lykyn, shrooly } = await world(["lykyn", "shrooly"]);
+  for (const c of [lykyn, shrooly]) {
+    await growStage(c, "colonization");
+    await c.cycle();
+    await coachOn(c);
+    const s = STAGE.colonization;
+    const band = humidityBandForStage(s);
+    const recipe = Math.max(c.p.ranges.air_exchange_speed[0], s.fan.speed_percent);
+    const targets = { ...c.targets };
+    c.sensor = { temperature: s.temperature_c, humidity: band.lo - 2 };
+    const seen = [];
+    for (let i = 0; i < 6; i += 1) {
+      tick(15 * MIN);
+      await c.cycle();
+      await coachPass(c);
+      seen.push(c.knobs.air_exchange_speed);
+    }
+    assert.ok(seen.every((f) => f <= recipe), `${c.kind}: the fan went the wrong way while too dry: ${seen}`);
+    const low = Math.min(...seen);
+    assert.equal(low, Math.max(c.p.ranges.air_exchange_speed[0], recipe - 10, 15), `${c.kind}: one step slower, straight there: ${seen}`);
+    assert.deepEqual(c.targets, targets, `${c.kind}: Coach never moved a target`);
+    // Humidity recovers to the target: the fan goes back to the recipe and stays.
+    c.sensor = { temperature: s.temperature_c, humidity: s.humidity_percent };
+    for (let i = 0; i < 6; i += 1) {
+      tick(15 * MIN);
+      await c.cycle();
+      await coachPass(c);
+    }
+    assert.equal(c.knobs.air_exchange_speed, recipe, `${c.kind}: back on the recipe`);
+    assert.deepEqual(c.targets, targets);
+  }
+});
+
+test("too wet: Coach speeds the fan up, never down", async () => {
+  const { shrooly } = await world(["shrooly"]);
+  await growStage(shrooly, "pinning");
+  await shrooly.cycle();
+  await coachOn(shrooly);
+  const s = STAGE.pinning;
+  const band = humidityBandForStage(s);
+  const recipe = Math.max(shrooly.p.ranges.air_exchange_speed[0], s.fan.speed_percent);
+  shrooly.sensor = { temperature: s.temperature_c, humidity: band.hi + 3 };
+  for (let i = 0; i < 6; i += 1) {
+    tick(15 * MIN);
+    await shrooly.cycle();
+    await coachPass(shrooly);
+    assert.ok(shrooly.knobs.air_exchange_speed >= recipe, `fan ${shrooly.knobs.air_exchange_speed} fell below the recipe ${recipe} while too wet`);
+  }
+  assert.equal(shrooly.knobs.air_exchange_speed, recipe + 10);
+});
+
+test("a cold chamber does not make Coach change the temperature target or the fan: it keeps driving the profile target", async () => {
+  const { lykyn } = await world(["lykyn"]);
+  await growStage(lykyn, "colonization");
+  await lykyn.cycle();
+  await coachOn(lykyn);
+  const s = STAGE.colonization;
+  const targets = { ...lykyn.targets };
+  const fan = lykyn.knobs.air_exchange_speed;
+  lykyn.sensor = { temperature: s.temperature_c - 2.5, humidity: s.humidity_percent }; // out of the temperature band, humidity fine
+  for (let i = 0; i < 8; i += 1) {
+    tick(15 * MIN);
+    await lykyn.cycle();
+    await coachPass(lykyn);
+    assert.deepEqual(lykyn.targets, targets, `cycle ${i}: the temperature target stays the profile's`);
+    assert.equal(lykyn.knobs.air_exchange_speed, fan, `cycle ${i}: the fan stays on the recipe for a temperature problem`);
+  }
+  assert.equal((await mode(lykyn)).mode, "autopilot");
 });
