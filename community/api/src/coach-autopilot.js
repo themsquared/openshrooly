@@ -683,7 +683,7 @@ export async function previewAutopilotSuggestion(db, { device, user, profile, sa
   const model = buildDeviceModel(samples, (reports || []).filter((r) => !String(r.profile_id || "").includes("psilocybin")));
   const suggestion = suggestSetpoints(model, stage, { reading: current });
   const fanKnob = knobSupported(caps, "air_exchange_speed");
-  const fanSteer = fanKnob ? steerFan(stage, current, caps) : null;
+  const fanSteer = fanKnob ? steerFan(stage, current, caps, { samples, now }) : null;
   if (fanSteer) {
     suggestion.fan_speed_percent = fanSteer.fan;
     if (fanSteer.reason) suggestion.reasons = [...(suggestion.reasons || []), fanSteer.reason];
@@ -1312,7 +1312,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   const model = buildDeviceModel(samples, reports.filter((r) => !String(r.profile_id || "").includes("psilocybin")));
   const suggestion = suggestSetpoints(model, stage, { reading: current });
   const fanKnob = knobSupported(caps, "air_exchange_speed");
-  const fanSteer = fanKnob ? steerFan(stage, current, caps) : null;
+  const fanSteer = fanKnob ? steerFan(stage, current, caps, { samples, now }) : null;
   if (fanSteer) {
     suggestion.fan_speed_percent = fanSteer.fan;
     if (fanSteer.reason) suggestion.reasons = [...(suggestion.reasons || []), fanSteer.reason];
