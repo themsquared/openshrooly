@@ -754,7 +754,7 @@ test("too dry: Coach slows the fan (less air), one step, straight there, targets
     const targets = { ...c.targets };
     c.sensor = { temperature: s.temperature_c, humidity: band.lo - 2 };
     const seen = [];
-    for (let i = 0; i < 6; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       tick(15 * MIN);
       await c.cycle();
       await coachPass(c);
@@ -785,7 +785,7 @@ test("too wet: Coach speeds the fan up, never down", async () => {
   const band = humidityBandForStage(s);
   const recipe = Math.max(shrooly.p.ranges.air_exchange_speed[0], s.fan.speed_percent);
   shrooly.sensor = { temperature: s.temperature_c, humidity: band.hi + 3 };
-  for (let i = 0; i < 6; i += 1) {
+  for (let i = 0; i < 3; i += 1) {
     tick(15 * MIN);
     await shrooly.cycle();
     await coachPass(shrooly);
@@ -902,7 +902,7 @@ test("on a 0-100 fan chamber, too dry colonization slows the fan to recipe minus
   const targets = { ...c.targets };
   c.sensor = { temperature: s.temperature_c, humidity: band.lo - 2 };
   const seen = [];
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < 2; i += 1) {
     tick(15 * MIN);
     await c.cycle();
     await coachPass(c);
@@ -919,4 +919,88 @@ test("on a 0-100 fan chamber, too dry colonization slows the fan to recipe minus
   assert.ok(!out.applied, `already at the one allowed step, should not command again: ${JSON.stringify(out)}`);
   assert.equal((await coachCommandsAfter(c, 0)).length, before);
   assert.deepEqual(c.targets, targets);
+});
+
+test("after a hold window of out-of-band humidity that is not improving, Coach takes one more fan step the right way", async () => {
+  const { shrooly } = await world(["shrooly"]);
+  await growStage(shrooly, "fruiting");
+  await shrooly.cycle();
+  await coachOn(shrooly);
+  const s = STAGE.fruiting;
+  const band = humidityBandForStage(s);
+  const recipe = Math.max(shrooly.p.ranges.air_exchange_speed[0], s.fan.speed_percent);
+  const targets = { ...shrooly.targets };
+  shrooly.sensor = { temperature: s.temperature_c, humidity: band.hi + 2 };
+  for (let i = 0; i < 3; i += 1) {
+    tick(15 * MIN);
+    await shrooly.cycle();
+    await coachPass(shrooly);
+  }
+  assert.equal(shrooly.knobs.air_exchange_speed, recipe + 10, "first step only during the first hold");
+  // Still just as wet for a full hour more.
+  for (let i = 0; i < 4; i += 1) {
+    tick(15 * MIN);
+    await shrooly.cycle();
+    await coachPass(shrooly);
+  }
+  assert.equal(shrooly.knobs.air_exchange_speed, recipe + 20, "second step after the hold window");
+  assert.deepEqual(shrooly.targets, targets, "Coach never moved a target");
+});
+
+test("Coach does not escalate the fan while humidity is moving back toward the target", async () => {
+  const { shrooly } = await world(["shrooly"]);
+  await growStage(shrooly, "fruiting");
+  await shrooly.cycle();
+  await coachOn(shrooly);
+  const s = STAGE.fruiting;
+  const band = humidityBandForStage(s);
+  const recipe = Math.max(shrooly.p.ranges.air_exchange_speed[0], s.fan.speed_percent);
+  const targets = { ...shrooly.targets };
+  const start = band.hi + 3;
+  shrooly.sensor = { temperature: s.temperature_c, humidity: start };
+  for (let i = 0; i < 3; i += 1) {
+    tick(15 * MIN);
+    await shrooly.cycle();
+    await coachPass(shrooly);
+  }
+  assert.equal(shrooly.knobs.air_exchange_speed, recipe + 10, "first step only");
+  for (let i = 1; i <= 5; i += 1) {
+    tick(15 * MIN);
+    shrooly.sensor = { temperature: s.temperature_c, humidity: start - i * 0.4 };
+    await shrooly.cycle();
+    await coachPass(shrooly);
+    assert.equal(shrooly.knobs.air_exchange_speed, recipe + 10, `cycle ${i}: still the first step while drying`);
+  }
+  assert.deepEqual(shrooly.targets, targets, "Coach never moved a target");
+});
+
+test("escalated fan speed stops at the recipe-plus-30 cap and still returns to the recipe once humidity is at target", async () => {
+  const { shrooly } = await world(["shrooly"]);
+  await growStage(shrooly, "fruiting");
+  await shrooly.cycle();
+  await coachOn(shrooly);
+  const s = STAGE.fruiting;
+  const band = humidityBandForStage(s);
+  const recipe = Math.max(shrooly.p.ranges.air_exchange_speed[0], s.fan.speed_percent);
+  const targets = { ...shrooly.targets };
+  const cap = recipe + 30;
+  shrooly.sensor = { temperature: s.temperature_c, humidity: band.hi + 3 };
+  const seen = [];
+  for (let i = 0; i < 16; i += 1) {
+    tick(15 * MIN);
+    await shrooly.cycle();
+    await coachPass(shrooly);
+    seen.push(shrooly.knobs.air_exchange_speed);
+  }
+  assert.equal(Math.max(...seen), cap, `cap is recipe + 30 (${cap}), got ${seen}`);
+  assert.ok(seen.every((f) => f >= recipe && f <= cap), `never the wrong way or past the cap: ${seen}`);
+  assert.deepEqual(shrooly.targets, targets, "Coach never moved a target");
+  shrooly.sensor = { temperature: s.temperature_c, humidity: s.humidity_percent };
+  for (let i = 0; i < 4; i += 1) {
+    tick(15 * MIN);
+    await shrooly.cycle();
+    await coachPass(shrooly);
+  }
+  assert.equal(shrooly.knobs.air_exchange_speed, recipe, "back on the recipe once humidity is at target");
+  assert.deepEqual(shrooly.targets, targets);
 });

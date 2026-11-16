@@ -24,7 +24,7 @@ const { call, register, signedWebhook, stripeCheckoutEvent, testEnv } = await im
 const { FakeChamber } = await import(`${API}/test/fake-chamber.js`);
 const MIN = 60000;
 
-async function build({ history }) {
+async function build({ history, coach } = {}) {
   mock.timers.enable({ apis: ["Date"], now: Date.now() - 24 * 60 * MIN });
   const ctx = testEnv({ GROW_COACH_STUB: "1", FLEET_UI_ENABLED: "1", COACH_AUTOPILOT_ENABLED: "1", DEVICE_ISSUER: "worker" });
   const { token, user } = await register(ctx, "grower@example.com");
@@ -60,6 +60,12 @@ async function build({ history }) {
     }
   }
   mock.timers.reset();
+  if (coach === "on") {
+    for (const c of Object.values(chambers)) {
+      const res = await call(ctx, "POST", "/api/fleet/apply", { token, body: { device_ids: [c.id], action: "coach_mode", payload: { mode: "autopilot", profile_id: prof.id } } });
+      if (res.status >= 400) throw new Error(`coach on failed for ${c.id}: ${JSON.stringify(res.data)}`);
+    }
+  }
   return { ctx, token, chambers };
 }
 
@@ -104,8 +110,8 @@ const browser = await puppeteer.launch({ executablePath: CHROME, args: ["--no-sa
 let failures = 0;
 let apiPort = 18790;
 
-async function scenario(name, { history, unit }, check) {
-  const { ctx, token, chambers } = await build({ history });
+async function scenario(name, { history, unit, coach }, check) {
+  const { ctx, token, chambers } = await build({ history, coach });
   const srv = await serve(ctx, apiPort++);
   try {
     for (const [kind, c] of Object.entries(chambers)) {
@@ -119,8 +125,10 @@ async function scenario(name, { history, unit }, check) {
       }, token, unit || "");
       await page.goto(`http://127.0.0.1:${srv.webPort}/device?id=${c.id}`, { waitUntil: "networkidle2" });
       await sleep(2500);
-      // A controls repaint (what the profile catalog load does) must not lose the graph.
+      // A controls-only repaint (catalog load, a Coach status update, a unit change) must not lose the graph.
       await page.evaluate(() => document.querySelector("#device-controls")?.dispatchEvent(new Event("input", { bubbles: true })));
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent("sl-temp-unit")));
+      await sleep(500);
       const info = await page.evaluate(() => {
         const box = document.querySelector("#reading-chart-box");
         const slot = document.querySelector("#device-chart-slot");
@@ -180,6 +188,16 @@ await scenario("fahrenheit", { history: true, unit: "F" }, (kind, info) => {
   assert.equal(info.tempUnitBtn, "°F", `${kind}: the unit toggle reads °F`);
   assert.match(info.liveText, /°F/);
   assert.doesNotMatch(info.liveText, /°C/);
+});
+
+await scenario("coach-on", { history: true, coach: "on" }, (kind, info) => {
+  assert.ok(info.svgs >= 1, `${kind}: the 24 hour graph is drawn with Coach on`);
+  assert.ok(info.rangeButtons >= 2, `${kind}: the range toggle is there with Coach on`);
+  assert.ok(info.inSlot && info.height > 60, `${kind}: the graph stays visible with Coach on after a controls repaint`);
+});
+await scenario("coach-off", { history: true, coach: "off" }, (kind, info) => {
+  assert.ok(info.svgs >= 1, `${kind}: the 24 hour graph is drawn with Coach off`);
+  assert.ok(info.inSlot && info.height > 60, `${kind}: the graph stays visible with Coach off after a controls repaint`);
 });
 await browser.close();
 console.log(failures ? `device page render: ${failures} failing` : "device page render: all passing");
