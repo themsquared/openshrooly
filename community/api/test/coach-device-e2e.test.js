@@ -447,6 +447,38 @@ test("an ack that arrives after the cloud wrote the command off is recorded trut
   assert.match(row.payload._ack.reason, /late/i);
 });
 
+test("an ack for a Coach change that a newer manual edit replaced does not become Coach's baseline or overwrite the edit", async () => {
+  const { lykyn } = await world(["lykyn"]);
+  await growStage(lykyn, "colonization");
+  await lykyn.cycle();
+  await coachOn(lykyn);
+  tick(MIN);
+  lykyn.sensor = { temperature: 24, humidity: 85 };
+  lykyn.setLocal({ air_exchange_speed: 60 });
+  await lykyn.report();
+  const out = await coachPass(lykyn);
+  assert.equal(out.applied, true, JSON.stringify(out));
+  const id = out.command_id;
+  const before = JSON.parse((await mode(lykyn)).last_setpoints || "{}");
+  tick(14 * MIN);
+  await lykyn.poll(); // the chamber took Coach's change, its ack is still on the way
+  tick(3 * MIN);
+  // The grower turns Coach off and edits the fan by hand in the meantime.
+  await coachOff(lykyn);
+  const edit = await apply(lykyn, "setpoints", { fan_speed_percent: 45 });
+  assert.equal(result(edit).status !== "failed", true, JSON.stringify(edit.data));
+  const manualId = Math.max(...(await commands(lykyn)).map((c) => c.id));
+  assert.ok(manualId > id, "the manual edit is a newer command");
+  await lykyn.report(); // the stale ack arrives now
+  const row = (await commands(lykyn)).find((x) => x.id === id);
+  assert.notEqual(row.payload._ack?.status, "applied", "a replaced change is not recorded as the current applied state");
+  assert.match(row.payload._ack?.reason || "", /newer|replaced/i);
+  const after = JSON.parse((await mode(lykyn)).last_setpoints || "{}");
+  assert.deepEqual(after, before, "Coach's remembered setpoints did not jump to the replaced change");
+  const manual = (await commands(lykyn)).find((x) => x.id === manualId);
+  assert.equal(manual.consumed_at, null, "the manual edit is still waiting for the chamber, untouched by the stale ack");
+});
+
 // ---- Offline and reconnect --------------------------------------------------------------------
 
 test("an offline chamber leaves Coach on and locked; on reconnect Coach puts the profile back", async () => {
