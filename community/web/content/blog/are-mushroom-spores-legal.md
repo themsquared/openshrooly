@@ -3,7 +3,7 @@ title: Are mushroom spores legal? US status by state, dated and cited
 h1: Are mushroom spores legal in the United States?
 description: Federal law does not list spores, but California, Florida, Georgia and Idaho do. State by state status for spores and psilocybin, each row cited and dated.
 date: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-15
 category: Off-menu research
 offmenu: true
 legal: Legal status checked 2026-11-09 against the cited federal and state sources. Research summary only, not legal advice. Laws change and enforcement varies, so confirm with the current statute and a licensed attorney in your state.
@@ -96,7 +96,7 @@ Most "spores are legal" pages repeat the federal point and stop. Three things ge
 2. **The offense is usually the mushroom, not the spore.** Where spores are lawful to hold, a grown cubensis or cyanescens flush is still a Schedule I material. The spore is legal only until it is used.
 3. **Sellers do not decide your exposure.** A vendor's "for microscopy only" label does not change what your state's statute says, so I would not assume it protects a buyer.
 
-For the species we profile, the legal notice is the same on each page: [Golden Teacher](/profiles/golden-teacher) and [P. cyanescens](/profiles/p-cyanescens) are listed as research references, not growing instructions. If your interest is culinary, none of this applies. Spores and cultures for oysters, lion's mane and shiitake are not controlled anywhere in the table. Start with [growing mushrooms at home](/guides/grow-mushrooms-at-home) or [cloning store-bought oysters](/blog/grow-mushrooms-from-store-bought-mushrooms).
+For the species we profile, those pages are for research and microscopy purposes only. [Golden Teacher](/profiles/golden-teacher) and [P. cyanescens](/profiles/p-cyanescens) list published environmental conditions for reference. They are not cultivation instructions, and you are responsible for following the laws where you live. If your interest is culinary, none of this applies. Spores and cultures for oysters, lion's mane and shiitake are not controlled anywhere in the table. Start with [growing mushrooms at home](/guides/grow-mushrooms-at-home) or [cloning store-bought oysters](/blog/grow-mushrooms-from-store-bought-mushrooms).
 
 ## FAQ
 

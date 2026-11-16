@@ -266,12 +266,14 @@ export function renderBlogPost(post, posts, kit, warnings = []) {
       ${blocksToHtml(post.blocks, linkFor)}
       ${
         species.length
-          ? `<h2>Grow guides for the species in this post</h2><ul class="faq-links">${species
+          ? `<h2>${post.offmenu ? "Research profiles for the species in this post" : "Grow guides for the species in this post"}</h2>${
+              post.offmenu && kit.researchNotice ? `<p class="muted">${escapeHtml(kit.researchNotice)}</p>` : ""
+            }<ul class="faq-links">${species
               .map((p) => `<li><a href="/profiles/${escapeHtml(p.id)}">${post.offmenu ? escapeHtml(p.name) : `How to grow ${escapeHtml(p.name)}`}</a>${p.species && p.species !== p.name ? ` <span class="muted">(${escapeHtml(p.species)})</span>` : ""}</li>`)
               .join("")}</ul>`
           : ""
       }
-      ${related.length ? `<h2>Keep reading</h2><ul class="faq-links">${related.map(([label, href]) => `<li><a href="${escapeHtml(href)}">${escapeHtml(label)}</a></li>`).join("")}</ul>` : ""}
+      ${related.length ? `<h2>Keep reading</h2>${post.offmenu && related.some(([, href]) => href.startsWith("/profiles/")) && kit.researchNotice ? `<p class="muted">${escapeHtml(kit.researchNotice)}</p>` : ""}<ul class="faq-links">${related.map(([label, href]) => `<li><a href="${escapeHtml(href)}">${escapeHtml(label)}</a></li>`).join("")}</ul>` : ""}
       ${
         more.length
           ? `<h2>More from the blog</h2><ul class="faq-links">${more.map((o) => `<li><a href="${postPath(o)}">${escapeHtml(o.h1)}</a></li>`).join("")}</ul>`
