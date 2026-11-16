@@ -38,6 +38,7 @@ const PERSONALITIES = {
     start: { air_exchange_speed: 33, air_exchange_period_min: 60, air_exchange_run_sec: 15, sunrise_hour: 8, light_hours: 0, white_intensity: 0, color_r: 0, color_g: 0, color_b: 0, grow_phase: "Colonization" },
   },
   shrooly: {
+    growDay: true,
     device_type: "shrooly_chamber",
     firmware_version: "1.0.6-sl.2",
     capabilities: ["setpoints.temperature", "setpoints.humidity", "setpoints.multi", "ack.refused", "setpoints.fan", "air.schedule", "light.schedule", "light.color", "grow.day", "grow.phase"],

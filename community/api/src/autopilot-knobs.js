@@ -69,11 +69,13 @@ function firstDayOfStage(profile, index) {
  *      moves the grow back to an earlier stage is never pushed forward again by the grow day.
  *   3. No usable phase or choice (old firmware, Idle, Custom): the grow day, then Fruiting.
  */
-export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage = null, chosenAtMs = null, nowMs = Date.now() } = {}) {
+export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage = null, chosenAtMs = null, nowMs = Date.now(), growDay = null } = {}) {
+  // The cloud's own grow day (counted from the start date it keeps) wins over whatever the chamber counts.
+  if (growDay != null) knobs = { ...knobs, grow_day: growDay };
   const stages = profile?.stages || [];
   const fallback = Math.max(0, stages.findIndex((s) => s.id === "fruiting"));
   const byPhase = caps.grow_phase ? stageIndexForPhase(profile, knobs.grow_phase) : -1;
-  const byDay = caps.grow_day ? stageIndexForDay(profile, knobs.grow_day) : -1;
+  const byDay = caps.grow_day || growDay != null ? stageIndexForDay(profile, knobs.grow_day) : -1;
   const byChoice = chosenStage ? stages.findIndex((s) => s.id === chosenStage) : -1;
   let index;
   let source;

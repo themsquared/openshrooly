@@ -22,6 +22,7 @@ import { CHANNELS } from "./alerts/channels.js";
 import { renderEmail } from "./alerts/templates.js";
 import { readPrefs } from "./alerts/rules.js";
 import { SQL as ALERT_SQL } from "./alerts/store.js";
+import { growStage, readRules } from "./alerts/rules.js";
 import {
   COACH_ITEM,
   READINGS_STALE_MINUTES,
@@ -775,6 +776,27 @@ function commandAck(payload = {}) {
 }
 
 /**
+ * The grow day by the cloud's own start date for this grow (day 1 is the start date), or null when this
+ * chamber has no tracked grow of this profile. The start date is the single source of truth: a chamber
+ * that counts its own day can sit on day 1 for weeks.
+ */
+export async function cloudGrowDay(db, device, profile, now = Date.now()) {
+  if (!profile?.id) return null;
+  const row = await db.one(ALERT_SQL.rulesGet, [device.id]);
+  const rules = readRules(row && Number(row.user_id) === Number(device.owner_id) ? row.document : null);
+  if (rules.grow?.profile_id !== profile.id || !rules.grow?.started_on) return null;
+  const tracked = growStage(profile, rules.grow.started_on, new Date(now).toISOString().slice(0, 10));
+  return tracked && tracked.day >= 0 ? tracked.day + 1 : null;
+}
+
+/** The grow day only needs sending when the chamber is more than a day off the cloud's count (clocks differ at midnight). */
+export function growDayCorrection(cloudDay, reportedDay, caps) {
+  if (cloudDay == null || !knobSupported(caps, "grow_day")) return {};
+  const got = Number(reportedDay);
+  return Number.isFinite(got) && Math.abs(got - cloudDay) <= 1 ? {} : { grow_day: cloudDay };
+}
+
+/**
  * The grower's latest say on which stage this chamber is in, newest first:
  * - a command that named a profile stage (Start this grow, or a profile apply), or
  * - a manual phase change with no stage field (the Stage picker). That still counts as the
@@ -1261,7 +1283,8 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   const profile = resolved.profile;
   const lastStaged = await latestStagedCommand(db, device.id, state.profile_id);
   const chosenStage = lastStaged?.stage || null;
-  const pick = pickAutopilotStage(profile, knobs, caps, { chosenStage, chosenAtMs: Date.parse(lastStaged?.row?.issued_at || "") || null, nowMs: now });
+  const growDay = await cloudGrowDay(db, device, profile, now);
+  const pick = pickAutopilotStage(profile, knobs, caps, { chosenStage, chosenAtMs: Date.parse(lastStaged?.row?.issued_at || "") || null, nowMs: now, growDay });
   const blocked = failedStageApplyBlocks(lastStaged, pick);
   if (blocked) {
     return { applied: false, status: "failed", error: blocked, reason: blocked, skipped: "phase_apply_failed", stage: lastStaged.stage };
@@ -1277,7 +1300,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     if (fanSteer.reason) suggestion.reasons = [...(suggestion.reasons || []), fanSteer.reason];
   }
   const recipe = caps.multi ? recipeKnobs(stage, pick.stageId, caps) : {};
-  const extras = caps.multi ? recipeChanges(recipe, knobs, caps) : {};
+  const extras = caps.multi ? { ...recipeChanges(recipe, knobs, caps), ...growDayCorrection(growDay, knobs.grow_day, caps) } : {};
   const currentSetpoints = {
     temperature_c: current.temperature_setpoint ?? last.temperature_c,
     humidity_percent: current.humidity_setpoint ?? last.humidity_percent,
