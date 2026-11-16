@@ -179,6 +179,10 @@ test("settings validation keeps defaults sane and rejects junk", () => {
   assert.throws(() => updatePrefs({}, { cooldown_minutes: 5 }), /cooldown/);
   assert.throws(() => updatePrefs({}, { quiet: { enabled: true, start: "25:00", end: "07:00" } }), /quiet/);
   assert.equal(updatePrefs({ email: false, unsubscribed_at: "x" }, { email: true }).unsubscribed_at, undefined);
+  assert.equal(readPrefs(null).temp_unit, undefined);
+  assert.equal(updatePrefs({}, { temp_unit: "F" }).temp_unit, "F");
+  assert.equal(updatePrefs({ temp_unit: "F" }, { temp_unit: "C" }).temp_unit, "C");
+  assert.throws(() => updatePrefs({}, { temp_unit: "K" }), /temperature unit/);
   assert.equal(readRules(null).temperature.minutes, 30);
   assert.throws(() => updateRules({}, { temperature: { minutes: 1 } }), /temperature minutes/);
   assert.throws(() => updateRules({}, { water: { below: 100 } }), /water below/);

@@ -104,7 +104,7 @@ const browser = await puppeteer.launch({ executablePath: CHROME, args: ["--no-sa
 let failures = 0;
 let apiPort = 18790;
 
-async function scenario(name, { history }, check) {
+async function scenario(name, { history, unit }, check) {
   const { ctx, token, chambers } = await build({ history });
   const srv = await serve(ctx, apiPort++);
   try {
@@ -113,7 +113,10 @@ async function scenario(name, { history }, check) {
       await page.setViewport({ width: 390, height: 1400, deviceScaleFactor: 2, isMobile: true });
       const errors = [];
       page.on("pageerror", (e) => errors.push(String(e)));
-      await page.evaluateOnNewDocument((t) => localStorage.setItem("openshrooly_token", t), token);
+      await page.evaluateOnNewDocument((t, u) => {
+        localStorage.setItem("openshrooly_token", t);
+        if (u === "C" || u === "F") localStorage.setItem("sl-temp-unit", u);
+      }, token, unit || "");
       await page.goto(`http://127.0.0.1:${srv.webPort}/device?id=${c.id}`, { waitUntil: "networkidle2" });
       await sleep(2500);
       // A controls repaint (what the profile catalog load does) must not lose the graph.
@@ -132,6 +135,9 @@ async function scenario(name, { history }, check) {
           legendClutter: document.querySelectorAll(".rc-key, .rc-events").length,
           statusBanner: Boolean(document.querySelector("#device-status")),
           rangeButtons: document.querySelectorAll("#reading-chart [data-hours]").length,
+          liveText: document.querySelector(".sheet-live")?.innerText || "",
+          tempValue: document.querySelector('input[name="temperature_c"]')?.value || "",
+          tempUnitBtn: document.querySelector(".temp-unit-toggle")?.textContent || "",
         };
       });
       if (shots) await page.screenshot({ path: path.join(shots, `${name}-${kind}.png`) });
@@ -166,6 +172,14 @@ await scenario("no-history", { history: false }, (kind, info) => {
   assert.equal(info.svgs, 0);
   assert.ok(info.skeleton, `${kind}: a skeleton stands in for the graph`);
   assert.match(info.emptyText, /Readings show up here|Loading the last 24 hours/);
+});
+await scenario("fahrenheit", { history: true, unit: "F" }, (kind, info) => {
+  assert.ok(info.svgs >= 1, `${kind}: the graph is drawn in F`);
+  // The page paint uses the chamber's last reported target (20 C at first check-in in this fixture).
+  assert.equal(info.tempValue, "68", `${kind}: 20 C shows as 68 F on the slider, got ${info.tempValue}`);
+  assert.equal(info.tempUnitBtn, "°F", `${kind}: the unit toggle reads °F`);
+  assert.match(info.liveText, /°F/);
+  assert.doesNotMatch(info.liveText, /°C/);
 });
 await browser.close();
 console.log(failures ? `device page render: ${failures} failing` : "device page render: all passing");

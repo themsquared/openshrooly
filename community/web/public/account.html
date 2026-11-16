@@ -75,6 +75,15 @@
       <p class="account-actions"><a class="button" href="/account/feedback">Send feedback</a></p>
     </section>
 
+    <details class="account-section card" id="display">
+      <summary><h2>Display</h2><span class="account-summary muted">Temperature unit</span></summary>
+      <p class="muted">This only changes how temperatures look. Chambers and recipes stay in Celsius.</p>
+      <div class="unit-seg" role="group" aria-label="Temperature unit">
+        <button type="button" data-account-temp-unit="C">°C</button>
+        <button type="button" data-account-temp-unit="F">°F</button>
+      </div>
+    </details>
+
     <details class="account-section card" id="alerts">
       <summary><h2>Email alerts</h2><span class="account-summary muted">When a chamber drifts, runs low on water, or stops reporting</span></summary>
       <p class="muted">An email when a chamber drifts out of range, runs low on water, stops reporting, or reaches fruiting day. Open a chamber to change its own alerts.</p>

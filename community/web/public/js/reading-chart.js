@@ -4,6 +4,8 @@
  * markers. No chart library. Pure helpers are exported for tests.
  */
 
+import { setTempUnit, tempUnit, toUnit, UNIT_CHANGE } from "./temp-unit.js";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 const HOUR = 3600 * 1000;
 export const RANGES = [
@@ -11,7 +13,6 @@ export const RANGES = [
   { hours: 24, label: "24h" },
   { hours: 168, label: "7d" },
 ];
-const UNIT_KEY = "sl-temp-unit";
 const GAP_FLOOR_MS = 20 * 60 * 1000;
 
 /** Series the chart knows. A series shows only when the chamber reported it in the range. */
@@ -41,19 +42,7 @@ const ts = (iso) => {
   return Number.isFinite(t) ? t : null;
 };
 
-export function tempUnit() {
-  try {
-    return globalThis.localStorage?.getItem(UNIT_KEY) === "F" ? "F" : "C";
-  } catch {
-    return "C";
-  }
-}
-
-export function toUnit(c, unit) {
-  const v = num(c);
-  if (v == null) return null;
-  return unit === "F" ? (v * 9) / 5 + 32 : v;
-}
+export { tempUnit, toUnit };
 
 /** Value text with its unit: "20.4 °C", "88%". */
 export function valueText(series, v, unit = "C") {
@@ -543,10 +532,7 @@ export function mountReadingChart(root, opts = {}) {
   root.addEventListener("click", async (ev) => {
     const unitBtn = ev.target.closest("[data-unit]");
     if (unitBtn) {
-      state.unit = unitBtn.dataset.unit === "F" ? "F" : "C";
-      try {
-        localStorage.setItem(UNIT_KEY, state.unit);
-      } catch {}
+      state.unit = setTempUnit(unitBtn.dataset.unit);
       draw();
       return;
     }
@@ -566,6 +552,13 @@ export function mountReadingChart(root, opts = {}) {
       }
       state.loading = false;
     }
+    draw();
+  });
+
+  globalThis.addEventListener?.(UNIT_CHANGE, (ev) => {
+    const u = ev.detail === "F" ? "F" : "C";
+    if (state.unit === u) return;
+    state.unit = u;
     draw();
   });
 

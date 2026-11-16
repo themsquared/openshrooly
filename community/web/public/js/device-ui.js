@@ -3,6 +3,7 @@
 import { speciesArt } from "./species-art.js";
 import { escapeHtml, safeDisplay } from "./safe-markdown.js";
 import { DEFAULT_DEVICE_TYPE, deviceAdapter, deviceTypeLabel } from "./device-adapters.js";
+import { formatTemp, formatTempValue, tempDisplayField, tempUnit } from "./temp-unit.js";
 
 export { DEFAULT_DEVICE_TYPE, deviceTypeLabel };
 
@@ -22,15 +23,16 @@ export const FIELDS = Object.freeze({
   grow_day: { min: 0, max: 90, step: 1, unit: "" },
 });
 
-export function fieldAttrs(name) {
-  const f = FIELDS[name];
+export function fieldAttrs(name, unit = tempUnit()) {
+  const f = name === "temperature_c" ? tempDisplayField(unit) : FIELDS[name];
   return `min="${f.min}" max="${f.max}" step="${f.step}"`;
 }
 
-export function formatField(name, value) {
+export function formatField(name, value, unit = tempUnit()) {
   if (value == null || value === "") return "";
   const n = Number(value);
   if (!Number.isFinite(n)) return "";
+  if (name === "temperature_c") return formatTempValue(n, unit, { style: "reading" });
   const step = FIELDS[name]?.step ?? 1;
   if (step < 1) {
     const r = Math.round(n * 10) / 10;
@@ -185,7 +187,7 @@ export function readingLine(device) {
   const t = device?.reading?.temperature;
   const h = device?.reading?.humidity;
   if (t == null && h == null) return "No reading yet";
-  const temp = t == null ? "temperature not reported" : `${safeDisplay(t)} °C`;
+  const temp = t == null ? "temperature not reported" : formatTemp(t);
   const rh = h == null ? "humidity not reported" : `${safeDisplay(h)}% humidity`;
   return `${temp} · ${rh}`;
 }
@@ -298,7 +300,7 @@ export function renderGauges(device, { now = Date.now() } = {}) {
   const waterNote = reports(device, "water_level") || !device?.reading ? "" : " This chamber does not report its water level.";
   return `<div class="device-gauges" aria-label="Live readings">
     ${gauge("Humidity", device.reading?.humidity, "%", device.setpoints?.humidity_percent)}
-    ${gauge("Temperature", device.reading?.temperature, " °C", device.setpoints?.temperature_c)}
+    ${gauge("Temperature", formatTempValue(device.reading?.temperature, tempUnit(), { style: "reading" }), ` ${tempDisplayField().unit}`, formatTempValue(device.setpoints?.temperature_c, tempUnit(), { style: "target" }))}
     ${extras.join("")}
   </div>
   <p class="muted device-reading-when" id="reading-when">${escapeHtml(`${when}${waterNote}`.trim())}</p>`;
@@ -410,7 +412,7 @@ function controlMsg(action) {
 
 /** One line for an Autopilot change: temperature and RH, then any fan, light or phase it moved. */
 export function autopilotSummary(next = {}, device = {}) {
-  const parts = [`${next.temperature_c ?? "?"} °C`, `${next.humidity_percent ?? "?"}% RH`];
+  const parts = [next.temperature_c == null ? "? °C" : formatTemp(next.temperature_c, tempUnit(), { style: "target" }), `${next.humidity_percent ?? "?"}% RH`];
   const fan = next.air_exchange_speed ?? next.fan_speed_percent;
   if (fan != null) parts.push(`fan ${fan}%`);
   if (next.air_exchange_period_min != null && next.air_exchange_run_sec != null) {
@@ -424,31 +426,42 @@ export function autopilotSummary(next = {}, device = {}) {
   return `Set ${parts.length ? `${parts.join(", ")} and ${last}` : last}`;
 }
 
+function displayValue(name, value) {
+  if (name === "temperature_c") return formatTempValue(value, tempUnit(), { style: "target" });
+  return numOrBlank(value);
+}
+
 function fieldInput(name, value, { off = "", autosave = "", extra = "" } = {}) {
-  const f = FIELDS[name];
   const save = autosave ? ` data-autosave="${autosave}"` : "";
-  return `<input name="${name}" type="number" inputmode="decimal" ${fieldAttrs(name)} value="${numOrBlank(value)}"${save}${off}${extra}>`;
+  const unit = name === "temperature_c" ? ` data-display-unit="${tempUnit()}"` : "";
+  return `<input name="${name}" type="number" inputmode="decimal" ${fieldAttrs(name)} value="${displayValue(name, value)}"${save}${unit}${off}${extra}>`;
 }
 
 function fieldSlider(name, value, { off = "", autosave = "", tone = "" } = {}) {
-  const f = FIELDS[name];
-  const n = Number(value);
-  const current = Number.isFinite(n) ? n : f.min;
+  const f = name === "temperature_c" ? tempDisplayField() : FIELDS[name];
+  const raw = name === "temperature_c" ? Number(formatTempValue(value, tempUnit(), { style: "target" })) : Number(value);
+  const current = Number.isFinite(raw) ? raw : f.min;
   const pct = ((current - f.min) / (f.max - f.min)) * 100;
   const save = autosave ? ` data-autosave="${autosave}"` : "";
   const toneAttr = tone ? ` data-tone="${tone}"` : "";
   return `<input type="range" class="knob-slider" data-sync="${name}" ${fieldAttrs(name)} value="${numOrBlank(current)}" style="--pct:${pct}%"${toneAttr}${save}${off} tabindex="-1">`;
 }
 
+function unitToggle(unit) {
+  const next = unit === "F" ? "C" : "F";
+  return `<button type="button" class="knob-unit temp-unit-toggle" data-temp-unit="${next}" aria-label="Show temperatures in ${next === "F" ? "Fahrenheit" : "Celsius"}">°${unit}</button>`;
+}
+
 function knob(name, label, value, actual, { off = "", autosave = "", tone = "", unit } = {}) {
-  const f = FIELDS[name];
+  const f = name === "temperature_c" ? tempDisplayField() : FIELDS[name];
   const u = unit ?? f.unit;
-  const shown = formatField(name, value);
-  const now = actual == null || actual === "" ? "" : `<span class="knob-now">${escapeHtml(formatField(name, actual))}${escapeHtml(u)} now</span>`;
+  const nowShown = name === "temperature_c" ? formatTemp(actual, tempUnit(), { style: "reading" }) : `${formatField(name, actual)}${u}`;
+  const now = actual == null || actual === "" ? "" : `<span class="knob-now">${escapeHtml(nowShown)} now</span>`;
+  const unitEl = name === "temperature_c" ? unitToggle(tempUnit()) : `<span class="knob-unit">${escapeHtml(u)}</span>`;
   return `<div class="knob${off.includes("disabled") ? " is-locked" : ""}" data-card="${name}">
     <div class="knob-head">
       <span class="knob-label">${escapeHtml(label)}</span>
-      <label class="knob-value">${fieldInput(name, value, { off, autosave })}<span class="knob-unit">${escapeHtml(u)}</span></label>
+      <label class="knob-value">${fieldInput(name, value, { off, autosave })}${unitEl}</label>
     </div>
     ${fieldSlider(name, value, { off, autosave, tone })}
     ${now}
@@ -516,11 +529,12 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
     .map(({ name, available }) => `<option value="${name}"${name === stageNow ? " selected" : ""}${available ? "" : " disabled"}>${name}</option>`)
     .join("");
 
-  const liveTemp = formatField("temperature_c", reading.temperature);
+  const unit = tempUnit();
+  const liveTemp = formatField("temperature_c", reading.temperature, unit);
   const liveRh = formatField("humidity_percent", reading.humidity);
   const live = liveTemp || liveRh
     ? `<div class="sheet-live" aria-label="Live readings">
-        ${liveTemp ? `<span><strong>${escapeHtml(liveTemp)}°</strong></span>` : ""}
+        ${liveTemp ? `<span><strong>${escapeHtml(liveTemp)}</strong>${unitToggle(unit)}</span>` : ""}
         ${liveRh ? `<span><strong>${escapeHtml(liveRh)}%</strong></span>` : ""}
       </div>`
     : "";
