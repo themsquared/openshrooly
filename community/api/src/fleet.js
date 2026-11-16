@@ -468,7 +468,9 @@ export function validateFleetChange({ action, payload = {}, profile, stage, curr
     if (proposed.temperature_c == null && proposed.humidity_percent == null && proposed.fan_speed_percent == null && !Object.keys(knobs).length) {
       return { ok: false, error: "Pick a temperature, humidity, fan, air, or light change." };
     }
-    const next = { ...clampAutopilotSetpoints({ ...currentSetpoints, ...proposed }, stage), ...knobs };
+    // A grower's own number is held to the global safe limits and the chamber's range, never to the profile's
+    // stage band. (Passing the stage here silently pulled a 20 C request up to the stage's 23 C floor.)
+    const next = { ...clampAutopilotSetpoints({ ...currentSetpoints, ...proposed }, {}), ...knobs };
     return {
       ok: true,
       kind: "setpoints",

@@ -147,7 +147,7 @@ test("on 1.0.5 Autopilot moves the grow to pinning by day: one command with fan,
   const [cmd] = await openCommands(ctx, "dev-k1");
   assert.equal(cmd.source, "grow-coach-autopilot");
   assert.equal(cmd.grow_phase, "Pinning");
-  assert.equal(cmd.temperature_c, 23, "temperature still steps 1 C at a time");
+  assert.equal(cmd.temperature_c, 18, "temperature goes straight to the pinning target, never in steps");
   assert.equal(cmd.air_exchange_speed, 25, "RH 91 is under the pinning 93 target, so the fan steps toward a reduced 25, not the full 35");
   assert.equal(cmd.fan_speed_percent, undefined, "firmware keys only");
   assert.equal(cmd.air_exchange_period_min, 15);
@@ -247,7 +247,7 @@ test("a chamber with old firmware still gets temperature and RH only", async () 
   const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-k3" } });
   assert.equal(run.data.applied, true, JSON.stringify(run.data));
   const [cmd] = await openCommands(ctx, "dev-k3");
-  assert.equal(cmd.temperature_c, 23);
+  assert.equal(cmd.temperature_c, 16, "straight to the stage target");
   for (const key of ["grow_phase", "air_exchange_speed", "light_hours", "white_intensity", "air_exchange_period_min"]) {
     assert.equal(cmd[key], undefined, key);
   }
@@ -344,8 +344,8 @@ test("a Shrooly colonization grow still lands Colonizing, not Fruiting", async (
   assert.equal(run.data.stage, "colonization");
   const cmd = (await openCommands(ctx, "dev-k-colo")).at(-1);
   assert.equal(cmd.grow_phase, "Colonizing");
-  assert.equal(cmd.temperature_c, 17, "temperature still steps 1 C at a time toward 24");
-  assert.equal(cmd.air_exchange_speed, 40, "fan steps 10 toward the colonization 20");
+  assert.equal(cmd.temperature_c, 24, "temperature goes straight to the colonization target, never in steps");
+  assert.equal(cmd.air_exchange_speed, 15, "RH 86 is under the 90 target: fan goes straight to one step under the colonization 20, no staircase");
   assert.equal(cmd.air_exchange_period_min, 60);
   assert.equal(cmd.light_hours, 0);
   assert.equal(cmd.white_intensity, 0);
