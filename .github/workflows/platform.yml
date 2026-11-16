@@ -70,6 +70,9 @@ jobs:
       - name: Install web
         working-directory: community/web
         run: npm ci
+      - name: Bundle seeds
+        working-directory: community/api
+        run: npm run bundle-seeds
       - name: Real device page in headless Chrome
         working-directory: community/web
         env:
