@@ -1615,9 +1615,9 @@ export default function Dashboard() {
                 <label>Fan Speed: {getNumber('air_exchange__speed')}%</label>
                 <input
                   type="range"
-                  min="15"
+                  min="0"
                   max="100"
-                  step="5"
+                  step="1"
                   value={getNumber('air_exchange__speed') as number}
                   onChange={(e) =>
                     handleNumberChange('number-air_exchange__speed', parseFloat(e.target.value))

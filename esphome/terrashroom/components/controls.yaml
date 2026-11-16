@@ -148,9 +148,9 @@ number:
     id: fresh_air_speed
     name: "Fresh Air Fan Speed"
     unit_of_measurement: "%"
-    min_value: 20
+    min_value: 0
     max_value: 100
-    step: 5
+    step: 1
     initial_value: 60
     optimistic: true
     restore_value: true

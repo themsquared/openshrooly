@@ -212,9 +212,11 @@ void CloudEngine::schedule_probe_error_(int retry_after_s) {
   next_probe_ms_ = now_() + wait;
 }
 
-void CloudEngine::schedule_telemetry_error_(int retry_after_s) {
+void CloudEngine::schedule_telemetry_error_(int retry_after_s, bool ack_pending) {
   bump_backoff_(retry_after_s);
-  const uint32_t wait = backoff_ms_ > TELEMETRY_INTERVAL_MS ? backoff_ms_ : TELEMETRY_INTERVAL_MS;
+  // A chamber that has applied a command owes the cloud an ack. Retry on the short backoff
+  // (20 s growing to 5 min) instead of waiting out a whole 15 minute heartbeat slot.
+  const uint32_t wait = ack_pending ? backoff_ms_ : (backoff_ms_ > TELEMETRY_INTERVAL_MS ? backoff_ms_ : TELEMETRY_INTERVAL_MS);
   next_telemetry_ms_ = now_() + wait;
 }
 
@@ -1157,7 +1159,7 @@ bool CloudEngine::process_inbox_(const std::string &body) {
         if (!pending_ack_ || pending_ack_id_ == ack_id)
           keep_pending_ack_(ack_id, ack_status.c_str(), ack_reason.c_str(), reading);
       }
-      schedule_telemetry_error_(0);
+      schedule_telemetry_error_(0, carried_ack);
     }
   }
   return true;
@@ -1370,6 +1372,10 @@ void CloudEngine::complete_apply(int64_t command_id, bool ok, const char *status
   if (ok && command_id != 0)
     last_applied_command_id_ = command_id;
   keep_pending_ack_(command_id, status ? status : (ok ? "applied" : "failed"), reason, reading);
+  // The ack goes out at once. If the telemetry job cannot start right now, the engine loop still
+  // sees the heartbeat as due on its next pass instead of leaving the ack for the next slot.
+  const uint32_t at = now_();
+  next_telemetry_ms_ = at != 0 ? at : 1;
 }
 
 bool CloudEngine::apply_waiting() const {
@@ -1415,7 +1421,7 @@ bool CloudEngine::handle_telemetry_() {
     next_telemetry_ms_ = now_() + TELEMETRY_INTERVAL_MS;
     return true;
   }
-  schedule_telemetry_error_(0);
+  schedule_telemetry_error_(0, had_ack);
   return false;
 }
 

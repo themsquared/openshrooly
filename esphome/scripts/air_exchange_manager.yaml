@@ -42,7 +42,7 @@
 
         - fan.turn_on:
             id: air_exchange_fan
-            speed: !lambda 'return std::max(15, (int) id(air_exchange_speed).state);'  # Enforce minimum 15%
+            speed: !lambda 'int pct = (int) id(air_exchange_speed).state; if (pct <= 0) return 0; const int FAN_STALL_PERCENT = 15; /* unmeasured stock floor; needs hands-on */ return std::max(FAN_STALL_PERCENT, pct);'
 
         # Per-second status during ON
         - repeat:
