@@ -128,6 +128,10 @@ async function scenario(name, { history }, check) {
           state: document.querySelector("#device-state")?.innerText || "",
           emptyText: document.querySelector(".device-chart-state:not(.hidden)")?.innerText || "",
           skeleton: Boolean(document.querySelector(".device-chart-state:not(.hidden) .device-chart-skeleton")),
+          pageText: document.body.innerText,
+          legendClutter: document.querySelectorAll(".rc-key, .rc-events").length,
+          statusBanner: Boolean(document.querySelector("#device-status")),
+          rangeButtons: document.querySelectorAll("#reading-chart [data-hours]").length,
         };
       });
       if (shots) await page.screenshot({ path: path.join(shots, `${name}-${kind}.png`) });
@@ -136,6 +140,9 @@ async function scenario(name, { history }, check) {
         assert.ok(info.inSlot, `${kind}: the chart box is in the page between the grow and the sliders`);
         assert.ok(info.height > 60, `${kind}: the chart area has height, ${info.height}`);
         assert.doesNotMatch(info.state, /Checked in|about every 15 minutes/, `${kind}: no check-in noise at the top`);
+        assert.doesNotMatch(info.pageText, /Hover or tap|No events in this range|Events in this range|Stage target\s+Setpoint|Email alerts are off/i, `${kind}: no helper text, legend or alert banner on the device page`);
+        assert.equal(info.legendClutter, 0, `${kind}: no key or event list under the graph`);
+        assert.equal(info.statusBanner, false, `${kind}: the email alerts banner is not on the device page`);
         check(kind, info);
         console.log(`ok   ${name} ${kind}`);
       } catch (err) {
@@ -152,6 +159,7 @@ async function scenario(name, { history }, check) {
 
 await scenario("with-history", { history: true }, (kind, info) => {
   assert.ok(info.svgs >= 1, `${kind}: the 24 hour graph is drawn`);
+  assert.ok(info.rangeButtons >= 2, `${kind}: the range toggle is there`);
   assert.match(info.state, /Online/);
 });
 await scenario("no-history", { history: false }, (kind, info) => {
