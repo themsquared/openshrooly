@@ -14,6 +14,7 @@ import {
   coachManagingTargets,
   COACH_MANAGES_NOTE,
   deviceMetaLine,
+  chartEmptyText,
   chartReady,
   growLine,
   growingLabels,
@@ -2047,30 +2048,67 @@ async function renderDevice() {
     return controls.dataset.dirty === "1" || controls.dataset.busy === "1" || controls.contains(document.activeElement);
   };
 
+  // The chart always has a place on the page. One box lives for the whole visit: a controls repaint
+  // replaces the slot, so the same box (with its mounted chart) is moved into the new slot, never rebuilt.
+  const chartBox = () => {
+    if (view.chartBox) return view.chartBox;
+    const box = document.createElement("section");
+    box.id = "reading-chart-box";
+    box.className = "fleet-chart device-chart";
+    box.setAttribute("aria-label", "Last 24 hours");
+    box.innerHTML = `<div class="device-chart-state" role="status"></div><div id="reading-chart" class="hidden"></div>`;
+    view.chartBox = box;
+    return box;
+  };
+
   const placeDeviceChart = (snap, device) => {
     const slot = $("#device-chart-slot");
     if (!slot) return;
-    let box = $("#reading-chart-box");
-    if (!box) {
-      box = document.createElement("section");
-      box.id = "reading-chart-box";
-      box.className = "fleet-chart hidden";
-      box.setAttribute("aria-label", "Readings");
-      box.innerHTML = `<div id="reading-chart"></div>`;
-    }
+    const box = chartBox();
     if (box.parentElement !== slot) slot.appendChild(box);
-    const ready = chartReady(snap.history);
-    box.classList.toggle("hidden", !ready);
-    if (!ready) return;
-    const chartEl = $("#reading-chart");
-    const chartKey = JSON.stringify([snap.history || [], snap.events || [], device.targets || null]);
+    // A snapshot without history (a socket message, a cached paint from an older build) keeps the last good one.
+    if (Array.isArray(snap.history)) view.history = { history: snap.history, events: snap.events || [], range: snap.range || null };
+    const have = view.history;
+    const chartEl = box.querySelector("#reading-chart");
+    const stateEl = box.querySelector(".device-chart-state");
+    const ready = chartReady(have?.history);
+    chartEl.classList.toggle("hidden", !ready);
+    stateEl.classList.toggle("hidden", ready);
+    if (!ready) {
+      const loading = !Array.isArray(have?.history);
+      stateEl.innerHTML = `<div class="device-chart-skeleton${loading ? "" : " is-empty"}" aria-hidden="true"></div><p class="muted">${escapeHtml(chartEmptyText(have?.history))}</p>`;
+      if (loading) ensureHistory();
+      return;
+    }
+    const chartKey = JSON.stringify([have.history, have.events, device.targets || null]);
     if (chartEl._history === chartKey) return;
     chartEl._history = chartKey;
     view.chart ||= mountReadingChart(chartEl, {
-      title: "",
+      title: "Last 24 hours",
       loadRange: (hours) => api(`/api/fleet/devices/${encodeURIComponent(id)}?hours=${hours}`),
     });
-    view.chart.update({ history: snap.history || [], events: snap.events || [], range: snap.range || null, device });
+    view.chart.update({ history: have.history, events: have.events, range: have.range, device });
+  };
+
+  // If the snapshot came back without history, ask for it directly, a few times, so the chart never stays blank.
+  const ensureHistory = () => {
+    if (view.historyTry) return;
+    view.historyTry = true;
+    const attempt = async (n) => {
+      try {
+        const detail = await api(`/api/fleet/devices/${enc}?hours=24`);
+        if (Array.isArray(detail.history)) {
+          view.history = { history: detail.history, events: detail.events || [], range: detail.range || null };
+          if (view.snapshot?.device) placeDeviceChart(view.snapshot, view.snapshot.device);
+          return;
+        }
+      } catch {
+        // retry below
+      }
+      if (n < 3) setTimeout(() => attempt(n + 1), 2000 * (n + 1));
+      else view.historyTry = false;
+    };
+    setTimeout(() => attempt(0), 1500);
   };
 
   const bindUnlink = () => {

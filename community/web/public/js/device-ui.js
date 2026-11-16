@@ -145,9 +145,8 @@ function clockText(ms) {
  */
 export function chamberStatus(device, now = Date.now()) {
   if (device?.online) {
-    const seen = Date.parse(device.last_seen_at || "");
-    const detail = Number.isFinite(seen) ? `Checked in at ${clockText(seen)}. It checks in about every 15 minutes.` : "";
-    return { kind: "online", label: "Online", detail };
+    // Online is just the dot and the word: no check-in time, no cadence.
+    return { kind: "online", label: "Online", detail: "" };
   }
   if (!device?.last_seen_at) {
     const since = Date.parse(device?.linked_at || device?.created_at || "");
@@ -624,6 +623,12 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
   </form>`;
 }
 
+
+/** The words under the chart slot while there is no line to draw yet. `history` is null before the first load. */
+export function chartEmptyText(history) {
+  if (!Array.isArray(history)) return "Loading the last 24 hours.";
+  return "Readings show up here after the chamber has checked in twice, about 30 minutes.";
+}
 
 /** The chart needs two readings to draw a line. Before that, say when it shows up. */
 export function chartReady(points) {
