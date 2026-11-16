@@ -39,6 +39,46 @@ jobs:
         working-directory: community/api
         run: npm test
 
+  coach-device-e2e:
+    name: Coach device e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: community/api/package-lock.json
+      - name: Install
+        working-directory: community/api
+        run: npm ci
+      - name: Coach and chamber end to end
+        working-directory: community/api
+        run: npm run test:coach-e2e
+
+  device-page-render:
+    name: Device page render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install API
+        working-directory: community/api
+        run: npm ci
+      - name: Install web
+        working-directory: community/web
+        run: npm ci
+      - name: Bundle seeds
+        working-directory: community/api
+        run: npm run bundle-seeds
+      - name: Real device page in headless Chrome
+        working-directory: community/web
+        env:
+          CHROME_PATH: /usr/bin/google-chrome-stable
+        run: node scripts/device-page-render.e2e.mjs
+
   matter-bridge:
     name: Matter bridge
     runs-on: ubuntu-latest
