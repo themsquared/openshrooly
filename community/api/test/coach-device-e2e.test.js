@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COACH_MANAGES_TARGETS, getAutopilotStatus, runAutopilotPass } from "../src/coach-autopilot.js";
 import { deviceAdapter } from "../src/device-adapters.js";
+import { SQL as ALERT_SQL } from "../src/alerts/store.js";
 import { humidityBandForStage } from "../src/autopilot-knobs.js";
 import { FakeChamber } from "./fake-chamber.js";
 import { call, register, signedWebhook, stripeCheckoutEvent, testEnv } from "./helpers.js";
@@ -778,4 +779,82 @@ test("a cold chamber does not make Coach change the temperature target or the fa
     assert.equal(lykyn.knobs.air_exchange_speed, fan, `cycle ${i}: the fan stays on the recipe for a temperature problem`);
   }
   assert.equal((await mode(lykyn)).mode, "autopilot");
+});
+
+// ---- The cloud's start date is the one source of truth for the grow day -------------------------------
+
+async function setStart(chamber, daysAgo) {
+  const row = await ctx.db.one("SELECT * FROM alert_rules WHERE device_id=?", [chamber.id]);
+  const doc = JSON.parse(row.document);
+  doc.grow = { ...doc.grow, started_on: new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10) };
+  await ctx.db.run(ALERT_SQL.rulesPut, [chamber.id, row.user_id, JSON.stringify(doc), new Date().toISOString().replace(/\.\d+Z$/, "Z")]);
+  return doc.grow.started_on;
+}
+const startedOn = async (chamber) => (await rules(chamber)).grow.started_on;
+
+test("a chamber stuck on day 1 is brought to the cloud's day by Coach, and the start date does not move", async () => {
+  const { shrooly } = await world(["shrooly"]);
+  await growStage(shrooly, "pinning");
+  await shrooly.cycle();
+  const start = await setStart(shrooly, 16); // day 17 of the grow: inside the 5 day pinning stage (days 15 to 19)
+  shrooly.setLocal({ grow_day: 1 });
+  shrooly.sensor = { temperature: STAGE.pinning.temperature_c, humidity: STAGE.pinning.humidity_percent };
+  await shrooly.report();
+  await coachOn(shrooly);
+  tick(MIN);
+  const out = await coachPass(shrooly);
+  assert.equal(out.applied, true, JSON.stringify(out));
+  await shrooly.cycle();
+  assert.equal(shrooly.knobs.grow_day, 17, "the chamber now counts from the cloud's start date");
+  assert.equal(await startedOn(shrooly), start, "the start date was not touched");
+  assert.equal(CANON[shrooly.knobs.grow_phase], "pinning");
+  assertRecipe(shrooly, "pinning");
+  assert.equal(shrooly.appliedLog.some((a) => a.status === "refused"), false);
+});
+
+test("a chamber within a day of the cloud's count is left alone (midnight clocks differ)", async () => {
+  const { shrooly } = await world(["shrooly"]);
+  await growStage(shrooly, "pinning");
+  await shrooly.cycle();
+  await setStart(shrooly, 16);
+  shrooly.setLocal({ grow_day: 16 });
+  shrooly.sensor = { temperature: STAGE.pinning.temperature_c, humidity: STAGE.pinning.humidity_percent };
+  await shrooly.report();
+  await coachOn(shrooly);
+  tick(MIN);
+  const out = await coachPass(shrooly);
+  assert.ok(!out.applied, JSON.stringify(out));
+  assert.equal(shrooly.knobs.grow_day, 16);
+});
+
+test("Grow on a tracked grow counts the day from the cloud's start date, not from the chamber's own day", async () => {
+  const { shrooly } = await world(["shrooly"]);
+  await growStage(shrooly, "pinning");
+  await shrooly.cycle();
+  const start = await setStart(shrooly, 16);
+  shrooly.setLocal({ grow_day: 1 }); // the chamber never counted up
+  await shrooly.report();
+  await growStage(shrooly, "pinning"); // the grower presses Grow again on the stage it is in
+  await shrooly.cycle();
+  assert.equal(shrooly.knobs.grow_day, 17);
+  assert.equal(await startedOn(shrooly), start, "same stage by the calendar: start date kept");
+});
+
+test("time moves the stage by the cloud's day even when the chamber is stuck on day 1, and the chamber's day is corrected in the same change", async () => {
+  const { shrooly } = await world(["shrooly"], { doc: fastProfile });
+  await growStage(shrooly, "colonization");
+  await shrooly.cycle();
+  await coachOn(shrooly);
+  const before = await rules(shrooly);
+  tick(3 * 24 * 60 * MIN); // three days of colonization go by; the chamber never counts up
+  shrooly.setLocal({ grow_day: 1 });
+  shrooly.sensor = { temperature: STAGE.pinning.temperature_c, humidity: STAGE.pinning.humidity_percent };
+  await shrooly.report();
+  const out = await coachPass(shrooly);
+  assert.equal(out.applied, true, JSON.stringify(out));
+  assert.equal(out.stage, "pinning");
+  await shrooly.cycle();
+  assert.equal(shrooly.knobs.grow_phase, "Pinning");
+  assert.equal(shrooly.knobs.grow_day, 4, "the chamber now counts from the cloud's start date");
+  assert.deepEqual((await rules(shrooly)).grow, before.grow, "start date and profile untouched");
 });

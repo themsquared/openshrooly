@@ -669,12 +669,21 @@ async function planChange(db, user, device, { action, payload = {} }, now) {
   const cloudKind = plan.ok && ["setpoints", "apply_profile", "schedule", "stage"].includes(plan.kind);
   // The chamber's grow day only carries over for the same grow. Otherwise send the grow day the
   // stage starts on, counted from 1 like the chamber does (its grow_day setter ignores 0).
+  // The cloud's start date is the single source of truth for the grow day: when this grow is already
+  // tracked here and its stage by the calendar is the stage being applied, the day is counted from that
+  // start date, never from what the chamber says (a chamber can sit on day 1 for weeks).
   const reportedDay = Number(knobs.grow_day);
+  const rulesRow = plan.kind === "apply_profile" && profile ? await db.one(ALERT_SQL.rulesGet, [device.id]) : null;
+  const rules = readRules(rulesRow && Number(rulesRow.user_id) === Number(device.owner_id) ? rulesRow.document : null);
+  const tracked = rules.grow?.profile_id === profile?.id && rules.grow?.started_on ? growStage(profile, rules.grow.started_on, todayUtc(now)) : null;
+  const trackedDay = tracked && tracked.day >= 0 && tracked.stage?.id === plan.payload.stage ? tracked.day + 1 : null;
   const growDay =
     plan.kind === "apply_profile" && caps.grow_day
-      ? trustReported && Number.isFinite(reportedDay) && reportedDay >= 1
-        ? reportedDay
-        : firstGrowDayOfStage(profile, plan.payload.stage)
+      ? trackedDay != null
+        ? trackedDay
+        : trustReported && Number.isFinite(reportedDay) && reportedDay >= 1
+          ? reportedDay
+          : firstGrowDayOfStage(profile, plan.payload.stage)
       : null;
   const translated = cloudKind ? planForCapabilities(plan, caps, { stage, requested: payload, current: knobs, growDay }) : null;
   return { modeRow, profile, stage, current, caps, plan, translated, trustReported };
