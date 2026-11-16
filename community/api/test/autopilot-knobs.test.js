@@ -302,7 +302,7 @@ test("Colonizing and Colonization are the same stage, named for the chamber", ()
   assert.equal(growPhaseForStage("colonization"), "Colonizing");
   assert.equal(growPhaseForStage("Colonization"), "Colonizing");
   assert.equal(growPhaseForStage("colonizing"), "Colonizing");
-  const lykyn = deviceCapabilities({ firmware_version: "0.2.0", capabilities: CAPS_105, ranges: { white_intensity: [0, 100, 0.1], air_exchange_speed: [33, 100, 1] } }, "lykyn_chamber");
+  const lykyn = deviceCapabilities({ firmware_version: "0.2.0", capabilities: CAPS_105, ranges: { white_intensity: [0, 100, 0.1], air_exchange_speed: [0, 100, 1] } }, "lykyn_chamber");
   assert.equal(growPhaseForStage("colonization", lykyn), "Colonization");
   assert.equal(growPhaseForStage("Colonizing", lykyn), "Colonization");
   assert.equal(sameGrowPhase("Colonizing", "Colonization"), true);

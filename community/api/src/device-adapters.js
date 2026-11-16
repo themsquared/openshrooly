@@ -65,8 +65,8 @@ const TYPES = {
     phases: ["Fruiting", "Pinning", "Colonization", "Custom"],
     nativeName: {},
     whiteScale: "percent",
-    // Used until the chamber reports its own ranges: the fan never runs below 33%, and white is 0-100%.
-    knobRanges: { air_exchange_speed: [33, 100, 1], white_intensity: [0, 100, 0.1] },
+    // White is 0-100%. Fan is 0-100% PWM; any stall floor lives in firmware.
+    knobRanges: { air_exchange_speed: [0, 100, 1], white_intensity: [0, 100, 0.1] },
   },
 };
 

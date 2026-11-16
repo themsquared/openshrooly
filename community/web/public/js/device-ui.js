@@ -6,6 +6,40 @@ import { DEFAULT_DEVICE_TYPE, deviceAdapter, deviceTypeLabel } from "./device-ad
 
 export { DEFAULT_DEVICE_TYPE, deviceTypeLabel };
 
+/** Canonical ranges. Every chamber uses these. Hardware limits stay in the adapter. */
+export const FIELDS = Object.freeze({
+  temperature_c: { min: 0, max: 40, step: 0.1, unit: "°" },
+  humidity_percent: { min: 0, max: 100, step: 0.1, unit: "%" },
+  fan_speed_percent: { min: 0, max: 100, step: 1, unit: "%" },
+  white_percent: { min: 0, max: 100, step: 0.1, unit: "%" },
+  red_percent: { min: 0, max: 100, step: 0.1, unit: "%" },
+  green_percent: { min: 0, max: 100, step: 0.1, unit: "%" },
+  blue_percent: { min: 0, max: 100, step: 0.1, unit: "%" },
+  air_exchange_period_min: { min: 1, max: 240, step: 1, unit: "min" },
+  air_exchange_run_sec: { min: 0, max: 900, step: 1, unit: "s" },
+  sunrise_hour: { min: 0, max: 23, step: 1, unit: "" },
+  duration_hours: { min: 0, max: 24, step: 0.25, unit: "h" },
+  grow_day: { min: 0, max: 90, step: 1, unit: "" },
+});
+
+export function fieldAttrs(name) {
+  const f = FIELDS[name];
+  return `min="${f.min}" max="${f.max}" step="${f.step}"`;
+}
+
+export function formatField(name, value) {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  const step = FIELDS[name]?.step ?? 1;
+  if (step < 1) {
+    const r = Math.round(n * 10) / 10;
+    return Number.isInteger(r) ? String(r) : r.toFixed(1);
+  }
+  return String(Math.round(n));
+}
+
+
 function rangeAttr(range, index, fallback) {
   const n = Array.isArray(range) ? Number(range[index]) : NaN;
   return Number.isFinite(n) ? n : fallback;
@@ -357,9 +391,11 @@ function commandLine(command) {
 }
 
 export function renderCommandList(commands = []) {
-  const items = (commands || []).map(commandLine).join("") || `<li class="muted">Nothing sent from the cloud yet.</li>`;
-  return `<section class="card device-commands" aria-labelledby="commands-title">
-    <h2 id="commands-title">Recent changes</h2>
+  const list = (commands || []).filter((c) => c && (c.status === "queued" || c.status === "delivered" || c.status === "failed"));
+  if (!list.length) return "";
+  const items = list.map(commandLine).join("");
+  return `<section class="device-commands" aria-labelledby="commands-title">
+    <h2 id="commands-title">In flight</h2>
     <ul id="device-commands" class="device-note-list">${items}</ul>
   </section>`;
 }
@@ -389,21 +425,41 @@ export function autopilotSummary(next = {}, device = {}) {
   return `Set ${parts.length ? `${parts.join(", ")} and ${last}` : last}`;
 }
 
-/** One note line for a card whose controls this chamber takes on the chamber itself. */
-function onChamberNote(what) {
-  return `<p class="muted control-note">This chamber takes ${escapeHtml(what)} on the chamber itself for now, not from here.</p>`;
+function fieldInput(name, value, { off = "", autosave = "", extra = "" } = {}) {
+  const f = FIELDS[name];
+  const save = autosave ? ` data-autosave="${autosave}"` : "";
+  return `<input name="${name}" type="number" inputmode="decimal" ${fieldAttrs(name)} value="${numOrBlank(value)}"${save}${off}${extra}>`;
 }
 
-/** min, max and step attributes from what the chamber reported, with the page's own fallbacks. */
-function knobAttrs(device, key, [min, max, step]) {
-  const r = device.capabilities?.knob_ranges?.[key];
-  return `min="${rangeAttr(r, 0, min)}" max="${rangeAttr(r, 1, max)}" step="${stepAttr({ [key]: r?.[2] }, key, step)}"`;
+function fieldSlider(name, value, { off = "", autosave = "", tone = "" } = {}) {
+  const f = FIELDS[name];
+  const n = Number(value);
+  const current = Number.isFinite(n) ? n : f.min;
+  const pct = ((current - f.min) / (f.max - f.min)) * 100;
+  const save = autosave ? ` data-autosave="${autosave}"` : "";
+  const toneAttr = tone ? ` data-tone="${tone}"` : "";
+  return `<input type="range" class="knob-slider" data-sync="${name}" ${fieldAttrs(name)} value="${numOrBlank(current)}" style="--pct:${pct}%"${toneAttr}${save}${off} tabindex="-1">`;
+}
+
+function knob(name, label, value, actual, { off = "", autosave = "", tone = "", unit } = {}) {
+  const f = FIELDS[name];
+  const u = unit ?? f.unit;
+  const shown = formatField(name, value);
+  const now = actual == null || actual === "" ? "" : `<span class="knob-now">${escapeHtml(formatField(name, actual))}${escapeHtml(u)} now</span>`;
+  return `<div class="knob${off.includes("disabled") ? " is-locked" : ""}" data-card="${name}">
+    <div class="knob-head">
+      <span class="knob-label">${escapeHtml(label)}</span>
+      <label class="knob-value">${fieldInput(name, value, { off, autosave })}<span class="knob-unit">${escapeHtml(u)}</span></label>
+    </div>
+    ${fieldSlider(name, value, { off, autosave, tone })}
+    ${now}
+  </div>`;
 }
 
 /**
- * Chamber controls, top to bottom and the same on every chamber: what is growing, the Stage
- * picker, then four cards: Temp, Humidity, Light, Fresh air. A card whose controls this chamber
- * can't take from the cloud keeps its place and shows one note line instead of boxes.
+ * Chamber sheet, the same on every chamber: pick a species, grow it, then
+ * sliders for temp, humidity, fan and light. A chart slot sits between grow
+ * and the sliders. Rare controls fold into Advanced.
  */
 export function renderControls(device, { profiles = [], canWrite = false, showCoach = false } = {}) {
   const disabled = canWrite ? "" : " disabled";
@@ -411,199 +467,163 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
   const targetOff = canWrite && !locked ? "" : " disabled";
   const controls = device.controls || {};
   const supported = (key) => controls[key]?.supported !== false;
-  // Newer knobs show only when the chamber says it can take them.
   const reported = (key) => controls[key]?.supported === true;
   const adapter = deviceAdapter(device);
   const chamber = device.chamber || {};
-  // Starting a grow is the grower's choice of what is growing, so Coach does not lock it.
   const profileOff = canWrite && supported("profile") ? "" : " disabled";
-  // What the chamber runs now wins over the stage recipe, so Save never surprises.
   const light = device.chamber_light || device.light || {};
   const whitePct = light.white_percent ?? (light.white_led_lux != null ? adapter.white.fromLux(light.white_led_lux) : null);
   const colorOff = controls.light?.color === false ? " disabled" : "";
   const scheduleOff = controls.light?.schedule === false ? " disabled" : "";
+  const grow = growingLabels(device);
+  const hasGrow = Boolean(device.profile?.id);
+  const reading = device.reading || {};
+
   const profileOptions =
-    `<option value="">Choose what you're growing</option>` +
+    `<option value="">Select a mushroom</option>` +
     profiles
       .map((p) => {
         const selected = p.id === device.profile?.id ? " selected" : "";
-        const species = p.species ? ` (${p.species})` : "";
         const stages = JSON.stringify((p.stage_list || []).map((st) => ({ id: st.id, name: st.name || st.id })));
-        return `<option value="${escapeHtml(p.id)}" data-stages="${escapeHtml(stages)}"${selected}>${escapeHtml(p.name)}${escapeHtml(species)}</option>`;
+        return `<option value="${escapeHtml(p.id)}" data-stages="${escapeHtml(stages)}"${selected}>${escapeHtml(p.name)}</option>`;
       })
       .join("");
-  const stageOptions = device.profile?.id
+  const stageOptions = hasGrow
     ? stageOptionsHtml(device.grow?.stages || [], { selectedId: device.stage?.id, sameProfile: true })
     : "";
+
   const notice = canWrite
     ? ""
     : device.online
-      ? "This chamber is not linked, so changes from here are off."
+      ? "This chamber is not linked."
       : !device.last_seen_at
-        ? "Changes from here turn on after the chamber's first check-in."
-        : "This chamber is offline. Changes from here come back when it checks in again.";
-  const coachNote = locked
-    ? `<p class="muted" data-coach-managing>${COACH_MANAGES_NOTE}</p>`
-    : "";
+        ? "Waiting for the first check-in."
+        : "This chamber is offline.";
+
+  const coachOn = device.coach?.mode === "autopilot";
   const coach =
     showCoach && !device.off_menu
-      ? `<fieldset>
-          <legend>Grow Coach</legend>
-          <label>Mode
-            <select name="coach_mode"${disabled}>
-              <option value="advisor"${device.coach?.mode !== "autopilot" ? " selected" : ""}>I approve changes</option>
-              <option value="autopilot"${device.coach?.mode === "autopilot" ? " selected" : ""}>Coach adjusts it for me</option>
-            </select>
-          </label>
-          <button type="submit" class="secondary" data-action="coach_mode"${disabled}>Save Coach mode</button>
-          ${controlMsg("coach_mode")}
-        </fieldset>`
+      ? `<label class="coach-switch">
+          <span>Coach</span>
+          <input type="checkbox" name="coach_on" data-autosave="coach_mode" ${coachOn ? "checked" : ""}${disabled}>
+          <span class="switch-ui" aria-hidden="true"></span>
+        </label>`
       : "";
 
-  // Stage: the four stages in one order. The current one is selected; one the chamber reports
-  // that is not among them (Idle, Harvest) is listed first so the box never lies.
   const phaseNow = chamber.grow_phase || "";
   const stageNow = adapter.currentStage(phaseNow);
   const extraPhase = phaseNow && !stageNow ? `<option value="${escapeHtml(phaseNow)}" selected>${escapeHtml(phaseNow)}</option>` : "";
   const stageList = adapter.stages
-    .map(({ name, available }) => {
-      const label = available ? name : `${name} (not on this chamber)`;
-      return `<option value="${name}"${name === stageNow ? " selected" : ""}${available ? "" : " disabled"}>${label}</option>`;
-    })
+    .map(({ name, available }) => `<option value="${name}"${name === stageNow ? " selected" : ""}${available ? "" : " disabled"}>${name}</option>`)
     .join("");
-  const dayBox = reported("stage") && controls.stage?.day !== false
-    ? `<div class="row">
-        <label>Grow day
-          <input name="grow_day" type="number" step="1" min="0" max="90" value="${numOrBlank(chamber.grow_day)}"${targetOff}>
-        </label>
-      </div>
-      <button type="submit" class="secondary" data-action="grow_day"${targetOff}>Save grow day</button>
-      ${controlMsg("grow_day")}`
+
+  const liveTemp = formatField("temperature_c", reading.temperature);
+  const liveRh = formatField("humidity_percent", reading.humidity);
+  const live = liveTemp || liveRh
+    ? `<div class="sheet-live" aria-label="Live readings">
+        ${liveTemp ? `<span><strong>${escapeHtml(liveTemp)}°</strong></span>` : ""}
+        ${liveRh ? `<span><strong>${escapeHtml(liveRh)}%</strong></span>` : ""}
+      </div>`
     : "";
-  const stageBlock = `<fieldset data-card="stage">
-      <legend>Stage</legend>
+
+  const stageDay = (() => {
+    const phase = device?.grow?.phase || device?.stage?.name || "";
+    const day = wholeDay(device?.grow?.stage_day);
+    if (!phase) return "";
+    return day == null ? phase : `${phase} · Day ${day}`;
+  })();
+  const growStatus = hasGrow && stageDay ? `<p class="sheet-stage">${escapeHtml(stageDay)}</p>` : "";
+
+  const top = `<header class="sheet-top">
+    <div class="sheet-heading">
+      <p class="sheet-name">${escapeHtml(device.name || "Chamber")}</p>
+      ${hasGrow ? `<p class="sheet-crop">${escapeHtml(grow.title)}</p>` : ""}
+    </div>
+    ${coach}
+  </header>
+  ${live}
+  <section id="grow" class="sheet-grow">
+    <label class="sheet-pick">
+      <select name="profile_id"${profileOff}>${profileOptions}</select>
+    </label>
+    <select name="stage" class="hidden" aria-hidden="true" tabindex="-1"${profileOff}>${stageOptions || `<option value="">Start from the beginning</option>`}</select>
+    ${growStatus}
+    <button type="submit" class="grow-btn${hasGrow ? " hidden" : ""}" data-action="profile" data-grow-btn${profileOff}>Grow</button>
+    ${controlMsg("profile")}
+  </section>
+  <div id="device-chart-slot"></div>`;
+
+  const sliders = `<section class="sheet-sliders" aria-label="Climate">
+    ${knob("temperature_c", "Temperature", device.setpoints?.temperature_c, reading.temperature, { off: targetOff, autosave: "temperature", tone: "heat" })}
+    ${knob("humidity_percent", "Humidity", device.setpoints?.humidity_percent, reading.humidity, { off: targetOff, autosave: "humidity", tone: "humid" })}
+    ${knob("fan_speed_percent", "Fan", device.setpoints?.fan_speed_percent, reading.fan_speed, { off: targetOff, autosave: "air", tone: "fan" })}
+    <div class="knob knob-light${targetOff ? " is-locked" : ""}" data-card="light">
+      <p class="knob-label">Light</p>
+      ${["white_percent", "red_percent", "green_percent", "blue_percent"].map((name, i) => {
+        const labels = ["W", "R", "G", "B"];
+        const tones = ["white", "red", "green", "blue"];
+        const values = [whitePct, light.red_percent, light.green_percent, light.blue_percent];
+        const off = `${targetOff}${colorOff}`;
+        return `<div class="rgba-row">
+          <span class="rgba-letter" data-tone="${tones[i]}">${labels[i]}</span>
+          ${fieldSlider(name, values[i], { off, autosave: "light", tone: tones[i] })}
+          <label class="knob-value rgba-value">${fieldInput(name, values[i], { off, autosave: "light" })}</label>
+        </div>`;
+      }).join("")}
+    </div>
+  </section>`;
+
+  const advanced = `<details class="sheet-advanced">
+    <summary>Advanced</summary>
+    <div class="advanced-body">
       <label>Stage
-        <select name="grow_phase"${profileOff}>${extraPhase}${stageList}</select>
+        <select name="grow_phase" data-autosave="stage"${profileOff}>${extraPhase}${stageList}</select>
       </label>
-      <p class="muted">${device.profile?.id ? "Picking a stage loads its Temp, Humidity, Light and Fresh air from the profile." : "Choose what you're growing above and a stage loads its recipe. Without one it only sets the phase."}</p>
-      <button type="submit" class="secondary" data-action="stage"${profileOff}>Set stage</button>
-      ${controlNote(controls.stage?.supported === false && !device.profile?.id ? controls.stage : null)}
-      ${controlMsg("stage")}
-      ${dayBox}
-    </fieldset>`;
-
-  const tempBlock = `<fieldset data-card="temperature">
-      <legend>Temp</legend>
       ${
-        supported("temperature")
-          ? `<label>Temperature (°C)
-        <input name="temperature_c" type="number" step="${stepAttr(device.capabilities?.steps, "temperature_c", 0.1)}" min="${rangeAttr(device.capabilities?.ranges?.temperature_c, 0, 10)}" max="${rangeAttr(device.capabilities?.ranges?.temperature_c, 1, 32)}" value="${numOrBlank(device.setpoints?.temperature_c)}"${targetOff}>
-      </label>
-      <button type="submit" class="secondary" data-action="temperature"${targetOff}>Save temp</button>`
-          : controlNote(controls.temperature) || onChamberNote("the temperature target")
+        reported("stage") && controls.stage?.day !== false
+          ? `<label>Grow day
+              ${fieldInput("grow_day", chamber.grow_day, { off: targetOff, autosave: "grow_day" })}
+            </label>`
+          : ""
       }
-      ${controlMsg("temperature")}
-    </fieldset>`;
-  const humidityBlock = `<fieldset data-card="humidity">
-      <legend>Humidity</legend>
-      ${
-        supported("humidity")
-          ? `<label>Humidity (%)
-        <input name="humidity_percent" type="number" step="${stepAttr(device.capabilities?.steps, "humidity_percent", 0.5)}" min="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 0, 30)}" max="${rangeAttr(device.capabilities?.ranges?.humidity_percent, 1, 98)}" value="${numOrBlank(device.setpoints?.humidity_percent)}"${targetOff}>
-      </label>
-      <button type="submit" class="secondary" data-action="humidity"${targetOff}>Save humidity</button>`
-          : controlNote(controls.humidity) || onChamberNote("the humidity target")
-      }
-      ${controlMsg("humidity")}
-    </fieldset>`;
-
-  const lightBlock = `<fieldset data-card="light">
-      <legend>Light</legend>
-      ${
-        supported("light")
-          ? `<div class="row">
-        <label>Lights on at (hour)
-          <input name="sunrise_hour" type="number" step="1" min="0" max="23" value="${numOrBlank(light.sunrise_hour)}"${targetOff}${scheduleOff}>
+      <div class="row">
+        <label>Lights on
+          ${fieldInput("sunrise_hour", light.sunrise_hour, { off: `${targetOff}${scheduleOff}`, autosave: "light" })}
         </label>
         <label>Hours on
-          <input name="duration_hours" type="number" step="0.25" min="0" max="24" value="${numOrBlank(light.duration_hours)}"${targetOff}${scheduleOff}>
+          ${fieldInput("duration_hours", light.duration_hours, { off: `${targetOff}${scheduleOff}`, autosave: "light" })}
         </label>
       </div>
-      <label>${adapter.white.label}
-        <input name="white_percent" type="number" step="0.1" min="0" max="100" value="${numOrBlank(whitePct)}"${targetOff}${colorOff}>
+      <div class="row">
+        <label>Fan every (min)
+          ${fieldInput("air_exchange_period_min", chamber.air_exchange_period_min, { off: targetOff, autosave: "air" })}
+        </label>
+        <label>For (sec)
+          ${fieldInput("air_exchange_run_sec", chamber.air_exchange_run_sec, { off: targetOff, autosave: "air" })}
+        </label>
+      </div>
+      <label>Name
+        <input name="device_name" maxlength="80" value="${escapeHtml(device.name || "")}" data-autosave="name"${disabled}>
       </label>
-      <p class="muted">${escapeHtml(adapter.white.note)}</p>
-      ${device.light?.limit_note ? `<p class="muted" data-light-limit>${escapeHtml(device.light.limit_note)}</p>` : ""}
-      <div class="row">
-        <label>Red % <input name="red_percent" type="number" min="0" max="100" value="${numOrBlank(light.red_percent)}"${targetOff}${colorOff}></label>
-        <label>Green % <input name="green_percent" type="number" min="0" max="100" value="${numOrBlank(light.green_percent)}"${targetOff}${colorOff}></label>
-        <label>Blue % <input name="blue_percent" type="number" min="0" max="100" value="${numOrBlank(light.blue_percent)}"${targetOff}${colorOff}></label>
-      </div>
-      <p class="muted">Hours on 0 means dark, with ${adapter.white.percent ? "white" : "brightness"} and colors at 0 too. A light that is on with 0 hours runs 12 hours.</p>
-      ${controlNote(controls.light)}
-      <button type="submit" class="secondary" data-action="light"${targetOff}>Save light</button>`
-          : controlNote(controls.light) || onChamberNote("the light schedule and mix")
+      ${renderCapabilities(device)}
+      ${
+        (device.local_only || []).length
+          ? `<ul class="device-note-list">${(device.local_only || []).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul>`
+          : ""
       }
-      ${controlMsg("light")}
-    </fieldset>`;
+      <button type="button" class="secondary" id="unlink-device">Unlink</button>
+    </div>
+  </details>`;
 
-  const fanOn = supported("fan");
-  const airOn = reported("air");
-  const airOffWhat = [fanOn ? "" : "fan speed", airOn ? "" : "how often and how long"].filter(Boolean).join(" and ");
-  const airBlock = `<fieldset data-card="fresh-air">
-      <legend>Fresh air</legend>
-      ${
-        fanOn
-          ? `<label>Fan speed (%)
-        <input name="fan_speed_percent" type="number" ${knobAttrs(device, "air_exchange_speed", [adapter.fanMin, 100, 5])} value="${numOrBlank(device.setpoints?.fan_speed_percent)}"${targetOff}>
-      </label>`
-          : ""
-      }
-      ${
-        airOn
-          ? `<div class="row">
-        <label>Run every (minutes)
-          <input name="air_exchange_period_min" type="number" ${knobAttrs(device, "air_exchange_period_min", [1, 240, 1])} value="${numOrBlank(chamber.air_exchange_period_min)}"${targetOff}>
-        </label>
-        <label>For (seconds)
-          <input name="air_exchange_run_sec" type="number" ${knobAttrs(device, "air_exchange_run_sec", [5, 900, 5])} value="${numOrBlank(chamber.air_exchange_run_sec)}"${targetOff}>
-        </label>
-      </div>`
-          : ""
-      }
-      ${airOffWhat ? onChamberNote(airOffWhat) : ""}
-      ${fanOn || airOn ? `<button type="submit" class="secondary" data-action="air"${targetOff}>Save fresh air</button>` : ""}
-      ${controlMsg("air")}
-    </fieldset>`;
-  return `<form id="device-controls" class="card alert-form">
-    ${notice ? `<p class="muted">${escapeHtml(notice)}</p>` : ""}
-    ${coachNote}
-    <fieldset id="grow">
-      <legend>What's growing</legend>
-      <div class="row">
-        <label>Profile <select name="profile_id"${profileOff}>${profileOptions}</select></label>
-        <label>Start at <select name="stage"${profileOff}>${stageOptions || `<option value="">Start from the beginning</option>`}</select></label>
-      </div>
-      <button type="submit" data-action="profile"${profileOff}>Start this grow</button>
-      ${controlNote(controls.profile)}
-      ${controlMsg("profile")}
-    </fieldset>
-    ${stageBlock}
-    ${tempBlock}
-    ${humidityBlock}
-    ${lightBlock}
-    ${airBlock}
-    <fieldset>
-      <legend>Chamber name</legend>
-      <label>Name <input name="device_name" maxlength="80" value="${escapeHtml(device.name || "")}"${disabled}></label>
-      <button type="submit" class="secondary" data-action="name"${disabled}>Save name</button>
-      ${controlMsg("name")}
-    </fieldset>
-    ${coach}
-    ${renderCapabilities(device)}
-    <p id="device-controls-msg" class="muted" role="status"></p>
+  return `<form id="device-controls" class="device-sheet">
+    ${notice ? `<p class="sheet-notice">${escapeHtml(notice)}</p>` : ""}
+    ${top}
+    ${sliders}
+    ${advanced}
+    <p id="device-controls-msg" class="sheet-msg" role="status"></p>
   </form>`;
 }
+
 
 /** The chart needs two readings to draw a line. Before that, say when it shows up. */
 export function chartReady(points) {
