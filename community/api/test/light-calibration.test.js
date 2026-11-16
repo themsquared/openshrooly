@@ -19,7 +19,7 @@ const ALL = [
   "grow.phase",
 ];
 const shroolyCaps = deviceCapabilities({ firmware_version: "1.0.5-sl.1", capabilities: ALL, ranges: { white_intensity: [0, 4000, 5] } }, "shrooly_chamber");
-const lykynCaps = deviceCapabilities({ firmware_version: "0.2.0", capabilities: ALL, ranges: { white_intensity: [0, 100, 0.1], air_exchange_speed: [33, 100, 1] } }, "lykyn_chamber");
+const lykynCaps = deviceCapabilities({ firmware_version: "0.2.0", capabilities: ALL, ranges: { white_intensity: [0, 100, 0.1], air_exchange_speed: [0, 100, 1] } }, "lykyn_chamber");
 const shrooly = deviceAdapter("shrooly_chamber");
 const lykyn = deviceAdapter("lykyn_chamber");
 

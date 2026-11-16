@@ -269,11 +269,11 @@ export class ProfileBuilder extends HTMLElement {
   renderStage(stage, issues) {
     if (!isStageId(stage.id)) return h("p", { class: "notice" }, "This phase id is not allowed.");
     const temp = this.unit === "F" ? Math.round(cToF(stage.temperature_c) * 10) / 10 : stage.temperature_c;
-    const tempRange = this.unit === "F" ? { min: Math.round(cToF(10)), max: Math.round(cToF(35)), unit: "F" } : { ...RANGES.temperature_c, unit: "C" };
+    const tempRange = this.unit === "F" ? { min: Math.round(cToF(0)), max: Math.round(cToF(40)), unit: "F" } : { ...RANGES.temperature_c, unit: "C" };
     return h("div", { id: `panel-${stage.id}`, role: "tabpanel", "aria-labelledby": `tab-${stage.id}` },
       this.slider("duration_days", "Duration", stage.duration_days, { min: 1, max: 45, step: 1, unit: "days" }, `stages.${stage.id}.duration_days`, issues),
-      this.slider("humidity_percent", "Humidity", stage.humidity_percent, { ...RANGES.humidity_percent, step: 1 }, `stages.${stage.id}.humidity_percent`, issues),
-      this.slider("temperature", `Temperature (${tempRange.unit})`, temp, { ...tempRange, step: 0.5 }, `stages.${stage.id}.temperature_c`, issues),
+      this.slider("humidity_percent", "Humidity", stage.humidity_percent, { ...RANGES.humidity_percent, step: 0.1 }, `stages.${stage.id}.humidity_percent`, issues),
+      this.slider("temperature", `Temperature (${tempRange.unit})`, temp, { ...tempRange, step: 0.1 }, `stages.${stage.id}.temperature_c`, issues),
       this.slider("fan_speed", "Fresh air", stage.fan?.speed_percent ?? 30, { ...RANGES.fan_speed_percent, step: 1 }, `stages.${stage.id}.fan.speed_percent`, issues),
       h("div", { class: "pb-row pb-row-2" },
         this.slider("fan_period", "Fan period", stage.fan?.period_min ?? 15, { ...RANGES.fan_period_min, step: 1 }, `stages.${stage.id}.fan.period_min`, issues),

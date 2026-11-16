@@ -82,7 +82,7 @@ export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage
 /** Server-side fan guardrail for a stage: the stage fan speed +/- FAN_BAND, inside FAN_CLAMP and the chamber's range. */
 export function fanRangeForStage(stage = {}, caps = {}) {
   const base = num(stage.fan?.speed_percent ?? stage.fan_speed_percent);
-  const chamber = caps.knob_ranges?.air_exchange_speed || [15, 100, 5];
+  const chamber = caps.knob_ranges?.air_exchange_speed || [0, 100, 1];
   let lo = Math.max(FAN_CLAMP[0], chamber[0]);
   let hi = Math.min(FAN_CLAMP[1], chamber[1]);
   if (base != null) {

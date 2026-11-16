@@ -192,9 +192,9 @@ def validate_profile(data: dict[str, Any] | MushroomProfile) -> MushroomProfile:
                 stage.id in profile.light_recipe.phases,
                 f"light_recipe needs a {stage.id} phase so this stage has a complete light mix",
             )
-        _require(15 <= stage.fan.speed_percent <= 100, f"stage {stage.id} fan speed invalid")
+        _require(0 <= stage.fan.speed_percent <= 100, f"stage {stage.id} fan speed invalid")
         _require(1 <= stage.fan.period_min <= 240, f"stage {stage.id} fan period invalid")
-        _require(5 <= stage.fan.run_duration_s <= 900, f"stage {stage.id} fan run duration invalid")
+        _require(0 <= stage.fan.run_duration_s <= 900, f"stage {stage.id} fan run duration invalid")
         downtime = stage.fan.period_min * 60 - stage.fan.run_duration_s
         _require(downtime >= 60, f"stage {stage.id} fan cycle needs >= 60s downtime")
         for channel, value in (

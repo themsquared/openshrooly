@@ -2047,6 +2047,45 @@ async function renderDevice() {
     return controls.dataset.dirty === "1" || controls.dataset.busy === "1" || controls.contains(document.activeElement);
   };
 
+  const placeDeviceChart = (snap, device) => {
+    const slot = $("#device-chart-slot");
+    if (!slot) return;
+    let box = $("#reading-chart-box");
+    if (!box) {
+      box = document.createElement("section");
+      box.id = "reading-chart-box";
+      box.className = "fleet-chart hidden";
+      box.setAttribute("aria-label", "Readings");
+      box.innerHTML = `<div id="reading-chart"></div>`;
+    }
+    if (box.parentElement !== slot) slot.appendChild(box);
+    const ready = chartReady(snap.history);
+    box.classList.toggle("hidden", !ready);
+    if (!ready) return;
+    const chartEl = $("#reading-chart");
+    const chartKey = JSON.stringify([snap.history || [], snap.events || [], device.targets || null]);
+    if (chartEl._history === chartKey) return;
+    chartEl._history = chartKey;
+    view.chart ||= mountReadingChart(chartEl, {
+      title: "",
+      loadRange: (hours) => api(`/api/fleet/devices/${encodeURIComponent(id)}?hours=${hours}`),
+    });
+    view.chart.update({ history: snap.history || [], events: snap.events || [], range: snap.range || null, device });
+  };
+
+  const bindUnlink = () => {
+    $("#unlink-device")?.addEventListener("click", async () => {
+      if (!(await confirmUnlink())) return;
+      try {
+        await api(`/api/fleet/devices/${enc}/unlink`, { method: "POST", jsonBody: { confirm: true } });
+        liveCache.clear();
+        location.href = "/devices";
+      } catch (err) {
+        flash($("#device-controls-msg"), err.message);
+      }
+    });
+  };
+
   const paintControls = (force = false) => {
     const snap = view.snapshot;
     if (!snap?.device) return;
@@ -2060,7 +2099,6 @@ async function renderDevice() {
     view.controlsKey = key;
     $("#dev-controls").innerHTML = renderControls(device, { profiles, canWrite, showCoach });
     const controls = $("#device-controls");
-    controls?.addEventListener("input", () => (controls.dataset.dirty = "1"));
     bindDeviceControls(id, () => view.snapshot?.device, {
       canWrite,
       onSent: () => {
@@ -2068,6 +2106,7 @@ async function renderDevice() {
         live.refresh();
       },
     });
+    bindUnlink();
   };
 
   const swap = (sel, html) => {
@@ -2083,29 +2122,9 @@ async function renderDevice() {
     view.built = true;
     const dash = $("#device-dash");
     dash.innerHTML = `
-      <div id="dev-identity"></div>
-      <div id="dev-gauges"></div>
-      <section class="fleet-chart card hidden" id="reading-chart-box" aria-label="Readings chart">
-        <div id="reading-chart"></div>
-      </section>
-      <p class="muted hidden" id="reading-chart-wait">A chart of the last 24 hours shows up here after a couple of readings.</p>
       <div id="dev-controls"></div>
-      <div id="dev-commands"></div>
-      <div id="dev-notes"></div>
-      <p class="row">
-        <button type="button" class="secondary" id="unlink-device">Unlink</button>
-      </p>`;
+      <div id="dev-commands"></div>`;
     dash.classList.remove("hidden");
-    $("#unlink-device")?.addEventListener("click", async () => {
-      if (!(await confirmUnlink())) return;
-      try {
-        await api(`/api/fleet/devices/${enc}/unlink`, { method: "POST", jsonBody: { confirm: true } });
-        liveCache.clear();
-        location.href = "/devices";
-      } catch (err) {
-        flash($("#device-controls-msg"), err.message);
-      }
-    });
   };
 
   const showStates = (states) => {
@@ -2148,23 +2167,8 @@ async function renderDevice() {
     $("#device-meta").textContent = deviceMetaLine(device, { showCoach });
     swap("#device-state", renderChamberStatus(device));
     buildDash();
-    swap("#dev-identity", renderIdentity(device));
-    swap("#dev-gauges", renderGauges(device));
-    const chartKey = JSON.stringify([snap.history || [], snap.events || [], device.targets || null]);
-    if ($("#reading-chart")._history !== chartKey) {
-      $("#reading-chart")._history = chartKey;
-      const ready = chartReady(snap.history);
-      $("#reading-chart-box").classList.toggle("hidden", !ready);
-      $("#reading-chart-wait").classList.toggle("hidden", ready);
-      if (ready) {
-        view.chart ||= mountReadingChart($("#reading-chart"), {
-          title: "Readings",
-          loadRange: (hours) => api(`/api/fleet/devices/${encodeURIComponent(id)}?hours=${hours}`),
-        });
-        view.chart.update({ history: snap.history || [], events: snap.events || [], range: snap.range || null, device });
-      }
-    }
     paintControls();
+    placeDeviceChart(snap, device);
     // A card or link with #grow lands on the profile picker once it exists.
     // Not before its first check-in: the status at the top is what matters then.
     if (!view.jumped && location.hash === "#grow" && $("#grow") && device.last_seen_at) {
@@ -2186,11 +2190,10 @@ async function renderDevice() {
         view.rulesFilled = true;
       }
       swap("#device-alerts", alertItems(alerts.alerts || []));
-      $("#device-body").classList.remove("hidden");
+      $("#device-body")?.classList.add("hidden");
     } else if (!cached) {
-      status.innerHTML = `Verify your email to use alerts for this chamber. <a href="/account">Account</a>`;
-      status.classList.remove("hidden");
-      $("#device-body").classList.add("hidden");
+      status.classList.add("hidden");
+      $("#device-body")?.classList.add("hidden");
     }
     if (!cached) liveCache.set(cacheKey, snap);
   };
@@ -2282,14 +2285,34 @@ async function inFlight(form, run) {
 }
 
 /**
- * Wire the controls form. Command status, renames and profile changes come back
- * through the live snapshot, so nothing here reloads the page.
+ * Wire the controls form. Climate sliders and the Coach switch save on their
+ * own. Starting a grow still uses the Grow button. Status comes back through
+ * the live snapshot, so nothing here reloads the page.
  */
+function syncKnobPair(form, name) {
+  const num = form.querySelector(`input[name="${name}"]`);
+  const slider = form.querySelector(`input[data-sync="${name}"]`);
+  if (!num || !slider) return;
+  const min = Number(slider.min);
+  const max = Number(slider.max);
+  const n = Number(num.value);
+  const value = Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : min;
+  slider.value = value;
+  const pct = ((value - min) / (max - min)) * 100;
+  slider.style.setProperty("--pct", `${pct}%`);
+}
+
 function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) {
   const form = $("#device-controls");
   const generalMsg = $("#device-controls-msg");
-  // Picking a different profile resets the phase to its first stage (a new grow starts at day 1).
-  form?.addEventListener("change", (ev) => {
+  if (!form) return;
+  form.querySelectorAll("input[data-sync]").forEach((slider) => syncKnobPair(form, slider.dataset.sync));
+  form.addEventListener("change", (ev) => {
+    if (ev.target?.name === "profile_id") {
+      const btn = form.querySelector("[data-grow-btn]");
+      const device = currentDevice() || {};
+      if (btn) btn.classList.toggle("hidden", Boolean(ev.target.value) && ev.target.value === device.profile?.id);
+    }
     if (ev.target?.name !== "profile_id" || !form.stage) return;
     const option = ev.target.selectedOptions?.[0];
     let stages = [];
@@ -2304,13 +2327,11 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
       sameProfile: Boolean(option?.value) && option.value === device.profile?.id,
     });
   });
-  form?.addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    if (!canWrite) return;
-    const action = ev.submitter?.dataset?.action;
+
+  const sendAction = (action) => {
+    if (!canWrite || !action) return;
     const device = currentDevice() || {};
-    // Say what happened right under the button that was tapped.
-    const msg = form.querySelector(`.control-msg[data-msg-for="${action}"]`) || generalMsg;
+    const msg = generalMsg;
     inFlight(form, async () => {
       try {
         if (action === "name") {
@@ -2318,13 +2339,11 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
             method: "PATCH",
             jsonBody: { name: form.device_name.value },
           });
-          flash(msg, "Name saved.");
+          flash(msg, "Saved");
           onSent();
           return;
         }
         const payload = { request_id: newRequestId() };
-        // What the form says goes out under the apply action the server knows. Temp, Humidity and Fresh air
-        // are all setpoints; the Stage picker loads the profile's recipe when the profile has that stage.
         let sendAs = action;
         const has = (name) => form[name] && !form[name].disabled;
         if (action === "temperature" || action === "humidity" || action === "air" || action === "setpoints") {
@@ -2332,7 +2351,6 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           if (action === "temperature" && has("temperature_c")) payload.temperature_c = numberOrUndefined(form.temperature_c.value);
           if (action === "humidity" && has("humidity_percent")) payload.humidity_percent = numberOrUndefined(form.humidity_percent.value);
           if (action === "air") {
-            // A missing or disabled box means this chamber can't take it; don't ask.
             if (has("fan_speed_percent")) payload.fan_speed_percent = numberOrUndefined(form.fan_speed_percent.value);
             if (has("air_exchange_period_min")) payload.air_exchange_period_min = numberOrUndefined(form.air_exchange_period_min.value);
             if (has("air_exchange_run_sec")) payload.air_exchange_run_sec = numberOrUndefined(form.air_exchange_run_sec.value);
@@ -2343,8 +2361,6 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           payload.stage = form.stage.value;
         }
         if (action === "stage") {
-          // The server finds the linked profile's stage and sends its knobs. It keeps the grow day and
-          // start date, so this never goes out as apply_profile.
           payload.grow_phase = form.grow_phase.value;
         }
         if (action === "grow_day") {
@@ -2356,7 +2372,6 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           payload.light = {
             sunrise_hour: numberOrUndefined(form.sunrise_hour.value),
             duration_hours: numberOrUndefined(form.duration_hours.value),
-            // Percent goes out as a percent. The server converts it for a chamber that takes lux.
             white_percent: whitePct,
             red_percent: numberOrUndefined(form.red_percent.value),
             green_percent: numberOrUndefined(form.green_percent.value),
@@ -2366,26 +2381,61 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           if (issues.length) throw new Error(issues[0].message);
         }
         if (action === "coach_mode") {
-          payload.mode = form.coach_mode.value;
+          payload.mode = form.coach_on?.checked ? "autopilot" : "advisor";
           payload.profile_id = form.profile_id.value || device.profile?.id;
         }
-        flash(msg, "Sending...");
         const applied = await api(`/api/fleet/devices/${encodeURIComponent(id)}/apply`, {
           method: "POST",
           jsonBody: { action: sendAs, payload },
         });
         const result = applied.results?.[0];
         if (!result || result.status === "failed") throw new Error(resultMessage(result));
-        // Keep this one up: the grower needs to know it is on its way, not just that a click happened.
         clearTimeout(msg._t);
-        msg.textContent = resultMessage(result);
-        // No profile id here: the picker can hold an Off-menu Profile. Only that a profile was sent.
+        msg.textContent = result.status === "queued" ? "On its way" : "Saved";
         if (sendAs === "profile" && !device.off_menu) track("profile_apply", { source: "device" });
         onSent();
       } catch (err) {
         flash(msg, err.message);
       }
     });
+  };
+
+  const timers = {};
+  const queueSave = (action, immediate) => {
+    if (!action) return;
+    form.dataset.dirty = "1";
+    clearTimeout(timers[action]);
+    if (immediate) sendAction(action);
+    else timers[action] = setTimeout(() => sendAction(action), 400);
+  };
+
+  form.addEventListener("input", (ev) => {
+    const el = ev.target;
+    if (!el) return;
+    form.dataset.dirty = "1";
+    const name = el.dataset.sync || el.name;
+    if (name && form.querySelector(`input[data-sync="${name}"]`)) {
+      if (el.dataset.sync) {
+        const num = form.querySelector(`input[name="${name}"]`);
+        if (num) num.value = el.value;
+      }
+      syncKnobPair(form, name);
+    }
+    if (el.dataset.autosave && el.dataset.autosave !== "coach_mode" && el.dataset.autosave !== "stage" && el.dataset.autosave !== "name") {
+      queueSave(el.dataset.autosave, false);
+    }
+  });
+  form.addEventListener("change", (ev) => {
+    const el = ev.target;
+    const action = el?.dataset?.autosave;
+    if (!action) return;
+    queueSave(action, true);
+  });
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (!canWrite) return;
+    const action = ev.submitter?.dataset?.action;
+    if (action) sendAction(action);
   });
 }
 

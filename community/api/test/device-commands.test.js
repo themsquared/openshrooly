@@ -318,7 +318,7 @@ const SL5_READING = {
   color_b: 0,
   grow_day: 3,
   grow_phase: "Colonizing",
-  ranges: { air_exchange_speed: [15, 100, 5], white_intensity: [0, 4000, 5], light_hours: [0, 24, 0.25] },
+  ranges: { air_exchange_speed: [0, 100, 1], white_intensity: [0, 4000, 5], light_hours: [0, 24, 0.25] },
   capabilities: [
     "setpoints.temperature",
     "setpoints.humidity",
@@ -364,9 +364,9 @@ test("profile apply on 1.0.5 sends the whole stage in one setpoints command", as
   assert.equal(p.temperature_c, fruiting.temperature_c);
   assert.equal(p.humidity_percent, fruiting.humidity_percent);
   assert.equal(p.fan_speed_percent, undefined, "never the key the firmware ignores");
-  assert.equal(p.air_exchange_speed, Math.round(fruiting.fan.speed_percent / 5) * 5);
+  assert.equal(p.air_exchange_speed, fruiting.fan.speed_percent);
   assert.equal(p.air_exchange_period_min, fruiting.fan.period_min);
-  assert.equal(p.air_exchange_run_sec, Math.round(fruiting.fan.run_duration_s / 5) * 5);
+  assert.equal(p.air_exchange_run_sec, fruiting.fan.run_duration_s);
   for (const key of ["sunrise_hour", "light_hours", "white_intensity", "color_r", "color_g", "color_b"]) assert.notEqual(p[key], undefined, key);
   assert.ok(p.light_hours > 0);
   assert.equal(p.grow_phase, "Fruiting");
@@ -397,7 +397,7 @@ test("light from the site: white % becomes lux, a lit light never goes out with 
   const q = JSON.parse((await rows(ctx))[1].payload);
   assert.equal(q.white_intensity, 4000);
   assert.equal(q.air_exchange_period_min, 240);
-  assert.equal(q.air_exchange_run_sec, 35);
+  assert.equal(q.air_exchange_run_sec, 33);
 });
 
 test("stage action sets the chamber phase and day; bad values are refused", async () => {
@@ -470,7 +470,7 @@ const LYKYN_READING = {
   color_b: 80,
   grow_phase: "Fruiting",
   ranges: {
-    air_exchange_speed: [33, 100, 1],
+    air_exchange_speed: [0, 100, 1],
     air_exchange_period_min: [1, 240, 1],
     air_exchange_run_sec: [5, 600, 5],
     sunrise_hour: [0, 23, 1],
@@ -516,7 +516,7 @@ test("Shrooly colonization apply still lands Colonizing with the colonization re
   assert.equal(p.white_intensity, 0);
 });
 
-test("Lykyn colonization apply lands Colonization, clamps fan to 33, and leaves lights off", async () => {
+test("Lykyn colonization apply lands Colonization, keeps the profile fan, and leaves lights off", async () => {
   const { ctx, token } = await setupLykyn("colo-lykyn@example.com");
   const res = await applyProfile(ctx, token, { stage: "colonization" });
   const r = res.data.results[0];
@@ -525,7 +525,7 @@ test("Lykyn colonization apply lands Colonization, clamps fan to 33, and leaves 
   assert.equal(p.grow_phase, "Colonization");
   assert.equal(p.temperature_c, colonization.temperature_c);
   assert.equal(p.humidity_percent, colonization.humidity_percent);
-  assert.equal(p.air_exchange_speed, 33, "profile 20 is below the Lykyn fan minimum");
+  assert.equal(p.air_exchange_speed, colonization.fan.speed_percent);
   assert.equal(p.air_exchange_period_min, colonization.fan.period_min);
   assert.equal(p.air_exchange_run_sec, colonization.fan.run_duration_s);
   assert.equal(p.light_hours, 0);
@@ -551,7 +551,7 @@ test("Lykyn fruiting apply converts 92 lux to percent and accepts a Colonization
   assert.equal(q.profile_id, pearlOyster.id);
   assert.equal(q.temperature_c, colonization.temperature_c);
   assert.equal(q.humidity_percent, colonization.humidity_percent);
-  assert.equal(q.air_exchange_speed, 33, "profile 20 clamps to the Lykyn fan minimum");
+  assert.equal(q.air_exchange_speed, colonization.fan.speed_percent);
   assert.equal(q.air_exchange_period_min, colonization.fan.period_min);
   assert.equal(q.air_exchange_run_sec, colonization.fan.run_duration_s);
   assert.equal(q.light_hours, 0);
@@ -846,8 +846,8 @@ const FIXTURES = [
   { name: "Lykyn", type: "lykyn_chamber", setup: setupLykyn, base: LYKYN_READING, white: 23 },
 ];
 const LUX_STEP = 5;
-const FAN_FLOOR = 33; // the strictest chamber's minimum: below it both chambers end up at the floor
-const FAN_STEP = 5; // the coarsest chamber's step: the chambers snap a fan figure to their own step
+const FAN_FLOOR = 0;
+const FAN_STEP = 1;
 
 function canonicalCommand(adapter, p) {
   const out = {
@@ -879,7 +879,7 @@ async function reportReading(ctx, fx, phaseStage, extra = {}) {
     humidity: 90,
     humidity_percent: 90,
     humidity_setpoint: 90,
-    air_exchange_speed: FAN_FLOOR,
+    air_exchange_speed: 30,
     air_exchange_period_min: 60,
     air_exchange_run_sec: 15,
     light_hours: 12,
@@ -907,10 +907,10 @@ test("adapters name the same four stages and hide each chamber's own words", () 
   assert.equal(shrooly.white.toPercent(92), 2.3);
   assert.equal(lykyn.white.describe(2.3), "white 2.3%");
   assert.equal(shrooly.white.describe(92), "white 2.3%", "a lux chamber is described in percent too");
-  assert.deepEqual(lykyn.knobRanges.air_exchange_speed, [33, 100, 1]);
-  assert.equal(deviceCapabilities({}, "lykyn_chamber").knob_ranges.air_exchange_speed[0], 33, "fan floor before the chamber reports");
+  assert.deepEqual(lykyn.knobRanges.air_exchange_speed, [0, 100, 1]);
+  assert.equal(deviceCapabilities({}, "lykyn_chamber").knob_ranges.air_exchange_speed[0], 0, "fan is 0-100 before the chamber reports");
   assert.equal(deviceCapabilities({}, "lykyn_chamber").knob_ranges.white_intensity[1], 100);
-  assert.equal(deviceCapabilities({}, "shrooly_chamber").knob_ranges.air_exchange_speed[0], 15);
+  assert.equal(deviceCapabilities({}, "shrooly_chamber").knob_ranges.air_exchange_speed[0], 0);
 });
 
 test("Lykyn takes Custom from the site, a Shrooly says it has no such phase", async () => {

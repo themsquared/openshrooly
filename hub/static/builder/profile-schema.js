@@ -766,12 +766,12 @@ export function detectsRestrictedTaxon(profile, extra = {}) {
 }
 
 export const RANGES = {
-  humidity_percent: { min: 30, max: 100, unit: "%" },
-  temperature_c: { min: 10, max: 35, unit: "C" },
+  humidity_percent: { min: 0, max: 100, unit: "%" },
+  temperature_c: { min: 0, max: 40, unit: "C" },
   duration_days: { exclusiveMin: 0, unit: "days" },
-  fan_speed_percent: { min: 15, max: 100, unit: "%" },
+  fan_speed_percent: { min: 0, max: 100, unit: "%" },
   fan_period_min: { min: 1, max: 240, unit: "min" },
-  fan_run_duration_s: { min: 5, max: 900, unit: "s" },
+  fan_run_duration_s: { min: 0, max: 900, unit: "s" },
   photoperiod_hours: { min: 0, max: 24, unit: "h" },
   white_brightness_percent: { min: 0, max: 100, unit: "%" },
   rgb_percent: { min: 0, max: 100, unit: "%" },
@@ -1073,11 +1073,11 @@ export function collectProfileIssues(profile, extra = {}) {
     if (!(Number(stage.duration_days) > 0)) {
       addIssue(issues, `stages.${stage.id}.duration_days`, `${label} duration must be greater than 0 days.`);
     }
-    if (!inRange(stage.humidity_percent, 30, 100)) {
-      addIssue(issues, `stages.${stage.id}.humidity_percent`, `${label} humidity must be 30 to 100%.`);
+    if (!inRange(stage.humidity_percent, 0, 100)) {
+      addIssue(issues, `stages.${stage.id}.humidity_percent`, `${label} humidity must be 0 to 100%.`);
     }
-    if (!inRange(stage.temperature_c, 10, 35)) {
-      addIssue(issues, `stages.${stage.id}.temperature_c`, `${label} temperature must be 10 to 35 C.`);
+    if (!inRange(stage.temperature_c, 0, 40)) {
+      addIssue(issues, `stages.${stage.id}.temperature_c`, `${label} temperature must be 0 to 40 C.`);
     }
     const fan = stage.fan || {};
     const period = fan.period_min ?? 15;

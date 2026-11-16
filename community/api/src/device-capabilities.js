@@ -89,9 +89,9 @@ export function normalizeDeviceModel(value) {
  * the chamber reports its real ranges in telemetry and those win when they are narrower.
  */
 export const KNOBS = [
-  { key: "air_exchange_speed", token: "setpoints.fan", group: "fan", range: [15, 100, 5], label: "fan", unit: "%" },
+  { key: "air_exchange_speed", token: "setpoints.fan", group: "fan", range: [0, 100, 1], label: "fan", unit: "%" },
   { key: "air_exchange_period_min", token: "air.schedule", group: "air", range: [1, 240, 1], label: "air every", unit: " min" },
-  { key: "air_exchange_run_sec", token: "air.schedule", group: "air", range: [5, 900, 5], label: "air run", unit: " s" },
+  { key: "air_exchange_run_sec", token: "air.schedule", group: "air", range: [0, 900, 1], label: "air run", unit: " s" },
   { key: "sunrise_hour", token: "light.schedule", group: "light", range: [0, 23, 1], label: "lights on at", unit: ":00" },
   { key: "light_hours", token: "light.schedule", group: "light", range: [0, 24, 0.25], label: "light", unit: " h" },
   { key: "white_intensity", token: "light.color", group: "light", range: [0, 4000, 5], label: "white", unit: " lux" },

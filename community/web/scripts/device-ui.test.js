@@ -57,15 +57,17 @@ test("device page identity and controls use chamber names, not product Shrooly",
   assert.match(identity, /Pleurotus ostreatus/);
   assert.match(identity, /Pearl Oyster/);
   const controls = renderControls(pearl, { profiles: [pearl.profile], canWrite: true, showCoach: true });
-  assert.match(controls, /Temperature \(°C\)/);
-  assert.match(controls, /Humidity \(%\)/);
-  assert.match(controls, /Fan speed/);
+  assert.match(controls, /Temperature/);
+  assert.match(controls, /Humidity/);
+  assert.match(controls, />Fan</);
   assert.match(controls, /Light/);
-  assert.match(controls, /I approve changes/);
+  assert.match(controls, /Coach/);
+  assert.match(controls, /name="coach_on"/);
+  assert.match(controls, />Grow</);
   assert.doesNotMatch(controls, /setpoint/i);
   assert.doesNotMatch(identity + controls, DASH);
   const offMenu = renderControls({ ...pearl, off_menu: true, coach: null }, { canWrite: true, showCoach: true });
-  assert.doesNotMatch(offMenu, /Coach Autopilot|Coach mode/);
+  assert.doesNotMatch(offMenu, /name="coach_on"/);
 });
 
 test("Coach Autopilot locks every target field and leaves mode and name editable", () => {
@@ -75,8 +77,7 @@ test("Coach Autopilot locks every target field and leaves mode and name editable
   };
   const html = renderControls(auto, { profiles: [pearl.profile], canWrite: true, showCoach: true });
   assert.equal(coachManagingTargets(auto), true);
-  assert.match(html, new RegExp(COACH_MANAGES_NOTE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(html, /data-coach-managing/);
+  assert.match(html, /name="coach_on"[^>]*checked/);
   for (const name of [
     "temperature_c",
     "humidity_percent",
@@ -87,20 +88,15 @@ test("Coach Autopilot locks every target field and leaves mode and name editable
   ]) {
     assert.match(html, new RegExp(`name="${name}"[^>]*disabled`), name);
   }
-  for (const action of ["temperature", "humidity", "air", "light"]) assert.match(html, new RegExp(`data-action="${action}"[^>]*disabled`), action);
-  // The Stage picker loads a profile recipe, like Start this grow, so it stays open under Coach.
+  // The Stage picker and Grow stay open under Coach.
   assert.doesNotMatch(html, /name="grow_phase"[^>]*disabled/);
-  // Starting a grow is the grower's choice of what is growing, so it stays open under Coach.
   assert.doesNotMatch(html, /name="profile_id"[^>]*disabled/);
   assert.doesNotMatch(html, /name="stage"[^>]*disabled/);
   assert.doesNotMatch(html, /data-action="profile"[^>]*disabled/);
-  assert.match(html, /Starting a grow still works/);
-  assert.doesNotMatch(html, /name="coach_mode"[^>]*disabled/);
+  assert.doesNotMatch(html, /name="coach_on"[^>]*disabled/);
   assert.doesNotMatch(html, /name="device_name"[^>]*disabled/);
-  assert.doesNotMatch(html, /data-action="name"[^>]*disabled/);
-  assert.doesNotMatch(html, /data-action="coach_mode"[^>]*disabled/);
   const off = renderControls({ ...auto, coach: { mode: "advisor", status: "advisor" } }, { profiles: [pearl.profile], canWrite: true, showCoach: true });
-  assert.doesNotMatch(off, /data-coach-managing/);
+  assert.doesNotMatch(off, /name="coach_on"[^>]*checked/);
   assert.doesNotMatch(off, /name="temperature_c"[^>]*disabled/);
 });
 
@@ -168,88 +164,92 @@ function tagFor(html, name) {
   return html.match(new RegExp(`<input name="${name}"[^>]*>`))[0];
 }
 
-test("humidity target accepts half-percent steps", () => {
-  const html = renderControls(pearl, { profiles: [pearl.profile], canWrite: true });
-  const tag = tagFor(html, "humidity_percent");
-  assert.match(tag, /step="0.5"/);
+test("every chamber uses the same climate ranges", () => {
   const lykyn = {
     ...pearl,
     device_type: "lykyn_chamber",
-    capabilities: { ...(pearl.capabilities || {}), ranges: { temperature_c: [10, 32], humidity_percent: [30, 95] }, steps: { humidity_percent: 0.5, temperature_c: 0.5 } },
+    capabilities: { ...(pearl.capabilities || {}), ranges: { temperature_c: [10, 32], humidity_percent: [30, 95] }, steps: { humidity_percent: 0.5, temperature_c: 0.5 }, knob_ranges: { air_exchange_speed: [33, 100, 1] } },
   };
-  const lykynTag = tagFor(renderControls(lykyn, { profiles: [pearl.profile], canWrite: true }), "humidity_percent");
-  assert.match(lykynTag, /step="0.5"/);
-  assert.match(lykynTag, /min="30"/);
-  assert.match(lykynTag, /max="95"/);
+  const want = {
+    temperature_c: { min: "0", max: "40", step: "0.1" },
+    humidity_percent: { min: "0", max: "100", step: "0.1" },
+    fan_speed_percent: { min: "0", max: "100", step: "1" },
+    white_percent: { min: "0", max: "100", step: "0.1" },
+    red_percent: { min: "0", max: "100", step: "0.1" },
+  };
+  for (const device of [pearl, lykyn]) {
+    const html = renderControls(device, { profiles: [pearl.profile], canWrite: true });
+    for (const [name, attrs] of Object.entries(want)) {
+      const tag = tagFor(html, name);
+      for (const [k, v] of Object.entries(attrs)) assert.match(tag, new RegExp(`${k}="${v}"`), `${device.device_type || "shrooly"} ${name} ${k}`);
+    }
+    // 33 is a valid fan value (the bug: step 5 with min 15 rejected it).
+    const fan = tagFor(html, "fan_speed_percent");
+    const min = Number(/min="([^"]+)"/.exec(fan)[1]);
+    const step = Number(/step="([^"]+)"/.exec(fan)[1]);
+    assert.equal((33 - min) % step, 0, "33 must be on the fan step");
+  }
   const card = renderDeviceCard({ id: "lyk", name: "Chamber", device_type: "lykyn_chamber", online: true, reading: null });
   assert.match(card, /Lykyn Chamber/);
   assert.doesNotMatch(card, /Shrooly chamber/i);
 });
 
-test("controls the firmware can't take are left out, with one plain line", () => {
+test("every chamber shows the same sliders, including older firmware", () => {
   const html = renderControls(sl2, { profiles: [pearl.profile], canWrite: true });
-  assert.doesNotMatch(html, /name="fan_speed_percent"/);
+  assert.match(html, /name="fan_speed_percent"/);
+  assert.match(html, /name="white_percent"/);
   assert.doesNotMatch(html, /name="white_led_lux"/);
-  assert.doesNotMatch(html, /data-action="light"/);
   assert.doesNotMatch(tagFor(html, "temperature_c"), /disabled/);
   assert.doesNotMatch(tagFor(html, "humidity_percent"), /disabled/);
-  assert.match(html, /<button type="submit" data-action="profile">Start this grow/);
-  assert.match(html, /This chamber takes fan speed and how often and how long on the chamber itself for now/);
-  assert.match(html, /can't take light settings from the cloud yet/);
-  assert.match(html, /can't load a whole profile/);
-  // Nothing to say about an unreported software version.
+  assert.match(html, /data-action="profile"[^>]*>Grow</);
   assert.doesNotMatch(html, /not reported|Chamber software/);
   assert.doesNotMatch(html, DASH);
 });
 
-test("one Save per card, and every Save says what happened right under it", () => {
+test("climate sliders save on their own; Grow is the only primary button", () => {
   const html = renderControls(pearl, { profiles: [pearl.profile], canWrite: true });
-  for (const action of ["temperature", "humidity", "light", "air", "stage"]) assert.equal(html.split(`data-action="${action}"`).length - 1, 1, action);
-  assert.doesNotMatch(html, /data-action="climate"|data-action="setpoints"/);
-  for (const action of ["profile", "stage", "temperature", "humidity", "light", "air", "name"]) assert.match(html, new RegExp(`data-msg-for="${action}"`));
-  // What's growing comes first and is the one primary button.
-  assert.ok(html.indexOf('id="grow"') < html.indexOf('data-action="stage"'));
-  assert.match(html, /<button type="submit" data-action="profile">/);
-  assert.match(html, /class="secondary" data-action="temperature"/);
+  assert.doesNotMatch(html, /data-action="climate"|data-action="setpoints"|Save temp|Save climate|Save humidity|Save light|Save fresh air|Set stage/);
+  assert.equal(html.split('data-action="profile"').length - 1, 1);
+  assert.match(html, /data-autosave="temperature"/);
+  assert.match(html, /data-autosave="humidity"/);
+  assert.match(html, /data-autosave="air"/);
+  assert.match(html, /data-autosave="light"/);
+  assert.ok(html.indexOf('id="grow"') < html.indexOf('data-card="temperature_c"'));
+  assert.match(html, /<button type="submit" class="grow-btn hidden" data-action="profile"/);
 });
 
-const LEGENDS = /<legend>([^<]+)<\/legend>/g;
-const cardOrder = (html) => [...html.matchAll(LEGENDS)].map((m) => m[1]).filter((l) => ["Stage", "Temp", "Humidity", "Light", "Fresh air"].includes(l));
+const cardOrder = (html) => ["temperature_c", "humidity_percent", "fan_speed_percent", "light"].filter((id) => html.includes(`data-card="${id}"`));
 
-test("every chamber gets the same cards in the same order: Stage, Temp, Humidity, Light, Fresh air", () => {
+test("every chamber gets the same sliders in the same order", () => {
   const lykyn = { ...pearl, device_type: "lykyn_chamber", capabilities: { knob_ranges: { white_intensity: [0, 100, 1], air_exchange_speed: [33, 100, 1] } } };
-  const want = ["Stage", "Temp", "Humidity", "Light", "Fresh air"];
+  const want = ["temperature_c", "humidity_percent", "fan_speed_percent", "light"];
   const stageValues = (html) => [...html.match(/<select name="grow_phase"[^>]*>([\s\S]*?)<\/select>/)[1].matchAll(/<option value="([^"]+)"/g)].map((m) => m[1]);
   for (const device of [pearl, lykyn, sl2, { ...sl2, device_type: "lykyn_chamber" }, { ...pearl, online: false }]) {
     const html = renderControls(device, { profiles: [pearl.profile], canWrite: true });
     assert.deepEqual(cardOrder(html), want, device.device_type || "shrooly");
-    assert.ok(html.indexOf('id="grow"') < html.indexOf("<legend>Stage</legend>"));
-    // The picker always lists the same four stages, in the same order.
+    assert.ok(html.indexOf('id="grow"') < html.indexOf('data-card="temperature_c"'));
     assert.deepEqual(stageValues(html).filter((v) => CANONICAL_STAGES.includes(v)), CANONICAL_STAGES);
+    assert.match(html, /<details class="sheet-advanced">/);
   }
-  // A stage the chamber lacks stays listed but can't be picked.
   const shrooly = renderControls(pearl, { canWrite: true });
-  assert.match(shrooly, /<option value="Custom" disabled>Custom \(not on this chamber\)<\/option>/);
+  assert.match(shrooly, /<option value="Custom" disabled>Custom<\/option>/);
   assert.match(renderControls(lykyn, { canWrite: true }), /<option value="Custom">Custom<\/option>/);
 });
 
-test("a card the chamber can't take keeps its place and shows one note line", () => {
+test("older firmware still gets the same four sliders", () => {
   const html = renderControls(sl2, { profiles: [pearl.profile], canWrite: true });
-  assert.deepEqual(cardOrder(html), ["Stage", "Temp", "Humidity", "Light", "Fresh air"]);
-  const light = html.match(/<fieldset data-card="light">[\s\S]*?<\/fieldset>/)[0];
-  assert.equal(light.split("control-note").length - 1, 1);
-  assert.doesNotMatch(light, /<input/);
-  const air = html.match(/<fieldset data-card="fresh-air">[\s\S]*?<\/fieldset>/)[0];
-  assert.equal(air.split("control-note").length - 1, 1);
-  assert.doesNotMatch(air, /<input|<button/);
+  assert.deepEqual(cardOrder(html), ["temperature_c", "humidity_percent", "fan_speed_percent", "light"]);
+  assert.match(html, /name="fan_speed_percent"/);
+  assert.match(html, /name="white_percent"/);
 });
 
-test("Fan speed floor and white unit come from the chamber's adapter", () => {
+test("the fan field is 0 to 100 on every chamber, and adapters still differ under the hood", () => {
   const lykyn = { ...pearl, device_type: "lykyn_chamber", capabilities: {} };
   const html = renderControls(lykyn, { canWrite: true });
-  assert.match(tagFor(html, "fan_speed_percent"), /min="33"/);
-  assert.match(html, /White added to each color/);
-  assert.match(tagFor(renderControls(pearl, { canWrite: true }), "fan_speed_percent"), /min="15"/);
+  assert.match(tagFor(html, "fan_speed_percent"), /min="0"/);
+  assert.match(tagFor(html, "fan_speed_percent"), /step="1"/);
+  assert.doesNotMatch(html, /White added to each color|Lykyn runs the fan/);
+  assert.match(tagFor(renderControls(pearl, { canWrite: true }), "fan_speed_percent"), /min="0"/);
   assert.equal(deviceAdapter(lykyn).white.percent, true);
   assert.equal(deviceAdapter({}).white.percent, false);
   assert.equal(deviceAdapter({ device_type: "mystery" }).label, "Shrooly chamber");
@@ -316,7 +316,7 @@ test("a 1.0.5 chamber gets fan, fresh air, light in %, and its phase", async () 
   assert.doesNotMatch(html, /lux/i);
   assert.match(html, /<option value="Pinning" selected>/);
   assert.match(tagFor(html, "grow_day"), /value="9"/);
-  for (const action of ["air", "light", "stage"]) assert.match(html, new RegExp(`data-action="${action}"`));
+  for (const action of ["air", "light", "stage"]) assert.match(html, new RegExp(`data-autosave="${action}"`));
   assert.doesNotMatch(html, /Fan period and run time stay on the chamber/);
   assert.doesNotMatch(html, /on the chamber itself for now/);
   assert.match(deviceAdapter({}).white.note, /100% is the brightest white this chamber makes/);
@@ -344,7 +344,7 @@ test("the stage picker says Colonization on both chambers and selects what the c
 
 test("grow day stays hidden until the chamber reports it", () => {
   const html = renderControls(sl2, { canWrite: true });
-  assert.doesNotMatch(html, /name="air_exchange_period_min"/);
+  assert.match(html, /name="air_exchange_period_min"/);
   assert.doesNotMatch(html, /name="grow_day"/);
   const offline = renderControls({ ...sl2, controls: SL5_CONTROLS, chamber: {} }, { canWrite: false });
   assert.match(tagFor(offline, "air_exchange_run_sec"), /disabled/);
@@ -364,8 +364,9 @@ test("command states read plainly and queued is never called applied", () => {
   ]);
   assert.match(html, /Delivered, not confirmed yet/);
   assert.match(html, /can't run profile commands/);
-  assert.match(html, /Applied, confirmed by the chamber/);
-  assert.match(renderCommandList([]), /Nothing sent from the cloud yet/);
+  assert.doesNotMatch(html, /Applied, confirmed by the chamber/);
+  assert.equal(renderCommandList([]), "");
+  assert.equal(renderCommandList([{ status: "applied", summary: "17 °C" }]), "");
   const queued = resultMessage({ status: "queued", command_id: 5 });
   assert.equal(queued, SENT_MESSAGE);
   assert.match(queued, /about every 15 minutes/);
@@ -611,12 +612,12 @@ test("Lykyn light controls are a color mix in percent with no lux readout", () =
   };
   assert.equal(deviceAdapter(lykyn).white.percent, true);
   const html = renderControls(lykyn, { profiles: [pearl.profile], canWrite: true, showCoach: true });
-  assert.match(html, /White added to each color \(%\)/);
   assert.match(html, /name="white_percent"[^>]*value="20"/);
-  assert.ok(html.includes(deviceAdapter(lykyn).white.note));
+  assert.match(html, /name="red_percent"/);
+  assert.match(html, /name="green_percent"/);
+  assert.match(html, /name="blue_percent"/);
   assert.doesNotMatch(html, /lux/i);
-  assert.doesNotMatch(html, /data-white-note/);
-  assert.doesNotMatch(html, /brightness/i);
+  assert.doesNotMatch(html, /White added to each color/);
   assert.doesNotMatch(deviceAdapter(lykyn).white.note, DASH);
 });
 
@@ -631,9 +632,8 @@ test("Shrooly light controls show white in percent, with no lux anywhere", () =>
   assert.equal(deviceAdapter(shrooly).white.percent, false);
   assert.equal(deviceAdapter({}).white.percent, false);
   const html = renderControls(shrooly, { profiles: [pearl.profile], canWrite: true, showCoach: true });
-  assert.match(html, /White brightness \(%\)/);
-  assert.match(html, /100% is the brightest white this chamber makes/);
-  assert.doesNotMatch(html, /data-white-note/);
+  assert.doesNotMatch(html, /White brightness \(%\)/);
+  assert.doesNotMatch(html, /100% is the brightest white this chamber makes/);
   assert.doesNotMatch(html, /lux/i);
   assert.match(html, /name="white_percent"[^>]*value="2.3"/);
   assert.match(html, /name="white_percent"[^>]*step="0.1"/);
@@ -657,7 +657,7 @@ test("the same recipe lux is a different percent on each chamber, and a capped t
     coach: { mode: "advisor", status: "advisor" },
   };
   const html = renderControls(device, { profiles: [pearl.profile], canWrite: true, showCoach: true });
-  assert.match(html, /data-light-limit[^>]*>Wanted 600 lux of white, this chamber tops out at about 400 lux \(estimated\)\./);
+  assert.doesNotMatch(html, /data-light-limit|Wanted 600 lux/);
   const plain = renderControls({ ...device, light: { duration_hours: 12, white_percent: 23 } }, { profiles: [pearl.profile], canWrite: true, showCoach: true });
   assert.doesNotMatch(plain, /data-light-limit/);
 });
@@ -669,6 +669,6 @@ test("Set stage sends the stage action, never apply_profile, so the start date s
   assert.match(block, /payload\.grow_phase = form\.grow_phase\.value/);
   assert.doesNotMatch(block, /sendAs = "profile"|profile_id|payload\.stage/);
   const html = renderControls({ ...demoDevices()[0], profile: { id: "black-oyster" } }, { profiles: [pearl.profile], canWrite: true, showCoach: false });
-  assert.match(html, /data-action="stage"/);
+  assert.match(html, /name="grow_phase"[^>]*data-autosave="stage"/);
   assert.doesNotMatch(html, /data-profile-stages|data-profile-id/);
 });
