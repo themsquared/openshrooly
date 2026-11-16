@@ -471,7 +471,6 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
       return `<option value="${name}"${name === stageNow ? " selected" : ""}${available ? "" : " disabled"}>${label}</option>`;
     })
     .join("");
-  const profileStageIds = JSON.stringify((device.grow?.stages || []).map((st) => st.id));
   const dayBox = reported("stage") && controls.stage?.day !== false
     ? `<div class="row">
         <label>Grow day
@@ -484,7 +483,7 @@ export function renderControls(device, { profiles = [], canWrite = false, showCo
   const stageBlock = `<fieldset data-card="stage">
       <legend>Stage</legend>
       <label>Stage
-        <select name="grow_phase" data-profile-id="${escapeHtml(device.profile?.id || "")}" data-profile-stages="${escapeHtml(profileStageIds)}"${profileOff}>${extraPhase}${stageList}</select>
+        <select name="grow_phase"${profileOff}>${extraPhase}${stageList}</select>
       </label>
       <p class="muted">${device.profile?.id ? "Picking a stage loads its Temp, Humidity, Light and Fresh air from the profile." : "Choose what you're growing above and a stage loads its recipe. Without one it only sets the phase."}</p>
       <button type="submit" class="secondary" data-action="stage"${profileOff}>Set stage</button>
