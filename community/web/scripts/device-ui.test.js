@@ -661,3 +661,14 @@ test("the same recipe lux is a different percent on each chamber, and a capped t
   const plain = renderControls({ ...device, light: { duration_hours: 12, white_percent: 23 } }, { profiles: [pearl.profile], canWrite: true, showCoach: true });
   assert.doesNotMatch(plain, /data-light-limit/);
 });
+
+test("Set stage sends the stage action, never apply_profile, so the start date stays put", () => {
+  const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/js/app.js"), "utf8");
+  const start = app.indexOf('if (action === "stage") {');
+  const block = app.slice(start, app.indexOf('if (action === "grow_day") {', start));
+  assert.match(block, /payload\.grow_phase = form\.grow_phase\.value/);
+  assert.doesNotMatch(block, /sendAs = "profile"|profile_id|payload\.stage/);
+  const html = renderControls({ ...demoDevices()[0], profile: { id: "black-oyster" } }, { profiles: [pearl.profile], canWrite: true, showCoach: false });
+  assert.match(html, /data-action="stage"/);
+  assert.doesNotMatch(html, /data-profile-stages|data-profile-id/);
+});

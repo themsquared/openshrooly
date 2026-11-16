@@ -37,7 +37,7 @@ import {
   speciesLine,
   stageOptionsHtml,
 } from "./device-ui.js";
-import { deviceAdapter, profileStageId } from "./device-adapters.js";
+import { deviceAdapter } from "./device-adapters.js";
 import { collectStageLightIssues, lightOnSummary } from "./profile-schema.js";
 import { lightRecipeLine } from "./light-line.js";
 import { mountPhotoCheck } from "./coach-photo.js";
@@ -2339,22 +2339,9 @@ function bindDeviceControls(id, currentDevice, { canWrite, onSent = () => {} }) 
           payload.stage = form.stage.value;
         }
         if (action === "stage") {
-          const picked = form.grow_phase.value;
-          const profileId = form.grow_phase.dataset.profileId;
-          let ids = [];
-          try {
-            ids = JSON.parse(form.grow_phase.dataset.profileStages || "[]");
-          } catch {
-            ids = [];
-          }
-          const stageId = profileStageId(picked);
-          if (profileId && stageId && ids.includes(stageId)) {
-            sendAs = "profile";
-            payload.profile_id = profileId;
-            payload.stage = stageId;
-          } else {
-            payload.grow_phase = picked;
-          }
+          // The server finds the linked profile's stage and sends its knobs. It keeps the grow day and
+          // start date, so this never goes out as apply_profile.
+          payload.grow_phase = form.grow_phase.value;
         }
         if (action === "grow_day") {
           sendAs = "stage";
