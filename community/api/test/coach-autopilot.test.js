@@ -110,20 +110,20 @@ test("clamp stays inside the profile stage target and the global 10-32 C / 60-98
   assert.equal(floor.humidity_percent, 60);
 });
 
-test("step limiter moves at most 1.0 C and 3% RH toward the target", () => {
+test("temperature, humidity and fan go straight to the value asked for, never in steps", () => {
   const next = limitAutopilotStep(
     { temperature_c: 24, humidity_percent: 80, fan_speed_percent: 30 },
     { temperature_c: 16, humidity_percent: 90, fan_speed_percent: 60 }
   );
-  assert.equal(next.temperature_c, 23);
-  assert.equal(next.humidity_percent, 83);
-  assert.equal(next.fan_speed_percent, 40);
+  assert.equal(next.temperature_c, 16);
+  assert.equal(next.humidity_percent, 90);
+  assert.equal(next.fan_speed_percent, 60);
 });
 
 test("interval and daily cap block further changes", () => {
   const now = Date.parse("2026-10-25T12:00:00Z");
-  const suggestion = { temperature_c: 16, humidity_percent: 88, fan_speed_percent: 30, reasons: ["Toward target."] };
-  const current = { temperature_c: 24, humidity_percent: 80, fan_speed_percent: 30 };
+  const suggestion = { temperature_c: 16, humidity_percent: 88, fan_speed_percent: 40, reasons: ["Toward target."] };
+  const current = { temperature_c: 16, humidity_percent: 88, fan_speed_percent: 30 };
   const interval = planAutopilotChange({
     suggestion,
     currentSetpoints: current,
@@ -148,7 +148,12 @@ test("interval and daily cap block further changes", () => {
   assert.equal(cap.next_eligible_at, "2026-10-26T00:00:00.000Z");
   const ok = planAutopilotChange({ suggestion, currentSetpoints: current, stage: fruiting, state: {}, now });
   assert.equal(ok.ok, true);
-  assert.equal(ok.next.temperature_c, 23);
+  assert.equal(ok.next.fan_speed_percent, 40);
+  // Getting a target onto the chamber is never throttled by the interval: Coach drives to the profile.
+  const off = { ...current, temperature_c: 24 };
+  const fix = planAutopilotChange({ suggestion, currentSetpoints: off, stage: fruiting, state: { last_change_at: "2026-10-25T11:30:00Z" }, now });
+  assert.equal(fix.ok, true);
+  assert.equal(fix.next.temperature_c, 16);
 });
 
 test("stale, missing, implausible, and offline readings pause Autopilot", () => {
@@ -270,13 +275,12 @@ test("Autopilot applies a stepped setpoint, logs it, and Undo restores the old v
   const run = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-auto" } });
   assert.equal(run.status, 200, JSON.stringify(run.data));
   assert.equal(run.data.applied, true);
-  assert.equal(run.data.next.temperature_c, 23);
-  assert.ok(run.data.next.temperature_c >= fruiting.temperature_target_max);
+  assert.equal(run.data.next.temperature_c, 16);
   const cmds = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-auto"]);
   assert.equal(cmds.length, 1);
   const payload = JSON.parse(cmds[0].payload);
   assert.equal(payload.source, "grow-coach-autopilot");
-  assert.equal(payload.temperature_c, 23);
+  assert.equal(payload.temperature_c, 16);
   const exp = Date.parse(payload.expires_at);
   assert.ok(Number.isFinite(exp));
   assert.ok(exp - Date.now() <= AUTOPILOT_LIMITS.commandTtlMs);
@@ -331,16 +335,16 @@ test("readings 15 min 30 s old keep Autopilot active", async () => {
   assert.notEqual(status.data.status, "paused");
 });
 
-test("readings 21 min old pause Autopilot to Advisor", async () => {
+test("readings 21 min old make Coach wait; it stays on and does not flip to Advisor", async () => {
   const { result, status } = await runWithReadingAge("late-stale@example.com", "dev-late-stale", 21 * 60 * 1000);
-  assert.equal(result.paused, true);
-  assert.equal(result.flipped_to, "advisor");
+  assert.equal(result.skipped, "waiting");
+  assert.equal(result.paused, undefined);
   assert.match(result.reason, /stale|offline/i);
-  assert.equal(status.data.mode, "advisor");
-  assert.equal(status.data.status, "paused");
+  assert.equal(status.data.mode, "autopilot");
+  assert.notEqual(status.data.status, "paused");
 });
 
-test("stale readings flip Autopilot back to Advisor with a visible reason", async () => {
+test("stale readings make Coach wait with a visible reason and keep it on", async () => {
   const ctx = env();
   const { token, user } = await register(ctx, "stale@example.com");
   await subscribe(ctx, token);
@@ -362,13 +366,11 @@ test("stale readings flip Autopilot back to Advisor with a visible reason", asyn
     device: await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-stale"]),
     user,
   });
-  assert.equal(result.paused, true);
-  assert.equal(result.flipped_to, "advisor");
+  assert.equal(result.skipped, "waiting");
   assert.match(result.reason, /stale/i);
   const status = await call(ctx, "GET", "/api/coach/autopilot?device_id=dev-stale", { token });
-  assert.equal(status.data.mode, "advisor");
-  assert.equal(status.data.status, "paused");
-  assert.match(status.data.pause_reason, /stale/i);
+  assert.equal(status.data.mode, "autopilot");
+  assert.notEqual(status.data.status, "paused");
 });
 
 test("a manual setpoint write is refused while Autopilot is on and does not pause Coach", async () => {
@@ -530,12 +532,14 @@ test("force-run still respects the interval and daily cap", async () => {
   const queued = await ctx.db.all("SELECT * FROM device_commands WHERE device_id=? AND consumed_at IS NULL", ["dev-force"]);
   assert.equal(queued.length, 1);
   queued[0].consumed_at = nowIso();
+  // The chamber took the targets: nothing left to correct, so Coach has nothing to send.
+  await addReading(ctx, "dev-force", { humidity: 89, humidity_setpoint: 88, temperature: 17, temperature_setpoint: 16 });
   const again = await call(ctx, "POST", "/api/coach/autopilot/run", { token, body: { device_id: "dev-force" } });
   assert.equal(again.status, 200, JSON.stringify(again.data));
   assert.equal(again.data.applied, undefined);
-  assert.match(again.data.reason, /minimum interval/i);
-  assert.match(again.data.reason, /Next eligible at/i);
-  assert.ok(again.data.next_eligible_at);
+  assert.match(again.data.reason, /Already at the profile target/i);
+  await ctx.db.run("DELETE FROM device_telemetry WHERE device_id=? AND created_at>=?", ["dev-force", "1970"]);
+  await addReading(ctx, "dev-force", { humidity: 88, humidity_setpoint: 90, temperature: 22.76, temperature_setpoint: 24 });
 
   const row = await ctx.db.one("SELECT * FROM coach_device_mode WHERE device_id=?", ["dev-force"]);
   row.last_change_at = null;
@@ -738,7 +742,7 @@ test("targets come from suggestSetpoints, never invented light fields", () => {
   assert.equal(plan.ok, true);
   assert.deepEqual(Object.keys(plan.next).sort(), ["fan_speed_percent", "humidity_percent", "temperature_c"]);
   assert.equal(plan.next.light, undefined);
-  assert.equal(plan.next.temperature_c, 23);
+  assert.equal(plan.next.temperature_c, 16);
 });
 
 test("0009 ack migration is additive ALTER/INDEX only", () => {
@@ -776,8 +780,8 @@ test("queued Autopilot commands use the cloud inbox payload and keep last_setpoi
   assert.equal(cmds.length, 1);
   const payload = JSON.parse(cmds[0].payload);
   assert.equal(payload.delivery, "cloud");
-  assert.equal(payload.temperature_c, 23);
-  assert.equal(payload.temperature_target, 23);
+  assert.equal(payload.temperature_c, 16);
+  assert.equal(payload.temperature_target, 16);
   assert.equal(payload.target_humidity, payload.humidity_percent);
   assert.equal(payload.source, "grow-coach-autopilot");
   const state = await getDeviceMode(ctx.db, "sldev_q1", user.id);
@@ -889,7 +893,7 @@ test("device ack or matching readings mark the command applied and set last_setp
   const acked = await noteAutopilotCommandAck(ctx.db, device, first.command_id, "applied");
   assert.equal(acked.status, "applied");
   const afterAck = await getDeviceMode(ctx.db, "dev-ack", user.id);
-  assert.equal(JSON.parse(afterAck.last_setpoints).temperature_c, 23);
+  assert.equal(JSON.parse(afterAck.last_setpoints).temperature_c, 16);
   const apply = (await ctx.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", ["dev-ack", 8])).find(
     (row) => row.action === "apply"
   );
@@ -906,13 +910,13 @@ test("device ack or matching readings mark the command applied and set last_setp
       humidity: 88,
       humidity_setpoint: 90,
       temperature: 22,
-      temperature_setpoint: 23,
+      temperature_setpoint: 16,
     },
     new Date(t2).toISOString()
   );
   const second = await runAutopilotForDevice(ctx.db, ctx, { device, user, now: t2 });
   assert.equal(second.applied, true, JSON.stringify(second));
-  assert.equal(JSON.parse((await getDeviceMode(ctx.db, "dev-ack", user.id)).last_setpoints).temperature_c, 23);
+  assert.equal(JSON.parse((await getDeviceMode(ctx.db, "dev-ack", user.id)).last_setpoints).temperature_c, 16);
   const tInfer = t2 + 60_000;
   await addReading(
     ctx,
@@ -1043,7 +1047,7 @@ test("Coach and Autopilot read a 24h telemetry window, not every row", async () 
     device: await ctx.db.one("SELECT * FROM cloud_devices WHERE id=?", ["dev-window"]),
     user,
   });
-  assert.equal(result.paused, true);
+  assert.equal(result.skipped, "waiting");
   assert.match(result.reason, /missing/i);
 });
 
@@ -1147,7 +1151,7 @@ test("finalize is idempotent on replayed acks", async () => {
   assert.equal(replay.skipped, "already_finalized");
   assert.equal(replay.status, "applied");
   const state = await getDeviceMode(ctx.db, "dev-idem", user.id);
-  assert.equal(JSON.parse(state.last_setpoints).temperature_c, 23);
+  assert.equal(JSON.parse(state.last_setpoints).temperature_c, 16);
   const logsReplay = await ctx.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=?", ["dev-idem"]);
   assert.equal(logsReplay.length, logsAfter.length);
 });

@@ -49,15 +49,27 @@ export function stageIndexForPhase(profile, phase) {
   );
 }
 
+/** First grow day (counted from 1) of the stage at `index`. */
+function firstDayOfStage(profile, index) {
+  const stages = profile?.stages || [];
+  let days = 0;
+  for (let i = 0; i < index; i += 1) days += Number(stages[i].duration_days) || 0;
+  return days + 1;
+}
+
 /**
- * Which stage Autopilot steers to. The grower's last applied stage wins when the chamber
- * still shows a different phase: the change may still be in flight, or they moved the grow
- * back (for example from Fruiting to Colonization). Grow day only moves the grow forward
- * once the chamber is already on that chosen stage. A fruiting apply is not dragged back
- * to colonizing just because the chamber is still on its default phase.
- * Chambers that report neither, with no chosen stage, keep the old target (fruiting).
+ * Which stage Autopilot steers to. One rule keeps Coach and the chamber on the same stage: the
+ * grower's last applied stage is the truth, and Coach drives the chamber to it (phase and recipe)
+ * until the chamber reports it. The chamber's own phase only decides when nothing was applied.
+ *   1. The grower applied a stage that differs from the chamber's phase: steer the applied stage.
+ *      (The change may still be in flight, which the caller waits out, or the chamber never took
+ *      the phase. A failed apply blocks the pass instead of being retried.)
+ *   2. Otherwise the stage the chamber is in, advanced by grow day only when time moved the grow
+ *      there: the grower's last pick must predate the day the next stage started. A grower who
+ *      moves the grow back to an earlier stage is never pushed forward again by the grow day.
+ *   3. No usable phase or choice (old firmware, Idle, Custom): the grow day, then Fruiting.
  */
-export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage = null } = {}) {
+export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage = null, chosenAtMs = null, nowMs = Date.now() } = {}) {
   const stages = profile?.stages || [];
   const fallback = Math.max(0, stages.findIndex((s) => s.id === "fruiting"));
   const byPhase = caps.grow_phase ? stageIndexForPhase(profile, knobs.grow_phase) : -1;
@@ -69,9 +81,20 @@ export function pickAutopilotStage(profile, knobs = {}, caps = {}, { chosenStage
     index = byChoice;
     source = "chosen";
   } else {
-    index = Math.max(byPhase, byDay, byChoice);
-    source = byChoice === index && byChoice > Math.max(byPhase, byDay) ? "chosen" : byDay > byPhase ? "grow_day" : byPhase >= 0 ? "phase" : "default";
-    if (index < 0) index = fallback;
+    index = byPhase >= 0 ? byPhase : byChoice;
+    source = byPhase >= 0 ? "phase" : "chosen";
+    if (byDay > index) {
+      const day = num(knobs.grow_day);
+      const daysSinceChoice = chosenAtMs ? Math.max(0, (nowMs - chosenAtMs) / 86400000) : 0;
+      if (day != null && (!chosenAtMs || day - daysSinceChoice < firstDayOfStage(profile, byDay))) {
+        index = byDay;
+        source = "grow_day";
+      }
+    }
+    if (index < 0) {
+      index = byDay >= 0 ? byDay : fallback;
+      source = byDay >= 0 ? "grow_day" : "default";
+    }
   }
   const stage = stages[index] || {};
   const phase = growPhaseForStage(stage.id, caps);

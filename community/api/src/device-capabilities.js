@@ -373,7 +373,11 @@ export function supportedSetpoints(payload = {}, caps, requested = payload, { cu
   const t = num(input.temperature_c);
   const h = num(input.humidity_percent);
   if (t != null) {
-    if (caps.temperature) out.temperature_c = Math.round(clip(t, caps.ranges.temperature_c) * 10) / 10;
+    if (caps.temperature) {
+      // The chamber's own step (a Lykyn takes halves): send a number it will accept, not one it would refuse.
+      const step = caps.steps?.temperature_c || 0.1;
+      out.temperature_c = Math.round(Math.round(clip(t, caps.ranges.temperature_c) / step) * step * 100) / 100;
+    }
     else if (asked.has("temperature_c")) skipped.push({ field: "temperature_c", note: support.temperature.note });
   }
   if (h != null) {

@@ -1065,6 +1065,11 @@ function dispatch(mode, tables, ids, sql, params) {
     }
     return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
   }
+  if (q.startsWith("UPDATE device_commands SET payload=? WHERE id=? AND device_id=?")) {
+    const row = tables.device_commands.find((c) => Number(c.id) === Number(params[1]) && c.device_id === params[2] && !c.consumed_at);
+    if (row) row.payload = params[0];
+    return { changes: row ? 1 : 0, meta: { changes: row ? 1 : 0 } };
+  }
   if (q.startsWith("UPDATE device_commands SET consumed_at=? WHERE id=? AND device_id=?")) {
     const row = tables.device_commands.find((c) => Number(c.id) === Number(params[1]) && c.device_id === params[2]);
     if (row) row.consumed_at = params[0];

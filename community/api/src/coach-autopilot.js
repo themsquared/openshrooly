@@ -54,6 +54,9 @@ export const AUTOPILOT_LIMITS = {
   // Short enough that a queued Autopilot change cannot apply after a stage pick or a long
   // offline stretch. Coach can issue a fresh command on a later pass if the chamber still needs it.
   commandTtlMs: 15 * 60 * 1000,
+  // Once the chamber has pulled a command it may apply it and report one check-in (about 15 minutes) later.
+  // Wait this long for that report before calling a delivered command expired.
+  deliveredGraceMs: 45 * 60 * 1000,
 };
 
 export function coachAutopilotFlagOn(env = {}) {
@@ -93,7 +96,22 @@ export function insertedId(result) {
   return Number(result?.lastRowId ?? result?.meta?.last_row_id ?? 0) || null;
 }
 
-export function autopilotCommandExpired(command, now = Date.now()) {
+const GROWER_KINDS = new Set(["setpoints", "apply_profile", "schedule", "stage"]);
+
+function payloadExpired(payload = {}, now = Date.now()) {
+  const t = Date.parse(payload.expires_at || "");
+  return Number.isFinite(t) && t <= now;
+}
+
+/** When the chamber pulled this command from its inbox, or null if it never did. */
+export function commandDeliveredAt(command) {
+  const at = parseJson(command?.payload, {})._delivered_at;
+  const t = Date.parse(at || "");
+  return Number.isFinite(t) ? t : null;
+}
+
+/** Past its delivery window: the chamber must not be handed this command any more. */
+export function autopilotCommandPastTtl(command, now = Date.now()) {
   const payload = parseJson(command?.payload, {});
   const issued = Date.parse(command?.issued_at || "");
   // issued_at wins over a longer expires_at left over from the old 2-hour window.
@@ -103,6 +121,17 @@ export function autopilotCommandExpired(command, now = Date.now()) {
     if (Number.isFinite(t) && t <= now) return true;
   }
   return false;
+}
+
+/**
+ * Expired means the chamber never got it in time, or got it and said nothing for the grace period.
+ * A command the chamber already pulled is not expired just because its report is one check-in away.
+ */
+export function autopilotCommandExpired(command, now = Date.now()) {
+  if (!autopilotCommandPastTtl(command, now)) return false;
+  const delivered = commandDeliveredAt(command);
+  if (delivered != null) return now - delivered > AUTOPILOT_LIMITS.deliveredGraceMs;
+  return true;
 }
 
 export function sameSetpoints(a = {}, b = {}) {
@@ -207,17 +236,16 @@ export function stepToward(current, target, maxStep) {
   return from + Math.sign(delta) * maxStep;
 }
 
+/**
+ * Coach never moves a target off the profile and never walks toward it in steps: the setpoints,
+ * the stage recipe and the fan go to the value asked for, as given (already clamped). The fan is
+ * Coach's lever for humidity, and steerFan already keeps it within one step of the stage's own speed.
+ */
 export function limitAutopilotStep(from = {}, to = {}) {
   const next = { ...to };
-  if (to.temperature_c != null) {
-    next.temperature_c = Math.round(stepToward(from.temperature_c, to.temperature_c, AUTOPILOT_LIMITS.maxStepTemp) * 10) / 10;
-  }
-  if (to.humidity_percent != null) {
-    next.humidity_percent = Math.round(stepToward(from.humidity_percent, to.humidity_percent, AUTOPILOT_LIMITS.maxStepRh) * 10) / 10;
-  }
-  if (to.fan_speed_percent != null) {
-    next.fan_speed_percent = Math.round(stepToward(from.fan_speed_percent, to.fan_speed_percent, AUTOPILOT_LIMITS.maxStepFan));
-  }
+  if (to.temperature_c != null) next.temperature_c = Math.round(Number(to.temperature_c) * 10) / 10;
+  if (to.humidity_percent != null) next.humidity_percent = Math.round(Number(to.humidity_percent) * 10) / 10;
+  if (to.fan_speed_percent != null) next.fan_speed_percent = Math.round(Number(to.fan_speed_percent));
   return next;
 }
 
@@ -260,17 +288,18 @@ export function setpointsMismatch(reading = {}, last = {}, { now = Date.now(), l
 export function evaluateAutopilotPause({ reading, previous, device, now = Date.now() } = {}) {
   const status = String(device?.status || "");
   const seen = device?.last_seen_at ? Date.parse(device.last_seen_at) : NaN;
+  // transient: the chamber is just quiet. Coach waits and stays on; it does not flip itself to Advisor.
   if (status && status !== "claimed" && status !== "active") {
     return { pause: true, reason: "The chamber looks offline." };
   }
   if (Number.isFinite(seen) && now - seen > AUTOPILOT_LIMITS.staleMs) {
-    return { pause: true, reason: "The chamber looks offline." };
+    return { pause: true, transient: true, reason: "The chamber looks offline." };
   }
   if (!reading || (reading.temperature == null && reading.humidity == null)) {
-    return { pause: true, reason: "Readings are missing." };
+    return { pause: true, transient: true, reason: "Readings are missing." };
   }
   if (reading.age_seconds != null && reading.age_seconds * 1000 > AUTOPILOT_LIMITS.staleMs) {
-    return { pause: true, reason: `Readings are stale (older than ${READINGS_STALE_MINUTES} minutes).` };
+    return { pause: true, transient: true, reason: `Readings are stale (older than ${READINGS_STALE_MINUTES} minutes).` };
   }
   const temp = num(reading.temperature);
   const rh = num(reading.humidity);
@@ -308,13 +337,6 @@ function blockedUntil(reason, waitUntil) {
  * phase) that differ from the chamber, already limited to what it can take.
  */
 export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage = {}, state = {}, now = Date.now(), fanRange, extras = {} } = {}) {
-  const intervalAt = nextEligibleAt(state, now);
-  if (now < intervalAt) {
-    return blockedUntil("Waiting for the minimum interval between changes.", intervalAt);
-  }
-  if (dailyChangeCount(state, now) >= AUTOPILOT_LIMITS.dailyCap) {
-    return blockedUntil("Daily Autopilot change cap reached.", nextChangeEligibleAt(state, now));
-  }
   const allowed = {
     temperature_c: suggestion?.temperature_c,
     humidity_percent: suggestion?.humidity_percent,
@@ -322,12 +344,21 @@ export function planAutopilotChange({ suggestion, currentSetpoints = {}, stage =
   };
   const clamped = clampAutopilotSetpoints(allowed, stage, fanRange ? { fanRange } : {});
   const stepped = limitAutopilotStep(currentSetpoints, clamped);
-  const changed =
+  // Getting a target or the stage recipe onto the chamber is never throttled: Coach drives to the
+  // profile until the chamber is there. Only fan steering (a judgment call) waits between changes.
+  const corrective =
     (stepped.temperature_c != null && stepped.temperature_c !== currentSetpoints.temperature_c) ||
     (stepped.humidity_percent != null && stepped.humidity_percent !== currentSetpoints.humidity_percent) ||
-    (stepped.fan_speed_percent != null && stepped.fan_speed_percent !== currentSetpoints.fan_speed_percent) ||
     Object.keys(extras || {}).length > 0;
-  if (!changed) return { ok: false, reason: "Already at the profile target.", next_eligible_at: null };
+  const fanChange = stepped.fan_speed_percent != null && stepped.fan_speed_percent !== currentSetpoints.fan_speed_percent;
+  if (!corrective && !fanChange) return { ok: false, reason: "Already at the profile target.", next_eligible_at: null };
+  const intervalAt = nextEligibleAt(state, now);
+  if (!corrective && now < intervalAt) {
+    return blockedUntil("Waiting for the minimum interval between changes.", intervalAt);
+  }
+  if (dailyChangeCount(state, now) >= AUTOPILOT_LIMITS.dailyCap) {
+    return blockedUntil("Daily Autopilot change cap reached.", nextChangeEligibleAt(state, now));
+  }
   return {
     ok: true,
     next: { ...stepped, ...(extras || {}) },
@@ -867,16 +898,24 @@ async function markCommandConsumed(db, command, extra = {}, now = Date.now()) {
 }
 
 async function finalizeAutopilotCommand(db, { command, state, user, status, reason, now = Date.now(), readings = null } = {}) {
-  if (autopilotCommandFinalized(command)) {
-    return { status: parseJson(command.payload, {})._ack.status, skipped: "already_finalized", last_setpoints: state.last_setpoints };
+  const finalAck = parseJson(command.payload, {})._ack;
+  // The chamber took a command we had already written off as expired and reported on it at its next
+  // check-in. The chamber is the truth: record what really happened instead of ignoring the ack.
+  const late = Boolean(finalAck?.status === "expired" && status !== "expired");
+  if (autopilotCommandFinalized(command) && !late) {
+    return { status: finalAck.status, skipped: "already_finalized", last_setpoints: state.last_setpoints };
   }
+  if (late) reason = `Reported late: ${reason || `Device reported ${status}.`}`;
   const payload = parseJson(command.payload, {});
   const from = commandFrom(payload);
   const next = commandTargets(payload);
   await markCommandConsumed(db, command, { _ack: { status, reason, at: isoAt(now) } }, now);
   if (Number(state.pending_command_id) === Number(command.id)) state.pending_command_id = null;
   if (status === "applied") {
-    state.last_setpoints = next;
+    // A late report must not roll back a newer pass: only adopt it while nothing newer has been sent.
+    if (!late || Number(state.pending_command_id || 0) === 0) state.last_setpoints = next;
+  } else if (late) {
+    // Already restored when it expired.
   } else if (sameSetpoints(parseJson(state.last_setpoints, {}), next)) {
     state.last_setpoints = from.temperature_c != null || from.humidity_percent != null ? from : state.last_setpoints;
   }
@@ -1180,6 +1219,11 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   const current = withKnobs(latestReading(samples, now), doc);
   const previous = parsed.length > 1 ? parsed[parsed.length - 2] : null;
   const pause = evaluateAutopilotPause({ reading: current, previous, device, now });
+  if (pause.pause && pause.transient) {
+    // A quiet chamber is not a reason to turn Coach off. It stays on, keeps locking the targets,
+    // and picks up on the first pass with fresh readings.
+    return { skipped: "waiting", reason: pause.reason };
+  }
   if (pause.pause) {
     await pauseAutopilot(db, state, user, pause.reason, current);
     return { paused: true, reason: pause.reason, flipped_to: "advisor" };
@@ -1197,6 +1241,15 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     return { skipped: "pending", reason: "Waiting for the chamber to apply the last Autopilot command." };
   }
 
+  // A change the grower just made (Grow, a stage pick) is still on its way to the chamber. Do not
+  // steer around it: Coach waits until the chamber has taken it, so both always agree on the stage.
+  const pendingGrower = (pending || []).filter(
+    (row) => !isAutopilotCommand(row) && GROWER_KINDS.has(row.kind) && !payloadExpired(parseJson(row.payload, {}), now)
+  );
+  if (pendingGrower.length) {
+    return { skipped: "pending_grower", reason: "Waiting for the chamber to take the change you just made." };
+  }
+
   const resolved = await resolveAllowedProfile(db, state.profile_id);
   if (resolved.error || !resolved.profile) {
     const reason = "The selected profile is missing or not allowed.";
@@ -1206,7 +1259,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
   const profile = resolved.profile;
   const lastStaged = await latestStagedCommand(db, device.id, state.profile_id);
   const chosenStage = lastStaged?.stage || null;
-  const pick = pickAutopilotStage(profile, knobs, caps, { chosenStage });
+  const pick = pickAutopilotStage(profile, knobs, caps, { chosenStage, chosenAtMs: Date.parse(lastStaged?.row?.issued_at || "") || null, nowMs: now });
   const blocked = failedStageApplyBlocks(lastStaged, pick);
   if (blocked) {
     return { applied: false, status: "failed", error: blocked, reason: blocked, skipped: "phase_apply_failed", stage: lastStaged.stage };
@@ -1284,6 +1337,7 @@ export async function runAutopilotForDevice(db, env, { device, user, now = Date.
     return {
       decider,
       skipped: "no_change",
+      stage: pick.stageId,
       reason: plan.reason,
       waitUntil: plan.waitUntil || null,
       next_eligible_at: plan.next_eligible_at || null,

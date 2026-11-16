@@ -7,6 +7,8 @@ import { ValidationError, validateStageLight } from "./profile.js";
 import { requireVerified, userFromRequest, audit } from "./auth.js";
 import {
   autopilotCommandExpired,
+  autopilotCommandPastTtl,
+  commandDeliveredAt,
   expireSupersededAutopilotCommand,
   inferAutopilotApplyFromReading,
   isAutopilotCommand,
@@ -869,7 +871,9 @@ export async function handleDevices(method, path, url, request, env) {
     const open = [];
     for (const row of (rows || []).slice().sort((a, b) => Number(a.id) - Number(b.id))) {
       const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
-      if (isAutopilotCommand(row) && autopilotCommandExpired(row)) {
+      if (isAutopilotCommand(row) && autopilotCommandPastTtl(row)) {
+        // Already handed out once: never hand it out again. Its report is still coming, so leave it open.
+        if (commandDeliveredAt(row) != null && !autopilotCommandExpired(row)) continue;
         await expireSupersededAutopilotCommand(
           db,
           bound.device,
@@ -885,6 +889,15 @@ export async function handleDevices(method, path, url, request, env) {
         continue;
       }
       open.push(row);
+    }
+    // Remember when each command first went out, so a stale one is never handed out twice and the
+    // wait for its report is measured from delivery, not from when it was queued.
+    for (const row of open) {
+      if (commandDeliveredAt(row) != null) continue;
+      const body = typeof row.payload === "string" ? JSON.parse(row.payload) : { ...row.payload };
+      body._delivered_at = nowIso();
+      row.payload = JSON.stringify(body);
+      await db.run("UPDATE device_commands SET payload=? WHERE id=? AND device_id=? AND consumed_at IS NULL", [row.payload, row.id, bound.device.id]);
     }
     return json({
       commands: open.map((row) => ({
