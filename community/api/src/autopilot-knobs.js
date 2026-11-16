@@ -116,28 +116,14 @@ export function fanRangeForStage(stage = {}, caps = {}) {
 }
 
 /**
- * Fan target for this stage: the recipe speed, one step more when RH is above the stage
- * humidity target, one step less when it is below. The step is held until RH is back
- * within FAN_IN_BAND of the target, so a chamber a few points short keeps the lower fan.
- * Always inside fanRangeForStage.
+ * Fan target for this stage: always the recipe speed, inside fanRangeForStage. `reading` is kept for callers.
  */
 export function steerFan(stage = {}, reading = {}, caps = {}) {
   const range = fanRangeForStage(stage, caps);
   const base = num(stage.fan?.speed_percent ?? stage.fan_speed_percent) ?? 30;
-  const rh = num(reading?.humidity);
-  const lo = num(stage.humidity_target_min);
-  const hi = num(stage.humidity_target_max);
-  const center = num(stage.humidity_percent) ?? (lo != null && hi != null ? (lo + hi) / 2 : lo ?? hi);
-  let target = base;
-  let reason = null;
-  if (rh != null && center != null && rh > center + FAN_IN_BAND) {
-    target = base + FAN_STEP;
-    reason = `Humidity is running high, so the fan runs a step faster.`;
-  } else if (rh != null && center != null && rh < center - FAN_IN_BAND) {
-    target = base - FAN_STEP;
-    reason = `Humidity is running low, so the fan runs a step slower.`;
-  }
-  return { fan: clip(target, range), range, reason };
+  // The fan is part of the stage recipe, so Coach holds it at the recipe value. It no longer speeds it up or
+  // slows it down with humidity: a fan that drifts off the recipe (33 to 23 on a Lykyn) is a target Coach moved.
+  return { fan: clip(base, range), range, reason: null };
 }
 
 /** Stage recipe knobs (fresh air, light, phase) this chamber can take, firmware keys. */

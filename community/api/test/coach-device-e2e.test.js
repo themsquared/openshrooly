@@ -183,6 +183,8 @@ for (const stage of ["colonization", "pinning", "fruiting"]) {
         // Readings wander around the target, both ways.
         drift(c, { dt: i % 2 ? 1.5 : -1.5, dh: i % 3 === 0 ? -6 : 4 });
         await c.cycle();
+        // Humidity swings above and below the target every cycle. Nothing Coach has sent may move the chamber off the recipe.
+        assertRecipe(c, stage, `${c.kind} on cycle ${i}`);
         const out = await coachPass(c);
         if (c.kind !== "generic") {
           assert.equal(CANON[c.knobs.grow_phase], stage, `${c.kind} device stage on cycle ${i}`);
@@ -344,9 +346,9 @@ for (const kind of ["lykyn", "shrooly"]) {
     tick(MIN);
     const id = await coachCommand(c);
     const targetsBefore = { ...c.targets };
-    // The chamber is offline for 20 minutes (queued Autopilot changes live for 15), then reconnects.
+    // The chamber is offline for 40 minutes (queued Autopilot changes live for 35), then reconnects.
     c.offline = true;
-    tick(20 * MIN);
+    tick(40 * MIN);
     c.offline = false;
     const handed = await c.poll();
     assert.deepEqual(handed.map((h) => h.id), [], "nothing stale is handed to the chamber");
@@ -385,11 +387,11 @@ test("a change the chamber pulled in time but reported one check-in later is rec
   const out = await coachPass(lykyn);
   assert.equal(out.applied, true, JSON.stringify(out));
   const id = out.command_id;
-  tick(14 * MIN);
-  const handed = await lykyn.poll(); // pulled at minute 14, applied, report not sent yet
+  tick(34 * MIN);
+  const handed = await lykyn.poll(); // pulled at minute 34, applied, report not sent yet
   assert.deepEqual(handed.map((h) => h.id), [id]);
   tick(2 * MIN);
-  // The cloud's sweep runs past the 15 minute mark while the report is still on its way.
+  // The cloud's sweep runs past the 35 minute mark while the report is still on its way.
   const sweep = await coachPass(lykyn);
   assert.notEqual(sweep.error, true);
   assert.equal((await commands(lykyn)).find((x) => x.id === id).payload._ack?.status, undefined, "not written off while the chamber holds it");

@@ -53,7 +53,9 @@ export const AUTOPILOT_LIMITS = {
   fanClamp: [15, 80],
   // Short enough that a queued Autopilot change cannot apply after a stage pick or a long
   // offline stretch. Coach can issue a fresh command on a later pass if the chamber still needs it.
-  commandTtlMs: 15 * 60 * 1000,
+  // Chambers check in about every 15 minutes, so a command made right after a check-in needs more than one
+  // interval to be picked up. 35 minutes covers two check-ins; Coach commands are whole targets, never nudges.
+  commandTtlMs: 35 * 60 * 1000,
   // Once the chamber has pulled a command it may apply it and report one check-in (about 15 minutes) later.
   // Wait this long for that report before calling a delivered command expired.
   deliveredGraceMs: 45 * 60 * 1000,

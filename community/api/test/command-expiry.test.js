@@ -5,8 +5,8 @@ import { AUTOPILOT_LIMITS, autopilotCommandExpired } from "../src/coach-autopilo
 
 const cmd = (id, kind, payload, extra = {}) => ({ id, device_id: "d1", kind, payload: JSON.stringify(payload), ...extra });
 
-test("Autopilot commands expire after 15 minutes; grower commands still last 2 hours", () => {
-  assert.equal(AUTOPILOT_LIMITS.commandTtlMs, 15 * 60 * 1000);
+test("Autopilot commands expire after 35 minutes; grower commands still last 2 hours", () => {
+  assert.equal(AUTOPILOT_LIMITS.commandTtlMs, 35 * 60 * 1000);
   assert.equal(COMMAND_TTL_MS, 2 * 60 * 60 * 1000);
   const issued = Date.parse("2026-11-15T22:20:05Z");
   const c = {
@@ -17,8 +17,8 @@ test("Autopilot commands expire after 15 minutes; grower commands still last 2 h
       expires_at: "2026-11-16T00:20:05Z",
     }),
   };
-  assert.equal(autopilotCommandExpired(c, issued + 14 * 60 * 1000), false);
-  assert.equal(autopilotCommandExpired(c, issued + 15 * 60 * 1000 + 1000), true);
+  assert.equal(autopilotCommandExpired(c, issued + 34 * 60 * 1000), false);
+  assert.equal(autopilotCommandExpired(c, issued + 35 * 60 * 1000 + 1000), true);
 });
 
 test("a later stage pick drops a queued Autopilot command even if it does not repeat every knob", () => {

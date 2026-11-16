@@ -218,7 +218,7 @@ test("Jev nudges humidity, clamped to the stage guardrail, and the audit log kee
   const [payload] = await pendingPayloads(ctx2, "dev-jev-raise");
   assert.equal(payload.humidity_percent, 88, "humidity moves toward the profile target, not a Jev step past or away from it");
   const ttl = Date.parse(payload.expires_at) - Date.now();
-  assert.ok(ttl > 14 * 60000 && ttl <= 15 * 60000, "Autopilot commands expire in 15 minutes");
+  assert.ok(ttl > 34 * 60000 && ttl <= 35 * 60000, "Autopilot commands expire in 35 minutes");
   const log = await ctx2.db.all("SELECT * FROM coach_autopilot_log WHERE device_id=? ORDER BY id DESC LIMIT ?", ["dev-jev-raise", 5]);
   const apply = log.find((r) => r.action === "apply");
   const readings = JSON.parse(apply.readings);
