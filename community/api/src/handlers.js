@@ -33,6 +33,8 @@ import { seedMissing } from "./seed.js";
 import seeds from "./seeds.json" with { type: "json" };
 import { handleMcp } from "./mcp.js";
 import { handleAlerts } from "./alerts/http.js";
+import { SQL as ALERT_SQL } from "./alerts/store.js";
+import { readPrefs } from "./alerts/rules.js";
 import { handleLive } from "./live.js";
 import { handleReview } from "./review-http.js";
 import { readJsonLimited } from "./http-body.js";
@@ -353,7 +355,9 @@ async function route(method, path, url, request, env) {
       [user.id]
     );
     const coachSub = await db.one("SELECT * FROM coach_subs WHERE user_id=?", [user.id]);
+    const prefs = readPrefs((await db.one(ALERT_SQL.prefsGet, [user.id]))?.document);
     return json({
+      prefs: { temp_unit: prefs.temp_unit || null },
       user: {
         id: user.id,
         username: user.username,

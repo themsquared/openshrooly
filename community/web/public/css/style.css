@@ -1635,6 +1635,33 @@ body[data-page="device"] #device-body { display: none !important; }
 .knob-value input[type="number"]::-webkit-inner-spin-button { appearance: none; margin: 0; }
 .knob-value input:disabled { opacity: 0.55; }
 .knob-unit { font-size: 1.05rem; color: var(--sl-muted); }
+button.temp-unit-toggle, button.knob-unit {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+.unit-seg { display: inline-flex; gap: 0; border: 1px solid var(--sl-border, #2a3a32); border-radius: 999px; overflow: hidden; }
+.unit-seg button {
+  appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0.4rem 0.85rem;
+  font: inherit;
+  color: var(--sl-muted);
+  cursor: pointer;
+}
+.unit-seg button[aria-pressed="true"] { color: var(--sl-fg, #e8f3ea); background: color-mix(in srgb, var(--sl-fg, #e8f3ea) 12%, transparent); }
+
 .knob-now { font-size: 0.85rem; color: var(--sl-muted); justify-self: end; }
 .knob.is-locked { pointer-events: none; }
 .knob.is-locked .knob-slider { opacity: 0.45; }

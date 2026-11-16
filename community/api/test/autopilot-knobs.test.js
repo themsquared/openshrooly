@@ -68,7 +68,7 @@ test("fan guardrail is the stage fan +/- 20; Coach moves the fan only when humid
   const fruiting = pearl.stages.find((s) => s.id === "fruiting");
   assert.deepEqual(fanRangeForStage(fruiting, caps105), [25, 65]);
   const colonization = pearl.stages.find((s) => s.id === "colonization");
-  assert.deepEqual(fanRangeForStage(colonization, caps105), [15, 40]);
+  assert.deepEqual(fanRangeForStage(colonization, caps105), [0, 40]);
   const stage = { ...fruiting, humidity_percent: 88, humidity_target_min: 85, humidity_target_max: 91 };
   const recipeFan = fruiting.fan.speed_percent;
   // Inside the band, anywhere in it: the recipe fan, no reason, nothing to change.
@@ -358,7 +358,7 @@ test("a Shrooly colonization grow still lands Colonizing, not Fruiting", async (
   const cmd = (await openCommands(ctx, "dev-k-colo")).at(-1);
   assert.equal(cmd.grow_phase, "Colonizing");
   assert.equal(cmd.temperature_c, 24, "temperature goes straight to the colonization target, never in steps");
-  assert.equal(cmd.air_exchange_speed, 15, "RH 86 is under the 88-92 band: one step slower than the colonization 20, clipped to the 15 floor, sent straight");
+  assert.equal(cmd.air_exchange_speed, 10, "RH 86 is under the 88-92 band: one step slower than the colonization 20, sent straight (fan floor is 0, so 10 is allowed)");
   assert.equal(cmd.air_exchange_period_min, 60);
   assert.equal(cmd.light_hours, 0);
   assert.equal(cmd.white_intensity, 0);

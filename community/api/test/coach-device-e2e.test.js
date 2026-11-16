@@ -762,7 +762,7 @@ test("too dry: Coach slows the fan (less air), one step, straight there, targets
     }
     assert.ok(seen.every((f) => f <= recipe), `${c.kind}: the fan went the wrong way while too dry: ${seen}`);
     const low = Math.min(...seen);
-    assert.equal(low, Math.max(c.p.ranges.air_exchange_speed[0], recipe - 10, 15), `${c.kind}: one step slower, straight there: ${seen}`);
+    assert.equal(low, Math.max(c.p.ranges.air_exchange_speed[0], recipe - 10), `${c.kind}: one step slower, straight there: ${seen}`);
     assert.deepEqual(c.targets, targets, `${c.kind}: Coach never moved a target`);
     // Humidity recovers to the target: the fan goes back to the recipe and stays.
     c.sensor = { temperature: s.temperature_c, humidity: s.humidity_percent };
@@ -889,4 +889,34 @@ test("time moves the stage by the cloud's day even when the chamber is stuck on 
   assert.equal(shrooly.knobs.grow_phase, "Pinning");
   assert.equal(shrooly.knobs.grow_day, 4, "the chamber now counts from the cloud's start date");
   assert.deepEqual((await rules(shrooly)).grow, before.grow, "start date and profile untouched");
+});
+
+
+test("on a 0-100 fan chamber, too dry colonization slows the fan to recipe minus 10, not a 15 floor, and a later pass does not send another command", async () => {
+  const { lykyn_pwm: c } = await world(["lykyn_pwm"]);
+  await growStage(c, "colonization");
+  await c.cycle();
+  await coachOn(c);
+  const s = STAGE.colonization;
+  const band = humidityBandForStage(s);
+  const targets = { ...c.targets };
+  c.sensor = { temperature: s.temperature_c, humidity: band.lo - 2 };
+  const seen = [];
+  for (let i = 0; i < 4; i += 1) {
+    tick(15 * MIN);
+    await c.cycle();
+    await coachPass(c);
+    seen.push(c.knobs.air_exchange_speed);
+  }
+  assert.equal(Math.min(...seen), 10, `should go to 10, got ${seen}`);
+  assert.ok(seen.every((f) => f === 10 || f === 20), `only the recipe or one step slower: ${seen}`);
+  assert.deepEqual(c.targets, targets, "Coach never moved a target");
+  const before = (await coachCommandsAfter(c, 0)).length;
+  tick(15 * MIN);
+  await c.cycle();
+  c.sensor = { temperature: s.temperature_c, humidity: band.lo - 2 };
+  const out = await coachPass(c);
+  assert.ok(!out.applied, `already at the one allowed step, should not command again: ${JSON.stringify(out)}`);
+  assert.equal((await coachCommandsAfter(c, 0)).length, before);
+  assert.deepEqual(c.targets, targets);
 });

@@ -51,7 +51,7 @@ export const AUTOPILOT_LIMITS = {
   physicalRh: [10, 100],
   jumpTemp: 8,
   jumpRh: 25,
-  fanClamp: [15, 80],
+  fanClamp: [0, 80],
   // Short enough that a queued Autopilot change cannot apply after a stage pick or a long
   // offline stretch. Coach can issue a fresh command on a later pass if the chamber still needs it.
   // Chambers check in about every 15 minutes, so a command made right after a check-in needs more than one

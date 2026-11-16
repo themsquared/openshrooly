@@ -22,6 +22,7 @@ import {
   SENT_MESSAGE,
 } from "../public/js/device-ui.js";
 import { CANONICAL_STAGES, canonicalStage, deviceAdapter, profileStageId } from "../public/js/device-adapters.js";
+import { setTempUnit } from "../public/js/temp-unit.js";
 
 const DASH = /[\u2013\u2014]/;
 const pearl = demoDevices()[0];
@@ -113,12 +114,12 @@ test("grow line falls back when no profile is set", () => {
 
 test("account page is a short menu of collapsed sections that keeps the old hooks", () => {
   const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../public/account.html"), "utf8");
-  for (const id of ["devices", "alerts", "billing", "security", "community", "your-data", "first-chamber", "who", "verified", "device-cards", "alert-prefs", "sessions", "signout", "signout-all", "mint", "my-profiles", "ents", "coach-billing", "billing-portal"]) {
+  for (const id of ["devices", "display", "alerts", "billing", "security", "community", "your-data", "first-chamber", "who", "verified", "device-cards", "alert-prefs", "sessions", "signout", "signout-all", "mint", "my-profiles", "ents", "coach-billing", "billing-portal"]) {
     assert.match(html, new RegExp(`id="${id}"`), id);
   }
   // Menu order: Chambers, Email alerts, Billing first, then the rest, each collapsed.
   const titles = [...html.matchAll(/<details class="account-section card" id="([^"]+)">/g)].map((m) => m[1]);
-  assert.deepEqual(titles.slice(0, 3), ["devices", "alerts", "billing"]);
+  assert.deepEqual(titles.slice(0, 3), ["devices", "display", "alerts"]);
   assert.doesNotMatch(html, /<details class="account-section card"[^>]* open/);
   assert.match(html, /Link your first chamber/);
   assert.match(html, />Sign out</);
@@ -681,4 +682,30 @@ test("online status is just the dot and the word, and the chart slot always has 
   assert.match(chartEmptyText(null), /Loading/);
   assert.match(chartEmptyText([]), /after the chamber has checked in twice/);
   assert.equal(chartReady([{ temperature: 20 }, { temperature: 21 }]), true);
+});
+
+
+test("the temperature slider and reading show Fahrenheit when that unit is on, and switch back", () => {
+  const store = {};
+  globalThis.localStorage = {
+    getItem: (k) => (Object.hasOwn(store, k) ? store[k] : null),
+    setItem: (k, v) => {
+      store[k] = String(v);
+    },
+  };
+  try {
+    setTempUnit("F");
+    const html = renderControls(pearl, { canWrite: true });
+    assert.match(html, /°F/);
+    assert.match(html, /min="32" max="104" step="1"/);
+    assert.match(html, /data-display-unit="F"/);
+    assert.doesNotMatch(html, /min="0" max="40" step="0.1"/);
+    setTempUnit("C");
+    const back = renderControls(pearl, { canWrite: true });
+    assert.match(back, /°C/);
+    assert.match(back, /min="0" max="40" step="0.1"/);
+    assert.match(back, /data-display-unit="C"/);
+  } finally {
+    delete globalThis.localStorage;
+  }
 });

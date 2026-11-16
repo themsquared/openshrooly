@@ -8,7 +8,7 @@ import { chamberKnobs, growPhaseForStage, KNOB_KEYS, knobSupported, readingMatch
 
 /** Fan may move this far from the stage's fan speed, never outside FAN_CLAMP. */
 export const FAN_BAND = 20;
-export const FAN_CLAMP = [15, 80];
+export const FAN_CLAMP = [0, 80];
 export const FAN_STEP = 10;
 /** Hold the fan step until RH is within this many points of the stage humidity target. */
 export const FAN_IN_BAND = 1;
