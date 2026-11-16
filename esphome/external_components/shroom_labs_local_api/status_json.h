@@ -12,9 +12,10 @@ constexpr int kApiVersion = 1;
 // Returns nullptr when the native name is not one of those four (Idle, Harvest, empty, unknown).
 const char *canonical_stage(const char *native);
 
-// Same curve as community/api/src/profile-schema.js whiteLuxToPercent.
-// 0-92 lux is linear to 0-20%. Above that, percent = (lux / 0.02307) ^ (1/2.768), cap 100.
-// 4000 lux (the Shrooly white entity max) is about 78%.
+// White percent is a share of the chamber's maximum, linear: lux / 40, so 4000 lux (the Shrooly
+// white entity max) is 100% and 92 lux is 2.3%. Same rule as community/api/src/profile-schema.js
+// whiteLuxToPercent. The firmware curve that turns lux into LED drive is not touched.
+constexpr float kWhiteMaxLux = 4000.0f;
 float white_lux_to_percent(float lux);
 
 struct OptF {

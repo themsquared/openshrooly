@@ -4,7 +4,7 @@
  * Lykyn, and any later chamber). Everything that differs between chambers lives in that
  * chamber's own device-adapter.js. See docs/device-ui-standard.md.
  *
- * Canonical units: degrees C, percent RH, light as hours and percent of full, fresh air as fan
+ * Canonical units: degrees C, percent RH, light as hours and percent of the chamber's maximum output, fresh air as fan
  * percent, minutes between runs and seconds per run.
  */
 
@@ -25,8 +25,8 @@ const CARDS = [
  */
 const RECIPES = {
   Colonization: { temperature: 24, humidity: 90, sunrise: 8, lightHours: 0, white: 0, red: 0, green: 0, blue: 0, fanSpeed: 20, airPeriodMin: 60, airRunSec: 15 },
-  Pinning: { temperature: 17, humidity: 92, sunrise: 8, lightHours: 12, white: 20, red: 0, green: 0, blue: 80, fanSpeed: 40, airPeriodMin: 12, airRunSec: 35 },
-  Fruiting: { temperature: 18, humidity: 88.5, sunrise: 8, lightHours: 12, white: 20, red: 0, green: 0, blue: 80, fanSpeed: 50, airPeriodMin: 10, airRunSec: 40 },
+  Pinning: { temperature: 17, humidity: 92, sunrise: 8, lightHours: 12, white: 2.3, red: 0, green: 0, blue: 80, fanSpeed: 40, airPeriodMin: 12, airRunSec: 35 },
+  Fruiting: { temperature: 18, humidity: 88.5, sunrise: 8, lightHours: 12, white: 2.3, red: 0, green: 0, blue: 80, fanSpeed: 50, airPeriodMin: 10, airRunSec: 40 },
 }
 
 const ALIASES = {

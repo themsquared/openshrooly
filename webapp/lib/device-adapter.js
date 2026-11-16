@@ -14,18 +14,26 @@ const STAGES_AVAILABLE = ["Colonization", "Pinning", "Fruiting"]
 /** The Shrooly firmware has no stage presets: the page writes the recipe. */
 const PRESETS_ON_DEVICE = false
 
-/** White is lux on this chamber. */
-const WHITE_UNIT = "lux"
+/** The page shows white as percent of the chamber's maximum. The chamber itself stores lux. */
+const WHITE_UNIT = "%"
 
-/** The fan never runs below 15 percent. */
-const FAN_MIN_PERCENT = 15
+/** The white entity tops out at 4000 lux, which is 100 percent. Same rule as the cloud adapter. */
+const WHITE_MAX_LUX = 4000
 
-/** White lux for a percent of full. Same curve as the cloud and the firmware: linear to 20 percent, then a power law. */
+const FAN_MIN_PERCENT = 0
+
+/** White lux for a percent of the maximum: linear, 40 lux per percent, 100 percent is 4000 lux. */
 function whitePercentToLux(percent) {
   const pct = Math.min(100, Number(percent))
   if (!(pct > 0)) return 0
-  const lux = pct <= 20 ? (pct / 20) * 92 : 0.02307 * pct ** 2.768
-  return Math.min(4000, Math.round(lux))
+  return Math.min(WHITE_MAX_LUX, Math.round(pct * (WHITE_MAX_LUX / 100)))
+}
+
+/** White as a percent of the maximum for a lux figure, to three decimals (exact for any whole lux). */
+function whiteLuxToPercent(lux) {
+  const value = Math.min(WHITE_MAX_LUX, Number(lux))
+  if (!(value > 0)) return 0
+  return Math.round((value / (WHITE_MAX_LUX / 100)) * 1000) / 1000
 }
 
 function nativeStage(stage) {
@@ -39,7 +47,7 @@ function stageWrites(stage, profileStages) {
   const writes = [{ kind: "select", id: "grow_phase", value: native }]
   const r = recipeFromProfile(stage, profileStages) || RECIPES[stage]
   if (!r) return writes
-  const fan = Math.max(r.fanSpeed, FAN_MIN_PERCENT)
+  const fan = Math.max(0, Math.min(100, r.fanSpeed))
   writes.push(
     { kind: "number", id: "temperature__target", value: r.temperature },
     { kind: "number", id: "target_humidity", value: r.humidity },
@@ -61,9 +69,9 @@ function currentStage(nativeName) {
   return canonicalStage(nativeName)
 }
 
-/** White as the chamber counts it, for the Light card. */
+/** White for the Light card and modal: percent of the maximum, one decimal. */
 function whiteDisplay(raw) {
-  return Math.round(Number(raw) || 0)
+  return Math.round(whiteLuxToPercent(Number(raw) || 0) * 10) / 10
 }
 
-module.exports = { STAGES_AVAILABLE, PRESETS_ON_DEVICE, WHITE_UNIT, FAN_MIN_PERCENT, whitePercentToLux, nativeStage, stageWrites, currentStage, whiteDisplay }
+module.exports = { STAGES_AVAILABLE, PRESETS_ON_DEVICE, WHITE_UNIT, FAN_MIN_PERCENT, whitePercentToLux, whiteLuxToPercent, nativeStage, stageWrites, currentStage, whiteDisplay }

@@ -2375,7 +2375,10 @@ int main() {
   engCadence.csr_now();
   expect(engCadence.probe_now(), "cadence probe applies");
   expect(engCadence.next_probe_ms() >= clk.now + PROBE_INTERVAL_MS, "telemetry 500 does not pull probe");
-  expect(engCadence.next_telemetry_ms() >= clk.now + TELEMETRY_INTERVAL_MS, "telemetry 500 waits a full slot");
+  // A chamber that owes an ack retries on the short backoff, not after a whole heartbeat slot.
+  expect(engCadence.next_telemetry_ms() >= clk.now + BACKOFF_MIN_MS &&
+             engCadence.next_telemetry_ms() <= clk.now + BACKOFF_MAX_MS,
+         "failed ack retries on the short backoff, not a full slot");
   expect(engCadence.ack_waiting(), "failed ack telemetry keeps pending ack");
   std::string retry_tel;
   trCadence.telemetry_status = 200;
@@ -2387,6 +2390,55 @@ int main() {
   expect(retry_tel.find("\"ack_status\":\"applied\"") != std::string::npos, "retried ack is applied");
   expect(retry_tel.find("\"ack_command_id\":9") != std::string::npos, "retried ack keeps command id");
   expect(!engCadence.ack_waiting(), "ack cleared after successful resend");
+
+  {
+    // An applied command is acked at once: finishing the apply makes the telemetry due now, and a
+    // failed ack POST is retried within 5 minutes, repeatedly, until it lands.
+    HostStore storeAck;
+    ScriptTransport trAck;
+    FakeChamber chamberAck;
+    chamberAck.t_range = {true, 15.f, 35.f, 0.5f};
+    chamberAck.h_range = {true, 30.f, 100.f, 0.5f};
+    trAck.steps = {{"/enroll", ok_body(200, enroll_ok)}, {"/csr", ok_body(200, cert_ok)}};
+    trAck.inbox_status = 200;
+    trAck.inbox_body = inbox_apply;
+    trAck.telemetry_status = 200;
+    CloudEngine engAck(&trAck, &clk, &storeAck, &crypto);
+    engAck.set_chamber(&chamberAck);
+    clk.now = 400000;
+    clk.wall = parse_iso8601_ms("2026-10-25T15:05:00Z");
+    engAck.connect();
+    engAck.csr_now();
+    engAck.set_sync_jobs(false);
+    expect(engAck.probe_now(), "ack timing probe pulls the command");
+    PendingApply pa;
+    expect(engAck.take_pending_apply(&pa), "pulled command waits for the main loop, not for a slot");
+    ChamberReading after{};
+    std::string why;
+    clk.now += 1500;
+    const bool ok = engAck.apply_now(pa, &after, &why);
+    engAck.complete_apply(pa.command_id, ok, ok ? "applied" : "failed", nullptr, after);
+    expect(engAck.next_telemetry_ms() <= clk.now, "ack is due right after the apply");
+    trAck.telemetry_status = 500;
+    expect(!engAck.run_job(CloudJob::TELEMETRY), "ack POST fails");
+    expect(engAck.ack_waiting(), "failed ack stays pending");
+    expect(engAck.next_telemetry_ms() <= clk.now + BACKOFF_MAX_MS, "first ack retry within the short backoff");
+    trAck.telemetry_status = 500;
+    clk.now = engAck.next_telemetry_ms();
+    expect(!engAck.run_job(CloudJob::TELEMETRY), "second ack POST fails");
+    expect(engAck.next_telemetry_ms() <= clk.now + BACKOFF_MAX_MS, "second ack retry within the short backoff");
+    std::string ack_body;
+    trAck.telemetry_status = 200;
+    trAck.hook = [&](const HttpRequest &req) {
+      if (req.url.find("/telemetry") != std::string::npos)
+        ack_body = req.body;
+    };
+    clk.now = engAck.next_telemetry_ms();
+    expect(engAck.run_job(CloudJob::TELEMETRY), "ack lands on a retry");
+    expect(!engAck.ack_waiting(), "ack cleared after it lands");
+    expect(ack_body.find("\"ack_status\":\"applied\"") != std::string::npos, "retry carries the applied ack");
+    expect(engAck.next_telemetry_ms() >= clk.now + TELEMETRY_INTERVAL_MS, "heartbeat returns to the full slot");
+  }
 
   HostStore storeBeat;
   ScriptTransport trBeat;

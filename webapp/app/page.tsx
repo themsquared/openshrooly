@@ -22,7 +22,7 @@ import FirstRun from './components/FirstRun'
 import CloudSettings from './components/CloudSettings'
 import { DEMO_ENTITIES, DEMO_STAGES } from './demo-entities'
 import type { EntityState } from './entity-types'
-import { STAGES_AVAILABLE, WHITE_UNIT, currentStage, stageWrites } from '../lib/device-adapter'
+import { STAGES_AVAILABLE, WHITE_UNIT, currentStage, stageWrites, whiteDisplay } from '../lib/device-adapter'
 import { CARDS } from '../lib/stage-standard'
 
 /** Card names come from the standard, so every chamber says the same words. */
@@ -1039,7 +1039,7 @@ export default function Dashboard() {
           <div className="card-icon"><Icon name={lightsOn ? 'sun' : 'moon'} /></div>
           <div className="card-label">{CARD_LABEL.light}</div>
           <div className="card-value">
-            {lightsOn ? getNumber('white_led_intensity') : 'OFF'}
+            {lightsOn ? whiteDisplay(getNumber('white_led_intensity')) : 'OFF'}
             {lightsOn && <span className="card-unit">{WHITE_UNIT}</span>}
           </div>
           <div className="card-schedule">
@@ -1615,9 +1615,9 @@ export default function Dashboard() {
                 <label>Fan Speed: {getNumber('air_exchange__speed')}%</label>
                 <input
                   type="range"
-                  min="15"
+                  min="0"
                   max="100"
-                  step="5"
+                  step="1"
                   value={getNumber('air_exchange__speed') as number}
                   onChange={(e) =>
                     handleNumberChange('number-air_exchange__speed', parseFloat(e.target.value))
@@ -1637,7 +1637,7 @@ export default function Dashboard() {
             <div className="modal-content">
               <div className="control-group">
                 <label>{lightOnSummary(lightSunrise, lightDuration)} ({lightDuration.toFixed(1)}h)</label>
-                <p className="lux-guide">Duration is required when the light is on. 0 hours is only for a dark stage with lux 0 and RGB 0.</p>
+                <p className="lux-guide">Duration is required when the light is on. 0 hours is only for a dark stage with white 0% and RGB 0.</p>
                 <label htmlFor="light-duration-hours">Duration (hours)</label>
                 <input
                   id="light-duration-hours"
@@ -1735,7 +1735,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="control-group">
-                <label>White Intensity: {luxValue} lux</label>
+                <label>White Intensity: {whiteDisplay(luxValue)}%</label>
                 <input
                   type="range"
                   min="0"
@@ -1750,7 +1750,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 <div className="lux-guide">
-                  Most mushrooms need minimal light - <strong>150 lux is typically sufficient</strong>. Light is primarily for pinning and directing growth, not energy production. Higher levels may cause bleaching or discolored caps.
+                  Most mushrooms need minimal light - <strong>about 4% is typically sufficient</strong>. 100% is the brightest white this chamber makes. Light is primarily for pinning and directing growth, not energy production. Higher levels may cause bleaching or discolored caps.
                 </div>
               </div>
               <div className="color-picker-row">

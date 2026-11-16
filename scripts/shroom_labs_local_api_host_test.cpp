@@ -43,10 +43,12 @@ int main() {
   expect(sl_local::canonical_stage(nullptr) == nullptr, "null stage");
 
   expect(sl_local::white_lux_to_percent(0) == 0, "0 lux");
-  expect(std::fabs(sl_local::white_lux_to_percent(92) - 20.0f) < 0.01f, "92 lux is 20%");
-  expect(std::lroundf(sl_local::white_lux_to_percent(150)) == 24, "150 lux is 24%");
-  expect(std::lroundf(sl_local::white_lux_to_percent(4000)) == 78, "4000 lux is 78%");
-  expect(sl_local::white_lux_to_percent(8000) <= 100.0f, "lux cap");
+  expect(std::fabs(sl_local::white_lux_to_percent(92) - 2.3f) < 0.001f, "92 lux is 2.3%");
+  expect(std::fabs(sl_local::white_lux_to_percent(150) - 3.75f) < 0.001f, "150 lux is 3.75%");
+  expect(std::fabs(sl_local::white_lux_to_percent(2000) - 50.0f) < 0.001f, "2000 lux is 50%");
+  expect(std::fabs(sl_local::white_lux_to_percent(3984) - 99.6f) < 0.001f, "3984 lux is 99.6%, no cap at 78%");
+  expect(sl_local::white_lux_to_percent(4000) == 100.0f, "4000 lux is 100%");
+  expect(sl_local::white_lux_to_percent(8000) == 100.0f, "lux cap");
 
   expect(sl_local::escape_json("A\"B\\C") == "A\\\"B\\\\C", "escape quotes and slashes");
   expect(sl_local::escape_json("ok") == "ok", "plain text");
@@ -132,7 +134,7 @@ int main() {
   expect(contains(js, "\"actual_speed_pct\":0"), "fan actual");
   expect(contains(js, "\"every_min\":30"), "fae period");
   expect(contains(js, "\"run_s\":60"), "fae run");
-  expect(contains(js, "\"rgba\":{\"r\":0,\"g\":0,\"b\":80,\"a\":20}"), "rgba 0-100");
+  expect(contains(js, "\"rgba\":{\"r\":0.0,\"g\":0.0,\"b\":48.0,\"a\":12.0}"), "rgba is what the ring is driven at: stored value x master brightness 60");
   expect(contains(js, "\"brightness_pct\":60"), "brightness");
   expect(contains(js, "\"coach_linked\":true"), "coach in detail");
   expect(contains(js, "\"wifi_rssi_dbm\":-52"), "rssi in detail");
@@ -144,6 +146,15 @@ int main() {
   expect(excludes(js, "\"readings\""), "old readings block gone");
   expect(excludes(js, "\"targets\""), "old targets block gone");
   expect(excludes(js, "\"device\":"), "old device block gone");
+
+  s.light_brightness.value = 100;
+  s.light_white.value = 2.3f;
+  const std::string full_js = sl_local::status_json(s);
+  expect(contains(full_js, "\"rgba\":{\"r\":0.0,\"g\":0.0,\"b\":80.0,\"a\":2.3}"), "master brightness 100 reports the stored mix as is");
+  s.light_brightness.has = false;
+  s.light_white.value = 100;
+  const std::string nomaster_js = sl_local::status_json(s);
+  expect(contains(nomaster_js, "\"a\":100.0"), "no master brightness: full white is 100");
 
   sl_local::Snapshot idle;
   idle.stage_native.has = true;
@@ -174,7 +185,7 @@ int main() {
   sh.fan_on.value = false;
   const std::string sh_js = sl_local::status_json(sh);
   expect(contains(sh_js, "\"name\":\"Colonization\",\"native\":\"Colonizing\""), "Shrooly stage map");
-  expect(contains(sh_js, "\"rgba\":{\"r\":0,\"g\":0,\"b\":80,\"a\":24}"), "Shrooly 150 lux -> 24");
+  expect(contains(sh_js, "\"rgba\":{\"r\":0.0,\"g\":0.0,\"b\":80.0,\"a\":3.8}"), "Shrooly 150 lux is 3.75 percent of 4000 lux");
   expect(contains(sh_js, "\"white_lux\":150"), "raw lux in detail");
   expect(contains(sh_js, "\"actual_speed_pct\":0"), "Shrooly actual is 0 when FAE is off");
 

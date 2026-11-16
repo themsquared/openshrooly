@@ -48,15 +48,21 @@ CORS is `Access-Control-Allow-Origin: *`.
 
 ## Units
 
-Light mix is RGBA on a 0-100 scale, integers. `r`, `g`, and `b` are the color
+Light mix is RGBA on a 0-100 scale, to one decimal. `r`, `g`, and `b` are the color
 channels. `a` is the white channel, not opacity. This matches the 0-100 light mix
 in the device UI standard.
 
-Shrooly's white entity is stored as lux (0-4000). The API maps that onto 0-100
-with the same curve the site uses (`whiteLuxToPercent` in profile-schema.js):
-0-92 lux is linear to 0-20%; above that, percent = (lux / 0.02307) ^ (1/2.768),
-capped at 100. 4000 lux is about 78%. The raw lux value is also in `detail.white_lux`
-on Shrooly only. Lykyn already stores white as 0-100, so no conversion is applied.
+100 always means that chamber's maximum output for that channel, so the same
+percent is the same share of the maximum on every chamber. Percent is linear in
+output.
+
+Shrooly's white entity is stored as lux, 0-4000. 4000 lux is 100%, so percent is
+lux / 40 and 1 lux is 0.025%. For example 92 lux is 2.3% and 2000 lux is 50%. The
+raw lux value is also in `detail.white_lux` on Shrooly only. Lykyn's white channel
+is already 0-100 of its ring. Lykyn reports each channel as it is actually driven,
+which is the stored value times the master brightness, so a chamber with
+`brightness_pct` at 60 reports 60% of the stored mix. Lykyn ships with that master
+brightness at 100, and the gamma curve is off (1.0), so percent is linear there too.
 
 Temperature is Celsius. Humidity, fan speed, and light brightness are percent.
 Fan cycle timing is `every_min` (minutes between airings) and `run_s` (seconds
@@ -102,7 +108,7 @@ the shape.
   "light": {
     "on": false,
     "enabled": true,
-    "rgba": { "r": 0, "g": 0, "b": 80, "a": 20 },
+    "rgba": { "r": 0, "g": 0, "b": 80, "a": 2.3 },
     "sunrise_hour": 8,
     "hours": 12,
     "brightness_pct": 60
@@ -133,7 +139,7 @@ the shape.
 - `fan.every_min` / `fan.run_s`: the fresh-air cycle.
 - `light.on` / `light.enabled`: whether the schedule currently has the lights on,
   and whether the light output is enabled at all.
-- `light.rgba`: the mix, 0-100, `a` = white.
+- `light.rgba`: the mix, 0-100 of this chamber's maximum, one decimal, `a` = white.
 - `light.sunrise_hour` / `light.hours` / `light.brightness_pct`: schedule and
   overall brightness. Brightness is omitted as null on chambers that have no
   separate brightness knob (Shrooly).
