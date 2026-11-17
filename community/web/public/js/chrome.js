@@ -31,6 +31,7 @@ export const OWNER_LINKS = [
 
 /** Small legal links at the bottom of every footer. Stripe needs Privacy and Terms reachable from every page. */
 export const LEGAL_LINKS = [
+  { href: "/about", label: "About" },
   { href: "/privacy", label: "Privacy" },
   { href: "/tos", label: "Terms" },
   { href: "/contact", label: "Contact" },

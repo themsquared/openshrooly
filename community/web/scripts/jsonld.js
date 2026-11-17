@@ -30,11 +30,42 @@ export const SAME_AS = ["https://github.com/themsquared/openshrooly", "https://g
 
 export const ORG_REF = { "@type": "Organization", "@id": `${SITE}/#org`, name: "Shroom Labs", url: `${SITE}/`, logo: ORG_LOGO };
 
+/**
+ * Author of guides, owner pages, chamber pages and blog posts. Name and URL only: no employer, no job title.
+ * The Person's own profiles (sameAs) live on /about, which is the page this URL points to.
+ */
+export const AUTHOR_NAME = "Mike Moore";
+export const AUTHOR_URL = `${SITE}/about`;
+export const AUTHOR = { "@type": "Person", name: AUTHOR_NAME, url: AUTHOR_URL };
+export const AUTHOR_SAME_AS = ["https://x.com/themsquared", "https://github.com/themsquared"];
+/** The visible byline. Google wants the markup to match what readers see. */
+export const BYLINE_HTML = `By <a href="/about" rel="author">${AUTHOR_NAME}</a>`;
+
+/**
+ * Refund terms, copied from the Terms of Service: a full refund if asked within 14 days of a charge,
+ * for Grow Coach and for one time Profile purchases. Everything Shroom Labs sells is digital and
+ * checkout takes payment from any country, so the policy applies everywhere the site is used.
+ * Nothing here is shipped, so no shippingDetails are claimed.
+ */
+export const RETURN_COUNTRIES = [
+  "US", "CA", "GB", "IE", "AU", "NZ", "CH", "NO",
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+];
+export const RETURN_POLICY = {
+  "@type": "MerchantReturnPolicy",
+  applicableCountry: RETURN_COUNTRIES,
+  returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+  merchantReturnDays: 14,
+  refundType: "https://schema.org/FullRefund",
+  returnFees: "https://schema.org/FreeReturn",
+  merchantReturnLink: `${SITE}/tos`,
+};
+
 const WEBSITE_ID = `${SITE}/#website`;
 
 /** Node types that already describe "this page". If a graph has none of these, a WebPage is added. */
-const PAGE_TYPES = new Set(["WebPage", "Article", "BlogPosting", "CollectionPage", "FAQPage", "ContactPage", "AboutPage", "Blog"]);
-const WEBPAGE_FAMILY = new Set(["WebPage", "Article", "BlogPosting", "CollectionPage", "FAQPage", "ContactPage", "AboutPage"]);
+const PAGE_TYPES = new Set(["WebPage", "ProfilePage", "Article", "BlogPosting", "CollectionPage", "FAQPage", "ContactPage", "AboutPage", "Blog"]);
+const WEBPAGE_FAMILY = new Set(["WebPage", "ProfilePage", "Article", "BlogPosting", "CollectionPage", "FAQPage", "ContactPage", "AboutPage"]);
 
 export const typesOf = (node) => [].concat(node?.["@type"] || []);
 const hasType = (node, set) => typesOf(node).some((t) => set.has(t));
