@@ -1449,6 +1449,7 @@ button.small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 @media (min-width: 720px) { .tool-stats { grid-template-columns: repeat(3, 1fr); } }
 .home-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: -0.6rem 0 1.6rem; color: var(--sl-ink-dim); }
 .home-tools a { color: var(--sl-ink); text-decoration: underline; text-underline-offset: 3px; display: inline-flex; min-height: 44px; align-items: center; }
+.home-tools + .home-tools { margin-top: -1.2rem; }
 
 /* Device sheet: pick a mushroom, grow it, graph it, slide to make it work. */
 body[data-page="device"] main {
