@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Build prerendered profile pages (culinary and Off-menu), sitemap, robots, llms.txt, FAQ, OG cards, and stamp shared head and chrome. */
 
+import { ORG_LOGO, ORG_REF, SAME_AS, enrichJsonLd } from "./jsonld.js";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -450,7 +451,6 @@ export function profileUrl(profile) {
   return `${SITE}/profiles/${profile.id}`;
 }
 
-const ORG_REF = { "@type": "Organization", "@id": `${SITE}/#org`, name: "Shroom Labs", url: `${SITE}/` };
 
 /** Plain description of Shroom Labs for schema and llms.txt. Every claim here is on a public page. */
 export const ABOUT =
@@ -468,6 +468,7 @@ export function openShroolyJsonLd() {
     applicationCategory: "UtilitiesApplication",
     operatingSystem: "Shrooly chamber",
     isAccessibleForFree: true,
+    installUrl: `${SITE}/install`,
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD", url: `${SITE}/install` },
     author: { "@type": "Person", name: "Graham Stewart", alternateName: "grahamsz" },
     publisher: ORG_REF,
@@ -565,6 +566,7 @@ export function profileJsonLd(profile) {
       "@type": "Product",
       "@id": `${url}#product`,
       name: `${profile.name} grow profile`,
+      sku: profile.id,
       url,
       description: answerFirst(profile),
       image,
@@ -665,8 +667,9 @@ export function siteJsonLd() {
       {
         ...ORG_REF,
         description: ABOUT,
-        logo: `${SITE}/apple-touch-icon.png`,
-        sameAs: ["https://github.com/themsquared/openshrooly"],
+        logo: ORG_LOGO,
+        image: ORG_LOGO,
+        sameAs: SAME_AS,
         contactPoint: { "@type": "ContactPoint", contactType: "customer support", url: `${SITE}/contact`, availableLanguage: "en" },
       },
       {
@@ -674,6 +677,7 @@ export function siteJsonLd() {
         "@id": `${SITE}/#website`,
         url: `${SITE}/`,
         name: "Shroom Labs",
+        alternateName: ["ShroomLabs", "shroomlabs.io"],
         description: ABOUT,
         inLanguage: "en",
         publisher: { "@id": `${SITE}/#org` },
@@ -696,7 +700,7 @@ export function renderAnalytics() {
   return [`<script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>`, `<script src="/js/ga.js" defer></script>`];
 }
 
-export function renderHead({ title, description, path, robots = "index,follow", image = ogImage(), type = "website", modified, jsonLd, analytics = true }) {
+export function renderHead({ title, description, path, robots = "index,follow", image = ogImage(), type = "website", modified, jsonLd, analytics = true, schema = true }) {
   const canonical = `${SITE}${path}`;
   const lines = [
     `<title>${escapeHtml(title)}</title>`,
@@ -718,7 +722,9 @@ export function renderHead({ title, description, path, robots = "index,follow", 
     `<meta name="twitter:image" content="${escapeHtml(image)}">`,
   ];
   if (modified) lines.push(`<meta property="article:modified_time" content="${escapeHtml(modified)}">`);
-  if (jsonLd) lines.push(`<script type="application/ld+json">${JSON.stringify(jsonLd).replaceAll("<", "\\u003c")}</script>`);
+  // Every indexable page gets the shared baseline (page node, breadcrumb, site link). schema: false opts a page out entirely.
+  const graph = schema === false || /noindex/.test(robots) ? undefined : enrichJsonLd(jsonLd, { path, title, description, modified });
+  if (graph) lines.push(`<script type="application/ld+json">${JSON.stringify(graph).replaceAll("<", "\\u003c")}</script>`);
   if (analytics) lines.push(...renderAnalytics());
   return lines.join("\n  ");
 }
@@ -912,6 +918,7 @@ export function renderProfilePage(profile, profiles = []) {
       image: ogImage(profile),
       type: "article",
       jsonLd: psi ? undefined : profileJsonLd(profile),
+      schema: !psi,
       analytics: !psi,
     },
     activeId: "profiles",
