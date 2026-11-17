@@ -224,6 +224,12 @@ export async function handleRequest(request, env) {
     return new Response(API_ROBOTS, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
   }
 
+  // The bare API host has no page. Send people and crawlers to the site instead of a JSON 404.
+  if ((method === "GET" || method === "HEAD") && path === "/") {
+    const site = String(env.SITE_ORIGIN || "https://shroomlabs.io").replace(/\/$/, "");
+    return new Response(null, { status: 301, headers: { location: `${site}/`, "cache-control": "public, max-age=3600" } });
+  }
+
   try {
     if (!env._seeded) {
       // Insert-if-missing in one batch. Share one in-flight seed so concurrent first
