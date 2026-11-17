@@ -142,6 +142,7 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     CollectionPage: ["name", "url", "mainEntity"],
     BreadcrumbList: ["itemListElement"],
     WebPage: ["name", "url", "description"],
+    ContactPage: ["name", "url", "description"],
     SoftwareApplication: ["name", "url", "applicationCategory", "offers", "publisher"],
     Product: ["name", "url", "offers", "brand"],
     Blog: ["name", "url", "publisher"],
