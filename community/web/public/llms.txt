@@ -133,6 +133,7 @@ For research and microscopy purposes only. This page lists published environment
 
 - [FAQ](https://shroomlabs.io/faq): plain answers about growing mushrooms at home, grow profiles, the Hub, and running OpenShrooly on a Shrooly.
 - [Docs](https://shroomlabs.io/docs): what Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.
+- [About](https://shroomlabs.io/about): who writes Shroom Labs and how the guides, profiles and firmware are tested.
 - [Contact](https://shroomlabs.io/contact): questions about an account, billing, a refund, a chamber, or your data.
 
 ## Optional

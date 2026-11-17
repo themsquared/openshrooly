@@ -9,6 +9,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { AUTHOR, BYLINE_HTML } from "../jsonld.js";
 import { blocksToHtml, blocksToText, escapeHtml, inline, parseBlocks, parseFrontMatter, plain } from "./markdown.js";
 
 export const BLOG_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "content", "blog");
@@ -211,7 +212,7 @@ export function postJsonLd(post, kit) {
       datePublished: post.date,
       dateModified: post.updated,
       articleSection: post.category,
-      author: kit.ORG_REF,
+      author: AUTHOR,
       publisher: kit.ORG_REF,
       isPartOf: { "@type": "Blog", "@id": `${kit.SITE}/blog#blog`, name: BLOG_TITLE, url: `${kit.SITE}/blog` },
       citation: post.sources.map((s) => s.href),
@@ -247,7 +248,7 @@ function withFeedLink(html, site) {
 
 function bylineHtml(post) {
   const updated = post.updated !== post.date ? ` Updated <time datetime="${post.updated}">${longDate(post.updated)}</time>.` : "";
-  return `<p class="updated muted">By Shroom Labs. Published <time datetime="${post.date}">${longDate(post.date)}</time>.${updated}</p>`;
+  return `<p class="updated muted">${BYLINE_HTML}. Published <time datetime="${post.date}">${longDate(post.date)}</time>.${updated}</p>`;
 }
 
 export function renderBlogPost(post, posts, kit, warnings = []) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Build prerendered profile pages (culinary and Off-menu), sitemap, robots, llms.txt, FAQ, OG cards, and stamp shared head and chrome. */
 
-import { ORG_LOGO, ORG_REF, SAME_AS, enrichJsonLd } from "./jsonld.js";
+import { AUTHOR, AUTHOR_NAME, AUTHOR_SAME_AS, AUTHOR_URL, BYLINE_HTML, ORG_LOGO, ORG_REF, RETURN_POLICY, SAME_AS, enrichJsonLd } from "./jsonld.js";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -447,6 +447,11 @@ export function ogImage(profile) {
   return `${SITE}/og/${profile ? profile.id : "default"}.jpg`;
 }
 
+/** Social card for a guide, owner page, chamber page or tool, drawn by scripts/render-page-og.mjs from its title. */
+export function pageOgImage(slug) {
+  return `${SITE}/og/pages/${slug}.jpg`;
+}
+
 export function profileUrl(profile) {
   return `${SITE}/profiles/${profile.id}`;
 }
@@ -484,6 +489,7 @@ export function growCoachJsonLd() {
     priceCurrency: "USD",
     url: `${SITE}/coach`,
     priceSpecification: { "@type": "UnitPriceSpecification", price: amount, priceCurrency: "USD", billingDuration: duration },
+    hasMerchantReturnPolicy: RETURN_POLICY,
   });
   return {
     "@type": "SoftwareApplication",
@@ -579,6 +585,7 @@ export function profileJsonLd(profile) {
         availability: "https://schema.org/InStock",
         url,
         seller: ORG_REF,
+        hasMerchantReturnPolicy: RETURN_POLICY,
       },
     });
   }
@@ -666,6 +673,7 @@ export function siteJsonLd() {
     "@graph": [
       {
         ...ORG_REF,
+        hasMerchantReturnPolicy: RETURN_POLICY,
         description: ABOUT,
         logo: ORG_LOGO,
         image: ORG_LOGO,
@@ -798,8 +806,8 @@ function crumbsHtml(rows) {
     .join("")}</ol></nav>`;
 }
 
-function updatedHtml(date) {
-  return `<p class="updated muted">Updated <time datetime="${date}">${date}</time></p>`;
+function updatedHtml(date, { byline = false } = {}) {
+  return `<p class="updated muted">${byline ? `${BYLINE_HTML} · ` : ""}Updated <time datetime="${date}">${date}</time></p>`;
 }
 
 /** Full grow guide for a free culinary or functional Profile. Every number comes from the profile JSON. */
@@ -1155,10 +1163,10 @@ export function renderGuidePage(guide) {
         description: guide.answer,
         url,
         mainEntityOfPage: url,
-        image: ogImage(),
+        image: pageOgImage(guide.slug),
         inLanguage: "en",
         dateModified: guide.updated,
-        author: ORG_REF,
+        author: AUTHOR,
         publisher: ORG_REF,
       },
       ...(guide.faq?.length
@@ -1179,7 +1187,7 @@ export function renderGuidePage(guide) {
       ${crumbsHtml([["Home", "/"], ["Grow guides", "/grow"], [guide.h1, ""]])}
       <p class="eyebrow">${escapeHtml(guide.eyebrow || "Grow guide")}</p>
       <h1>${escapeHtml(guide.h1)}</h1>
-      ${updatedHtml(guide.updated)}
+      ${updatedHtml(guide.updated, { byline: true })}
       <p class="lede answer-first">${escapeHtml(guide.answer)}</p>
       ${sections}
       ${guide.faq?.length ? `<h2>FAQ</h2>${faqHtml(guide.faq)}` : ""}
@@ -1190,7 +1198,7 @@ export function renderGuidePage(guide) {
       }
     </article>`;
   return shell({
-    head: { title: guide.title, description: guide.description, path: `/guides/${guide.slug}`, type: "article", modified: guide.updated, jsonLd },
+    head: { title: guide.title, description: guide.description, path: `/guides/${guide.slug}`, type: "article", image: pageOgImage(guide.slug), modified: guide.updated, jsonLd },
     activeId: "grow",
     body,
   });
@@ -1237,7 +1245,7 @@ export function renderToolPage(tool) {
       <h2>Keep reading</h2><ul class="faq-links">${tool.related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>
     </article>`;
   return shell({
-    head: { title: tool.title, description: tool.description, path: tool.path, type: "website", modified: tool.updated, jsonLd },
+    head: { title: tool.title, description: tool.description, path: tool.path, type: "website", image: pageOgImage(tool.slug), modified: tool.updated, jsonLd },
     activeId: "grow",
     body,
     script: tool.script,
@@ -1320,10 +1328,10 @@ export function renderOwnerPage(page) {
         description: page.answer,
         url,
         mainEntityOfPage: url,
-        image: ogImage(),
+        image: pageOgImage(page.slug),
         inLanguage: "en",
         dateModified: page.updated,
-        author: ORG_REF,
+        author: AUTHOR,
         publisher: ORG_REF,
         citation: page.sources.map((key) => OWNER_SOURCES[key].url),
       },
@@ -1345,7 +1353,7 @@ export function renderOwnerPage(page) {
       ${crumbsHtml([["Home", "/"], [page.h1, ""]])}
       <p class="eyebrow">${escapeHtml(page.eyebrow)}</p>
       <h1>${escapeHtml(page.h1)}</h1>
-      ${updatedHtml(page.updated)}
+      ${updatedHtml(page.updated, { byline: true })}
       <p class="lede answer-first">${escapeHtml(page.answer)}</p>
       ${installCta(null)}
       ${sections}
@@ -1361,7 +1369,7 @@ export function renderOwnerPage(page) {
       ${installCta(secondary)}
     </article>`;
   return shell({
-    head: { title: page.title, description: page.description, path, type: "article", modified: page.updated, jsonLd },
+    head: { title: page.title, description: page.description, path, type: "article", image: pageOgImage(page.slug), modified: page.updated, jsonLd },
     activeId: "",
     body,
   });
@@ -1393,10 +1401,10 @@ export function renderChamberPage(page) {
         description: page.answer,
         url,
         mainEntityOfPage: url,
-        image: ogImage(),
+        image: pageOgImage(page.slug),
         inLanguage: "en",
         dateModified: page.updated,
-        author: ORG_REF,
+        author: AUTHOR,
         publisher: ORG_REF,
         citation: page.sources.map((key) => CHAMBER_SOURCES[key].url),
       },
@@ -1419,7 +1427,7 @@ export function renderChamberPage(page) {
       ${crumbsHtml(crumbs)}
       <p class="eyebrow">${escapeHtml(page.eyebrow)}</p>
       <h1>${escapeHtml(page.h1)}</h1>
-      ${updatedHtml(page.updated)}
+      ${updatedHtml(page.updated, { byline: true })}
       <p class="lede answer-first">${escapeHtml(page.answer)}</p>
       ${chamberCta(page.cta)}
       ${sections}
@@ -1431,7 +1439,7 @@ export function renderChamberPage(page) {
       ${chamberCta(page.cta)}
     </article>`;
   return shell({
-    head: { title: page.title, description: page.description, path, type: "article", modified: page.updated, jsonLd },
+    head: { title: page.title, description: page.description, path, type: "article", image: pageOgImage(page.slug), modified: page.updated, jsonLd },
     activeId: "",
     body,
   });
@@ -1551,6 +1559,7 @@ ${offMenuLlms(profiles)}${blogLlms(publishedPosts(), SITE)}## Help
 
 - [FAQ](${SITE}/faq): plain answers about growing mushrooms at home, grow profiles, the Hub, and running OpenShrooly on a Shrooly.
 - [Docs](${SITE}/docs): what Profiles, the Hub, and Community are, and how a chamber running OpenShrooly uses them.
+- [About](${SITE}/about): who writes Shroom Labs and how the guides, profiles and firmware are tested.
 - [Contact](${SITE}/contact): questions about an account, billing, a refund, a chamber, or your data.
 
 ## Optional
@@ -1782,6 +1791,38 @@ export const PAGES = {
   "legacy-preview.html": { active: "", path: "/legacy-preview", robots: "noindex,nofollow", title: "Legacy preview · Shroom Labs", description: "Archived preview of an earlier Shroom Labs layout." },
   "account/feedback.html": { active: "", path: "/account/feedback", robots: "noindex,nofollow", title: "Beta feedback · Shroom Labs", description: "Tell Shroom Labs what broke, what confused you, or what you want next. Mike reads every one." },
   // Legal and contact pages: public, no sign-in, linked from every footer. Indexable, so they are in the sitemap.
+  "about.html": {
+    active: "",
+    sitemap: true,
+    path: "/about",
+    updated: "2026-11-17",
+    title: "About Mike Moore and Shroom Labs",
+    description: "Who writes Shroom Labs: Mike Moore runs the project and tests every guide, grow profile and firmware release on his own chambers.",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "ProfilePage",
+          "@id": `${SITE}/about#page`,
+          url: `${SITE}/about`,
+          name: "About Mike Moore and Shroom Labs",
+          inLanguage: "en",
+          dateModified: "2026-11-17",
+          isPartOf: { "@id": `${SITE}/#website` },
+          mainEntity: { "@id": `${SITE}/about#mike` },
+        },
+        {
+          "@type": "Person",
+          "@id": `${SITE}/about#mike`,
+          name: AUTHOR_NAME,
+          url: AUTHOR_URL,
+          description: "Runs Shroom Labs and writes its mushroom growing guides.",
+          sameAs: AUTHOR_SAME_AS,
+        },
+        breadcrumbs([["Home", `${SITE}/`], ["About", `${SITE}/about`]]),
+      ],
+    },
+  },
   "privacy.html": { active: "", sitemap: true, path: "/privacy", title: "Privacy policy · Shroom Labs", description: "What Shroom Labs collects, how it's used, who else sees it, how it's kept safe, and how to download or delete it." },
   "tos.html": { active: "", sitemap: true, path: "/tos", title: "Terms of Service · Shroom Labs", description: "The rules for using Shroom Labs and Grow Coach: billing, renewals, refunds, the beta, and installing on your Shrooly at your own risk." },
   "contact.html": { active: "", sitemap: true, path: "/contact", title: "Contact · Shroom Labs", description: "Send Shroom Labs a message about your account, billing, a refund, a chamber, or your data." },
@@ -1924,4 +1965,29 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   for (const w of blogWarnings) console.warn(`blog: ${w}`);
   if (savePageDates()) console.log("updated scripts/page-dates.json");
   console.log(`wrote SEO files for ${profiles} profiles`);
+}
+
+/** Every page that has its own social card in public/og/pages/. The test checks each file exists. */
+export function pageOgCards() {
+  return [
+    ...GUIDES.map((g) => ({ slug: g.slug, eyebrow: g.eyebrow || "Grow guide", title: g.h1 })),
+    ...OWNER_PAGES.map((p) => ({ slug: p.slug, eyebrow: "For Shrooly owners", title: p.h1 })),
+    ...CHAMBER_PAGES.map((p) => ({ slug: p.slug, eyebrow: "Chamber guide", title: p.h1 })),
+    ...TOOL_PAGES.map((t) => ({ slug: t.slug, eyebrow: "Free tool", title: t.h1 })),
+  ];
+}
+
+/** 1200x630 card with the page title. Same look as the profile and blog cards. */
+export function renderPageOgHtml({ eyebrow, title }, fontBase = "../fonts") {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face { font-family: Fraunces; src: url("${fontBase}/fraunces-600.woff2") format("woff2"); font-weight: 600; }
+@font-face { font-family: Atkinson; src: url("${fontBase}/atkinson-400.woff2") format("woff2"); }
+html, body { margin: 0; width: 1200px; height: 630px; background: #07110e; color: #e8f3ea; }
+body { box-sizing: border-box; padding: 72px; display: flex; flex-direction: column; font-family: Atkinson, sans-serif;
+  background: radial-gradient(circle at 85% 20%, rgba(125,255,179,0.14), transparent 45%), #07110e; }
+.brand { color: #c9a45c; font: 600 30px Fraunces, serif; }
+.eyebrow { margin-top: 56px; color: #7dffb3; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase; }
+h1 { margin: 12px 0 0; font: 600 62px/1.1 Fraunces, serif; max-width: 1050px; }
+.foot { margin-top: auto; color: #7dffb3; font-size: 24px; }
+</style></head><body><div class="brand">Shroom Labs</div><div class="eyebrow">${escapeHtml(eyebrow)}</div><h1>${escapeHtml(title)}</h1><div class="foot">${POSITIONING}</div></body></html>`;
 }

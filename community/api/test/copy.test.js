@@ -12,7 +12,7 @@ const BANNED = [
   { name: "Cloudflare", re: /Cloudflare/i },
   { name: "wrangler", re: /wrangler/i },
   { name: "docs/", re: /docs\//i },
-  { name: "Mike", re: /\bMike\b/ },
+  { name: "Mike", re: /\bMike\b(?! Moore\b)/ },
   { name: "httpOnly", re: /httpOnly/i },
   { name: "Bearer", re: /\bBearer\b/ },
   { name: "cookie", re: /\bcookies?\b/i },

@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { enrichJsonLd, ORG_LOGO, pageLabel } from "./jsonld.js";
+import { AUTHOR, AUTHOR_NAME, AUTHOR_SAME_AS, AUTHOR_URL, BYLINE_HTML, RETURN_COUNTRIES, RETURN_POLICY, enrichJsonLd, ORG_LOGO, pageLabel } from "./jsonld.js";
+import { pageOgCards } from "./generate-seo.js";
 
 const PUBLIC = join(import.meta.dirname, "..", "public");
 const SITE = "https://shroomlabs.io";
@@ -67,7 +68,7 @@ test("no JSON-LD string uses an em dash, an en dash, or an arrow", () => {
 
 test("every indexable page except the Off-menu research pages has a page node tied to the site", () => {
   for (const p of indexable.filter((x) => !x.offMenu)) {
-    const page = p.nodes.find((n) => types(n).some((t) => ["WebPage", "Article", "BlogPosting", "CollectionPage", "FAQPage", "ContactPage", "Blog"].includes(t)));
+    const page = p.nodes.find((n) => types(n).some((t) => ["WebPage", "ProfilePage", "Article", "BlogPosting", "CollectionPage", "FAQPage", "ContactPage", "Blog"].includes(t)));
     assert.ok(page, `${p.rel} has no page node`);
   }
 });
@@ -208,4 +209,96 @@ test("enrichJsonLd adds the baseline and keeps what a builder wrote", () => {
   assert.equal(kept["@graph"].filter((n) => n["@type"] === "WebPage").length, 0, "no second page node");
   assert.deepEqual(kept["@graph"].find((n) => n["@type"] === "BreadcrumbList").itemListElement.map((i) => i.name), ["Home", "Grow guides", "H"]);
   assert.equal(pageLabel("A · Shroom Labs"), "A");
+});
+
+const authored = (p) => /^(guides|blog)\//.test(p.rel) || ["what-happened-to-shrooly", "reuse-your-shrooly", "shrooly-faq", "shrooly-pods", "shrooly-alternatives", "chambers", "terrashroom", "ac-infinity", "lykyn"].some((s) => p.rel === `${s}.html`);
+
+test("every Article and BlogPosting has a named author, and guides, owner pages, chamber pages and posts are by Mike Moore with a visible byline", () => {
+  let by = 0;
+  for (const p of indexable.filter((x) => !x.offMenu)) {
+    for (const a of p.nodes.filter((x) => types(x).some((t) => t === "Article" || t === "BlogPosting"))) {
+      assert.ok(a.author?.name, `${p.rel} author name`);
+      if (!authored(p)) continue;
+      by++;
+      assert.deepEqual(a.author, AUTHOR, `${p.rel} author is exactly name and url`);
+      assert.equal(a.author.url, AUTHOR_URL);
+      assert.ok(p.html.includes(`${BYLINE_HTML}`), `${p.rel} shows the byline`);
+    }
+  }
+  assert.ok(by >= 30, `checked ${by} bylines`);
+  assert.deepEqual(Object.keys(AUTHOR).sort(), ["@type", "name", "url"], "no employer or job title on the author");
+});
+
+test("/about is a ProfilePage for the author with only his public X and GitHub, and names no employer", () => {
+  const about = pages.find((p) => p.rel === "about.html");
+  assert.ok(about, "about page built");
+  assert.ok(indexable.includes(about), "about is indexable");
+  const [profile] = byType(about, "ProfilePage");
+  const [person] = byType(about, "Person");
+  assert.equal(profile.mainEntity["@id"], person["@id"]);
+  assert.equal(person.name, AUTHOR_NAME);
+  assert.equal(person.url, AUTHOR_URL);
+  assert.deepEqual(person.sameAs, AUTHOR_SAME_AS);
+  assert.deepEqual(AUTHOR_SAME_AS, ["https://x.com/themsquared", "https://github.com/themsquared"]);
+  for (const key of ["jobTitle", "worksFor", "affiliation", "email"]) assert.ok(!(key in person), `Person has ${key}`);
+  assert.ok(!/solo\.io|\bsolo\b/i.test(about.html), "no employer on /about");
+  assert.ok(pages.find((p) => p.rel === "index.html").html.includes('href="/about"'), "home footer links /about");
+  assert.ok(readFileSync(join(PUBLIC, "sitemap.xml"), "utf8").includes(`${SITE}/about`), "about is in the sitemap");
+});
+
+test("the return policy matches the Terms of Service and is on the Organization, every Product offer and every Coach offer", () => {
+  const tos = readFileSync(join(PUBLIC, "tos.html"), "utf8").replace(/<[^>]+>/g, " ");
+  assert.match(tos, /within 14 days of a charge, we refund that charge in full/);
+  assert.match(tos, /single Profile as a one time purchase, the same 14 day refund rule applies/);
+  assert.equal(RETURN_POLICY.merchantReturnDays, 14);
+  assert.equal(RETURN_POLICY.returnPolicyCategory, "https://schema.org/MerchantReturnFiniteReturnWindow");
+  assert.equal(RETURN_POLICY.refundType, "https://schema.org/FullRefund");
+  assert.ok(RETURN_COUNTRIES.includes("US") && RETURN_COUNTRIES.every((c) => /^[A-Z]{2}$/.test(c)) && new Set(RETURN_COUNTRIES).size === RETURN_COUNTRIES.length);
+  const home = pages.find((p) => p.rel === "index.html");
+  assert.deepEqual(byType(home, "Organization")[0].hasMerchantReturnPolicy, RETURN_POLICY);
+  let offers = 0;
+  for (const p of pages) {
+    for (const n of p.nodes.filter((x) => types(x).some((t) => t === "Product" || t === "SoftwareApplication"))) {
+      const isCoach = types(n).includes("SoftwareApplication") && n.name === "Grow Coach";
+      if (types(n).includes("SoftwareApplication") && !isCoach) continue;
+      for (const o of [].concat(n.offers)) {
+        offers++;
+        assert.deepEqual(o.hasMerchantReturnPolicy, RETURN_POLICY, `${p.rel} offer return policy`);
+      }
+    }
+  }
+  assert.ok(offers >= 12, `checked ${offers} offers`);
+  for (const p of pages) for (const n of p.nodes) assert.ok(!("shippingDetails" in n) && !("shippingDetails" in (n.offers || {})), `${p.rel} claims shipping for a digital product`);
+});
+
+test("every guide, owner page, chamber page and tool has its own social card, used for og:image, twitter:image and the Article image", () => {
+  const cards = pageOgCards();
+  assert.ok(cards.length >= 25, `${cards.length} cards`);
+  const seen = new Set();
+  for (const c of cards) {
+    const file = join(PUBLIC, "og", "pages", `${c.slug}.jpg`);
+    const jpg = readFileSync(file);
+    assert.equal(jpg[0], 0xff, `${c.slug} is a JPEG`);
+    // Find the frame header (SOF0 or SOF2) and read its size.
+    let i = 2;
+    let size;
+    while (i < jpg.length) {
+      const marker = jpg[i + 1];
+      const len = jpg.readUInt16BE(i + 2);
+      if (marker === 0xc0 || marker === 0xc2) {
+        size = [jpg.readUInt16BE(i + 7), jpg.readUInt16BE(i + 5)];
+        break;
+      }
+      i += 2 + len;
+    }
+    assert.deepEqual(size, [1200, 630], `${c.slug} card is 1200x630`);
+    const url = `${SITE}/og/pages/${c.slug}.jpg`;
+    assert.ok(!seen.has(url), `${c.slug} card is shared`);
+    seen.add(url);
+    const page = pages.find((p) => p.rel === `${c.slug}.html` || p.rel === `guides/${c.slug}.html` || p.rel === `tools/${c.slug}.html`);
+    assert.ok(page, `${c.slug} page built`);
+    for (const tag of [`<meta property="og:image" content="${url}">`, `<meta name="twitter:image" content="${url}">`]) assert.ok(page.html.includes(tag), `${c.slug} ${tag}`);
+    for (const a of page.nodes.filter((x) => types(x).includes("Article"))) assert.equal(imageUrl(a.image), url, `${c.slug} Article image`);
+  }
+  assert.equal(seen.size, cards.length);
 });
