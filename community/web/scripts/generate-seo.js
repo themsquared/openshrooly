@@ -412,6 +412,18 @@ export function relatedProfiles(profile, profiles) {
     .map((r) => r.p);
 }
 
+/** Chef's line methods built on a free profile: same species, id starts with the free id plus a dash. */
+export function chefVersions(profile, profiles) {
+  if (isPaid(profile)) return [];
+  return profiles.filter((p) => isChef(p) && !isPsi(p) && p.id.startsWith(`${profile.id}-`));
+}
+
+/** The free guide profile a Chef's line method builds on, if there is one. */
+export function freeBase(profile, profiles) {
+  if (!isChef(profile)) return null;
+  return profiles.filter((p) => isGuideProfile(p) && profile.id.startsWith(`${p.id}-`)).sort((a, b) => b.id.length - a.id.length)[0] || null;
+}
+
 export function guideHref(slug) {
   return GUIDES.some((g) => g.slug === slug) ? `/guides/${slug}` : "";
 }
@@ -810,6 +822,14 @@ function updatedHtml(date, { byline = false } = {}) {
   return `<p class="updated muted">${byline ? `${BYLINE_HTML} · ` : ""}Updated <time datetime="${date}">${date}</time></p>`;
 }
 
+function chefVersionsHtml(profile, profiles) {
+  const versions = chefVersions(profile, profiles);
+  if (!versions.length) return "";
+  return `<h2>Is there a Chef's line version of ${escapeHtml(profile.name)}?</h2><p>Yes. ${versions
+    .map((v) => `<a href="/profiles/${escapeHtml(v.id)}">${escapeHtml(v.name)}</a> (${price(v)}, one time)`)
+    .join(" and ")} keeps the same species and adds a method aimed at a specific result in the kitchen. The free guide above stays free. See the <a href="/chefs-line">Chef's line</a> for the rest.</p>`;
+}
+
 /** Full grow guide for a free culinary or functional Profile. Every number comes from the profile JSON. */
 export function renderGuideProfilePage(profile, profiles = []) {
   const tools = `/profile?id=${encodeURIComponent(profile.id)}`;
@@ -840,7 +860,7 @@ export function renderGuideProfilePage(profile, profiles = []) {
       ${updatedHtml(updated)}
       <p class="lede answer-first">${escapeHtml(directAnswer(profile))}</p>
       ${profile.summary ? `<p>${escapeHtml(profile.summary)}</p>` : ""}
-      <p class="actions"><a class="button" href="${tools}">Use this profile on your chamber</a></p>
+      <p class="actions"><a class="button" href="${tools}" rel="nofollow">Use this profile on your chamber</a></p>
       <h2>What conditions does ${name} need at each stage?</h2>
       ${conditionsTable(profile)}
       <h2>How long does ${name} take to grow?</h2>
@@ -853,6 +873,7 @@ export function renderGuideProfilePage(profile, profiles = []) {
       <p>Kit or block doing nothing? Work through <a href="/guides/mushroom-grow-kit-not-growing">grow kit not growing</a>. To check your fresh air, put your chamber size and fan into the <a href="/tools/fresh-air-planner?species=${escapeHtml(profile.id)}">fresh air planner</a>.</p>
       <h2>${name} growing FAQ</h2>
       ${faqHtml(profileFaq(profile))}
+      ${chefVersionsHtml(profile, profiles)}
       ${
         related.length
           ? `<h2>Related grow guides</h2><ul class="faq-links">${related
@@ -860,7 +881,7 @@ export function renderGuideProfilePage(profile, profiles = []) {
               .join("")}${guides.map((g) => `<li><a href="/guides/${g.slug}">${escapeHtml(g.h1)}</a></li>`).join("")}<li><a href="/grow">All species and conditions</a></li></ul>`
           : ""
       }
-      <p class="actions"><a class="button" href="${tools}">Download, rate, or report a grow</a></p>
+      <p class="actions"><a class="button" href="${tools}" rel="nofollow">Download, rate, or report a grow</a></p>
       ${renderSources(profile)}
     </article>`;
   return shell({
@@ -876,6 +897,12 @@ export function renderGuideProfilePage(profile, profiles = []) {
     activeId: "profiles",
     body,
   });
+}
+
+function freeBaseHtml(profile, profiles) {
+  const base = freeBase(profile, profiles);
+  if (!base) return "";
+  return `<p>Want the standard method first? Read the free guide, <a href="/profiles/${escapeHtml(base.id)}">how to grow ${escapeHtml(base.name)} at home</a>, with every stage, the fresh air it needs, and what goes wrong.</p>`;
 }
 
 export function renderProfilePage(profile, profiles = []) {
@@ -894,8 +921,8 @@ export function renderProfilePage(profile, profiles = []) {
   const legal = psi ? offMenuNoticeHtml() : "";
   const tools = `/profile?id=${encodeURIComponent(profile.id)}`;
   const cta = paid
-    ? `<p class="actions"><a class="button" href="${tools}">Buy for ${price(profile)}</a></p>`
-    : `<p class="actions"><a class="button" href="${tools}">Download, rate, or report a grow</a></p>`;
+    ? `<p class="actions"><a class="button" href="${tools}" rel="nofollow">Buy for ${price(profile)}</a></p>`
+    : `<p class="actions"><a class="button" href="${tools}" rel="nofollow">Download, rate, or report a grow</a></p>`;
   const art = speciesArt(profile.species, profile.strain, profile.name, profile.pack, { priority: true, id: profile.id });
   // js/ga.js sends view_item from this. Off-menu pages have no analytics and no attribute.
   const viewItem = psi ? "" : ` data-sl-view-item="${escapeHtml(JSON.stringify(profileItem(profile)))}"`;
@@ -910,6 +937,7 @@ export function renderProfilePage(profile, profiles = []) {
       ${profile.summary ? `<p>${escapeHtml(profile.summary)}</p>` : ""}
       <h2>${paid ? "Stages" : "Grow parameters"}</h2>
       <ol class="grow-timeline">${stages}</ol>
+      ${freeBaseHtml(profile, profiles)}
       ${paid ? `<p class="muted">Temperatures, humidity, and notes unlock after purchase. It is a one-time purchase, and the profile stays in your account for good.</p>` : ""}
       ${renderLightRecipe(profile)}
       ${cta}
@@ -948,11 +976,33 @@ export function renderFaqPage(profiles = []) {
 }
 
 /** /grow: every species with its fruiting conditions in one table, plus the guides. */
+function andList(items) {
+  return items.length < 3 ? items.join(" and ") : `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function median(nums) {
+  const a = [...nums].sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+function oysterTempAnswer(rows) {
+  const oysters = rows.filter((p) => (p.tags || []).includes("oyster"));
+  const cool = oysters.filter((p) => Number(fruiting(p).temperature_c) < 20);
+  const warm = oysters.filter((p) => Number(fruiting(p).temperature_c) >= 20);
+  const range = (list) => `${tempText(Math.min(...list.map((p) => Number(fruiting(p).temperature_c))))} to ${tempText(Math.max(...list.map((p) => Number(fruiting(p).temperature_c))))}`;
+  return `It depends on the type. ${andList(cool.map((p) => p.name))} fruit cool, at ${range(cool)}. ${andList(warm.map((p) => p.name))} fruit warm, at ${range(warm)}.`;
+}
+
 export function hubFaq(profiles) {
   const rows = profiles.filter(isGuideProfile);
   const temps = rows.map((p) => Number(fruiting(p).temperature_c));
   const hums = rows.map((p) => Number(fruiting(p).humidity_percent));
   const fast = [...rows].sort((a, b) => daysToFruit(a) - daysToFruit(b)).slice(0, 3);
+  const colTemps = rows.map((p) => Number(firstStage(p).temperature_c));
+  const drops = rows.map((p) => Number(firstStage(p).temperature_c) - Number(fruiting(p).temperature_c));
+  const warm = rows.filter((p) => Number(fruiting(p).temperature_c) >= 20).sort((a, b) => Number(fruiting(b).temperature_c) - Number(fruiting(a).temperature_c));
+  const cool = rows.filter((p) => Number(fruiting(p).temperature_c) < 20);
   const beginner = rows.filter((p) => (p.tags || []).includes("beginner") && (p.tags || []).includes("oyster"));
   return [
     {
@@ -962,6 +1012,18 @@ export function hubFaq(profiles) {
     {
       q: "What humidity do mushrooms need to fruit?",
       a: `Between ${Math.min(...hums)}% and ${Math.max(...hums)}% while fruiting for the species here. Most sit near 90%.`,
+    },
+    {
+      q: "What temperature do mushrooms colonize at?",
+      a: `Colonization runs at ${tempText(Math.min(...colTemps))} to ${tempText(Math.max(...colTemps))} across the species here, and ${colTemps.filter((t) => t >= 22 && t <= 25).length} of ${colTemps.length} sit between ${tempText(22)} and ${tempText(25)}. Spawn run is the warm, dark stage. Fruiting is usually ${median(drops)} °C cooler.`,
+    },
+    {
+      q: "What is the ideal fruiting temperature for oyster mushrooms?",
+      a: oysterTempAnswer(rows),
+    },
+    {
+      q: "Which mushrooms fruit at warm temperatures?",
+      a: `Species that fruit at ${tempText(20)} or higher in this library: ${andList(warm.map((p) => `${p.name} at ${tempText(Number(fruiting(p).temperature_c))}`))}. They are the easier picks in a warm room. The other ${cool.length} species fruit at ${tempText(Math.max(...cool.map((p) => Number(fruiting(p).temperature_c))))} or less.`,
     },
     {
       q: "Which mushrooms grow fastest?",
@@ -974,6 +1036,17 @@ export function hubFaq(profiles) {
   ];
 }
 
+/** Original read of the library: how far fruiting sits below colonizing, and who breaks the pattern. */
+function hubTempSection(profiles) {
+  const rows = profiles.filter(isGuideProfile);
+  const drop = (p) => Number(firstStage(p).temperature_c) - Number(fruiting(p).temperature_c);
+  const flat = rows.filter((p) => drop(p) <= 4).sort((a, b) => drop(a) - drop(b) || a.name.localeCompare(b.name));
+  const biggest = [...rows].sort((a, b) => drop(b) - drop(a) || a.name.localeCompare(b.name)).slice(0, 3);
+  const med = median(rows.map(drop));
+  return `<h2>How much cooler is fruiting than colonizing?</h2>
+      <p>For the middle species in this library, fruiting runs ${med} °C (${Math.round(med * 1.8)} °F) cooler than colonizing. For many species, a drop in temperature along with more fresh air helps trigger pins. The biggest drops are ${andList(biggest.map((p) => `<a href="/profiles/${escapeHtml(p.id)}">${escapeHtml(p.name)}</a>`))}, at ${drop(biggest[biggest.length - 1])} °C or more. ${andList(flat.map((p) => `<a href="/profiles/${escapeHtml(p.id)}">${escapeHtml(p.name)}</a>`))} drop ${drop(flat[flat.length - 1])} °C or less, so they need the least cooling and are the easy picks if you cannot cool a chamber.</p>`;
+}
+
 export function renderHubPage(profiles) {
   const rows = hubRows(profiles);
   const level = (p) => ((p.tags || []).find((t) => ["beginner", "intermediate", "advanced"].includes(t)) || "").replace(/^./, (c) => c.toUpperCase());
@@ -981,8 +1054,8 @@ export function renderHubPage(profiles) {
     .map((p) => {
       const f = fruiting(p);
       const link = `<a href="/profiles/${escapeHtml(p.id)}">${escapeHtml(p.name)}</a>`;
-      if (isPaid(p)) return `<tr><th scope="row">${link}</th><td colspan="3">Paid profile</td><td>${daysToFruit(p)}</td><td>${escapeHtml(level(p))}</td></tr>`;
-      return `<tr><th scope="row">${link}</th><td>${escapeHtml(tempText(f.temperature_c))}</td><td>${f.humidity_percent}%</td><td>${lightHours(p, f)} h</td><td>${daysToFruit(p)}</td><td>${escapeHtml(level(p))}</td></tr>`;
+      if (isPaid(p)) return `<tr><th scope="row">${link}</th><td colspan="4">Paid profile</td><td>${daysToFruit(p)}</td><td>${escapeHtml(level(p))}</td></tr>`;
+      return `<tr><th scope="row">${link}</th><td>${escapeHtml(tempText(firstStage(p).temperature_c))}</td><td>${escapeHtml(tempText(f.temperature_c))}</td><td>${f.humidity_percent}%</td><td>${lightHours(p, f)} h</td><td>${daysToFruit(p)}</td><td>${escapeHtml(level(p))}</td></tr>`;
     })
     .join("");
   const faq = hubFaq(profiles);
@@ -998,11 +1071,13 @@ export function renderHubPage(profiles) {
       ${updatedHtml(HUB_UPDATED.value)}
       <p class="lede answer-first">Most culinary mushrooms colonize warm and dark, then fruit cooler with high humidity, regular fresh air, and some light. The table lists fruiting temperature, humidity, light, and total days for every species in the library, straight from each grow profile. Open a species for the full stage by stage guide.</p>
       <div class="table-wrap"><table class="conditions-table">
-        <caption>Fruiting conditions by species</caption>
-        <thead><tr><th scope="col">Species</th><th scope="col">Fruiting temp</th><th scope="col">Humidity</th><th scope="col">Light</th><th scope="col">Days</th><th scope="col">Level</th></tr></thead>
+        <caption>Colonizing and fruiting conditions by species</caption>
+        <thead><tr><th scope="col">Species</th><th scope="col">Colonizing temp</th><th scope="col">Fruiting temp</th><th scope="col">Fruiting humidity</th><th scope="col">Light</th><th scope="col">Days</th><th scope="col">Level</th></tr></thead>
         <tbody>${table}</tbody>
       </table></div>
+      ${hubTempSection(profiles)}
       ${chefLineTeaser(profiles)}
+      <p>Growing in a Shrooly or another chamber? See the <a href="/chambers">supported chambers</a>, or read <a href="/what-happened-to-shrooly">what happened to Shrooly</a> if your app stopped working.</p>
       ${guides}
       ${toolsList}
       <h2>Common questions</h2>
@@ -1103,9 +1178,9 @@ export function renderChefsLinePage(profiles) {
 function hubHead(profiles) {
   const rows = hubRows(profiles);
   return {
-    title: `Mushroom growing temperature and humidity chart for ${rows.length} species`,
+    title: `Mushroom growing temperature and humidity chart, °F and °C, ${rows.length} species`,
     description: fitDescription(
-      `Fruiting temperature, humidity, light, and days to harvest for ${rows.length} culinary and functional mushrooms, from oyster and lion's mane to shiitake and reishi.`
+      `Colonizing and fruiting temperature in °F and °C, humidity, light, and days to harvest for ${rows.length} mushrooms, from oyster and lion's mane to shiitake and reishi.`
     ),
     path: "/grow",
     modified: HUB_UPDATED.value,

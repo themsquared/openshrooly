@@ -103,6 +103,14 @@ const exFruit = exampleSpecies.stages.find((s) => s.id === "fruiting");
 const exLiters = chamberLiters(EX.l, EX.w, EX.h, EX.unit);
 const exAir = airChanges({ liters: exLiters, lpm: flowLpm(EX.flow, EX.flowUnit), runS: exFruit.fan.run, everyMin: exFruit.fan.every });
 
+const pearlStage = (id) => exampleSpecies.stages.find((s) => s.id === id);
+const pearlCol = pearlStage("colonization");
+const pearlPin = pearlStage("pinning");
+const pearlFruit = exFruit;
+const minutesPerHour = (fan) => round((fan.run * 60) / fan.every / 60, 1);
+const twoMin = airChanges({ liters: exLiters, lpm: flowLpm(EX.flow, EX.flowUnit), runS: 120, everyMin: 60 });
+const fourMin = airChanges({ liters: exLiters, lpm: flowLpm(EX.flow, EX.flowUnit), runS: 240, everyMin: 60 });
+
 const freshAir = {
   slug: "fresh-air-planner",
   script: "/js/tools.js",
@@ -150,6 +158,11 @@ const freshAir = {
 <p>Those numbers are for rooms full of blocks. A small chamber with one block makes far less carbon dioxide, so it can do well with fewer changes. Use the reference as a starting point and let the mushrooms tell you the rest: long stems and small caps mean more air, dry or cracked caps mean more humidity.</p>`,
     },
     {
+      h2: "Is 2 minutes of fresh air an hour enough for oyster mushrooms?",
+      html: `<p>It depends on your fan and chamber, because what counts is how many times an hour the air is replaced, not the minutes. Two minutes an hour is low next to the profiles. As a yardstick, the ${link("pearl-oyster")} profile runs its fan ${minutesPerHour(pearlPin.fan)} minutes an hour while pinning and ${minutesPerHour(pearlFruit.fan)} minutes an hour while fruiting, and about ${round((pearlCol.fan.run * 60) / pearlCol.fan.every, 0)} seconds an hour during spawn run.</p>
+<p>In the worked example above, a ${EX.flow} CFM fan in a ${round(exLiters, 0)} L chamber changes the air ${round(twoMin.perHour, 1)} times an hour at 2 minutes an hour, and ${round(fourMin.perHour, 1)} times at 4 minutes an hour. The UC guide's range for cropping oysters is ${REFERENCE_ACH.low} to ${REFERENCE_ACH.high}. A bigger or more powerful fan hits it with fewer minutes. A small fan or a filter on the intake needs more. Check your own numbers above, then watch the mushrooms: long stems and small caps mean add air.</p>`,
+    },
+    {
       h2: "Does more fresh air lower humidity?",
       html: `<p>Yes. Fresh air from a room is almost always drier than the air in a fruiting chamber, so every air change pulls humidity down for a while. That is why the profiles run the fan in short bursts and give humidity time to recover. If more air leaves caps dry, mist more often or add a humidifier instead of cutting the air. Read <a href="/guides/humidity-and-fresh-air">how much humidity and fresh air mushrooms need</a> for the signs of each.</p>`,
     },
@@ -168,6 +181,7 @@ const freshAir = {
   faq: [
     { q: "How do you calculate air changes per hour for a grow chamber?", a: "Multiply the fan flow per hour by the share of time the fan runs, then divide by the chamber volume. One air change moves as much air as the chamber holds." },
     { q: "How many fresh air changes do oyster mushrooms need?", a: `A University of California grower guide lists ${REFERENCE_ACH.low} an hour while pins form and ${REFERENCE_ACH.low} to ${REFERENCE_ACH.high} an hour while fruiting, with carbon dioxide under 600 ppm.` },
+    { q: "Is 2 minutes of fresh air an hour enough for oyster mushrooms?", a: `It depends on your fan and chamber, not the minutes alone. The pearl oyster profile runs its fan ${minutesPerHour(pearlPin.fan)} minutes an hour while pinning and ${minutesPerHour(pearlFruit.fan)} minutes an hour while fruiting. What matters is air changes per hour, which depends on your fan flow and chamber size. The UC guide lists ${REFERENCE_ACH.low} to ${REFERENCE_ACH.high} an hour for cropping oysters.` },
     { q: "Does fresh air lower humidity in a mushroom chamber?", a: "Yes. Room air is drier than fruiting air, so each air change lowers humidity for a while. Short fan bursts give humidity time to recover." },
     { q: "What are signs of too little fresh air?", a: "Long stems, small caps, and oyster clusters that look like coral or trumpets. More fresh air fixes it." },
   ],

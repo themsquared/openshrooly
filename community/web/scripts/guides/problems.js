@@ -330,16 +330,24 @@ const dry = {
 
 const contamination = {
   slug: "mushroom-contamination",
-  title: "Mushroom contamination: mold, bacteria, and what to do",
+  title: "Mold on a mushroom block? Contamination signs and what to do",
   h1: "Is my mushroom block contaminated?",
   eyebrow: "Grow problems",
-  description: "How to tell mushroom contamination from healthy mycelium: green, black, pink, and gray molds, wet bacterial spots, and what to do with a contaminated block.",
+  description: "Moldy mushroom block? Tell contamination from healthy mycelium: green, black, pink, and gray mold, wet bacterial spots, and what to do with the block.",
   answer:
     "Healthy mycelium is white, sometimes with yellow or amber drops. Contamination usually shows as color: green, blue-green, black, pink, or orange patches, or wet, slimy spots that smell sour. If you see colored mold, bag the block, take it outside without opening it, and clean the area. Do not eat mushrooms from a moldy block.",
   sections: [
     {
       h2: "Is it mold or mycelium?",
       html: "<ul><li><strong>Mycelium:</strong> white, cottony or rope-like, smells earthy or like fresh mushrooms.</li><li><strong>Yellow or amber drops:</strong> normal liquid from the mycelium. Not mold.</li><li><strong>Fuzzy white growth on stems:</strong> usually mycelium reaching for air. Add fresh air.</li><li><strong>Colored patches or powder:</strong> mold.</li><li><strong>Wet, sour, or slimy patches:</strong> bacteria.</li></ul>",
+    },
+    {
+      h2: "Are mushrooms mold?",
+      html: "<p>No, but they are relatives. A mushroom is the fruiting body of a fungus, the way an apple is the fruit of a tree. Mold is also a fungus, but a different kind: it grows as fuzzy patches and spreads by dusty spores, and it never forms a cap and stem. Both feed on the same wet, sugary material, which is why a block that is not fully colonized can grow either one. White, rope-like mycelium is the mushroom. Green, black, pink, or orange powder is a mold that moved in.</p>",
+    },
+    {
+      h2: "Is black mold on a mushroom block toxic?",
+      html: "<p>You cannot tell at home. Several different molds look black or dark gray, and some release spores that can irritate lungs or set off allergies. A dark patch is not a reason to panic, but it is a reason to stop handling the block. Do not sniff it, shake it, or open it indoors. Bag it, seal it, and throw it out, as described below, and do not eat anything that grew on or near it.</p>",
     },
     {
       h2: "What does each kind of contamination look like?",
@@ -384,6 +392,14 @@ const contamination = {
     {
       q: "Can you eat mushrooms from a contaminated block?",
       a: "It is safest not to. Mold can spread into the mushrooms before you can see it. Grow a new block instead.",
+    },
+    {
+      q: "Are mushrooms mold?",
+      a: "No. A mushroom is the fruiting body of a fungus. Mold is a different kind of fungus that grows as fuzzy, dusty patches and has no cap or stem. Mold on a mushroom block is a contaminant, not the crop.",
+    },
+    {
+      q: "Is black mold on a mushroom block toxic?",
+      a: "You cannot identify it at home. Several molds look black or dark gray, and some spores irritate lungs and allergies. Do not open the block indoors, and throw it out.",
     },
     {
       q: "Is green mold on mushrooms dangerous?",

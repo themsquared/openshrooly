@@ -1437,6 +1437,14 @@ Healthy mycelium is white, sometimes with yellow or amber drops. Contamination u
 - Colored patches or powder: mold.
 - Wet, sour, or slimy patches: bacteria.
 
+### Are mushrooms mold?
+
+No, but they are relatives. A mushroom is the fruiting body of a fungus, the way an apple is the fruit of a tree. Mold is also a fungus, but a different kind: it grows as fuzzy patches and spreads by dusty spores, and it never forms a cap and stem. Both feed on the same wet, sugary material, which is why a block that is not fully colonized can grow either one. White, rope-like mycelium is the mushroom. Green, black, pink, or orange powder is a mold that moved in.
+
+### Is black mold on a mushroom block toxic?
+
+You cannot tell at home. Several different molds look black or dark gray, and some release spores that can irritate lungs or set off allergies. A dark patch is not a reason to panic, but it is a reason to stop handling the block. Do not sniff it, shake it, or open it indoors. Bag it, seal it, and throw it out, as described below, and do not eat anything that grew on or near it.
+
 ### What does each kind of contamination look like?
 
 Common contamination at home |  | What you see | Likely cause | What to do
@@ -1497,6 +1505,12 @@ A block that has fruited two or three times has less food left and weaker defens
 
 Q: Can you eat mushrooms from a contaminated block?
 A: It is safest not to. Mold can spread into the mushrooms before you can see it. Grow a new block instead.
+
+Q: Are mushrooms mold?
+A: No. A mushroom is the fruiting body of a fungus. Mold is a different kind of fungus that grows as fuzzy, dusty patches and has no cap or stem. Mold on a mushroom block is a contaminant, not the crop.
+
+Q: Is black mold on a mushroom block toxic?
+A: You cannot identify it at home. Several molds look black or dark gray, and some spores irritate lungs and allergies. Do not open the block indoors, and throw it out.
 
 Q: Is green mold on mushrooms dangerous?
 A: Green mold mainly ruins the grow. Its spores can irritate lungs and allergies, so do not open or shake a moldy block indoors.
@@ -2161,6 +2175,12 @@ The University of California grower guide lists 4 fresh air exchanges an hour wh
 
 Those numbers are for rooms full of blocks. A small chamber with one block makes far less carbon dioxide, so it can do well with fewer changes. Use the reference as a starting point and let the mushrooms tell you the rest: long stems and small caps mean more air, dry or cracked caps mean more humidity.
 
+### Is 2 minutes of fresh air an hour enough for oyster mushrooms?
+
+It depends on your fan and chamber, because what counts is how many times an hour the air is replaced, not the minutes. Two minutes an hour is low next to the profiles. As a yardstick, the Pearl Oyster profile runs its fan 2.3 minutes an hour while pinning and 4 minutes an hour while fruiting, and about 15 seconds an hour during spawn run.
+
+In the worked example above, a 5 CFM fan in a 36 L chamber changes the air 7.9 times an hour at 2 minutes an hour, and 15.7 times at 4 minutes an hour. The UC guide's range for cropping oysters is 4 to 6. A bigger or more powerful fan hits it with fewer minutes. A small fan or a filter on the intake needs more. Check your own numbers above, then watch the mushrooms: long stems and small caps mean add air.
+
 ### Does more fresh air lower humidity?
 
 Yes. Fresh air from a room is almost always drier than the air in a fruiting chamber, so every air change pulls humidity down for a while. That is why the profiles run the fan in short bursts and give humidity time to recover. If more air leaves caps dry, mist more often or add a humidifier instead of cutting the air. Read how much humidity and fresh air mushrooms need for the signs of each.
@@ -2200,6 +2220,9 @@ A: Multiply the fan flow per hour by the share of time the fan runs, then divide
 
 Q: How many fresh air changes do oyster mushrooms need?
 A: A University of California grower guide lists 4 an hour while pins form and 4 to 6 an hour while fruiting, with carbon dioxide under 600 ppm.
+
+Q: Is 2 minutes of fresh air an hour enough for oyster mushrooms?
+A: It depends on your fan and chamber, not the minutes alone. The pearl oyster profile runs its fan 2.3 minutes an hour while pinning and 4 minutes an hour while fruiting. What matters is air changes per hour, which depends on your fan flow and chamber size. The UC guide lists 4 to 6 an hour for cropping oysters.
 
 Q: Does fresh air lower humidity in a mushroom chamber?
 A: Yes. Room air is drier than fruiting air, so each air change lowers humidity for a while. Short fan bursts give humidity time to recover.
