@@ -10,7 +10,7 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export const CHAMBERS = [
   { id: "shrooly-a", name: "Shrooly A", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Runs the free profile for the comparison species." },
   { id: "shrooly-b", name: "Shrooly B", hardware: "Shrooly", software: "OpenShrooly firmware", status: "Starting soon", note: "Second Shrooly, so one odd block does not decide the result." },
-  { id: "lykyn", name: "Lykyn Single-Tier", hardware: "Lykyn Single-Tier smart grow box", software: "Shroom Labs firmware", status: "Supported, validated on a real unit", note: "Runs native Shroom Labs firmware with a local dashboard and an optional cloud link. The side by side grow has not started yet." },
+  { id: "lykyn", name: "Lykyn Single-Tier", hardware: "Lykyn Single-Tier smart grow box", software: "Shroom Labs firmware", status: "Supported, validated on a real unit", note: "Runs native Shroom Labs firmware with Coach, a local dashboard and an optional cloud link. It has run on our unit since Nov 13. The side by side grow has not started yet." },
 ];
 
 export const COMPARISON = {
@@ -38,9 +38,9 @@ export const GROW_LOG = {
   title: "Mushroom grow log: Shrooly vs Lykyn, same species · Shroom Labs",
   h1: "Shroom Labs grow log",
   description: "Two Shrooly chambers and a Lykyn, set to grow the same species side by side. The Lykyn runs Shroom Labs firmware. The comparison grow has not started yet.",
-  answer: "We are setting up three chambers to log in public: two Shroolys and one Lykyn Single-Tier, growing the same species side by side. Nothing has started yet, so there are no readings, yields, or photos here. Entries go up as they happen.",
+  answer: "We are setting up three chambers to log in public: two Shroolys and one Lykyn Single-Tier, growing the same species side by side. The Lykyn already runs Shroom Labs firmware with Coach, but the side by side comparison has not started, so there are no readings, yields, or photos here yet. Entries go up as they happen.",
   faq: [
-    { q: "When does the grow log start?", a: "When the Lykyn arrives and we confirm we can read and set it from outside. The two Shroolys start the same day so the comparison is fair." },
+    { q: "When does the grow log start?", a: "The Lykyn is already here and runs Shroom Labs firmware with Coach. The log starts when all three chambers can start the same day from the same batch of blocks, so the comparison is fair." },
     { q: "Are the numbers real?", a: "Yes. Each entry comes from a chamber log or a kitchen scale. If we did not measure it, the entry leaves it blank." },
     { q: "Why compare a Shrooly and a Lykyn?", a: "Both are small home chambers. Growing the same species from the same blocks in each shows how much the chamber itself changes the result." },
   ],
