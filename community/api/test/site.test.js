@@ -126,7 +126,7 @@ test("every page has one title, description, canonical, Open Graph, and Twitter 
     assert.deepEqual(meta(html, "name", "twitter:card"), ["summary_large_image"]);
     const [image] = meta(html, "property", "og:image");
     assert.deepEqual(meta(html, "name", "twitter:image"), [image]);
-    assert.match(image, new RegExp(`^${SITE}/og/(blog/)?[a-z0-9-]+\\.jpg$`));
+    assert.match(image, new RegExp(`^${SITE}/og/(blog/|pages/)?[a-z0-9-]+\\.jpg$`));
     assert.ok(existsSync(join(PUBLIC, image.slice(SITE.length))), `${file} og image missing`);
     assert.equal(meta(html, "name", "robots").length, 1, `${file} robots`);
   }
@@ -143,6 +143,8 @@ test("JSON-LD parses, uses the right types, and never claims ratings or reviews"
     BreadcrumbList: ["itemListElement"],
     WebPage: ["name", "url", "description"],
     ContactPage: ["name", "url", "description"],
+    ProfilePage: ["name", "url", "mainEntity"],
+    Person: ["name", "url"],
     SoftwareApplication: ["name", "url", "applicationCategory", "offers", "publisher"],
     Product: ["name", "url", "offers", "brand"],
     Blog: ["name", "url", "publisher"],
@@ -241,7 +243,7 @@ test("Off-menu pages carry the legal note and no prices, affiliate links, or Gro
   }
 });
 
-const LEGAL_PAGES = ["privacy.html", "tos.html", "contact.html"];
+const LEGAL_PAGES = ["privacy.html", "tos.html", "contact.html", "about.html"];
 
 test("Grow Coach stays off every static page except /coach, which is public and indexed", () => {
   for (const file of allPages()) {
