@@ -64,3 +64,10 @@ test("new pages use plain punctuation: no em or en dashes or arrows", () => {
   }
   assert.doesNotMatch(GROW_LOG.answer, /[\u2013\u2014]/);
 });
+
+test("the grow log does not say the Lykyn is still arriving or unvalidated", () => {
+  const html = page("grow-log.html");
+  assert.doesNotMatch(html, /when the lykyn arrives|validation (is )?pending|validation has not started|nothing has started yet/i);
+  assert.match(html, /already runs Shroom Labs firmware with Coach/);
+  assert.doesNotMatch(html, /[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}/, "no MAC address");
+});
