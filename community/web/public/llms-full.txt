@@ -2185,6 +2185,8 @@ In the worked example above, a 5 CFM fan in a 36 L chamber changes the air 7.9 t
 
 Yes. Fresh air from a room is almost always drier than the air in a fruiting chamber, so every air change pulls humidity down for a while. That is why the profiles run the fan in short bursts and give humidity time to recover. If more air leaves caps dry, mist more often or add a humidifier instead of cutting the air. Read how much humidity and fresh air mushrooms need for the signs of each.
 
+Sizing a Martha tent? Hypha's Martha tent setup guide covers the humidifier, fan and sensor side.
+
 ### What humidity and fan cycle does each mushroom use?
 
 Fruiting humidity and fan cycle from each profile |  | Mushroom | Fruiting humidity | Fan cycle
