@@ -63,3 +63,11 @@
     Cache-Control = "no-cache"
     Service-Worker-Allowed = "/"
 
+
+# Production builds only. Skip deploy previews and branch deploys to save
+# build minutes (Mike, Nov 18 2026).
+[context.deploy-preview]
+  ignore = "exit 0"
+
+[context.branch-deploy]
+  ignore = "exit 0"
