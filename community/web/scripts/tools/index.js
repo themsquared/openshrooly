@@ -164,7 +164,8 @@ const freshAir = {
     },
     {
       h2: "Does more fresh air lower humidity?",
-      html: `<p>Yes. Fresh air from a room is almost always drier than the air in a fruiting chamber, so every air change pulls humidity down for a while. That is why the profiles run the fan in short bursts and give humidity time to recover. If more air leaves caps dry, mist more often or add a humidifier instead of cutting the air. Read <a href="/guides/humidity-and-fresh-air">how much humidity and fresh air mushrooms need</a> for the signs of each.</p>`,
+      html: `<p>Yes. Fresh air from a room is almost always drier than the air in a fruiting chamber, so every air change pulls humidity down for a while. That is why the profiles run the fan in short bursts and give humidity time to recover. If more air leaves caps dry, mist more often or add a humidifier instead of cutting the air. Read <a href="/guides/humidity-and-fresh-air">how much humidity and fresh air mushrooms need</a> for the signs of each.</p>
+<p>Sizing a Martha tent? <a href="https://hyphaapp.com/blog/martha-tent-setup">Hypha's Martha tent setup guide</a> covers the humidifier, fan and sensor side.</p>`,
     },
     {
       h2: "What humidity and fan cycle does each mushroom use?",
