@@ -7,7 +7,7 @@
  */
 
 import { evaluate, decide, readState } from "./engine.js";
-import { DAILY_EMAIL_CAP, inQuietHours, readPrefs, readRules, RULES } from "./rules.js";
+import { DAILY_EMAIL_CAP, inQuietHours, readPrefs, readRules, STATE_RULES } from "./rules.js";
 import { alertCopy, renderEmail } from "./templates.js";
 import { changes, isoSeconds, SQL } from "./store.js";
 import { trackableProfile } from "./profiles.js";
@@ -96,7 +96,7 @@ export async function evaluateDevice(env, device, now) {
   const { conditions, ranges } = evaluate({ device, rows, rules, prefs, profile, now });
 
   let states = new Map((await db.all(SQL.stateAll, [device.id])).map((r) => [r.rule, r]));
-  const missing = RULES.filter((rule) => !states.has(rule));
+  const missing = STATE_RULES.filter((rule) => !states.has(rule));
   if (missing.length) {
     for (const rule of missing) await db.run(SQL.stateInit, [device.id, rule, isoSeconds(now)]);
     states = new Map((await db.all(SQL.stateAll, [device.id])).map((r) => [r.rule, r]));
@@ -104,6 +104,9 @@ export async function evaluateDevice(env, device, now) {
 
   const user = await loadUser(env, ownerId);
   const out = { notices: 0, delivered: 0 };
+  // One refill email, not two: when the urgent water notice recovers and mails, the low notice
+  // that recovers in the same pass stays quiet.
+  let urgentWaterRecovery = false;
   for (const cond of conditions) {
     const stateRow = states.get(cond.rule);
     const state = readState(stateRow);
@@ -125,6 +128,8 @@ export async function evaluateDevice(env, device, now) {
     );
     if (!swapped) continue; // another run already handled this transition
     for (const notice of decision.notices) {
+      if (cond.rule === "water_empty" && notice.kind === "recovered" && notice.notify) urgentWaterRecovery = true;
+      if (cond.rule === "water" && notice.kind === "recovered" && urgentWaterRecovery) continue;
       const copy = alertCopy(notice.kind, cond, { deviceName: device.name, now, stage: ranges.stage });
       let resolved = await initialStatus({ notice, user, prefs, now, sentToday: () => sentToday(db, ownerId, now) });
       if (notice.kind === "recovered" && resolved !== "suppressed") {
@@ -170,7 +175,8 @@ export async function initialStatus({ notice, user, prefs, now, sentToday }) {
   if (!notice.notify) return "suppressed";
   if (!emailReady(user)) return "unverified";
   if (!prefs.email) return "muted";
-  if (inQuietHours(prefs, now)) return "held";
+  // Urgent notices (tank empty, mister not responding) go out through quiet hours. Everything else waits.
+  if (inQuietHours(prefs, now) && !notice.urgent) return "held";
   return (await sentToday()) >= DAILY_EMAIL_CAP ? "capped" : "pending";
 }
 

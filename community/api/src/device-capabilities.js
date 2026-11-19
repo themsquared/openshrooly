@@ -73,6 +73,8 @@ export const CAPABILITY_TOKENS = {
   "grow.day": "grow_day number",
   "grow.phase": "grow_phase select",
   "ack.refused": "acks commands it can't run with refused",
+  "sensors.water": "water_level, water_state and water_source=sensor in telemetry; stops the humidifier on an empty tank",
+  "water.inferred": "water_state and water_source=inferred in telemetry (no tank sensor; watches humidity respond to the mister)",
   apply_profile: "whole profile and grow_phase select",
   firmware_notice: "update notice on the chamber screen",
 };
@@ -224,6 +226,8 @@ export function deviceCapabilities(doc = {}, deviceType = "shrooly_chamber") {
     grow_day: has.has("grow.day"),
     grow_phase: has.has("grow.phase"),
     ack_refused: has.has("ack.refused"),
+    water_sensor: has.has("sensors.water"),
+    water_inferred: has.has("water.inferred"),
     apply_profile: has.has("apply_profile"),
     firmware_notice: has.has("firmware_notice"),
   };

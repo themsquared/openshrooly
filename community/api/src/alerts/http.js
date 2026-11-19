@@ -70,10 +70,13 @@ export async function deviceAlertsView(db, env, user, device, rulesRow) {
     db.all(SQL.alertsForDevice, [user.id, device.id, LIST_LIMIT]),
     prefsFor(db, user.id),
   ]);
+  const stateMap = Object.fromEntries(RULES.map((rule) => [rule, readState(states.find((s) => s.rule === rule)).status]));
+  // The urgent water tier shows as a water problem.
+  if (readState(states.find((s) => s.rule === "water_empty")).status === "open") stateMap.water = "open";
   return {
     device: { id: device.id, name: device.name, status: device.status, last_seen_at: device.last_seen_at },
     rules: rulesFor(row, device),
-    states: Object.fromEntries(RULES.map((rule) => [rule, readState(states.find((s) => s.rule === rule)).status])),
+    states: stateMap,
     profiles: trackableList(),
     alerts: alerts.map(publicAlert),
     ...accountView(env, user, prefs),

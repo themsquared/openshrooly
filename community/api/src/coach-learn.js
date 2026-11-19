@@ -1,6 +1,7 @@
 /** Deterministic per-device learning. No model call, so it is cheap and testable. */
 
 import { stageForGrowPhase } from "./device-capabilities.js";
+import { readWater } from "./alerts/water.js";
 
 export const COACH_ITEM = "grow-coach";
 /** Monthly list price. Kept as the default plan so older callers keep working. */
@@ -165,6 +166,9 @@ export function latestReading(samples = [], now = Date.now()) {
     temperature_setpoint: latest.temperature_setpoint,
     fan_speed: latest.fan_speed,
     water_level: latest.water_level,
+    water_state: latest.water_state,
+    water_source: latest.water_source,
+    water_low: latest.water_low,
     stage: latest.stage || "",
     grow_day: latest.grow_day,
     reading_at: latest.created_at || null,
@@ -265,6 +269,7 @@ export function parseTelemetry(rows = []) {
         // The fan setting the chamber holds, so the chart can draw the target next to what it reports.
         fan_setpoint: num(doc.air_exchange_speed ?? doc.fan_speed_percent ?? doc.fan_speed),
         water_level: num(doc.water_level ?? doc.water ?? doc.water_level_percent),
+        ...waterFields(doc),
         co2: num(doc.co2 ?? doc.co2_ppm),
         temperature_calibration: num(
           doc.temperature_calibration ?? doc.temp_calibration_c ?? doc.calibration_c
@@ -276,6 +281,11 @@ export function parseTelemetry(rows = []) {
       };
     })
     .filter((s) => s.humidity != null || s.temperature != null);
+}
+
+function waterFields(doc) {
+  const w = readWater(doc);
+  return { water_state: w.state, water_source: w.source, water_low: w.low };
 }
 
 function num(value) {

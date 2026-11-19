@@ -292,13 +292,38 @@ export function renderIdentity(device) {
   </section>`;
 }
 
+/** Newest readings older than this no longer drive the water notice. */
+const WATER_NOTICE_MAX_AGE_S = 3 * 3600;
+
+/**
+ * One plain line when the water needs attention, or "". Driven by what the chamber reported last:
+ * water_state (ok, low, empty, suspect) and, for tank sensors, water_level. A chamber with no tank
+ * sensor says "suspect" (humidity not rising while the mister ran), so the words say check, not empty.
+ */
+export function waterNotice(device) {
+  const r = device?.reading;
+  if (!r) return null;
+  if (r.age_seconds != null && Number(r.age_seconds) > WATER_NOTICE_MAX_AGE_S) return null;
+  const state = typeof r.water_state === "string" ? r.water_state : "";
+  if (state === "suspect" || (r.water_source === "inferred" && state !== "ok" && r.water_low === true)) {
+    return { level: "empty", text: "Check the tank. Humidity is not rising while the mister runs, so it may be empty or blocked." };
+  }
+  if (state === "empty") return { level: "empty", text: "Add water. The tank is empty and the humidifier is paused." };
+  if (state === "low" || (!state && r.water_low === true)) return { level: "low", text: "Water is getting low. Top it up soon." };
+  return null;
+}
+
 /** Humidity and temperature always; water and fan only when this chamber reports them. */
 export function renderGauges(device, { now = Date.now() } = {}) {
   const extras = [];
+  const notice = waterNotice(device);
+  const noticeHtml = notice
+    ? `<p class="water-chip is-${notice.level}" role="status" id="water-notice">${escapeHtml(notice.text)}</p>`
+    : "";
   if (reports(device, "water_level")) extras.push(gauge("Water", device.reading.water_level, "%"));
   const when = readingWhenLine(device, now);
   const waterNote = reports(device, "water_level") || !device?.reading ? "" : " This chamber does not report its water level.";
-  return `<div class="device-gauges" aria-label="Live readings">
+  return `${noticeHtml}<div class="device-gauges" aria-label="Live readings">
     ${gauge("Humidity", device.reading?.humidity, "%", device.setpoints?.humidity_percent)}
     ${gauge("Temperature", formatTempValue(device.reading?.temperature, tempUnit(), { style: "reading" }), ` ${tempDisplayField().unit}`, formatTempValue(device.setpoints?.temperature_c, tempUnit(), { style: "target" }))}
     ${extras.join("")}

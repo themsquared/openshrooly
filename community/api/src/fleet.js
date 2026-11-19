@@ -379,6 +379,9 @@ export async function enrichDevice(db, env, user, device, { now = Date.now(), co
           humidity_setpoint: current.humidity_setpoint,
           fan_speed: current.fan_speed,
           water_level: current.water_level,
+          water_state: current.water_state,
+          water_source: current.water_source,
+          water_low: current.water_low,
           reading_at: current.reading_at,
           age_seconds: current.age_seconds,
         }

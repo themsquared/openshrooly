@@ -3,7 +3,13 @@
 import { ValidationError } from "../profile.js";
 
 export const RULES = ["temperature", "humidity", "water", "offline", "fruiting"];
-export const RECOVERY_KINDS = new Set(["temperature", "humidity", "water", "offline"]);
+export const RECOVERY_KINDS = new Set(["temperature", "humidity", "water", "water_empty", "offline"]);
+/**
+ * Every rule that keeps state per chamber. `water_empty` is the urgent second tier of the water
+ * rule: it has its own state so a tank that goes from low to empty gets a second notice. It is not
+ * a separate setting, it follows the water rule.
+ */
+export const STATE_RULES = [...RULES, "water_empty"];
 export const DEFAULT_TIMEZONE = "America/Los_Angeles";
 
 export const DEFAULT_PREFS = Object.freeze({
@@ -16,7 +22,7 @@ export const DEFAULT_PREFS = Object.freeze({
 export const DEFAULT_RULES = Object.freeze({
   temperature: { enabled: true, minutes: 30 },
   humidity: { enabled: true, minutes: 30, margin: 8 },
-  water: { enabled: true, below: 15 },
+  water: { enabled: true, below: 30, empty: 12 },
   offline: { enabled: true, minutes: 30 },
   fruiting: { enabled: true },
   grow: { profile_id: null, started_on: null },
@@ -129,7 +135,7 @@ export function readRules(doc) {
     const rule = data[key];
     if (!rule || typeof rule !== "object") continue;
     if (typeof rule.enabled === "boolean") out[key].enabled = rule.enabled;
-    for (const field of ["minutes", "margin", "below"]) {
+    for (const field of ["minutes", "margin", "below", "empty"]) {
       if (field in out[key] && Number.isFinite(Number(rule[field]))) out[key][field] = Number(rule[field]);
     }
   }
@@ -150,7 +156,7 @@ export function updateRules(current, body, profileOk = () => false) {
   const limits = {
     temperature: { minutes: [5, 720] },
     humidity: { minutes: [5, 720], margin: [2, 30] },
-    water: { below: [5, 60] },
+    water: { below: [5, 60], empty: [2, 30] },
     offline: { minutes: [10, 1440] },
     fruiting: {},
   };
