@@ -157,6 +157,10 @@ int main() {
     expect(telemetry_body_json(r, 0, nullptr, nullptr).find("\"water_low\":true") != std::string::npos,
            "low is water_low true");
 
+    r.water_state = "suspect";
+    const std::string sus = telemetry_body_json(r, 0, nullptr, nullptr);
+    expect(sus.find("\"water_source\":\"inferred\"") != std::string::npos, "suspect is always inferred");
+
     r.water_state = "unknown";
     const std::string unk = telemetry_body_json(r, 0, nullptr, nullptr);
     expect(unk.find("\"water_state\":\"unknown\"") != std::string::npos && unk.find("water_low") == std::string::npos,
