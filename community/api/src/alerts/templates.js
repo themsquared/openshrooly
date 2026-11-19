@@ -65,12 +65,39 @@ export function alertCopy(kind, cond, { deviceName, now, stage }) {
     case "water:open":
       return {
         title: `${name}: water is low`,
-        detail: `The water tank reads ${one(cond.value)}%. Top it up with clean water so the humidifier keeps running.`,
+        detail: cond.value != null
+          ? `The water tank reads ${one(cond.value)}%. Top it up with clean water soon so the humidifier keeps running.`
+          : "The chamber says its water tank is getting low. Top it up with clean water soon so the humidifier keeps running.",
       };
     case "water:recovered":
       return {
         title: `${name}: water is topped up`,
-        detail: `The water tank now reads ${one(cond.value)}%.`,
+        detail: cond.value != null ? `The water tank now reads ${one(cond.value)}%.` : "The chamber says the water is back to normal.",
+      };
+    case "water_empty:open":
+      if (cond.inferred) {
+        return {
+          title: `${name}: humidity is not rising`,
+          detail:
+            "The humidifier has been running but humidity is not going up. The tank may be empty, or the mister may be blocked or worn. This chamber has no tank sensor, so it cannot tell which. Check the water and the mister disc. Until humidity responds, the chamber limits the mister to short test bursts so it does not run dry.",
+        };
+      }
+      return {
+        title: `${name}: water tank is empty`,
+        detail: `${cond.value != null ? `The water tank reads ${one(cond.value)}%. ` : ""}${
+          cond.protected ? "The humidifier has paused so the mister does not run dry. " : "Humidity will fall until it is refilled. "
+        }Refill it with clean water.${cond.protected ? " It restarts on its own once the tank has water." : ""}`,
+      };
+    case "water_empty:recovered":
+      if (cond.inferred) {
+        return {
+          title: `${name}: humidity is responding again`,
+          detail: "The mister is raising humidity again, so the chamber has gone back to normal misting.",
+        };
+      }
+      return {
+        title: `${name}: water is topped up`,
+        detail: `${cond.value != null ? `The water tank now reads ${one(cond.value)}%. ` : ""}${cond.protected ? "The humidifier is running again." : ""}`.trim(),
       };
     case "offline:open":
       return {

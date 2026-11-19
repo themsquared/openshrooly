@@ -77,14 +77,78 @@ test("humidity uses the margin and a tracked grow overrides chamber set points",
   assert.equal(t.open, true, "24 °C is above the lion's mane fruiting warning max");
 });
 
-test("water opens at once below the mark and recovers five points above it", () => {
-  const w = (level) => cond(series([{ temperature: 20, humidity: 90, water_level: level }])).water;
-  assert.equal(w(14).open, true);
-  assert.equal(w(15).open, false);
-  assert.equal(w(18).recovered, false, "inside the hysteresis band");
-  assert.equal(w(20).recovered, true);
-  const waterOnly = cond([{ created_at: iso(NOW), document: JSON.stringify({ water_level: 3 }) }]).water;
-  assert.equal(waterOnly.open, true, "a water only report counts");
+test("water: low below 30, empty below 12, each recovers five points above its mark", () => {
+  const w = (level) => cond(series([{ temperature: 20, humidity: 90, water_level: level }]));
+  assert.equal(w(29).water.open, true);
+  assert.equal(w(30).water.open, false);
+  assert.equal(w(34).water.recovered, false, "inside the hysteresis band");
+  assert.equal(w(35).water.recovered, true);
+  assert.equal(w(11).water_empty.open, true);
+  assert.equal(w(12).water_empty.open, false);
+  assert.equal(w(16).water_empty.recovered, false);
+  assert.equal(w(17).water_empty.recovered, true);
+  assert.equal(w(11).water_empty.urgent, true);
+  assert.equal(w(29).water.urgent, undefined, "low is not urgent");
+  assert.equal(w(11).water.silent, true, "empty covers low");
+  assert.equal(w(20).water.silent, false);
+  const waterOnly = cond([{ created_at: iso(NOW), document: JSON.stringify({ water_level: 3 }) }]);
+  assert.equal(waterOnly.water_empty.open, true, "a water only report counts");
+});
+
+test("water: the owner's low mark applies, and empty never sits above it", () => {
+  const w = (level, rules) => cond(series([{ temperature: 20, humidity: 90, water_level: level }]), rules);
+  assert.equal(w(18, { water: { enabled: true, below: 15 } }).water.open, false);
+  assert.equal(w(14, { water: { enabled: true, below: 15 } }).water.open, true);
+  const tight = w(8, { water: { enabled: true, below: 10 } });
+  assert.equal(tight.water_empty.range.min, 10, "empty is capped at the low mark");
+  assert.equal(readRules({}).water.below, 30);
+  assert.equal(readRules({}).water.empty, 12);
+  assert.equal(updateRules({}, { water: { empty: 10 } }).water.empty, 10);
+  assert.throws(() => updateRules({}, { water: { empty: 99 } }), /water empty/);
+});
+
+test("water: a chamber with no tank sensor reports a state, and suspect is urgent and inferred", () => {
+  const s = (doc) => cond(series([{ temperature: 20, humidity: 90, ...doc }]));
+  const suspect = s({ water_state: "suspect", water_source: "inferred", water_low: true });
+  assert.equal(suspect.water_empty.open, true);
+  assert.equal(suspect.water_empty.inferred, true);
+  assert.equal(suspect.water_empty.urgent, true);
+  assert.equal(suspect.water_empty.value, null);
+  assert.equal(s({ water_state: "low", water_low: true }).water.open, true);
+  assert.equal(s({ water_state: "low", water_low: true }).water_empty.open, false);
+  assert.equal(s({ water_state: "empty" }).water_empty.open, true);
+  assert.equal(s({ water_state: "ok", water_low: false }).water.recovered, true);
+  assert.equal(s({ water_state: "ok", water_low: false }).water_empty.recovered, true);
+  assert.equal(s({ water_low: true }).water.open, true, "a bare flag counts as low");
+  const unknown = s({ water_state: "unknown" });
+  assert.equal(unknown.water.known, false, "unknown changes nothing");
+  assert.equal(s({ water_state: "bogus" }).water.known, false, "an invalid state is ignored");
+  const withLevel = s({ water_level: 50, water_state: "empty" });
+  assert.equal(withLevel.water_empty.open, false, "a number wins over the chamber's own state");
+  assert.equal(withLevel.water_empty.protected, true, "a chamber that reports a state also stops its mister");
+  assert.equal(s({ water_level: 5 }).water_empty.protected, false, "older firmware only reports a number");
+});
+
+test("water: unknown readings are skipped, so a sensor hiccup never closes an open episode", () => {
+  const rows = series([
+    { temperature: 20, humidity: 90, water_level: 8 },
+    { temperature: 20, humidity: 90, water_state: "unknown" },
+  ]);
+  const c = cond(rows);
+  assert.equal(c.water_empty.open, true);
+});
+
+test("decide: a low notice stays quiet and records nothing while empty covers it", () => {
+  const low = { rule: "water", known: true, open: true, recovered: false, since: iso(NOW - MIN), value: 8, silent: true };
+  const opened = decide(null, low, { now: NOW, cooldownMinutes: 360 });
+  assert.deepEqual(opened.notices, []);
+  assert.equal(opened.next.status, "open");
+  const back = decide(opened.next, { ...low, open: false, recovered: true, silent: false }, { now: NOW + 5 * MIN, cooldownMinutes: 360 });
+  assert.deepEqual(back.notices, [], "no recovery for a notice that was never sent");
+  assert.equal(back.next.status, "ok");
+  const empty = decide(null, { ...low, rule: "water_empty", silent: false, urgent: true }, { now: NOW, cooldownMinutes: 360 });
+  assert.equal(empty.notices[0].urgent, true);
+  assert.equal(empty.notices[0].notify, true);
 });
 
 test("offline opens after the rule's minutes and recovers when the chamber reports again", () => {
@@ -225,6 +289,22 @@ test("unsubscribe links verify, expire, and refuse any tampering", async () => {
 
 const DASHES = /[\u2010-\u2015\u2212-]/;
 
+test("water copy: an inferred alert never claims the tank is empty, and only protected chambers say they paused", () => {
+  const copy = (kind, c) => alertCopy(kind, c, { deviceName: "Kitchen", now: NOW });
+  const sensor = copy("open", { rule: "water_empty", value: 5, protected: true });
+  assert.equal(sensor.title, "Kitchen: water tank is empty");
+  assert.match(sensor.detail, /reads 5%/);
+  assert.match(sensor.detail, /humidifier has paused/);
+  const old = copy("open", { rule: "water_empty", value: 5, protected: false });
+  assert.doesNotMatch(old.detail, /paused/, "older firmware does not stop its mister");
+  const inferred = copy("open", { rule: "water_empty", value: null, inferred: true });
+  assert.equal(inferred.title, "Kitchen: humidity is not rising");
+  assert.match(inferred.detail, /no tank sensor/);
+  assert.match(inferred.detail, /mister may be blocked/);
+  assert.doesNotMatch(`${inferred.title} ${inferred.detail}`, /tank is empty/);
+  assert.match(copy("open", { rule: "water", value: null }).detail, /getting low/);
+});
+
 test("email copy has no dashes, carries the footer, and the one click headers", () => {
   const conds = [
     ["open", { rule: "temperature", direction: "high", value: 27.5, range: { min: 12, max: 22 }, since: iso(NOW - 45 * MIN) }],
@@ -233,6 +313,10 @@ test("email copy has no dashes, carries the footer, and the one click headers", 
     ["recovered", { rule: "humidity", value: 90, range: { min: 82, max: 98 } }],
     ["open", { rule: "water", value: 5 }],
     ["recovered", { rule: "water", value: 60 }],
+    ["open", { rule: "water_empty", value: 5, protected: true }],
+    ["open", { rule: "water_empty", value: null, inferred: true }],
+    ["recovered", { rule: "water_empty", value: 60, protected: true }],
+    ["recovered", { rule: "water_empty", value: null, inferred: true }],
     ["open", { rule: "offline", value: 47 }],
     ["recovered", { rule: "offline" }],
     ["milestone", { rule: "fruiting", value: 21, profile_name: "Lion's Mane" }],

@@ -26,9 +26,34 @@ Rules per chamber (defaults, all adjustable on `device.html?id=`):
 | --- | --- | --- |
 | Temperature | on, 30 min | out of the tracked profile's stage range (or set point ±3 °C) for longer than N minutes |
 | Humidity | on, 30 min, margin 8 | out of range for longer than N minutes |
-| Water | on, below 15% | the latest reading is under the mark; recovers 5 points above it |
+| Water (low) | on, below 30% | the latest reading is under the mark (adjustable 5 to 60); recovers 5 points above it. Held during quiet hours |
+| Water (empty) | on with Water, below 12% | the tank is empty, or a chamber with no tank sensor reports `suspect`. **Urgent: emails through quiet hours.** Recovers 5 points above |
 | Offline | on, 30 min | no report for longer than N minutes |
 | Fruiting day | on | the tracked grow reaches its fruiting stage (once per grow) |
+
+## Water alerts
+
+Chambers may report these optional telemetry fields. Older firmware sends none of them and keeps working (no water alert, no chip).
+
+| Field | Meaning |
+| --- | --- |
+| `water_level` | number, percent of the tank, 0 to 110. Only chambers with a tank sensor (Shrooly) |
+| `water_state` | `ok`, `low`, `empty`, `unknown` or `suspect` |
+| `water_source` | `sensor`, or `inferred` for a chamber with no tank sensor (Lykyn) that watched humidity fail to rise while its mister ran |
+| `water_low` | true when the chamber wants attention (low, empty or suspect) |
+
+Capability tokens: `sensors.water` (sensor, and the chamber stops its humidifier on empty) and `water.inferred`.
+
+How the cloud reads them (`community/api/src/alerts/water.js`, `engine.js`):
+
+- A number wins over the chamber's own state, so the owner's "low means below" setting applies. With no number, the state decides: `low` is low, `empty` and `suspect` are empty, `ok` is fine, `unknown` and anything unrecognised change nothing.
+- Two tiers, each with its own state row (`water` and `water_empty`) so a tank that goes from low to empty gets a second email. Low is the adjustable mark (default 30). Empty is the `empty` field of the water rule (default 12, never above the low mark; set through the API, not on the device page).
+- An empty tank covers the low notice. The low episode is recorded with no email and no alert row, and a refill sends one "water is topped up" email, not two.
+- **Quiet hours:** empty and `suspect` are urgent and go out at once. Low is held until quiet hours end like any other alert. Cooldown and the daily cap still apply to both.
+- **Wording is honest about inference.** A `suspect` alert says humidity is not rising and the tank may be empty or the mister blocked, because a chamber with no tank sensor cannot tell which. It never says "tank is empty". Only chambers that report a `water_state` (the same firmware that stops its humidifier) are told "the humidifier has paused".
+- Device page: a water chip above the gauges ("Water is getting low", "Add water", "Check the tank") driven by the latest reading, hidden when the reading is older than 3 hours or the chamber reports no water fields.
+- Channels today: email (Resend, or stub when `RESEND_API_KEY` is unset) and the in-app list. Push is not wired.
+- Existing saved water rules keep their saved mark (for example 15). Only chambers with no saved rule get the new defaults.
 
 Account settings (`account.html#alerts`): email on or off, time zone, quiet hours (default 22:00 to 07:00, on), wait before repeating an alert (default 6 hours), send a test alert, recent alerts.
 
@@ -36,7 +61,7 @@ Anti spam:
 
 - One open alert per problem episode (unique dedupe key per device, rule, episode, kind).
 - Cooldown per rule, then one recovery notice after readings stay back in range for 10 minutes, only if the open alert was not skipped by the cooldown.
-- Quiet hours hold everything (offline included) and send one combined email when they end. Problems that cleared overnight are marked expired instead of mailed.
+- Quiet hours hold everything (offline included) and send one combined email when they end. The one exception is the urgent water notice (empty tank, or mister not raising humidity): it is sent at once. Its recovery still waits. Problems that cleared overnight are marked expired instead of mailed.
 - Daily cap of 12 emails per person.
 - Only verified emails receive mail. Unsubscribed or muted accounts still see alerts in app.
 - Every email has a one click link (`/alerts-unsub.html?token=…`, valid 60 days) plus `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` pointing at `POST /api/alerts/unsubscribe`.

@@ -447,6 +447,30 @@ test("the page connection badge never shows a status dot or says Live", () => {
   assert.ok(html.indexOf('id="device-state"') < html.indexOf('id="device-live"'));
 });
 
+test("water chip: nothing when water is fine or unreported, plain words when it needs attention", async () => {
+  const { renderGauges, waterNotice } = await import("../public/js/device-ui.js");
+  const at = new Date().toISOString();
+  const dev = (reading) => ({ reading: { temperature: 21, humidity: 88, reading_at: at, age_seconds: 60, ...reading }, setpoints: {} });
+  assert.equal(waterNotice(dev({})), null, "no water fields, no chip");
+  assert.equal(waterNotice(dev({ water_level: 60, water_state: "ok", water_low: false })), null);
+  assert.equal(waterNotice({}), null);
+  const low = waterNotice(dev({ water_level: 25, water_state: "low", water_low: true }));
+  assert.equal(low.level, "low");
+  assert.match(low.text, /getting low/);
+  const empty = waterNotice(dev({ water_level: 5, water_state: "empty", water_low: true }));
+  assert.equal(empty.level, "empty");
+  assert.match(empty.text, /Add water/);
+  const suspect = waterNotice(dev({ water_state: "suspect", water_source: "inferred", water_low: true }));
+  assert.equal(suspect.level, "empty");
+  assert.match(suspect.text, /Check the tank/);
+  assert.doesNotMatch(suspect.text, /is empty/, "never claims empty without a tank sensor");
+  assert.equal(waterNotice(dev({ water_state: "empty", age_seconds: 4 * 3600 })), null, "an old reading does not raise it");
+  const html = renderGauges(dev({ water_level: 5, water_state: "empty", water_low: true }));
+  assert.match(html, /class="water-chip is-empty" role="status"/);
+  assert.doesNotMatch(renderGauges(dev({ water_level: 60, water_state: "ok" })), /water-chip/);
+  assert.doesNotMatch(html + JSON.stringify(low) + JSON.stringify(suspect), /[\u2010-\u2015]/, "no dashes");
+});
+
 test("a chamber that does not report water gets no Water tile and never n/a", async () => {
   const { renderGauges, readingLine } = await import("../public/js/device-ui.js");
   const dry = { reading: { temperature: 21.9, humidity: 88.9, reading_at: new Date().toISOString() }, setpoints: { temperature_c: 18, humidity_percent: 90 } };
