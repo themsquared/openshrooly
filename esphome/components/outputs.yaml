@@ -53,7 +53,11 @@ switch:
     optimistic: true
     turn_on_action:
       - lambda: |-
-          const float requested = fmaxf(0.0f, fminf(100.0f, id(humidifier_speed).state));
+          float requested = fmaxf(0.0f, fminf(100.0f, id(humidifier_speed).state));
+          if (id(water_empty_flag)) {
+            ESP_LOGW("humidifier", "TURN ON refused: tank is empty");
+            requested = 0.0f;
+          }
           uint8_t data[2] = {0x18, static_cast<uint8_t>(lroundf(requested))};
           bool err = id(bus_a).write(0x6C, data, 2);  // true = error
           if (err) {

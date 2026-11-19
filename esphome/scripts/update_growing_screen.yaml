@@ -199,7 +199,9 @@
         id: grow_alert_text
         text: !lambda |-
           std::string alert;
-          if (id(water_level_percent).has_state() && id(water_level_percent).state < 15.0f) {
+          if (id(water_empty_flag)) {
+            alert = "ADD WATER";
+          } else if (id(water_low_flag)) {
             alert = "WATER LOW";
           }
           if (id(alert_temp_too_low).state) {
@@ -213,7 +215,7 @@
           return alert;
 
     - lambda: |-
-        const bool water_low = id(water_level_percent).has_state() && id(water_level_percent).state < 15.0f;
+        const bool water_low = id(water_low_flag);
         const bool alerting = water_low || id(alert_temp_too_low).state || id(alert_temp_too_high).state ||
                               id(alert_humidity_failure).state;
         if (alerting) {

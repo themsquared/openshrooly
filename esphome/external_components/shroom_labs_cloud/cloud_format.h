@@ -197,6 +197,11 @@ struct ChamberReading {
   uint16_t knob_mask{0};
   float knob[KNOB_COUNT]{};
   std::string grow_phase;
+  // Tank water. level is the percent from the capacitive sensor. state is ok, low, empty or unknown
+  // (empty string when the chamber has no water tracking, which sends no water fields at all).
+  bool has_water_level{false};
+  float water_level{0};
+  std::string water_state;
 };
 
 struct EntityRange {

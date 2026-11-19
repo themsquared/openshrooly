@@ -10,6 +10,8 @@ esphome:
     version: ${device_version}
   build_flags:
     - -Wno-cpp  # Suppress preprocessor warnings (including deprecation warnings)
+  includes:
+    - external_components/shroom_labs_cloud/water_level.h
 
   on_boot:
     priority: 600  # Very early boot
