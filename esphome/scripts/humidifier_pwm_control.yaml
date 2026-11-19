@@ -9,7 +9,7 @@
     requested_duty: float
   then:
     - lambda: |-
-        float requested = id(humidifier_on_flag) ? requested_duty : 0.0f;
+        float requested = (id(humidifier_on_flag) && !id(water_empty_flag)) ? requested_duty : 0.0f;
         requested = fmaxf(0.0f, fminf(100.0f, requested));
         id(humidifier_command_duty) =
           static_cast<uint8_t>(lroundf(requested));

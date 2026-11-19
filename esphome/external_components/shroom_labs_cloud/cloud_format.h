@@ -197,6 +197,13 @@ struct ChamberReading {
   uint16_t knob_mask{0};
   float knob[KNOB_COUNT]{};
   std::string grow_phase;
+  // Tank water. state is ok, low, empty, suspect or unknown (empty string when the chamber has no water
+  // tracking, which sends no water fields at all). source is "sensor" (default) or "inferred" (no tank
+  // sensor, guessed from humidity). level is the sensor percent and only exists with a sensor.
+  bool has_water_level{false};
+  float water_level{0};
+  std::string water_state;
+  std::string water_source;
 };
 
 struct EntityRange {

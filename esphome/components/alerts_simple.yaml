@@ -64,6 +64,18 @@ binary_sensor:
       sorting_group_id: grp_hidden  # Hide from main web UI
     lambda: 'return id(humidity_not_rising_flag);'
 
+  # Tank is low or empty. On while the tracker in water_level_calculator says
+  # low or empty (30% / 12%, three reads in a row). Unknown is not an alert.
+  - platform: template
+    id: alert_water_low
+    name: "Alert: Water Low"
+    device_class: problem
+    icon: mdi:water-alert
+    internal: false  # Keep exposed to HA
+    web_server:
+      sorting_group_id: grp_hidden  # Hide from main web UI
+    lambda: 'return id(water_low_flag);'
+
   # I2C communication failure alert
   - platform: template
     id: alert_i2c_failure
@@ -126,6 +138,13 @@ text_sensor:
       int count = 0;
       std::string summary = "";
 
+      if (id(water_empty_flag)) {
+        summary += "Add Water; ";
+        count++;
+      } else if (id(alert_water_low).state) {
+        summary += "Water Low; ";
+        count++;
+      }
       if (id(alert_humidity_failure).state) {
         summary += "Humidity; ";
         count++;
