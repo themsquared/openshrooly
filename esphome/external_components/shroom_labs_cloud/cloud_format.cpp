@@ -982,6 +982,24 @@ std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, c
     out += "\":";
     append_num(&out, reading.knob[k]);
   }
+  if (reading.has_water_level) {
+    comma();
+    out += "\"water_level\":";
+    char wl[24];
+    std::snprintf(wl, sizeof(wl), "%.1f", static_cast<double>(reading.water_level));
+    out += wl;
+  }
+  if (!reading.water_state.empty()) {
+    comma();
+    out += "\"water_state\":\"";
+    out += json_escape(reading.water_state.c_str());
+    out += "\",\"water_source\":\"sensor\"";
+    // low, empty and suspect are "needs water". unknown says nothing, so the site neither opens nor clears an alert.
+    if (reading.water_state != "unknown") {
+      out += ",\"water_low\":";
+      out += (reading.water_state == "ok") ? "false" : "true";
+    }
+  }
   if (!reading.grow_phase.empty()) {
     comma();
     out += "\"grow_phase\":\"";

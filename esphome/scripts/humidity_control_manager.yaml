@@ -163,6 +163,24 @@
         pending_off_dwell_log = false;
       }
 
+      // Empty tank: never run the mister dry. This only applies to a tank that reads empty
+      // (three reads in a row), never to a sensor that cannot be read.
+      if (id(water_empty_flag)) {
+        if (humidifier_on) {
+          id(humidifier_on_flag) = false;
+          id(humidifier_effectiveness_check).stop();
+          id(humidity_not_rising_flag) = false;
+          id(alert_humidity_failure).publish_state(false);
+          last_off_ms = now;
+          id(humidifier_pwm_control).execute(0.0f);
+          ESP_LOGW("humidity", "Turning off humidifier: tank is empty");
+        }
+        pending_on_dwell_log = false;
+        pending_off_dwell_log = false;
+        id(humidifier_fan_status).publish_state("OFF, add water");
+        return;
+      }
+
       if (should_turn_on) {
         id(humidifier_on_flag) = true;
         id(humidity_not_rising_flag) = false;

@@ -12,11 +12,42 @@
       static int reading_index = 0;
       static bool first_reading = true;
       static uint32_t last_calibration_generation = UINT32_MAX;
+      // Tank state: ok / low / empty / unknown, with hysteresis and a 3-read debounce.
+      static esphome::shroom_labs::WaterTracker tracker;
+
+      // Publish the tracker's verdict. Called with every reading, readable or not.
+      auto apply_tracker = [&](float level) {
+        const bool changed = tracker.update(level, millis());
+        const bool was_empty = id(water_empty_flag);
+        const bool was_low = id(water_low_flag);
+        id(water_empty_flag) = tracker.empty();
+        id(water_low_flag) = tracker.needs_water();
+        const char *name = esphome::shroom_labs::water_state_name(tracker.state());
+        if (!id(water_state_text).has_state() || id(water_state_text).state != name) {
+          id(water_state_text).publish_state(name);
+        }
+        id(alert_water_low).publish_state(id(water_low_flag));
+        if (!changed) return;
+        ESP_LOGW("water", "Tank is %s (level %.0f%%)", name, level);
+        if (id(water_empty_flag) && !was_empty) {
+          id(alert_beep_critical).execute();
+        } else if (id(water_low_flag) && !was_low) {
+          id(alert_beep_warning).execute();
+        } else if (!id(water_low_flag) && was_low) {
+          id(alert_beep_cleared).execute();
+        }
+        // Stop the mister now, or let it start again, rather than at the next humidity change.
+        if (id(water_empty_flag) != was_empty) {
+          id(humidity_control_manager).execute();
+        }
+        id(update_growing_screen).execute();
+      };
 
       if (last_calibration_generation != id(water_calibration_generation)) {
         reading_index = 0;
         first_reading = true;
         last_calibration_generation = id(water_calibration_generation);
+        tracker.reset();
       }
 
       // Differential water level detection algorithm
@@ -32,6 +63,8 @@
         ESP_LOGW("water", "Capacitance read failed");
         delete device;
         id(water_level_percent).publish_state(NAN);
+        // An unreadable sensor never reads as empty. After 10 minutes the state is unknown.
+        apply_tracker(NAN);
         return;
       }
       for (int i = 0; i < 5; i++) {
@@ -165,3 +198,4 @@
 
       // Publish the result to the sensor
       id(water_level_percent).publish_state(avg);
+      apply_tracker(avg);

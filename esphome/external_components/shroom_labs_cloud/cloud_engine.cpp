@@ -1165,7 +1165,7 @@ bool CloudEngine::process_inbox_(const std::string &body) {
   return true;
 }
 
-std::string CloudEngine::capabilities_json_(const EntityRange *kr, bool has_phase) const {
+std::string CloudEngine::capabilities_json_(const EntityRange *kr, bool has_phase, bool has_water) const {
   std::string out = "[\"setpoints.temperature\",\"setpoints.humidity\",\"setpoints.multi\",\"ack.refused\"";
   if (chamber_ == nullptr)
     return out + "]";
@@ -1187,6 +1187,8 @@ std::string CloudEngine::capabilities_json_(const EntityRange *kr, bool has_phas
     out += ",\"grow.day\"";
   if (has_phase)
     out += ",\"grow.phase\"";
+  if (has_water)
+    out += ",\"sensors.water\"";
   return out + "]";
 }
 
@@ -1440,7 +1442,7 @@ bool CloudEngine::post_telemetry_(const ChamberReading &reading, int64_t ack_id,
   EntityRange kr[KNOB_COUNT];
   for (uint8_t k = 0; k < KNOB_COUNT; k++)
     kr[k] = chamber_ ? chamber_->knob_range(k) : EntityRange{};
-  const std::string caps = capabilities_json_(kr, !reading.grow_phase.empty());
+  const std::string caps = capabilities_json_(kr, !reading.grow_phase.empty(), !reading.water_state.empty());
   TelemetryExtras ex;
   ex.firmware_version = firmware_version_;
   ex.capabilities = caps.c_str();

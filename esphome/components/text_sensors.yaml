@@ -31,6 +31,14 @@ text_sensor:
       sorting_group_id: grp_lights
       sorting_weight: 1
 
+  # ok, low, empty or unknown. Sent to the Shroom Labs site with the water level.
+  - platform: template
+    id: water_state_text
+    name: "Water State"
+    icon: mdi:cup-water
+    web_server:
+      sorting_group_id: grp_hidden
+
   - platform: template
     id: humidifier_fan_status
     name: "Humidifier Status"

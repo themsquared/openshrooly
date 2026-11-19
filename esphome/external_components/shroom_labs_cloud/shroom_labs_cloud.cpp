@@ -6,6 +6,9 @@
 #include "esphome/core/log.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/sensor/sensor.h"
+#ifdef USE_TEXT_SENSOR
+#include "esphome/components/text_sensor/text_sensor.h"
+#endif
 #include "../web_server_idf/web_server_idf.h"
 
 #include <esp_crt_bundle.h>
@@ -568,6 +571,34 @@ void ShroomLabsCloud::attach_local_watchers_() {
     if (n != nullptr)
       watch(n);
   }
+#ifdef USE_TEXT_SENSOR
+  // A tank going low or empty (or being refilled) is reported now, not at the next 15 minute check-in.
+  for (auto *t : App.get_text_sensors()) {
+    if (t != nullptr && std::strcmp(entity_object_id(t, id_buf), "water_state") == 0) {
+      t->add_on_state_callback([this](const std::string &state) { this->on_water_state_(state); });
+    }
+  }
+#endif
+}
+
+void ShroomLabsCloud::on_water_state_(const std::string &state) {
+  const std::string prev = this->last_water_state_;
+  this->last_water_state_ = state;
+  if (state == prev || state == "unknown")
+    return;
+  const bool needs = state == "low" || state == "empty";
+  const bool refilled = state == "ok" && (prev == "low" || prev == "empty");
+  if (!needs && !refilled)
+    return;
+  if (!this->cloud_ready())
+    return;
+  // Each push is one connect on an hourly budget. A tank cannot flap faster than its debounce, and this
+  // keeps a misbehaving sensor from using the budget.
+  const uint32_t now = millis();
+  if (this->last_water_push_ms_ != 0 && now - this->last_water_push_ms_ < WATER_PUSH_MIN_MS)
+    return;
+  this->last_water_push_ms_ = now;
+  this->engine_.telemetry_now();
 }
 
 ChamberReading ShroomLabsCloud::read_chamber() {
@@ -583,8 +614,21 @@ ChamberReading ShroomLabsCloud::read_chamber() {
     } else if (sensor_is_humidity(id)) {
       out.has_humidity = true;
       out.humidity = s->state;
+    } else if (std::strcmp(id, "water_level") == 0) {
+      out.has_water_level = true;
+      out.water_level = s->state;
     }
   }
+#ifdef USE_TEXT_SENSOR
+  for (auto *t : App.get_text_sensors()) {
+    if (t == nullptr || !t->has_state())
+      continue;
+    if (std::strcmp(entity_object_id(t, id_buf), "water_state") == 0) {
+      out.water_state = t->state;
+      break;
+    }
+  }
+#endif
   for (auto *n : App.get_numbers()) {
     if (n == nullptr || std::isnan(n->state))
       continue;

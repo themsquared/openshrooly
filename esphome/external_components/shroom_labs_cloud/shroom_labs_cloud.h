@@ -169,6 +169,10 @@ class ShroomLabsCloud : public Component {
   std::atomic<bool> busy_{false};
 
   void attach_local_watchers_();
+  void on_water_state_(const std::string &state);
+  std::string last_water_state_;
+  uint32_t last_water_push_ms_{0};
+  static constexpr uint32_t WATER_PUSH_MIN_MS = 2u * 60u * 1000u;
   void persist_remote_apply_(bool on);
   void load_saved_grow_();
   void persist_grow_if_changed_();

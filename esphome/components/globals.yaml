@@ -106,6 +106,18 @@ globals:
     restore_value: no
     initial_value: '0'
 
+  # Tank water state (see water_level.h). Set by water_level_calculator.
+  # water_empty_flag stops the mister. It is never set for an unreadable sensor.
+  - id: water_empty_flag
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  - id: water_low_flag
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
   # Alert tracking globals
   - id: active_alert_count
     type: int
