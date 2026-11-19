@@ -233,19 +233,19 @@ test("cron: quiet hours hold alerts, then one combined email; a night that fixed
   const { ctx, owner, deviceId, otherDevice } = await setup({ NOW_MS: String(night) });
   for (const at of [night, night + 61 * MIN, Date.parse("2026-07-16T14:05:00Z")]) await reading(ctx, otherDevice, at - MIN, {});
   const second = await addDevice(ctx, owner.user.id, { name: "Closet", seen: night });
-  await reading(ctx, deviceId, night - MIN, { water_level: 4 });
-  await reading(ctx, second, night - MIN, { water_level: 6 });
+  await reading(ctx, deviceId, night - MIN, { water_level: 20 });
+  await reading(ctx, second, night - MIN, { water_level: 25 });
   const held = await runAlerts(ctx, { now: night });
   assert.equal(held.notices, 2);
   assert.equal(held.delivered, 0);
 
   // The closet gets refilled overnight: its open notice expires and its recovery is never sent.
   await reading(ctx, second, night + 60 * MIN, { water_level: 80 });
-  await reading(ctx, deviceId, night + 60 * MIN, { water_level: 4 });
+  await reading(ctx, deviceId, night + 60 * MIN, { water_level: 20 });
   await runAlerts(ctx, { now: night + 61 * MIN });
 
   const morning = Date.parse("2026-07-16T14:05:00Z"); // 07:05 PDT
-  await reading(ctx, deviceId, morning - MIN, { water_level: 4 });
+  await reading(ctx, deviceId, morning - MIN, { water_level: 20 });
   await reading(ctx, second, morning - MIN, { water_level: 80 });
   const logs = captureLogs();
   let out;
@@ -259,6 +259,73 @@ test("cron: quiet hours hold alerts, then one combined email; a night that fixed
   const list = (await call(ctx, "GET", "/api/alerts", { token: owner.token })).data.alerts;
   const by = Object.fromEntries(list.map((a) => [`${a.device_id === second ? "closet" : "kitchen"}:${a.kind}`, a.status]));
   assert.deepEqual(by, { "kitchen:open": "stub", "closet:open": "expired", "closet:recovered": "expired" });
+});
+
+test("cron: an empty tank emails through quiet hours, a low tank waits for morning", async () => {
+  const night = Date.parse("2026-07-16T05:00:00Z"); // 22:00 in Los Angeles, quiet hours on
+  const { ctx, owner, deviceId } = await setup({ NOW_MS: String(night) });
+  const second = await addDevice(ctx, owner.user.id, { name: "Closet", seen: night });
+  await reading(ctx, deviceId, night - MIN, { water_level: 8 });
+  await reading(ctx, second, night - MIN, { water_level: 22 });
+  const logs = captureLogs();
+  let out;
+  try {
+    out = await runAlerts(ctx, { now: night });
+  } finally {
+    logs.restore();
+  }
+  assert.equal(out.delivered, 1, "only the empty tank is sent at night");
+  const list = (await call(ctx, "GET", "/api/alerts", { token: owner.token })).data.alerts;
+  const by = Object.fromEntries(list.map((a) => [`${a.device_id === second ? "closet" : "kitchen"}:${a.rule}:${a.kind}`, a.status]));
+  assert.deepEqual(by, { "kitchen:water_empty:open": "stub", "closet:water:open": "held" });
+  const empty = list.find((a) => a.rule === "water_empty");
+  assert.match(empty.title, /water tank is empty/);
+});
+
+test("cron: a chamber with no tank sensor that cannot raise humidity is urgent and says so honestly", async () => {
+  const night = Date.parse("2026-07-16T05:00:00Z");
+  const { ctx, owner, deviceId } = await setup({ NOW_MS: String(night) });
+  await reading(ctx, deviceId, night - MIN, { water_level: null, water_state: "suspect", water_source: "inferred", water_low: true });
+  const out = await runAlerts(ctx, { now: night });
+  assert.equal(out.delivered, 1);
+  const [alert] = (await call(ctx, "GET", "/api/alerts", { token: owner.token })).data.alerts;
+  assert.equal(alert.rule, "water_empty");
+  assert.match(alert.title, /humidity is not rising/);
+  assert.match(alert.detail, /tank may be empty, or the mister may be blocked/);
+  assert.doesNotMatch(alert.title + alert.detail, /tank is empty/);
+  const state = await call(ctx, "GET", `/api/devices/${deviceId}/alerts`, { token: owner.token });
+  assert.equal(state.data.states.water, "open", "the urgent tier shows as a water problem");
+  // It clears when the chamber reports ok again, and the recovery waits for morning like any recovery.
+  await reading(ctx, deviceId, night + 20 * MIN, { water_level: null, water_state: "ok", water_source: "inferred", water_low: false });
+  const later = await runAlerts(ctx, { now: night + 21 * MIN });
+  assert.equal(later.notices, 1);
+  const after = (await call(ctx, "GET", `/api/devices/${deviceId}/alerts`, { token: owner.token })).data;
+  assert.equal(after.states.water, "ok");
+});
+
+test("cron: a tank that goes from low to empty to refilled sends two emails, never four", async () => {
+  const { ctx, owner, deviceId } = await setup();
+  await call(ctx, "PUT", "/api/alerts/prefs", { token: owner.token, body: { quiet: { enabled: false }, cooldown_minutes: 30 } });
+  const logs = captureLogs();
+  const sent = () => logs.lines.filter((l) => l.includes("alert_email_stub")).length;
+  try {
+    await reading(ctx, deviceId, T0 - 40 * MIN, { water_level: 25 });
+    await runAlerts(ctx, { now: T0 - 39 * MIN });
+    assert.equal(sent(), 1, "low");
+    await reading(ctx, deviceId, T0 - 20 * MIN, { water_level: 6 });
+    await runAlerts(ctx, { now: T0 - 19 * MIN });
+    assert.equal(sent(), 2, "empty");
+    await reading(ctx, deviceId, T0 - MIN, { water_level: 90 });
+    await runAlerts(ctx, { now: T0 });
+    assert.equal(sent(), 3, "one refill email, not two");
+  } finally {
+    logs.restore();
+  }
+  const list = (await call(ctx, "GET", "/api/alerts", { token: owner.token })).data.alerts;
+  assert.deepEqual(
+    list.map((a) => `${a.rule}:${a.kind}`).reverse(),
+    ["water:open", "water_empty:open", "water_empty:recovered"]
+  );
 });
 
 test("cron: unverified or muted owners never get email, and the record says why", async () => {

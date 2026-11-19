@@ -4,6 +4,7 @@
  * stored rule state into the next state plus the notices to record.
  */
 
+import { hasWater, readWater, waterSeverity } from "./water.js";
 import {
   fruitingDay,
   localParts,
@@ -15,6 +16,8 @@ import {
 } from "./rules.js";
 
 const MIN = 60000;
+/** open_notified value for an open episode that a more urgent notice already covers. */
+const COVERED = 2;
 
 function num(value) {
   if (value == null || value === "") return null;
@@ -43,7 +46,7 @@ export function readSamples(rows = []) {
       humidity: num(doc.humidity ?? doc.humidity_percent),
       temperature_setpoint: num(doc.temperature_setpoint ?? doc.target_temperature),
       humidity_setpoint: num(doc.humidity_setpoint ?? doc.target_humidity),
-      water: num(doc.water_level ?? doc.water),
+      water: readWater(doc),
     });
   }
   return out.sort((a, b) => a.t - b.t);
@@ -107,24 +110,7 @@ export function evaluate({ device, rows = [], rules, prefs, profile = null, now 
   if (r.humidity.enabled) {
     out.push(rangeCondition("humidity", samples, ranges.humidity, r.humidity.minutes, staleMs, now));
   }
-  if (r.water.enabled) {
-    const waterRows = samples.filter((x) => x.water != null);
-    const latest = waterRows[waterRows.length - 1];
-    if (!latest) out.push({ rule: "water", known: false, reason: "no readings" });
-    else if (now - latest.t > staleMs) out.push({ rule: "water", known: false, reason: "readings are stale" });
-    else {
-      out.push({
-        rule: "water",
-        known: true,
-        open: latest.water < r.water.below,
-        recovered: latest.water >= r.water.below + WATER_HYSTERESIS,
-        since: new Date(lowSince(waterRows, r.water.below)).toISOString(),
-        value: latest.water,
-        range: { min: r.water.below },
-        direction: latest.water < r.water.below ? "low" : null,
-      });
-    }
-  }
+  if (r.water.enabled) out.push(...waterConditions(samples, r.water, staleMs, now));
   if (r.offline.enabled) {
     const seen = ts(device?.last_seen_at);
     if (seen == null) out.push({ rule: "offline", known: false, reason: "never reported" });
@@ -148,10 +134,68 @@ export function evaluate({ device, rows = [], rules, prefs, profile = null, now 
   return { conditions: out, ranges, today };
 }
 
-function lowSince(rows, below) {
+/**
+ * Two conditions from one set of water readings: `water` (low, adjustable) and `water_empty`
+ * (urgent: tank empty, or a chamber without a tank sensor that saw humidity stop responding).
+ * Readings that say "unknown" are skipped, so a sensor hiccup never opens or closes anything.
+ */
+function waterConditions(samples, rule, staleMs, now) {
+  const rows = samples
+    .filter((x) => hasWater(x.water))
+    .map((x) => ({ t: x.t, water: x.water, sev: waterSeverity(x.water, rule) }))
+    .filter((x) => x.sev !== "unknown");
+  const latest = rows[rows.length - 1];
+  if (!latest) {
+    return [
+      { rule: "water_empty", known: false, reason: "no readings" },
+      { rule: "water", known: false, reason: "no readings" },
+    ];
+  }
+  if (now - latest.t > staleMs) {
+    return [
+      { rule: "water_empty", known: false, reason: "readings are stale" },
+      { rule: "water", known: false, reason: "readings are stale" },
+    ];
+  }
+  const emptyAt = Math.min(rule.empty, rule.below);
+  const w = latest.water;
+  const numeric = w.level != null;
+  const inferred = !numeric && (w.source === "inferred" || w.state === "suspect");
+  const isEmpty = latest.sev === "empty";
+  const isLow = latest.sev === "low" || isEmpty;
+  const common = { value: numeric ? w.level : null, numeric, inferred, source: inferred ? "inferred" : numeric || w.source === "sensor" ? "sensor" : "reported" };
+  const emptyCond = {
+    rule: "water_empty",
+    known: true,
+    open: isEmpty,
+    recovered: numeric ? w.level >= emptyAt + WATER_HYSTERESIS : !isEmpty,
+    since: new Date(runStart(rows, (x) => x.sev === "empty")).toISOString(),
+    range: { min: emptyAt },
+    direction: isEmpty ? "low" : null,
+    urgent: true,
+    // The firmware that reports a state also stops the mister on empty. Older firmware only reports a number.
+    protected: w.state != null && !inferred,
+    ...common,
+  };
+  const lowCond = {
+    rule: "water",
+    known: true,
+    open: isLow,
+    recovered: numeric ? w.level >= rule.below + WATER_HYSTERESIS : latest.sev === "ok",
+    since: new Date(runStart(rows, (x) => x.sev === "low" || x.sev === "empty")).toISOString(),
+    range: { min: rule.below },
+    direction: isLow ? "low" : null,
+    // The urgent notice already covers this tank. One email, not two.
+    silent: isEmpty,
+    ...common,
+  };
+  return [emptyCond, lowCond];
+}
+
+function runStart(rows, test) {
   let start = rows[rows.length - 1].t;
   for (let i = rows.length - 1; i >= 0; i -= 1) {
-    if (!(rows[i].water < below)) break;
+    if (!test(rows[i])) break;
     start = rows[i].t;
   }
   return start;
@@ -213,6 +257,13 @@ export function decide(stateRow, cond, { now, cooldownMinutes }) {
     const episode = `${cond.rule}@${cond.since}`;
     const last = ts(state.last_open_notice_at);
     const cooling = last != null && now - last < cooldownMinutes * MIN;
+    // A tank that is already empty gets the urgent notice, so the low notice stays quiet and records nothing.
+    if (cond.silent) {
+      return {
+        next: { ...state, status: "open", episode_key: episode, opened_at: cond.since, open_notified: COVERED },
+        notices: [],
+      };
+    }
     return {
       next: {
         ...state,
@@ -222,11 +273,20 @@ export function decide(stateRow, cond, { now, cooldownMinutes }) {
         last_open_notice_at: cooling ? state.last_open_notice_at : nowIso,
         open_notified: cooling ? 0 : 1,
       },
-      notices: [{ kind: "open", episode_key: episode, notify: !cooling, reason: cooling ? "cooldown" : null }],
+      notices: [
+        {
+          kind: "open",
+          episode_key: episode,
+          notify: !cooling,
+          urgent: Boolean(cond.urgent),
+          reason: cooling ? "cooldown" : null,
+        },
+      ],
     };
   }
 
   if (state.status === "open" && cond.recovered) {
+    if (state.open_notified === COVERED) return { next: { ...state, status: "ok", open_notified: 0 }, notices: [] };
     const notify = state.open_notified === 1;
     return {
       next: { ...state, status: "ok", open_notified: 0 },
