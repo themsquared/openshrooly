@@ -586,8 +586,8 @@ void ShroomLabsCloud::on_water_state_(const std::string &state) {
   this->last_water_state_ = state;
   if (state == prev || state == "unknown")
     return;
-  const bool needs = state == "low" || state == "empty";
-  const bool refilled = state == "ok" && (prev == "low" || prev == "empty");
+  const bool needs = state == "low" || state == "empty" || state == "suspect";
+  const bool refilled = state == "ok" && (prev == "low" || prev == "empty" || prev == "suspect");
   if (!needs && !refilled)
     return;
   if (!this->cloud_ready())
@@ -623,9 +623,11 @@ ChamberReading ShroomLabsCloud::read_chamber() {
   for (auto *t : App.get_text_sensors()) {
     if (t == nullptr || !t->has_state())
       continue;
-    if (std::strcmp(entity_object_id(t, id_buf), "water_state") == 0) {
+    const char *tid = entity_object_id(t, id_buf);
+    if (std::strcmp(tid, "water_state") == 0) {
       out.water_state = t->state;
-      break;
+    } else if (std::strcmp(tid, "water_source") == 0) {
+      out.water_source = t->state;
     }
   }
 #endif

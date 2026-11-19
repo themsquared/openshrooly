@@ -993,7 +993,10 @@ std::string telemetry_body_json(const ChamberReading &reading, int64_t ack_id, c
     comma();
     out += "\"water_state\":\"";
     out += json_escape(reading.water_state.c_str());
-    out += "\",\"water_source\":\"sensor\"";
+    out += "\",\"water_source\":\"";
+    // A suspect verdict is only ever a guess from humidity, whatever the source field says.
+    out += (reading.water_source == "inferred" || reading.water_state == "suspect") ? "inferred" : "sensor";
+    out += "\"";
     // low, empty and suspect are "needs water". unknown says nothing, so the site neither opens nor clears an alert.
     if (reading.water_state != "unknown") {
       out += ",\"water_low\":";
