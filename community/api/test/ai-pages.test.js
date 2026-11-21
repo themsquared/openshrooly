@@ -64,6 +64,14 @@ test("every AI page answers first, carries Article, FAQPage and breadcrumbs, and
     assert.ok(html.includes(`<link rel="canonical" href="https://shroomlabs.io${p.path}">`), `${p.path} canonical`);
     assert.match(html, /googletagmanager\.com\/gtag\/js/, `${p.path} GA`);
     assert.ok(html.includes('href="/ai"'), `${p.path} links the hub`);
+    // The funnel: flash a Shrooly or Lykyn, then Grow Coach, near the top and again at the end, each with cta_click.
+    for (const spot of ["ai_top", "ai_bottom"]) {
+      for (const [href, type] of [["/install", "flash_shrooly"], ["/lykyn", "flash_lykyn"], ["/coach", "grow_coach"], ["/claim", "link_chamber"]]) {
+        assert.ok(html.includes(`href="${href}" data-sl-event="cta_click" data-sl-params='{"location":"${spot}","type":"${type}"}'`), `${p.path} ${spot} ${type}`);
+      }
+    }
+    assert.ok(html.indexOf('"location":"ai_top"') < html.indexOf('class="owner-section"'), `${p.path} top CTA comes right after the answer`);
+    assert.match(text(main(html)), /Connect your grow to AI: flash your Lykyn or Shrooly today/);
   }
 });
 

@@ -826,12 +826,24 @@ Product facts about the official app and models also come from the Lykyn Smart M
 
 ---
 
-## How Shroom Labs uses AI to grow mushrooms
+## Connect your mushroom grow to AI
 
 URL: https://shroomlabs.io/ai
 Updated: 2026-11-21
 
-Shroom Labs uses AI in a few narrow places: Grow Coach compares a chamber's live readings with the grow profile for your species and recommends changes, Autopilot makes those changes in small steps inside limits written in code, and a photo check reads a picture of your grow. The target numbers come from researched grow profiles, not from a model, and the chamber firmware is open source and keeps growing on its own if the internet or our site goes down.
+You connect a mushroom chamber to AI in three steps: flash free Shroom Labs firmware on a Shrooly or Lykyn, link it to a free account, and start Grow Coach. From there, Shroom Labs uses AI in a few narrow places: Grow Coach compares a chamber's live readings with the grow profile for your species and recommends changes, Autopilot makes those changes in small steps inside limits written in code, and a photo check reads a picture of your grow. The target numbers come from researched grow profiles, not from a model, and the chamber firmware is open source and keeps growing on its own if the internet or our site goes down.
+
+### How do I connect my mushroom chamber to AI?
+
+Flash free Shroom Labs firmware on your Shrooly or Lykyn, link the chamber to a free Shroom Labs account, then start a Grow Coach plan.
+
+- Flash the firmware. A Shrooly installs from the browser installer with Chrome or Edge and a USB-C data cable in about 5 minutes. A Lykyn is flashed from the public firmware repo; read Lykyn for mushrooms first and back up the stock image.
+
+- Link the chamber. Link it to your account so its readings reach Shroom Labs. The chamber keeps working on your Wi-Fi either way.
+
+- Start Grow Coach. Grow Coach reads those readings, recommends changes for your species, and with Autopilot makes them for you.
+
+Flashing alone does not connect the chamber to Grow Coach: the AI part starts only when you link the chamber and turn on Coach.
 
 ### What does the AI actually do in a Shroom Labs chamber?
 
@@ -1278,7 +1290,7 @@ Steps are small and fixed, changes are spaced at least an hour apart, temperatur
 
 No. Oyster and lion's mane kits fruit on a kitchen counter with misting and indirect light.
 
-Start with the easiest mushrooms to grow and how long mushrooms take. AI is worth it when you run a chamber for weeks and want it to adjust itself.
+Start with the easiest mushrooms to grow and how long mushrooms take. AI is worth it when you run a chamber for weeks and want it to adjust itself. If you have a Shrooly or a Lykyn, that starts with flashing a Shrooly or flashing a Lykyn, then Grow Coach.
 
 ### Sources
 
@@ -1338,7 +1350,7 @@ Most culinary species fruit in normal room temperatures, which is why small grow
 
 Yes: a humidifier on a humidity controller and an exhaust fan on a cycle timer give you the same loop, set from the same profile numbers.
 
-The AC Infinity build guide turns profile numbers into controller settings. Our AC Infinity adapter that would set them for you exists but is untested on real hardware.
+The AC Infinity build guide turns profile numbers into controller settings. Our AC Infinity adapter that would set them for you exists but is untested on real hardware. A Shrooly or Lykyn already has the loop built in: flash a Shrooly or flash a Lykyn and it runs from the same profiles, and Autopilot can tune it.
 
 ### Sources
 
@@ -1389,7 +1401,7 @@ That is why the photo check exists, and why it reports a confidence score rather
 
 Yes, and Advisor mode is built for that: Coach recommends, you look at the block, and you approve the changes that match what you see.
 
-Switch to Autopilot later if you find yourself approving everything.
+To get there, flash your Shrooly or flash your Lykyn, link it, and start Grow Coach. Switch to Autopilot later if you find yourself approving everything.
 
 ### Sources
 
@@ -1426,7 +1438,7 @@ The 2026 study found that only 3 of 12 tools named fly agaric first when shown i
 
 No. It assumes you already know the species because you are growing it from a culinary profile, and it refuses photos that are not a mushroom grow.
 
-It looks at stage and problems such as drying or possible mold on a grow you set up. See photo check and charts.
+It looks at stage and problems such as drying or possible mold on a grow you set up, as part of Grow Coach. See photo check and charts.
 
 ### What is a safer way to get into mushrooms?
 

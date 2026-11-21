@@ -130,18 +130,27 @@ const hub = {
   slug: "",
   path: "/ai",
   og: "ai",
-  title: "AI mushroom growing: Grow Coach, Autopilot and open firmware",
-  h1: "How Shroom Labs uses AI to grow mushrooms",
+  title: "Connect your mushroom grow box to AI: Grow Coach and Autopilot",
+  h1: "Connect your mushroom grow to AI",
   crumb: "AI",
-  eyebrow: "AI for growers",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
-  description: "How Shroom Labs uses AI for culinary mushrooms: Grow Coach advice, Autopilot inside hard limits, photo checks, open firmware, and an MCP server.",
+  description: "Connect a Shrooly or Lykyn to AI: flash free firmware, link the chamber, and Grow Coach reads it and can adjust it inside hard limits.",
   answer:
-    "Shroom Labs uses AI in a few narrow places: Grow Coach compares a chamber's live readings with the grow profile for your species and recommends changes, Autopilot makes those changes in small steps inside limits written in code, and a photo check reads a picture of your grow. The target numbers come from researched grow profiles, not from a model, and the chamber firmware is open source and keeps growing on its own if the internet or our site goes down.",
+    "You connect a mushroom chamber to AI in three steps: flash free Shroom Labs firmware on a Shrooly or Lykyn, link it to a free account, and start Grow Coach. From there, Shroom Labs uses AI in a few narrow places: Grow Coach compares a chamber's live readings with the grow profile for your species and recommends changes, Autopilot makes those changes in small steps inside limits written in code, and a photo check reads a picture of your grow. The target numbers come from researched grow profiles, not from a model, and the chamber firmware is open source and keeps growing on its own if the internet or our site goes down.",
   cta: [["Grow Coach", "/coach"], ["Install on your Shrooly", "/install"], ["Chambers that work", "/chambers"]],
   sources: ["coachLearn", "autopilot", "decider", "photo", "chart", "mcpDoc", "openshrooly", "repo"],
   related: [["Mushroom growing conditions for every species", "/grow"], ["Shroom Labs grow log", "/grow-log"], ["Fresh air planner", "/tools/fresh-air-planner"]],
   sections: [
+    {
+      h2: "How do I connect my mushroom chamber to AI?",
+      answer: "Flash free Shroom Labs firmware on your Shrooly or Lykyn, link the chamber to a free Shroom Labs account, then start a Grow Coach plan.",
+      html: `<ol>
+<li><strong>Flash the firmware.</strong> A Shrooly installs from <a href="/install">the browser installer</a> with Chrome or Edge and a USB-C data cable in about 5 minutes. A Lykyn is flashed from the public firmware repo; read <a href="/lykyn">Lykyn for mushrooms</a> first and back up the stock image.</li>
+<li><strong>Link the chamber.</strong> <a href="/claim">Link it to your account</a> so its readings reach Shroom Labs. The chamber keeps working on your Wi-Fi either way.</li>
+<li><strong>Start Grow Coach.</strong> <a href="/coach">Grow Coach</a> reads those readings, recommends changes for your species, and with Autopilot makes them for you.</li>
+</ol><p>Flashing alone does not connect the chamber to Grow Coach: the AI part starts only when you link the chamber and turn on Coach.</p>`,
+    },
     {
       h2: "What does the AI actually do in a Shroom Labs chamber?",
       answer: "It watches, explains, and nudges: Grow Coach reads the chamber, Autopilot adjusts targets, and the photo check looks at your block.",
@@ -198,7 +207,7 @@ const growCoach = {
   title: "Grow Coach: AI mushroom grow coach with per-species advice",
   h1: "Grow Coach: per-species advice from your chamber's own readings",
   crumb: "Coach advice",
-  eyebrow: "AI feature",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "Grow Coach compares your chamber's live readings with the culinary profile for your species, keeps track of how your chamber behaves, and explains each change.",
   answer: `Grow Coach reads your chamber's live temperature, humidity and fan readings, compares them with the stage targets in the culinary profile you picked, and tells you what to change and why. It also keeps a running picture of how your particular chamber behaves, such as whether it lags its humidity target, and answers questions about your grow in plain words. It is a paid plan you can cancel anytime.`,
@@ -264,7 +273,7 @@ const autopilot = {
   title: "Autopilot for mushroom chambers: how it adjusts, and its limits",
   h1: "Autopilot: how the chamber adjusts itself, and the limits it cannot cross",
   crumb: "Autopilot",
-  eyebrow: "AI feature",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "Autopilot sets temperature, humidity, fresh air, light and stage from your mushroom profile in small logged steps, inside hard limits, with undo.",
   answer: `Autopilot is the hands off mode of Grow Coach. It picks the profile stage from your grow day, sets fresh air and light from that stage's recipe, and nudges the temperature target, humidity target and fan speed in small steps, never more than one change an hour or ${FACTS.dailyCap} a day. Every change lands in a decisions feed with who decided and why, and you can undo it.`,
@@ -340,7 +349,7 @@ const photoCharts = {
   title: "Mushroom grow photo check and live readings charts",
   h1: "Photo check and readings charts: seeing what the chamber sees",
   crumb: "Photo check and charts",
-  eyebrow: "AI feature",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "Snap a phone photo of your mushroom grow for an AI check against the chamber's readings, and read live charts with target bands and change markers.",
   answer: `There is no camera inside a Shroom Labs chamber. You take a photo with your phone, and Grow Coach's photo check reads it next to the chamber's readings, then names the stage it sees, any issues and how sure it is, and two to four next steps. The readings charts show temperature, humidity, fan and water over ${RANGES.map((r) => r.label).join(", ")}, with the stage's target band and a marker for every Autopilot or Coach change.`,
@@ -404,7 +413,7 @@ const openFirmware = {
   title: "Open source mushroom chamber firmware for Shrooly and Lykyn",
   h1: "Open firmware for Shrooly and Lykyn: AI on top, local control underneath",
   crumb: "Open firmware",
-  eyebrow: "Under the hood",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "OpenShrooly and Shroom Labs Lykyn firmware run humidity, fresh air and light locally. Grow Coach only sends targets over an optional, outbound cloud link.",
   answer: "Both supported chambers run open source firmware: OpenShrooly on the Shrooly and Shroom Labs firmware on the Lykyn. The firmware holds humidity, fresh air and light on its own, on your Wi-Fi, with no account. Grow Coach and Autopilot only send new targets through an optional, outbound cloud link, so the chamber keeps growing if that link or our site goes down.",
@@ -451,7 +460,7 @@ const mcp = {
   title: "Mushroom growing MCP server for AI assistants (free, read only)",
   h1: "Ask your AI assistant about mushrooms with the Shroom Labs MCP server",
   crumb: "MCP server",
-  eyebrow: "For AI assistants",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "A free, read only MCP server at api.shroomlabs.io/mcp lets AI assistants look up mushroom grow profiles, stage conditions, timelines and guides.",
   answer: "Shroom Labs runs a free, read only MCP server at https://api.shroomlabs.io/mcp. AI assistants that support the Model Context Protocol can use it to look up culinary grow profiles, stage by stage conditions, grow timelines and our guides, then link the page they used. It needs no account or sign in and cannot touch a chamber.",
@@ -500,7 +509,7 @@ const canAiGrow = {
   title: "Can AI grow mushrooms? What it can and cannot do",
   h1: "Can AI grow mushrooms?",
   crumb: "Can AI grow mushrooms?",
-  eyebrow: "Question",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "AI cannot grow mushrooms on its own, but it can watch a chamber around the clock and make small, logged changes. What it handles and what needs you.",
   answer: "Not by itself. Mushrooms grow from mycelium when temperature, humidity, fresh air and light are right, and a chamber's hardware does that work. What AI can do well is watch the readings around the clock, notice drift sooner than you would, and make small, logged adjustments inside limits a person set. That is how Shroom Labs uses it.",
@@ -542,7 +551,7 @@ const canAiGrow = {
     {
       h2: "Do you need AI to grow mushrooms at home?",
       answer: "No. Oyster and lion's mane kits fruit on a kitchen counter with misting and indirect light.",
-      html: `<p>Start with the <a href="/guides/easiest-mushrooms-to-grow">easiest mushrooms to grow</a> and <a href="/guides/how-long-to-grow-mushrooms">how long mushrooms take</a>. AI is worth it when you run a chamber for weeks and want it to adjust itself.</p>`,
+      html: `<p>Start with the <a href="/guides/easiest-mushrooms-to-grow">easiest mushrooms to grow</a> and <a href="/guides/how-long-to-grow-mushrooms">how long mushrooms take</a>. AI is worth it when you run a chamber for weeks and want it to adjust itself. If you have a Shrooly or a Lykyn, that starts with <a href="/install">flashing a Shrooly</a> or <a href="/lykyn">flashing a Lykyn</a>, then <a href="/coach">Grow Coach</a>.</p>`,
     },
   ],
 };
@@ -553,7 +562,7 @@ const humidityFae = {
   title: "How a smart mushroom grow box automates humidity and fresh air",
   h1: "How does a smart mushroom grow box automate humidity and fresh air?",
   crumb: "Smart grow box humidity and fresh air",
-  eyebrow: "Question",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "A smart mushroom grow box runs the mister on a humidity band and the fan on a timer, both set per species and stage. Here is how the loop works.",
   answer: "A smart grow box runs a loop. A sensor reads humidity, the mister switches on when humidity drops below the target minus a small margin and off when it passes the target plus that margin, and a fan runs on a timer, a set number of seconds every so many minutes, to swap stale air for fresh. The grow profile sets those numbers for each species and stage, and a coach layer like Autopilot can shift them when the chamber drifts.",
@@ -589,7 +598,7 @@ const humidityFae = {
     {
       h2: "Can I automate a monotub or grow tent the same way?",
       answer: "Yes: a humidifier on a humidity controller and an exhaust fan on a cycle timer give you the same loop, set from the same profile numbers.",
-      html: `<p>The <a href="/guides/ac-infinity-mushroom-fruiting-chamber">AC Infinity build guide</a> turns profile numbers into controller settings. Our AC Infinity adapter that would set them for you exists but is untested on real hardware.</p>`,
+      html: `<p>The <a href="/guides/ac-infinity-mushroom-fruiting-chamber">AC Infinity build guide</a> turns profile numbers into controller settings. Our AC Infinity adapter that would set them for you exists but is untested on real hardware. A Shrooly or Lykyn already has the loop built in: <a href="/install">flash a Shrooly</a> or <a href="/lykyn">flash a Lykyn</a> and it runs from the same profiles, and <a href="/ai/autopilot">Autopilot</a> can tune it.</p>`,
     },
   ],
 };
@@ -600,7 +609,7 @@ const coachVsManual = {
   title: "AI mushroom grow coach vs manual monitoring: which do you need?",
   h1: "AI grow coach vs checking your grow by hand",
   crumb: "AI coach vs manual",
-  eyebrow: "Question",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "Checking by hand works for a kit on the counter. An AI grow coach pays off on long chamber grows. A side by side of what each catches and misses.",
   answer: "Checking by hand works fine for a kit on the counter: look twice a day, mist, fan. An AI coach pays off when a chamber runs for weeks: it reads every check in, spots slow drift like a chamber that always lags its humidity target, and leaves a written reason for each change. It does not replace your eyes on the block; contamination and harvest timing still need a look.",
@@ -642,7 +651,7 @@ const coachVsManual = {
     {
       h2: "Can I use both?",
       answer: "Yes, and Advisor mode is built for that: Coach recommends, you look at the block, and you approve the changes that match what you see.",
-      html: `<p>Switch to <a href="/ai/autopilot">Autopilot</a> later if you find yourself approving everything.</p>`,
+      html: `<p>To get there, <a href="/install">flash your Shrooly</a> or <a href="/lykyn">flash your Lykyn</a>, <a href="/claim">link it</a>, and start <a href="/coach">Grow Coach</a>. Switch to <a href="/ai/autopilot">Autopilot</a> later if you find yourself approving everything.</p>`,
     },
   ],
 };
@@ -653,7 +662,7 @@ const canAiIdentify = {
   title: "Can AI identify mushrooms safely? What the studies found",
   h1: "Can AI identify mushrooms safely?",
   crumb: "Can AI identify mushrooms?",
-  eyebrow: "Question",
+  eyebrow: "Connect your grow to AI",
   updated: AI_UPDATED,
   description: "AI mushroom identification apps are not reliable enough to decide if a wild mushroom is safe to eat. What published tests found, and safer ways to start.",
   answer: "No, not well enough to decide whether a wild mushroom is safe to eat. In a 2023 Clinical Toxicology study the best of three apps identified 49% of specimens correctly, and a 2026 test of 12 tools found even the best one wrong in nearly 15% of cases. Use an app as a first clue only, confirm with an expert, and in the US call Poison Help at 1-800-222-1222 if someone ate a mushroom you are unsure of.",
@@ -678,7 +687,7 @@ const canAiIdentify = {
     {
       h2: "Does Grow Coach's photo check identify mushrooms?",
       answer: "No. It assumes you already know the species because you are growing it from a culinary profile, and it refuses photos that are not a mushroom grow.",
-      html: `<p>It looks at stage and problems such as drying or possible mold on a grow you set up. See <a href="/ai/photo-check-and-charts">photo check and charts</a>.</p>`,
+      html: `<p>It looks at stage and problems such as drying or possible mold on a grow you set up, as part of <a href="/coach">Grow Coach</a>. See <a href="/ai/photo-check-and-charts">photo check and charts</a>.</p>`,
     },
     {
       h2: "What is a safer way to get into mushrooms?",

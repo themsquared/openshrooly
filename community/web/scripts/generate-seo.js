@@ -1530,6 +1530,21 @@ function aiCardList(pages) {
   return `<ul class="faq-links">${pages.map((p) => `<li><a href="${p.path}">${escapeHtml(p.h1)}</a> <span class="muted">${escapeHtml(p.description)}</span></li>`).join("")}</ul>`;
 }
 
+/**
+ * The /ai funnel block: flash a Shrooly or Lykyn, link it, then start Grow Coach. Same buttons as the
+ * owner and chamber pages. Each link sends cta_click with location and type, like the sign up buttons
+ * in js/share.js; the /install link also sends install_click on its own through js/ga.js.
+ * No prices: only /coach shows Coach prices.
+ */
+export function aiConnectCta(spot) {
+  const ev = (type) => `data-sl-event="cta_click" data-sl-params='{"location":"${spot}","type":"${type}"}'`;
+  return `<section class="ai-connect" aria-label="Connect your grow to AI">
+        <p class="ai-connect-title"><strong>Connect your grow to AI: flash your Lykyn or Shrooly today</strong></p>
+        <p>Step 1: put free Shroom Labs firmware on your chamber. Step 2: <a href="/claim" ${ev("link_chamber")}>link it to your free account</a>. Step 3: start Grow Coach, and it reads your chamber's live readings and can adjust it for you.</p>
+        <div class="owner-cta"><a class="button hero-cta" href="/install" ${ev("flash_shrooly")}>Flash your Shrooly</a><a class="button secondary" href="/lykyn" ${ev("flash_lykyn")}>Flash your Lykyn</a><a class="button secondary" href="/coach" ${ev("grow_coach")}>Start Grow Coach</a></div>
+      </section>`;
+}
+
 export function renderAiPage(page) {
   const isHub = page.path === AI_HUB.path;
   const url = `${SITE}${page.path}`;
@@ -1568,7 +1583,8 @@ export function renderAiPage(page) {
     ? `<h2>AI features</h2>${aiCardList(AI_FEATURES.map((f) => AI_SPOKES.find((p) => p.slug === f.slug)))}<h2>Questions growers ask about AI</h2>${aiCardList(AI_QUESTIONS.map((q) => AI_SPOKES.find((p) => p.slug === q.slug)))}`
     : "";
   const siblings = isHub ? [] : [[`${AI_HUB.h1}`, AI_HUB.path], ...AI_SPOKES.filter((p) => p.path !== page.path).map((p) => [p.h1, p.path])];
-  const related = [...siblings, ...page.related.filter(([, h]) => !siblings.some(([, o]) => o === h))];
+  const extra = [...page.related, ...page.cta.filter(([, h]) => h.startsWith("/") && !["/install", "/lykyn", "/coach"].includes(h))];
+  const related = [...siblings, ...extra.filter(([, h], i) => !siblings.some(([, o]) => o === h) && extra.findIndex(([, x]) => x === h) === i)];
   const body = `
     <article class="profile-page guide-page owner-page ai-page">
       ${crumbsHtml(crumbs)}
@@ -1576,7 +1592,7 @@ export function renderAiPage(page) {
       <h1>${escapeHtml(page.h1)}</h1>
       ${updatedHtml(page.updated, { byline: true })}
       <p class="lede answer-first">${escapeHtml(page.answer)}</p>
-      ${chamberCta(page.cta)}
+      ${aiConnectCta("ai_top")}
       ${sections}
       ${spokes}
       <h2>Sources</h2>
@@ -1584,7 +1600,7 @@ export function renderAiPage(page) {
       <ol class="sources">${page.sources.map((key) => `<li><a href="${AI_SOURCES[key].url}" rel="noopener">${escapeHtml(AI_SOURCES[key].label)}</a></li>`).join("")}</ol>
       <h2>Keep reading</h2>
       <ul class="faq-links">${related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>
-      ${chamberCta(page.cta)}
+      ${aiConnectCta("ai_bottom")}
     </article>`;
   return shell({
     head: { title: page.title, description: page.description, path: page.path, type: "article", image: pageOgImage(page.og), modified: page.updated, jsonLd },
