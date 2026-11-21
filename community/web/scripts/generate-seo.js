@@ -1904,7 +1904,7 @@ export const PAGES = {
     sitemap: true,
     path: "/coach",
     title: "Grow Coach: automatic grow control for your Shrooly or Lykyn · Shroom Labs",
-    description: "Grow Coach reads your Shrooly or Lykyn chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.",
+    description: "Grow Coach reads live readings from a Shrooly or Lykyn and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.",
     jsonLd: { "@context": "https://schema.org", "@graph": [growCoachJsonLd(), breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach`]])] },
   },
   "claim.html": {
