@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AI_PAGES, FACTS, SOURCES } from "../../web/scripts/ai/index.js";
 import { AUTOPILOT_LIMITS } from "../src/coach-autopilot.js";
-import { DEVICE_HEARTBEAT_MS, READINGS_STALE_MINUTES, SAFE_BOUNDS, TEMPERATURE_CLAMP } from "../src/coach-learn.js";
+import { DEVICE_HEARTBEAT_MS, READINGS_STALE_MINUTES, SAFE_BOUNDS, TEMPERATURE_CLAMP, detectAlerts } from "../src/coach-learn.js";
+import { DEFAULT_PREFS, DEFAULT_RULES } from "../src/alerts/rules.js";
+import { readWater, waterSeverity } from "../src/alerts/water.js";
+import { initialStatus } from "../src/alerts/cron.js";
 import { JEV_POLICY } from "../src/jev.js";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
@@ -104,4 +107,49 @@ test("AI pages are in the sitemap, llms files, redirects and footer, and cite ht
     for (const key of p.sources) assert.ok(SOURCES[key]?.url.startsWith("https://"), `${p.path} source ${key}`);
   }
   assert.ok(read("index.html").includes('<a href="/ai">AI</a>'), "footer link");
+});
+
+test("water alert levels on the AI pages match the alert rules", async () => {
+  assert.equal(FACTS.waterLow, DEFAULT_RULES.water.below);
+  assert.equal(FACTS.waterEmpty, DEFAULT_RULES.water.empty);
+  // "below" on the page: the mark itself is not yet an alert.
+  const sev = (level) => waterSeverity(readWater({ water_level: level }), DEFAULT_RULES.water);
+  assert.equal(sev(FACTS.waterLow), "ok");
+  assert.equal(sev(FACTS.waterLow - 0.1), "low");
+  assert.equal(sev(FACTS.waterEmpty), "low");
+  assert.equal(sev(FACTS.waterEmpty - 0.1), "empty");
+  // "The empty alert sends even during quiet hours": urgent notices skip the hold, others wait.
+  const night = Date.parse("2026-11-21T07:00:00Z"); // 11 PM Pacific, inside the default quiet hours
+  const base = { user: { email: "a@b.c", email_verified: 1 }, prefs: DEFAULT_PREFS, now: night, sentToday: async () => 0 };
+  assert.equal(await initialStatus({ ...base, notice: { notify: true, urgent: true } }), "pending");
+  assert.equal(await initialStatus({ ...base, notice: { notify: true, urgent: false } }), "held");
+});
+
+test("Coach alert thresholds on the AI pages match detectAlerts", () => {
+  const t0 = Date.parse("2026-10-01T00:00:00Z");
+  const day = 86400000;
+  const sample = (humidity, setpoint, at) => ({ document: { humidity, humidity_setpoint: setpoint, temperature: 20, temperature_setpoint: 20 }, created_at: new Date(at).toISOString() });
+  const kinds = (model, samples, stage, now) => detectAlerts(model, samples, stage, now).map((a) => a.kind);
+  const flat = [sample(90, 90, t0)];
+
+  // Humidity trouble: off by the quoted points or more, either direction.
+  assert.ok(kinds({ humidity_error: FACTS.humidityTroublePts }, flat, {}, t0).includes("humidity_trouble"));
+  assert.ok(kinds({ humidity_error: -FACTS.humidityTroublePts }, flat, {}, t0).includes("humidity_trouble"));
+  assert.ok(!kinds({ humidity_error: FACTS.humidityTroublePts - 0.1 }, flat, {}, t0).includes("humidity_trouble"));
+
+  // Stalled colonization: more than the quoted share of the stage, more than the quoted points under, not climbing.
+  const col = { id: "colonization", name: "Colonization", duration_days: 10 };
+  const under = (pts) => [sample(90 - pts, 90, t0)];
+  const past = (pct) => t0 + (col.duration_days * pct) / 100 * day;
+  const stalled = (pts, pct, rise = 0) => kinds({ humidity_rise_per_min: rise }, under(pts), col, past(pct)).includes("stalled_colonization");
+  assert.ok(stalled(FACTS.stalledHumidityPts + 0.1, FACTS.stalledColonizationPercent + 1));
+  assert.ok(!stalled(FACTS.stalledHumidityPts, FACTS.stalledColonizationPercent + 1), "exactly the quoted points under is not stalled");
+  assert.ok(!stalled(FACTS.stalledHumidityPts + 0.1, FACTS.stalledColonizationPercent), "exactly the quoted share is not stalled");
+  assert.ok(!stalled(FACTS.stalledHumidityPts + 0.1, FACTS.stalledColonizationPercent + 1, 0.05), "climbing humidity is not stalled");
+
+  // Time to harvest: the quoted share of the fruiting stage has passed.
+  const fruit = { id: "fruiting", name: "Fruiting", duration_days: 10 };
+  const harvest = (pct) => kinds({}, flat, fruit, t0 + (fruit.duration_days * pct) / 100 * day).includes("time_to_harvest");
+  assert.ok(harvest(FACTS.harvestPercent));
+  assert.ok(!harvest(FACTS.harvestPercent - 1));
 });

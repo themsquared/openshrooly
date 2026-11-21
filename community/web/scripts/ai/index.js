@@ -79,6 +79,10 @@ export const FACTS = {
   heartbeatMin: 15,
   waterLow: 30,
   waterEmpty: 12,
+  humidityTroublePts: 8,
+  stalledColonizationPercent: 70,
+  stalledHumidityPts: 5,
+  harvestPercent: 90,
 };
 
 const table = (caption, heads, rows) =>
@@ -236,11 +240,11 @@ const growCoach = {
     },
     {
       h2: "What alerts does Grow Coach send?",
-      answer: "Three grow alerts: humidity trouble when it misses the target by 8 points or more on average, colonization that looks stalled, and a heads up when the fruiting window is nearly over.",
+      answer: `Three grow alerts: humidity trouble when it misses the target by ${FACTS.humidityTroublePts} points or more on average, colonization that looks stalled, and a heads up when the fruiting window is nearly over.`,
       html: `<ul>
 <li><strong>Humidity trouble.</strong> Humidity misses the target by a wide margin. The message tells you to check the reservoir and the door seal.</li>
-<li><strong>Stalled colonization.</strong> More than 70% of the colonization stage has passed, humidity sits 5 or more points under its target, and it is not climbing.</li>
-<li><strong>Time to harvest.</strong> 90% of the fruiting stage has passed. Check cap size and harvest if veils are thinning.</li>
+<li><strong>Stalled colonization.</strong> More than ${FACTS.stalledColonizationPercent}% of the colonization stage has passed, humidity sits more than ${FACTS.stalledHumidityPts} points under its target, and it is not climbing.</li>
+<li><strong>Time to harvest.</strong> ${FACTS.harvestPercent}% of the fruiting stage has passed. Check cap size and harvest if veils are thinning.</li>
 </ul>
 <p>Account alerts for water level and an offline chamber are separate and work without Grow Coach. See ${cite("alerts", "the alert rules")}.</p>`,
     },
@@ -587,7 +591,7 @@ const humidityFae = {
     },
     {
       h2: "What happens when the water runs out?",
-      answer: `Shroom Labs can email a low water alert at ${FACTS.waterLow}% and an urgent empty alert at ${FACTS.waterEmpty}% for chambers that report a water level.`,
+      answer: `Shroom Labs can email a low water alert below ${FACTS.waterLow}% and an urgent empty alert below ${FACTS.waterEmpty}% for chambers that report a water level.`,
       html: `<p>The empty alert sends even during quiet hours. Firmware that also stops the mister on an empty tank, and a version for chambers with no tank sensor that infers an empty tank by watching humidity fail to rise while the mister runs, are in progress and not released yet. See ${cite("alerts", "the alert rules")}.</p>`,
     },
     {
