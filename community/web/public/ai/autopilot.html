@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Autopilot for mushroom chambers: how it adjusts, and its limits</title>
+  <meta name="description" content="Autopilot sets temperature, humidity, fresh air, light and stage from your mushroom profile in small logged steps, inside hard limits, with undo.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/ai/autopilot">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Autopilot for mushroom chambers: how it adjusts, and its limits">
+  <meta property="og:description" content="Autopilot sets temperature, humidity, fresh air, light and stage from your mushroom profile in small logged steps, inside hard limits, with undo.">
+  <meta property="og:url" content="https://shroomlabs.io/ai/autopilot">
+  <meta property="og:image" content="https://shroomlabs.io/og/pages/ai-autopilot.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Autopilot for mushroom chambers: how it adjusts, and its limits">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Autopilot for mushroom chambers: how it adjusts, and its limits">
+  <meta name="twitter:description" content="Autopilot sets temperature, humidity, fresh air, light and stage from your mushroom profile in small logged steps, inside hard limits, with undo.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/pages/ai-autopilot.jpg">
+  <meta property="article:modified_time" content="2026-11-21">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","@id":"https://shroomlabs.io/ai/autopilot#article","headline":"Autopilot: how the chamber adjusts itself, and the limits it cannot cross","description":"Autopilot is the hands off mode of Grow Coach. It picks the profile stage from your grow day, sets fresh air and light from that stage's recipe, and nudges the temperature target, humidity target and fan speed in small steps, never more than one change an hour or 8 a day. Every change lands in a decisions feed with who decided and why, and you can undo it.","url":"https://shroomlabs.io/ai/autopilot","mainEntityOfPage":"https://shroomlabs.io/ai/autopilot","image":"https://shroomlabs.io/og/pages/ai-autopilot.jpg","inLanguage":"en","dateModified":"2026-11-21","author":{"@type":"Person","name":"Mike Moore","url":"https://shroomlabs.io/about"},"publisher":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/","logo":{"@type":"ImageObject","@id":"https://shroomlabs.io/#logo","url":"https://shroomlabs.io/icons/icon-512.png","contentUrl":"https://shroomlabs.io/icons/icon-512.png","width":512,"height":512,"caption":"Shroom Labs"}},"citation":["https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js","https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/autopilot-knobs.js","https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/jev.js","https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/web/public/js/reading-chart.js","https://github.com/themsquared/openshrooly"],"isPartOf":{"@type":"WebPage","name":"Connect your mushroom grow to AI","url":"https://shroomlabs.io/ai"}},{"@type":"FAQPage","@id":"https://shroomlabs.io/ai/autopilot#faq","mainEntity":[{"@type":"Question","name":"What can Autopilot change?","acceptedAnswer":{"@type":"Answer","text":"Temperature target, humidity target, fan speed, the fresh air schedule, the light schedule, light brightness and color, and the grow stage, but only the ones your chamber says it supports."}},{"@type":"Question","name":"How does Autopilot know which stage the grow is in?","acceptedAnswer":{"@type":"Answer","text":"It counts grow days through the profile's stage lengths, so a profile with a 16 day colonization moves to pinning on day 17, and a stage you pick yourself always wins."}},{"@type":"Question","name":"What limits are hard coded?","acceptedAnswer":{"@type":"Answer","text":"Fixed ranges, fixed step sizes, and a fixed pace that the model cannot change."}},{"@type":"Question","name":"Where does the AI come in?","acceptedAnswer":{"@type":"Answer","text":"On each pass a small decision model answers five narrow questions: raise, hold or lower for temperature, humidity, fan and light, plus whether the readings look broken."}},{"@type":"Question","name":"How does Autopilot handle humidity and fresh air together?","acceptedAnswer":{"@type":"Answer","text":"It holds the fan step until humidity is within 1 point of target, and only reaches further when humidity stays off target for an hour without improving."}},{"@type":"Question","name":"When does Autopilot pause itself?","acceptedAnswer":{"@type":"Answer","text":"When the chamber looks offline, readings are missing or older than 20 minutes, a reading is physically impossible, or a reading jumps more than 8 °C or 25 points of humidity from the last one."}},{"@type":"Question","name":"What is the decisions feed?","acceptedAnswer":{"@type":"Answer","text":"A newest first list of what Coach changed, who decided, and why, with an undo for each change."}},{"@type":"Question","name":"Can I still change settings by hand?","acceptedAnswer":{"@type":"Answer","text":"Not while Autopilot is on: the site locks climate, fresh air, light, stage and what is growing until you switch Coach back to Advisor."}}],"isPartOf":{"@id":"https://shroomlabs.io/#website"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"AI","item":"https://shroomlabs.io/ai"},{"@type":"ListItem","position":3,"name":"Autopilot","item":"https://shroomlabs.io/ai/autopilot"}],"@id":"https://shroomlabs.io/ai/autopilot#breadcrumb"}]}</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RKQ4CBEZWY"></script>
+  <script src="/js/ga.js" defer></script>
+  <!--/SEO_HEAD-->
+  <link rel="preload" href="/fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/fraunces-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!--PWA-->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#07110e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Shroom Labs">
+  <script src="/js/pwa.js?v=2" defer></script>
+  <!--/PWA-->
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="page">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <article class="profile-page guide-page owner-page ai-page">
+      <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><a href="/ai">AI</a></li><li aria-current="page">Autopilot</li></ol></nav>
+      <p class="eyebrow">Connect your grow to AI</p>
+      <h1>Autopilot: how the chamber adjusts itself, and the limits it cannot cross</h1>
+      <p class="updated muted">By <a href="/about" rel="author">Mike Moore</a> · Updated <time datetime="2026-11-21">2026-11-21</time></p>
+      <p class="lede answer-first">Autopilot is the hands off mode of Grow Coach. It picks the profile stage from your grow day, sets fresh air and light from that stage's recipe, and nudges the temperature target, humidity target and fan speed in small steps, never more than one change an hour or 8 a day. Every change lands in a decisions feed with who decided and why, and you can undo it.</p>
+      <section class="ai-connect" aria-label="Connect your grow to AI">
+        <p class="ai-connect-title"><strong>Connect your grow to AI: flash your Lykyn or Shrooly today</strong></p>
+        <p>Step 1: put free Shroom Labs firmware on your chamber. Step 2: <a href="/claim" data-sl-event="cta_click" data-sl-params='{"location":"ai_top","type":"link_chamber"}'>link it to your free account</a>. Step 3: start Grow Coach, and it reads your chamber's live readings and can adjust it for you.</p>
+        <div class="owner-cta"><a class="button hero-cta" href="/install" data-sl-event="cta_click" data-sl-params='{"location":"ai_top","type":"flash_shrooly"}'>Flash your Shrooly</a><a class="button secondary" href="/lykyn" data-sl-event="cta_click" data-sl-params='{"location":"ai_top","type":"flash_lykyn"}'>Flash your Lykyn</a><a class="button secondary" href="/coach" data-sl-event="cta_click" data-sl-params='{"location":"ai_top","type":"grow_coach"}'>Start Grow Coach</a></div>
+      </section>
+      <section class="owner-section"><h2>What can Autopilot change?</h2><p class="answer-first">Temperature target, humidity target, fan speed, the fresh air schedule, the light schedule, light brightness and color, and the grow stage, but only the ones your chamber says it supports.</p><p>Chambers report a list of what they can take. Autopilot never sends a setting a chamber did not list, and older firmware that only takes temperature and humidity just gets those. Fresh air timing and the light schedule come straight from the stage recipe in the profile. Fan speed may move up to 20 points from the recipe in steps of 10, always inside 0 to 80%. Light brightness stays within 50% of the recipe. Source: <a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/autopilot-knobs.js" rel="noopener">Autopilot stage, fan, fresh air and light rules</a>.</p></section>
+      <section class="owner-section"><h2>How does Autopilot know which stage the grow is in?</h2><p class="answer-first">It counts grow days through the profile's stage lengths, so a profile with a 16 day colonization moves to pinning on day 17, and a stage you pick yourself always wins.</p><p>On chambers that report their phase, Autopilot can also move the chamber to the next stage when the day count says it is time.</p></section>
+      <section class="owner-section"><h2>What limits are hard coded?</h2><p class="answer-first">Fixed ranges, fixed step sizes, and a fixed pace that the model cannot change.</p><div class="table-wrap"><table class="conditions-table"><caption>Autopilot limits in the source code</caption><thead><tr><th scope="col">Limit</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">Temperature target range</th><td>10 to 32 °C, plus the stage's guardrails</td></tr><tr><th scope="row">Humidity target range</th><td>60 to 98%, plus the stage's guardrails</td></tr><tr><th scope="row">Biggest single step</th><td>1 °C, 3 points of humidity, 10 points of fan</td></tr><tr><th scope="row">Time between changes</th><td>At least 1 hour</td></tr><tr><th scope="row">Changes per day</th><td>At most 8</td></tr><tr><th scope="row">Unclaimed command</th><td>Expires after 35 minutes, so an old change cannot land late</td></tr><tr><th scope="row">Fan range</th><td>0 to 80%</td></tr></tbody></table></div><p>Source: <a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js" rel="noopener">Autopilot guardrails and pause rules</a>.</p></section>
+      <section class="owner-section"><h2>Where does the AI come in?</h2><p class="answer-first">On each pass a small decision model answers five narrow questions: raise, hold or lower for temperature, humidity, fan and light, plus whether the readings look broken.</p><p>The model sees the chamber's structured state only: profile, stage, grow day, the last 6 hours of readings in 30 minute buckets, current targets, the guardrails, and its own last few changes. It sees no free text and no personal data. Then code takes over:</p>
+<ul>
+<li>A raise or lower only counts at a confidence of 0.6 or higher. Below that, the plain rules decide that knob.</li>
+<li>A confident answer moves exactly one fixed step: 0.5 °C, 2 points of humidity, 10 points of fan, or 50 units of white light.</li>
+<li>The result still goes through every limit in the table above.</li>
+<li>If the model is slow, errors, or answers in the wrong shape, that pass uses the rules.</li>
+</ul>
+<p>Hold is always the safe answer. Source: <a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/jev.js" rel="noopener">Autopilot decision model: questions, confidence and step sizes</a>.</p></section>
+      <section class="owner-section"><h2>How does Autopilot handle humidity and fresh air together?</h2><p class="answer-first">It holds the fan step until humidity is within 1 point of target, and only reaches further when humidity stays off target for an hour without improving.</p><p>Every fan run pulls moist air out, so a fan change can fight the mister. When humidity stays out of band and is not moving toward the target, Autopilot may step the fan up to 30 points from the recipe, still inside the fan range. More on the physics in <a href="/ai/smart-mushroom-grow-box-humidity-and-fresh-air">how a smart grow box automates humidity and fresh air</a>.</p></section>
+      <section class="owner-section"><h2>When does Autopilot pause itself?</h2><p class="answer-first">When the chamber looks offline, readings are missing or older than 20 minutes, a reading is physically impossible, or a reading jumps more than 8 °C or 25 points of humidity from the last one.</p><p>Physically impossible means outside 0 to 45 °C or 10 to 100% humidity, which usually means a sensor problem. A short quiet spell just makes it wait. A bad sensor reading switches it back to Advisor. The decision model's broken readings question can do the same: at 0.85 or above, Autopilot drops to Advisor, sends nothing to the chamber, and emails you if email alerts are on.</p></section>
+      <section class="owner-section"><h2>What is the decisions feed?</h2><p class="answer-first">A newest first list of what Coach changed, who decided, and why, with an undo for each change.</p><p>The same decisions show as markers on the chamber's readings chart, so you can see a humidity dip and the change that followed it on one screen. See <a href="/ai/photo-check-and-charts">the readings charts</a>.</p></section>
+      <section class="owner-section"><h2>Can I still change settings by hand?</h2><p class="answer-first">Not while Autopilot is on: the site locks climate, fresh air, light, stage and what is growing until you switch Coach back to Advisor.</p><p>That keeps two drivers from fighting over one chamber. The message you see is "Coach is managing targets. Turn Coach off to set them yourself."</p></section>
+      
+      <h2>Sources</h2>
+      <p class="muted">Every page below was checked on November 21, 2026.</p>
+      <ol class="sources"><li><a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js" rel="noopener">Autopilot guardrails and pause rules (coach-autopilot.js)</a></li><li><a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/autopilot-knobs.js" rel="noopener">Autopilot stage, fan, fresh air and light rules (autopilot-knobs.js)</a></li><li><a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/jev.js" rel="noopener">Autopilot decision model: questions, confidence and step sizes</a></li><li><a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/web/public/js/reading-chart.js" rel="noopener">Readings chart: series, target bands and event markers (reading-chart.js)</a></li><li><a href="https://github.com/themsquared/openshrooly" rel="noopener">themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API)</a></li></ol>
+      <h2>Keep reading</h2>
+      <ul class="faq-links"><li><a href="/ai">Connect your mushroom grow to AI</a></li><li><a href="/ai/grow-coach">Grow Coach: per-species advice from your chamber's own readings</a></li><li><a href="/ai/photo-check-and-charts">Photo check and readings charts: seeing what the chamber sees</a></li><li><a href="/ai/open-firmware">Open firmware for Shrooly and Lykyn: AI on top, local control underneath</a></li><li><a href="/ai/mcp-server">Ask your AI assistant about mushrooms with the Shroom Labs MCP server</a></li><li><a href="/ai/can-ai-grow-mushrooms">Can AI grow mushrooms?</a></li><li><a href="/ai/smart-mushroom-grow-box-humidity-and-fresh-air">How does a smart mushroom grow box automate humidity and fresh air?</a></li><li><a href="/ai/ai-grow-coach-vs-manual-monitoring">AI grow coach vs checking your grow by hand</a></li><li><a href="/ai/can-ai-identify-mushrooms">Can AI identify mushrooms safely?</a></li><li><a href="/guides/humidity-and-fresh-air">Humidity and fresh air</a></li><li><a href="/grow-log">Shroom Labs grow log</a></li></ul>
+      <section class="ai-connect" aria-label="Connect your grow to AI">
+        <p class="ai-connect-title"><strong>Connect your grow to AI: flash your Lykyn or Shrooly today</strong></p>
+        <p>Step 1: put free Shroom Labs firmware on your chamber. Step 2: <a href="/claim" data-sl-event="cta_click" data-sl-params='{"location":"ai_bottom","type":"link_chamber"}'>link it to your free account</a>. Step 3: start Grow Coach, and it reads your chamber's live readings and can adjust it for you.</p>
+        <div class="owner-cta"><a class="button hero-cta" href="/install" data-sl-event="cta_click" data-sl-params='{"location":"ai_bottom","type":"flash_shrooly"}'>Flash your Shrooly</a><a class="button secondary" href="/lykyn" data-sl-event="cta_click" data-sl-params='{"location":"ai_bottom","type":"flash_lykyn"}'>Flash your Lykyn</a><a class="button secondary" href="/coach" data-sl-event="cta_click" data-sl-params='{"location":"ai_bottom","type":"grow_coach"}'>Start Grow Coach</a></div>
+      </section>
+    </article></main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/chambers">Chambers</a><a href="/ai">AI</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <nav class="footer-legal" aria-label="Legal"><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/lite.js"></script>
+</body>
+</html>

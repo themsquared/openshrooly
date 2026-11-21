@@ -826,6 +826,642 @@ Product facts about the official app and models also come from the Lykyn Smart M
 
 ---
 
+## Connect your mushroom grow to AI
+
+URL: https://shroomlabs.io/ai
+Updated: 2026-11-21
+
+You connect a mushroom chamber to AI in three steps: flash free Shroom Labs firmware on a Shrooly or Lykyn, link it to a free account, and start Grow Coach. From there, Shroom Labs uses AI in a few narrow places: Grow Coach compares a chamber's live readings with the grow profile for your species and recommends changes, Autopilot makes those changes in small steps inside limits written in code, and a photo check reads a picture of your grow. The target numbers come from researched grow profiles, not from a model, and the chamber firmware is open source and keeps growing on its own if the internet or our site goes down.
+
+### How do I connect my mushroom chamber to AI?
+
+Flash free Shroom Labs firmware on your Shrooly or Lykyn, link the chamber to a free Shroom Labs account, then start a Grow Coach plan.
+
+- Flash the firmware. A Shrooly installs from the browser installer with Chrome or Edge and a USB-C data cable in about 5 minutes. A Lykyn is flashed from the public firmware repo; read Lykyn for mushrooms first and back up the stock image.
+
+- Link the chamber. Link it to your account so its readings reach Shroom Labs. The chamber keeps working on your Wi-Fi either way.
+
+- Start Grow Coach. Grow Coach reads those readings, recommends changes for your species, and with Autopilot makes them for you.
+
+Flashing alone does not connect the chamber to Grow Coach: the AI part starts only when you link the chamber and turn on Coach.
+
+### What does the AI actually do in a Shroom Labs chamber?
+
+It watches, explains, and nudges: Grow Coach reads the chamber, Autopilot adjusts targets, and the photo check looks at your block.
+
+Where AI is used on Shroom Labs |  | Feature | What it does | Who decides the numbers
+ | Grow Coach | Compares live readings with your species profile, keeps track of how your chamber behaves, recommends changes with a reason, sends alerts, and answers questions. | The profile and fixed safe bounds. The chamber model is plain math.
+ | Autopilot | Makes Coach's changes for you, picks the stage from the grow day, and logs every decision with the reason. | Code. A small model only answers raise, hold or lower, and code clamps every step.
+ | Photo check | Reads a phone photo of your grow next to the chamber's readings and suggests next steps. | Advice only. It changes nothing on the chamber.
+ | Readings charts | Shows temperature, humidity, fan and water with target bands and a marker for every change. | No AI. A plain record of what happened.
+ | MCP server | Lets AI assistants look up grow profiles and guides and cite them. | Read only. It never touches a chamber.
+
+Underneath all of it is open firmware that runs the mister, fans and light locally. AI only ever sends new targets to it.
+
+### What does the AI not do?
+
+It does not invent targets, it does not run the chamber's basic control loop, and it does not identify wild mushrooms.
+
+- No made up numbers. Targets start from the grow profile for the species and stage you picked. Autopilot moves them one small fixed step at a time and code clamps the result. See the limits.
+
+- No hidden control. The chamber's own firmware holds humidity, fresh air and light. If our site is down, it keeps going on its last targets.
+
+- No species identification. The photo check assumes you know what you are growing. For wild mushrooms, read can AI identify mushrooms safely.
+
+- Culinary only. Grow Coach, Autopilot and the photo check refuse anything that is not a culinary grow.
+
+### Which chambers can use Grow Coach and Autopilot?
+
+A Shrooly running OpenShrooly and a Lykyn running Shroom Labs firmware, once you link the chamber to your account.
+
+Both run on real hardware and are marked supported on the chambers page. Terrashroom firmware and the AC Infinity adapter exist but are untested on real hardware, so only Shrooly and Lykyn are marked supported. Any other chamber, tub or tent can still use the free grow profiles by hand.
+
+### Do I need AI to grow mushrooms with Shroom Labs?
+
+No. The grow profiles and firmware are free, and a chamber runs fine on its own without an account or Grow Coach.
+
+There are 24 free culinary profiles, each with temperature, humidity, fresh air and light for every stage. Load one and the chamber follows it. Grow Coach adds a second set of eyes for people who want the chamber to adjust itself over a long grow. If you are new, start with can AI grow mushrooms for an honest look at what it adds.
+
+### What does it cost?
+
+Grow Coach, which includes Autopilot and the photo check, is a paid monthly or yearly plan; the firmware, free profiles, charts and MCP server cost nothing.
+
+You can cancel Grow Coach anytime from your account. Current prices are on the Grow Coach page.
+
+### How is the AI kept from making a bad change?
+
+Every limit lives in code the model cannot change: small fixed steps, at most one change an hour and eight a day, hard temperature and humidity ranges, and an automatic pause when readings look stale or broken.
+
+The full list, with the numbers, is on the Autopilot page. Each change also lands in a decisions feed with who made it and why, and you can undo it.
+
+### Sources
+
+- Grow Coach chamber model and recommendation rules (coach-learn.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-learn.js
+- Autopilot guardrails and pause rules (coach-autopilot.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js
+- Autopilot decision model: questions, confidence and step sizes: https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/jev.js
+- Grow Coach photo check (coach-photo.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-photo.js
+- Readings chart: series, target bands and event markers (reading-chart.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/web/public/js/reading-chart.js
+- Shroom Labs MCP server (notes on GitHub): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/MCP.md
+- OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+- themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API): https://github.com/themsquared/openshrooly
+
+---
+
+## Grow Coach: per-species advice from your chamber's own readings
+
+URL: https://shroomlabs.io/ai/grow-coach
+Updated: 2026-11-21
+
+Grow Coach reads your chamber's live temperature, humidity and fan readings, compares them with the stage targets in the culinary profile you picked, and tells you what to change and why. It also keeps a running picture of how your particular chamber behaves, such as whether it lags its humidity target, and answers questions about your grow in plain words. It is a paid plan you can cancel anytime.
+
+### How does Grow Coach decide what to recommend?
+
+It compares the latest reading with the profile's target band for the current stage and with your chamber's own track record over the last day, then writes a recommendation with the reason attached.
+
+The track record is a small per chamber model built from recent readings. It is plain math, not a language model:
+
+- Humidity error and droop. How far humidity sits from its target on average, and whether it tends to fall short.
+
+- Temperature offset. How far the chamber runs warm or cool against its target.
+
+- Humidity rise rate. How fast humidity climbs, which shows whether the mister keeps up.
+
+- Water use and average fan speed. From the chamber's own reports.
+
+- Your grow outcomes. How often your past culinary grows on that chamber went well.
+
+A useful detail: when humidity is off, Coach leaves the humidity target at the profile value and works on fresh air instead of chasing the humidity number up and down. A warm or cool reading outside the profile's temperature band gets a plain instruction, such as lowering the target back toward the profile value. Only a real sensor calibration value can shift the suggested temperature, and never outside the profile's band. Source: Grow Coach chamber model and recommendation rules.
+
+### Why does each species get different advice?
+
+Because every culinary profile has its own targets for each stage, and Grow Coach measures your chamber against the profile you picked, not a generic number.
+
+Fruiting targets Grow Coach checks against, from the free profiles |  | Mushroom | Temperature | Humidity | Fresh air
+ | Pearl Oyster | 16 °C (61 °F) | 88% ± 2 points | 40 s every 10 min at 45%
+ | Blue Oyster | 14 °C (57 °F) | 87% ± 2 points | 40 s every 10 min at 50%
+ | Pink Oyster | 24 °C (75 °F) | 86% ± 2 points | 40 s every 10 min at 50%
+ | Lion's Mane | 17 °C (63 °F) | 90% ± 2 points | 25 s every 18 min at 25%
+ | Shiitake | 16 °C (61 °F) | 85% ± 2 points | 35 s every 12 min at 40%
+ | King Oyster | 15 °C (59 °F) | 82% ± 2 points | 25 s every 25 min at 25%
+ | Chestnut Mushroom | 15 °C (59 °F) | 92% ± 2 points | 30 s every 15 min at 30%
+
+So the same 85% reading can be fine for one species and too dry for another. Every profile page in the grow guides lists the other stages too.
+
+### What alerts does Grow Coach send?
+
+Three grow alerts: humidity trouble when it misses the target by 8 points or more on average, colonization that looks stalled, and a heads up when the fruiting window is nearly over.
+
+- Humidity trouble. Humidity misses the target by a wide margin. The message tells you to check the reservoir and the door seal.
+
+- Stalled colonization. More than 70% of the colonization stage has passed, humidity sits more than 5 points under its target, and it is not climbing.
+
+- Time to harvest. 90% of the fruiting stage has passed. Check cap size and harvest if veils are thinning.
+
+Account alerts for water level and an offline chamber are separate and work without Grow Coach. See the alert rules.
+
+### Can I ask Grow Coach questions about my grow?
+
+Yes. The chat answers in plain prose using your chamber's readings, its learned model, and the stage targets of the profile you selected.
+
+Because it sees the same numbers you do, a question like "why are my pins drying out" gets an answer that mentions your actual humidity, not a textbook range. There is a daily limit on chats and photo checks so costs stay predictable. Questions about anything that is not a culinary grow are refused.
+
+### What will Grow Coach never do?
+
+It never suggests humidity outside 70 to 96% or temperature outside 10 to 32 °C, never moves more than 6 points of humidity or 2 °C from the profile, and never coaches anything but a culinary grow.
+
+Per stage warning bands in a profile tighten that range further. The bounds are in the Coach source, which is public. Grow Coach also does not identify species: it assumes you know what you are growing because you picked the profile.
+
+### Should I use Advisor or Autopilot?
+
+Start with Advisor, where you approve each change with one tap, and switch to Autopilot once the reasons it gives make sense to you.
+
+Autopilot makes the same kind of changes on its own, with extra limits on how often and how far. Read how Autopilot works first. You can switch back to Advisor anytime.
+
+### What do I need to use Grow Coach?
+
+A Shrooly running OpenShrooly or a Lykyn running Shroom Labs firmware, linked to a Shroom Labs account, plus a Grow Coach plan.
+
+Install OpenShrooly from the install page or read Lykyn for mushrooms, then link the chamber. The chamber reports in about every 15 minutes, and that is what Coach reads.
+
+### Sources
+
+- Grow Coach chamber model and recommendation rules (coach-learn.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-learn.js
+- Autopilot guardrails and pause rules (coach-autopilot.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js
+- Grow Coach photo check (coach-photo.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-photo.js
+- themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API): https://github.com/themsquared/openshrooly
+
+---
+
+## Autopilot: how the chamber adjusts itself, and the limits it cannot cross
+
+URL: https://shroomlabs.io/ai/autopilot
+Updated: 2026-11-21
+
+Autopilot is the hands off mode of Grow Coach. It picks the profile stage from your grow day, sets fresh air and light from that stage's recipe, and nudges the temperature target, humidity target and fan speed in small steps, never more than one change an hour or 8 a day. Every change lands in a decisions feed with who decided and why, and you can undo it.
+
+### What can Autopilot change?
+
+Temperature target, humidity target, fan speed, the fresh air schedule, the light schedule, light brightness and color, and the grow stage, but only the ones your chamber says it supports.
+
+Chambers report a list of what they can take. Autopilot never sends a setting a chamber did not list, and older firmware that only takes temperature and humidity just gets those. Fresh air timing and the light schedule come straight from the stage recipe in the profile. Fan speed may move up to 20 points from the recipe in steps of 10, always inside 0 to 80%. Light brightness stays within 50% of the recipe. Source: Autopilot stage, fan, fresh air and light rules.
+
+### How does Autopilot know which stage the grow is in?
+
+It counts grow days through the profile's stage lengths, so a profile with a 16 day colonization moves to pinning on day 17, and a stage you pick yourself always wins.
+
+On chambers that report their phase, Autopilot can also move the chamber to the next stage when the day count says it is time.
+
+### What limits are hard coded?
+
+Fixed ranges, fixed step sizes, and a fixed pace that the model cannot change.
+
+Autopilot limits in the source code |  | Limit | Value
+ | Temperature target range | 10 to 32 °C, plus the stage's guardrails
+ | Humidity target range | 60 to 98%, plus the stage's guardrails
+ | Biggest single step | 1 °C, 3 points of humidity, 10 points of fan
+ | Time between changes | At least 1 hour
+ | Changes per day | At most 8
+ | Unclaimed command | Expires after 35 minutes, so an old change cannot land late
+ | Fan range | 0 to 80%
+
+Source: Autopilot guardrails and pause rules.
+
+### Where does the AI come in?
+
+On each pass a small decision model answers five narrow questions: raise, hold or lower for temperature, humidity, fan and light, plus whether the readings look broken.
+
+The model sees the chamber's structured state only: profile, stage, grow day, the last 6 hours of readings in 30 minute buckets, current targets, the guardrails, and its own last few changes. It sees no free text and no personal data. Then code takes over:
+
+- A raise or lower only counts at a confidence of 0.6 or higher. Below that, the plain rules decide that knob.
+
+- A confident answer moves exactly one fixed step: 0.5 °C, 2 points of humidity, 10 points of fan, or 50 units of white light.
+
+- The result still goes through every limit in the table above.
+
+- If the model is slow, errors, or answers in the wrong shape, that pass uses the rules.
+
+Hold is always the safe answer. Source: Autopilot decision model: questions, confidence and step sizes.
+
+### How does Autopilot handle humidity and fresh air together?
+
+It holds the fan step until humidity is within 1 point of target, and only reaches further when humidity stays off target for an hour without improving.
+
+Every fan run pulls moist air out, so a fan change can fight the mister. When humidity stays out of band and is not moving toward the target, Autopilot may step the fan up to 30 points from the recipe, still inside the fan range. More on the physics in how a smart grow box automates humidity and fresh air.
+
+### When does Autopilot pause itself?
+
+When the chamber looks offline, readings are missing or older than 20 minutes, a reading is physically impossible, or a reading jumps more than 8 °C or 25 points of humidity from the last one.
+
+Physically impossible means outside 0 to 45 °C or 10 to 100% humidity, which usually means a sensor problem. A short quiet spell just makes it wait. A bad sensor reading switches it back to Advisor. The decision model's broken readings question can do the same: at 0.85 or above, Autopilot drops to Advisor, sends nothing to the chamber, and emails you if email alerts are on.
+
+### What is the decisions feed?
+
+A newest first list of what Coach changed, who decided, and why, with an undo for each change.
+
+The same decisions show as markers on the chamber's readings chart, so you can see a humidity dip and the change that followed it on one screen. See the readings charts.
+
+### Can I still change settings by hand?
+
+Not while Autopilot is on: the site locks climate, fresh air, light, stage and what is growing until you switch Coach back to Advisor.
+
+That keeps two drivers from fighting over one chamber. The message you see is "Coach is managing targets. Turn Coach off to set them yourself."
+
+### Sources
+
+- Autopilot guardrails and pause rules (coach-autopilot.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js
+- Autopilot stage, fan, fresh air and light rules (autopilot-knobs.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/autopilot-knobs.js
+- Autopilot decision model: questions, confidence and step sizes: https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/jev.js
+- Readings chart: series, target bands and event markers (reading-chart.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/web/public/js/reading-chart.js
+- themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API): https://github.com/themsquared/openshrooly
+
+---
+
+## Photo check and readings charts: seeing what the chamber sees
+
+URL: https://shroomlabs.io/ai/photo-check-and-charts
+Updated: 2026-11-21
+
+There is no camera inside a Shroom Labs chamber. You take a photo with your phone, and Grow Coach's photo check reads it next to the chamber's readings, then names the stage it sees, any issues and how sure it is, and two to four next steps. The readings charts show temperature, humidity, fan and water over 6h, 24h, 7d, with the stage's target band and a marker for every Autopilot or Coach change.
+
+### Does the chamber have a built in camera?
+
+No. Shrooly and Lykyn chambers have no camera we use, so the photo check works from a photo you take with your phone.
+
+A Terrashroom has a camera module on its board, but our community Terrashroom firmware does not support it yet. A phone photo is sharper anyway, and you choose the angle.
+
+### What does the photo check tell you?
+
+A one or two sentence summary, the stage it sees, any issues with a severity, two to four next steps, and a confidence score.
+
+What a photo check returns |  | Field | What it holds
+ | Stage | Colonizing, pinning, fruiting, ready to harvest, past harvest, or unclear
+ | Issues | Each with a short name, one sentence, and a severity of low, medium or high
+ | Next steps | Two to four short steps
+ | Confidence | 0 to 1, so you know how much weight to give it
+
+If you pick a chamber, the check also sees its stage, grow day, targets and recent readings, and says so plainly when readings are off target. On possible mold it is told to say what it sees and how sure it is rather than guess. For a closer look at mold, read mushroom contamination. Source: Grow Coach photo check.
+
+### What happens to my photo?
+
+It is not saved: location and camera details are stripped, the image is checked once, and then it is dropped.
+
+Photos that do not look like a mushroom grow get a polite "try a closer shot" instead of advice, and grows that are not culinary are refused. If you want to show off a harvest, post it on the grow feed instead, where you choose to make it public.
+
+### What is on the readings chart?
+
+Stacked panels on one time axis for each reading the chamber sends, the current stage's target band, a line for each target you set, gaps where the chamber was offline, and lettered markers for changes.
+
+Readings the chart shows when the chamber reports them |  | Reading | Unit
+ | Temperature | °C or °F
+ | Humidity | %
+ | Fan | %
+ | Water | %
+ | CO2 | ppm
+
+Change markers on the chart |  | Marker | Meaning
+ | A | Autopilot
+ | C | Coach suggestion
+ | P | Profile or stage
+ | S | Target change
+ | F | Firmware
+ | ! | No readings
+
+CO2 only shows when a chamber reports it, and today's chambers do not. Source: Readings chart: series, target bands and event markers.
+
+### How do the charts help find a problem?
+
+Look for a reading that sits outside its shaded target band while the target you set is right, because that means the chamber cannot keep up rather than being set wrong.
+
+- Humidity under the band while its target is right. Check the reservoir and the door seal before changing anything.
+
+- A gap in the lines. The chamber stopped reporting. Autopilot pauses during gaps.
+
+- A marker right before a change in the line. Hover it to see whether Autopilot, a Coach suggestion, a profile or stage pick, or a firmware update caused it.
+
+### Can the photo check identify a wild mushroom?
+
+No. It is built for a culinary grow you already know the species of, and it should never be used to decide whether a wild mushroom is safe to eat.
+
+Read can AI identify mushrooms safely for what the research says about identification apps.
+
+### Sources
+
+- Grow Coach photo check (coach-photo.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-photo.js
+- Readings chart: series, target bands and event markers (reading-chart.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/web/public/js/reading-chart.js
+- themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API): https://github.com/themsquared/openshrooly
+
+---
+
+## Open firmware for Shrooly and Lykyn: AI on top, local control underneath
+
+URL: https://shroomlabs.io/ai/open-firmware
+Updated: 2026-11-21
+
+Both supported chambers run open source firmware: OpenShrooly on the Shrooly and Shroom Labs firmware on the Lykyn. The firmware holds humidity, fresh air and light on its own, on your Wi-Fi, with no account. Grow Coach and Autopilot only send new targets through an optional, outbound cloud link, so the chamber keeps growing if that link or our site goes down.
+
+### Why does open firmware matter for an AI grow chamber?
+
+Because you can read exactly what runs your chamber, and the part that keeps your mushrooms alive never depends on a model or a server.
+
+The firmware runs the control loop: it reads the sensor, switches the mister, cycles the fans and runs the light schedule. Grow Coach sits on top and can only change targets. Chambers whose company app stopped working are the reason this project exists, so local control comes first.
+
+### What runs on a Shrooly?
+
+OpenShrooly, free open source firmware started by Graham Stewart, which Shroom Labs builds on, signs, and installs from the browser in about 5 minutes.
+
+You need Chrome or Edge on a computer and a USB-C data cable. The browser checks the release signature before anything is sent to the chamber, and later updates install over Wi-Fi and are checked the same way. Upstream code: grahamsz/openshrooly. Start at the install page.
+
+### What runs on a Lykyn?
+
+Native Shroom Labs firmware on the Lykyn's ESP32-C3, validated on a real unit, with a local dashboard, an optional cloud link, grow profiles and Grow Coach.
+
+The Lykyn has an SHT3x temperature and humidity sensor, two PWM fans, an ultrasonic mister and a 16 pixel grow ring, and no heater or cooler, so temperature targets are tracked rather than forced. Back up the stock image before you flash and do not erase the flash. Details on Lykyn for mushrooms and in the firmware repo.
+
+### What does the cloud link send and receive?
+
+The chamber sends its readings and a list of what it can do; it receives targets, profiles and schedules, and answers each command with applied or refused.
+
+The link is opt-in and outbound: the chamber calls out to the Shroom Labs API, nothing calls in. A linked chamber proves who it is with a secret it creates on its own chip, and that secret never leaves the chip, so a copied log line cannot impersonate your chamber. You can turn the link off in the chamber's settings. Design notes: Device identity and opt-in cloud control.
+
+### What happens when the internet or Shroom Labs goes down?
+
+The chamber keeps running its current targets locally, and Autopilot pauses until fresh readings arrive.
+
+Pending Autopilot commands expire after 35 minutes, so a backlog cannot pile up and land all at once when the link returns. You can still use the chamber's buttons and its local web page on your network.
+
+### Can I use Home Assistant instead of the cloud?
+
+Yes. A chamber running OpenShrooly stays fully usable on your network, including from Home Assistant, with no account and no cloud link.
+
+You would then run the grow profile numbers yourself or with your own automations. Grow Coach needs the cloud link because it reads the chamber's history.
+
+### Sources
+
+- OpenShrooly.com, project page by Graham Stewart: https://openshrooly.com/
+- grahamsz/openshrooly on GitHub (upstream firmware): https://github.com/grahamsz/openshrooly
+- themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API): https://github.com/themsquared/openshrooly
+- Shroom Labs Lykyn firmware on GitHub: https://github.com/themsquared/lykyn-firmware
+- Device identity and opt-in cloud control (design notes on GitHub): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/DEVICES.md
+
+---
+
+## Ask your AI assistant about mushrooms with the Shroom Labs MCP server
+
+URL: https://shroomlabs.io/ai/mcp-server
+Updated: 2026-11-21
+
+Shroom Labs runs a free, read only MCP server at https://api.shroomlabs.io/mcp. AI assistants that support the Model Context Protocol can use it to look up culinary grow profiles, stage by stage conditions, grow timelines and our guides, then link the page they used. It needs no account or sign in and cannot touch a chamber.
+
+### What can an assistant look up through the MCP server?
+
+Five read only tools: list profiles, get one profile, search grow content, get a chamber guide, and build a grow timeline.
+
+Shroom Labs MCP tools |  | Tool | What it returns
+ | list_profiles | Culinary grow profiles with slug, species, total days and page URL, with an optional text filter
+ | get_profile | One profile: every stage with days, temperature in °C and °F, humidity, fresh air, light hours, chamber tips and sources
+ | search_grow_content | Matching profiles, guides, blog posts and chamber pages, with title, description and page URL
+ | get_chamber_guide | The chambers hub, Shrooly install, Terrashroom, reuse and FAQ pages
+ | grow_timeline | Start and end day for each stage and total days to harvest
+
+### How do I connect it to my assistant?
+
+Add https://api.shroomlabs.io/mcp as a remote MCP server using Streamable HTTP with no authentication.
+
+The server answers plain HTTP POST requests and keeps no session, as the MCP specification allows. Where your assistant calls it a custom connector or a remote server, paste the URL and leave authentication off. Test it from a terminal with a tools/list request.
+
+### What does an answer look like?
+
+Ask "how long does pearl oyster take" and the assistant can call grow_timeline and get the profile's stage by stage days, 29 in total, with a link to the profile page.
+
+The numbers come from the same profile data as the pearl oyster guide, so the assistant and this site never disagree.
+
+### What is not in the MCP server?
+
+No Grow Coach chat, no chamber control, no accounts and no payments: it is a library, not a remote control.
+
+That keeps it safe to leave open to everyone. For advice about a specific chamber, use Grow Coach.
+
+### Sources
+
+- Shroom Labs MCP server (notes on GitHub): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/MCP.md
+- Model Context Protocol specification: https://modelcontextprotocol.io/specification
+- themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API): https://github.com/themsquared/openshrooly
+
+---
+
+## Can AI grow mushrooms?
+
+URL: https://shroomlabs.io/ai/can-ai-grow-mushrooms
+Updated: 2026-11-21
+
+Not by itself. Mushrooms grow from mycelium when temperature, humidity, fresh air and light are right, and a chamber's hardware does that work. What AI can do well is watch the readings around the clock, notice drift sooner than you would, and make small, logged adjustments inside limits a person set. That is how Shroom Labs uses it.
+
+### What parts of growing can AI actually handle?
+
+Watching readings, timing stage changes, nudging targets, and giving a first read on a photo.
+
+Where AI helps in a home grow |  | Task | Can AI help? | How it works on Shroom Labs
+ | Watching temperature and humidity | Yes | Reads every check in, about every 15 minutes
+ | Knowing when to switch stages | Yes | Counts grow days through the profile's stage lengths
+ | Small target changes | Yes, inside limits | One fixed step at a time, at most 8 a day
+ | Noticing a chamber that cannot keep up | Yes | Tracks humidity lag and temperature offset per chamber
+ | Looking at the block | A first read | Photo check names stage and issues with a confidence score
+ | Mixing substrate, clean work, refilling water, harvesting | No | Hands only
+
+### What still needs a person?
+
+Everything physical, and the final call on contamination and harvest.
+
+You prepare or buy the block, keep things clean, fill the reservoir, and pick the mushrooms. A photo check can point out what might be mold, but you decide whether to toss a block. Read mushroom contamination for what to look for.
+
+### Is AI better than a simple humidity controller?
+
+It does a different job: a controller holds one number, while a coach layer changes that number by species and stage and notices when the chamber cannot reach it.
+
+A humidity controller with a fan timer is still the base loop, and it works well. The firmware in a Shroom Labs chamber is that loop. Grow Coach adds stage timing and a record of why each target changed. If you only grow one kit at a time on a counter, a controller or plain misting may be all you need.
+
+### Can AI make a bad call and ruin a grow?
+
+A model can pick a poor nudge, which is why on Shroom Labs it only answers raise, hold or lower and code decides how far anything moves.
+
+Steps are small and fixed, changes are spaced at least an hour apart, temperature and humidity have hard ranges, and Autopilot pauses on stale or impossible readings. Every change can be undone. The full list is on the Autopilot page.
+
+### Do you need AI to grow mushrooms at home?
+
+No. Oyster and lion's mane kits fruit on a kitchen counter with misting and indirect light.
+
+Start with the easiest mushrooms to grow and how long mushrooms take. AI is worth it when you run a chamber for weeks and want it to adjust itself. If you have a Shrooly or a Lykyn, that starts with flashing a Shrooly or flashing a Lykyn, then Grow Coach.
+
+### Sources
+
+- Grow Coach chamber model and recommendation rules (coach-learn.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-learn.js
+- Autopilot guardrails and pause rules (coach-autopilot.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js
+- Grow Coach photo check (coach-photo.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-photo.js
+
+---
+
+## How does a smart mushroom grow box automate humidity and fresh air?
+
+URL: https://shroomlabs.io/ai/smart-mushroom-grow-box-humidity-and-fresh-air
+Updated: 2026-11-21
+
+A smart grow box runs a loop. A sensor reads humidity, the mister switches on when humidity drops below the target minus a small margin and off when it passes the target plus that margin, and a fan runs on a timer, a set number of seconds every so many minutes, to swap stale air for fresh. The grow profile sets those numbers for each species and stage, and a coach layer like Autopilot can shift them when the chamber drifts.
+
+### How does the humidity loop work?
+
+The profile sets a target and a margin, called hysteresis, and the mister runs only while humidity is below the bottom of that band.
+
+Fruiting humidity bands and fresh air timers from the free profiles |  | Mushroom | Target | Mister on, then off | Fan timer
+ | Pearl Oyster | 88% | below 86%, off above 90% | 40 s every 10 min
+ | Blue Oyster | 87% | below 85%, off above 89% | 40 s every 10 min
+ | Pink Oyster | 86% | below 84%, off above 88% | 40 s every 10 min
+ | Lion's Mane | 90% | below 88%, off above 92% | 25 s every 18 min
+ | Shiitake | 85% | below 83%, off above 87% | 35 s every 12 min
+ | King Oyster | 82% | below 80%, off above 84% | 25 s every 25 min
+ | Chestnut Mushroom | 92% | below 90%, off above 94% | 30 s every 15 min
+
+The margin stops the mister from clicking on and off every few seconds. A lower humidity target or a wider margin means drier swings between mist bursts.
+
+### How does fresh air exchange work in a small chamber?
+
+A fan runs for a set number of seconds every set number of minutes at a set speed, which flushes out the carbon dioxide the mushrooms breathe out.
+
+Too little fresh air gives long stems and small caps. Too much dries the surface. To size a fan cycle for your own box or tent, use the fresh air planner, and see leggy mushroom stems for the symptoms.
+
+### Why do humidity and fresh air fight each other?
+
+Every fan run pulls moist air out, so more fresh air means the mister has to work harder to hold the same humidity.
+
+That is why Autopilot holds a fan step until humidity is within 1 point of target, and only reaches further, up to 30 points from the recipe, when humidity stays off target for an hour without improving. A person tends to over correct here; a slow, spaced rule does not.
+
+### What happens when the water runs out?
+
+Shroom Labs can email a low water alert below 30% and an urgent empty alert below 12% for chambers that report a water level.
+
+The empty alert sends even during quiet hours. Firmware that also stops the mister on an empty tank, and a version for chambers with no tank sensor that infers an empty tank by watching humidity fail to rise while the mister runs, are in progress and not released yet. See the alert rules.
+
+### What about temperature?
+
+It depends on the chamber: a Lykyn has no heater or cooler, so it tracks temperature and boosts the fans when it runs hot, and the room has to do the rest.
+
+Most culinary species fruit in normal room temperatures, which is why small grow boxes skip a heater. Each profile lists its own range, for example Lion's Mane fruits at 17 °C (63 °F).
+
+### Can I automate a monotub or grow tent the same way?
+
+Yes: a humidifier on a humidity controller and an exhaust fan on a cycle timer give you the same loop, set from the same profile numbers.
+
+The AC Infinity build guide turns profile numbers into controller settings. Our AC Infinity adapter that would set them for you exists but is untested on real hardware. A Shrooly or Lykyn already has the loop built in: flash a Shrooly or flash a Lykyn and it runs from the same profiles, and Autopilot can tune it.
+
+### Sources
+
+- Autopilot stage, fan, fresh air and light rules (autopilot-knobs.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/autopilot-knobs.js
+- Shroom Labs alert rules, including water level (alert rules on GitHub): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/ALERTS.md
+- themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API): https://github.com/themsquared/openshrooly
+
+---
+
+## AI grow coach vs checking your grow by hand
+
+URL: https://shroomlabs.io/ai/ai-grow-coach-vs-manual-monitoring
+Updated: 2026-11-21
+
+Checking by hand works fine for a kit on the counter: look twice a day, mist, fan. An AI coach pays off when a chamber runs for weeks: it reads every check in, spots slow drift like a chamber that always lags its humidity target, and leaves a written reason for each change. It does not replace your eyes on the block; contamination and harvest timing still need a look.
+
+### How do the two compare?
+
+A coach wins on how often it looks and on keeping records; you win on everything you can see and touch.
+
+AI grow coach vs manual monitoring |  |  | Checking by hand | Grow Coach on a linked chamber
+ | How often | When you remember, often twice a day | Every check in, about every 15 minutes
+ | Overnight drift | Missed until morning | Seen on the next check in
+ | Stage changes | Calendar or memory | Counted from the profile's stage lengths
+ | Record of changes | A notebook, if you keep one | Decisions feed with reasons, and chart markers
+ | Mold, color, smell | Yes | Only from a photo you take, as a first read
+ | Cost | Free | A paid Grow Coach plan
+
+### When is checking by hand enough?
+
+For one kit at a time on a counter or in a simple tub, where misting and a look twice a day cover it.
+
+Use the grow timeline calculator to know what to expect when, and the profile for your species for the numbers.
+
+### When does a coach help most?
+
+On a chamber that runs unattended for weeks, slow species with long stages, and chambers that cannot quite hold their targets.
+
+The chamber model shows patterns a daily glance misses, such as humidity that sags a few points every afternoon. Coach also flags colonization that looks stalled and tells you when the fruiting window is nearly over.
+
+### What can a coach miss?
+
+Anything the sensor cannot measure: mold, pests, a dry block surface under good air readings, or a reservoir that is about to run dry on a chamber with no tank sensor.
+
+That is why the photo check exists, and why it reports a confidence score rather than a verdict.
+
+### Can I use both?
+
+Yes, and Advisor mode is built for that: Coach recommends, you look at the block, and you approve the changes that match what you see.
+
+To get there, flash your Shrooly or flash your Lykyn, link it, and start Grow Coach. Switch to Autopilot later if you find yourself approving everything.
+
+### Sources
+
+- Grow Coach chamber model and recommendation rules (coach-learn.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-learn.js
+- Autopilot guardrails and pause rules (coach-autopilot.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-autopilot.js
+- Readings chart: series, target bands and event markers (reading-chart.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/web/public/js/reading-chart.js
+
+---
+
+## Can AI identify mushrooms safely?
+
+URL: https://shroomlabs.io/ai/can-ai-identify-mushrooms
+Updated: 2026-11-21
+
+No, not well enough to decide whether a wild mushroom is safe to eat. In a 2023 Clinical Toxicology study the best of three apps identified 49% of specimens correctly, and a 2026 test of 12 tools found even the best one wrong in nearly 15% of cases. Use an app as a first clue only, confirm with an expert, and in the US call Poison Help at 1-800-222-1222 if someone ate a mushroom you are unsure of.
+
+### What did the studies find?
+
+Every published test so far found identification apps too unreliable to rule out a poisonous mushroom on their own.
+
+- Clinical Toxicology, 2023: three apps were tested on photos of 78 specimens sent to an Australian poisons centre and botanic garden. The most accurate identified 49% correctly, and 44% of the poisonous ones. The authors concluded the apps are not reliable enough to exclude exposure to poisonous mushrooms when used alone.
+
+- npj Science of Food, 2026: 12 tools were tested on more than 100 real world photos of nearly 60 species. The best performer still failed in nearly 15% of cases, and none consistently gave a single correct answer.
+
+- Public Citizen, 2024: a consumer group report warned that AI identification tools are being marketed to beginner foragers and that some misidentifications appear to come from regional bias.
+
+### Why do photo apps get mushrooms wrong?
+
+Many toxic and edible species look alike in a photo, and young mushrooms can look very different from mature ones.
+
+The 2026 study found that only 3 of 12 tools named fly agaric first when shown it at the button stage, while 10 of 12 got it right when mature. A photo also cannot show spore print color, smell, or what is under the soil, which experts use.
+
+### Does Grow Coach's photo check identify mushrooms?
+
+No. It assumes you already know the species because you are growing it from a culinary profile, and it refuses photos that are not a mushroom grow.
+
+It looks at stage and problems such as drying or possible mold on a grow you set up, as part of Grow Coach. See photo check and charts.
+
+### What is a safer way to get into mushrooms?
+
+Grow a known culinary species from a kit or a block, where you know exactly what you are eating.
+
+Oyster and lion's mane are good first grows. Start with the easiest mushrooms to grow or how to grow mushrooms at home. If you want to forage, learn in person with a local mycological society before eating anything you picked.
+
+### What should I do if someone ate a mushroom I am not sure about?
+
+In the US, call Poison Help at 1-800-222-1222 right away, even if nobody feels sick yet, and keep any leftover mushroom or a photo of it.
+
+Poison control is free, expert and confidential. Call 911 if the person collapses, has a seizure, has trouble breathing, or cannot be woken. Source: National Capital Poison Center: Poison Control and the Poison Help line.
+
+### Sources
+
+- Clinical Toxicology (2023): A comparison of the accuracy of mushroom identification applications using digital photographs: https://www.tandfonline.com/doi/10.1080/15563650.2022.2162917
+- npj Science of Food (2026): AI-mediated risks and real-life challenges in mushroom foraging: https://www.nature.com/articles/s41538-026-00752-4
+- Public Citizen (2024): Mushrooming Risk, unreliable A.I. tools generate mushroom misinformation (PDF): https://www.citizen.org/wp-content/uploads/ai-mushroom-apps-risk-misinformation-report-2024.pdf
+- National Capital Poison Center: Poison Control and the Poison Help line: https://www.poison.org/
+- Grow Coach photo check (coach-photo.js): https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/community/api/src/coach-photo.js
+
+---
+
 ## Join the Shroom Labs beta
 
 URL: https://shroomlabs.io/beta

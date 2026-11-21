@@ -158,8 +158,8 @@ const COACH_HTML = readFileSync(new URL("../public/coach.html", import.meta.url)
 
 test("/coach is indexable: no noindex, in the sitemap, not blocked in robots, with title, description, canonical, og tags", () => {
   assert.doesNotMatch(COACH_HTML, /noindex/);
-  assert.match(COACH_HTML, /<title>Grow Coach: automatic grow control for your Shrooly · Shroom Labs<\/title>/);
-  assert.match(COACH_HTML, /<meta name="description" content="Grow Coach reads your Shrooly chamber's live readings[^"]+">/);
+  assert.match(COACH_HTML, /<title>Grow Coach: automatic grow control for your Shrooly or Lykyn · Shroom Labs<\/title>/);
+  assert.match(COACH_HTML, /<meta name="description" content="Grow Coach reads live readings from a Shrooly or Lykyn[^"]+">/);
   assert.match(COACH_HTML, /<link rel="canonical" href="https:\/\/shroomlabs.io\/coach">/);
   for (const tag of ["og:title", "og:description", "og:url", "og:image"]) assert.match(COACH_HTML, new RegExp(`property="${tag}"`));
   assert.ok(sitemapEntries([]).some((e) => e.path === "/coach"));
@@ -171,7 +171,9 @@ test("/coach static HTML is the signed-out pitch: hero and how it works visible,
   assert.match(COACH_HTML, /<section id="coach-pitch" class="coach-pitch"/);
   assert.match(COACH_HTML, /id="coach-skeleton" class="device-skeleton hidden"/);
   assert.match(COACH_HTML, /id="gated" class="hidden/);
-  assert.match(COACH_HTML, /<h1>Automatic grow control for your Shrooly.<\/h1>/);
+  assert.match(COACH_HTML, /<h1>Automatic grow control for your Shrooly or Lykyn.<\/h1>/);
+  assert.match(COACH_HTML, /Lykyn running Shroom Labs firmware/);
+  assert.match(COACH_HTML, /href="\/lykyn"/);
   const pitch = COACH_HTML.slice(COACH_HTML.indexOf('id="coach-hero"'), COACH_HTML.indexOf('id="gated"'));
   assert.doesNotMatch(pitch, DASHES);
   assert.doesNotMatch(pitch, /psilocybin|off-menu/i);

@@ -271,6 +271,7 @@ test("visible site copy has no grower jargon or promises the product cannot keep
   const pages = [
     ...readdirSync(root).filter((f) => f.endsWith(".html")),
     ...readdirSync(new URL("profiles/", root)).map((f) => `profiles/${f}`),
+    ...readdirSync(new URL("ai/", root)).map((f) => `ai/${f}`),
   ];
   for (const page of pages) {
     const html = readFileSync(new URL(page, root), "utf8");
