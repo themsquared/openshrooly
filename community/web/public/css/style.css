@@ -1789,3 +1789,8 @@ button.temp-unit-toggle, button.knob-unit {
 #device-chart-slot:empty { display: none; }
 #device-chart-slot .fleet-chart,
 #reading-chart-box.card { border: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
+
+/* /ai pages: the connect your grow to AI block, near the top and at the end */
+.ai-connect { margin: 1.4rem 0 1.8rem; padding: 1rem 1.2rem 0.2rem; border: 1px solid rgba(125, 255, 179, 0.25); border-radius: 14px; background: rgba(125, 255, 179, 0.05); }
+.ai-connect .ai-connect-title { margin-top: 0.2rem; font-size: 1.3rem; }
+.ai-connect .owner-cta { margin: 0.8rem 0 1rem; }

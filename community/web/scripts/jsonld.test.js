@@ -295,7 +295,7 @@ test("every guide, owner page, chamber page and tool has its own social card, us
     const url = `${SITE}/og/pages/${c.slug}.jpg`;
     assert.ok(!seen.has(url), `${c.slug} card is shared`);
     seen.add(url);
-    const page = pages.find((p) => p.rel === `${c.slug}.html` || p.rel === `guides/${c.slug}.html` || p.rel === `tools/${c.slug}.html`);
+    const page = pages.find((p) => (c.rel && p.rel === c.rel) || p.rel === `${c.slug}.html` || p.rel === `guides/${c.slug}.html` || p.rel === `tools/${c.slug}.html`);
     assert.ok(page, `${c.slug} page built`);
     for (const tag of [`<meta property="og:image" content="${url}">`, `<meta name="twitter:image" content="${url}">`]) assert.ok(page.html.includes(tag), `${c.slug} ${tag}`);
     for (const a of page.nodes.filter((x) => types(x).includes("Article"))) assert.equal(imageUrl(a.image), url, `${c.slug} Article image`);
