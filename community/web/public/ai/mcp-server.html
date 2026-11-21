@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--SEO_HEAD-->
+  <title>Mushroom growing MCP server for AI assistants (free, read only)</title>
+  <meta name="description" content="A free, read only MCP server at api.shroomlabs.io/mcp lets AI assistants look up mushroom grow profiles, stage conditions, timelines and guides.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://shroomlabs.io/ai/mcp-server">
+  <meta property="og:site_name" content="Shroom Labs">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Mushroom growing MCP server for AI assistants (free, read only)">
+  <meta property="og:description" content="A free, read only MCP server at api.shroomlabs.io/mcp lets AI assistants look up mushroom grow profiles, stage conditions, timelines and guides.">
+  <meta property="og:url" content="https://shroomlabs.io/ai/mcp-server">
+  <meta property="og:image" content="https://shroomlabs.io/og/pages/ai-mcp-server.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Mushroom growing MCP server for AI assistants (free, read only)">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Mushroom growing MCP server for AI assistants (free, read only)">
+  <meta name="twitter:description" content="A free, read only MCP server at api.shroomlabs.io/mcp lets AI assistants look up mushroom grow profiles, stage conditions, timelines and guides.">
+  <meta name="twitter:image" content="https://shroomlabs.io/og/pages/ai-mcp-server.jpg">
+  <meta property="article:modified_time" content="2026-11-21">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","@id":"https://shroomlabs.io/ai/mcp-server#article","headline":"Ask your AI assistant about mushrooms with the Shroom Labs MCP server","description":"Shroom Labs runs a free, read only MCP server at https://api.shroomlabs.io/mcp. AI assistants that support the Model Context Protocol can use it to look up culinary grow profiles, stage by stage conditions, grow timelines and our guides, then link the page they used. It needs no account or sign in and cannot touch a chamber.","url":"https://shroomlabs.io/ai/mcp-server","mainEntityOfPage":"https://shroomlabs.io/ai/mcp-server","image":"https://shroomlabs.io/og/pages/ai-mcp-server.jpg","inLanguage":"en","dateModified":"2026-11-21","author":{"@type":"Person","name":"Mike Moore","url":"https://shroomlabs.io/about"},"publisher":{"@type":"Organization","@id":"https://shroomlabs.io/#org","name":"Shroom Labs","url":"https://shroomlabs.io/","logo":{"@type":"ImageObject","@id":"https://shroomlabs.io/#logo","url":"https://shroomlabs.io/icons/icon-512.png","contentUrl":"https://shroomlabs.io/icons/icon-512.png","width":512,"height":512,"caption":"Shroom Labs"}},"citation":["https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/MCP.md","https://modelcontextprotocol.io/specification","https://github.com/themsquared/openshrooly"],"isPartOf":{"@type":"WebPage","name":"How Shroom Labs uses AI to grow mushrooms","url":"https://shroomlabs.io/ai"}},{"@type":"FAQPage","@id":"https://shroomlabs.io/ai/mcp-server#faq","mainEntity":[{"@type":"Question","name":"What can an assistant look up through the MCP server?","acceptedAnswer":{"@type":"Answer","text":"Five read only tools: list profiles, get one profile, search grow content, get a chamber guide, and build a grow timeline."}},{"@type":"Question","name":"How do I connect it to my assistant?","acceptedAnswer":{"@type":"Answer","text":"Add https://api.shroomlabs.io/mcp as a remote MCP server using Streamable HTTP with no authentication."}},{"@type":"Question","name":"What does an answer look like?","acceptedAnswer":{"@type":"Answer","text":"Ask \"how long does pearl oyster take\" and the assistant can call grow_timeline and get the profile's stage by stage days, 29 in total, with a link to the profile page."}},{"@type":"Question","name":"What is not in the MCP server?","acceptedAnswer":{"@type":"Answer","text":"No Grow Coach chat, no chamber control, no accounts and no payments: it is a library, not a remote control."}}],"isPartOf":{"@id":"https://shroomlabs.io/#website"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shroomlabs.io/"},{"@type":"ListItem","position":2,"name":"AI","item":"https://shroomlabs.io/ai"},{"@type":"ListItem","position":3,"name":"MCP server","item":"https://shroomlabs.io/ai/mcp-server"}],"@id":"https://shroomlabs.io/ai/mcp-server#breadcrumb"}]}</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RKQ4CBEZWY"></script>
+  <script src="/js/ga.js" defer></script>
+  <!--/SEO_HEAD-->
+  <link rel="preload" href="/fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/fraunces-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!--PWA-->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#07110e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Shroom Labs">
+  <script src="/js/pwa.js?v=2" defer></script>
+  <!--/PWA-->
+  <script src="/js/config.js"></script>
+</head>
+<body data-page="page">
+  <!--CHROME_HEADER-->
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-chrome="header">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M6 16h16l2-2-3-6-7-4-7 4-3 6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 16l-1.5 6 2.5 2.4h4l2.3-2.5L16.8 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Shroom Labs<small>Works with Shrooly devices running OpenShrooly.</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="site-nav" aria-label="Site"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><span id="session-nav"></span></nav>
+  </header>
+  <!--/CHROME_HEADER-->
+  <main id="main">
+    <article class="profile-page guide-page owner-page ai-page">
+      <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><a href="/ai">AI</a></li><li aria-current="page">MCP server</li></ol></nav>
+      <p class="eyebrow">For AI assistants</p>
+      <h1>Ask your AI assistant about mushrooms with the Shroom Labs MCP server</h1>
+      <p class="updated muted">By <a href="/about" rel="author">Mike Moore</a> · Updated <time datetime="2026-11-21">2026-11-21</time></p>
+      <p class="lede answer-first">Shroom Labs runs a free, read only MCP server at https://api.shroomlabs.io/mcp. AI assistants that support the Model Context Protocol can use it to look up culinary grow profiles, stage by stage conditions, grow timelines and our guides, then link the page they used. It needs no account or sign in and cannot touch a chamber.</p>
+      <div class="owner-cta"><a class="button hero-cta" href="/grow">Grow profiles</a><a class="text-link" href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/MCP.md" rel="noopener">MCP notes on GitHub</a></div>
+      <section class="owner-section"><h2>What can an assistant look up through the MCP server?</h2><p class="answer-first">Five read only tools: list profiles, get one profile, search grow content, get a chamber guide, and build a grow timeline.</p><div class="table-wrap"><table class="conditions-table"><caption>Shroom Labs MCP tools</caption><thead><tr><th scope="col">Tool</th><th scope="col">What it returns</th></tr></thead><tbody><tr><th scope="row">list_profiles</th><td>Culinary grow profiles with slug, species, total days and page URL, with an optional text filter</td></tr><tr><th scope="row">get_profile</th><td>One profile: every stage with days, temperature in °C and °F, humidity, fresh air, light hours, chamber tips and sources</td></tr><tr><th scope="row">search_grow_content</th><td>Matching profiles, guides, blog posts and chamber pages, with title, description and page URL</td></tr><tr><th scope="row">get_chamber_guide</th><td>The chambers hub, Shrooly install, Terrashroom, reuse and FAQ pages</td></tr><tr><th scope="row">grow_timeline</th><td>Start and end day for each stage and total days to harvest</td></tr></tbody></table></div></section>
+      <section class="owner-section"><h2>How do I connect it to my assistant?</h2><p class="answer-first">Add https://api.shroomlabs.io/mcp as a remote MCP server using Streamable HTTP with no authentication.</p><p>The server answers plain HTTP POST requests and keeps no session, as the <a href="https://modelcontextprotocol.io/specification" rel="noopener">MCP specification</a> allows. Where your assistant calls it a custom connector or a remote server, paste the URL and leave authentication off. Test it from a terminal with a <code>tools/list</code> request.</p></section>
+      <section class="owner-section"><h2>What does an answer look like?</h2><p class="answer-first">Ask &quot;how long does pearl oyster take&quot; and the assistant can call grow_timeline and get the profile's stage by stage days, 29 in total, with a link to the profile page.</p><p>The numbers come from the same profile data as <a href="/profiles/pearl-oyster">the pearl oyster guide</a>, so the assistant and this site never disagree.</p></section>
+      <section class="owner-section"><h2>What is not in the MCP server?</h2><p class="answer-first">No Grow Coach chat, no chamber control, no accounts and no payments: it is a library, not a remote control.</p><p>That keeps it safe to leave open to everyone. For advice about a specific chamber, use <a href="/ai/grow-coach">Grow Coach</a>.</p></section>
+      
+      <h2>Sources</h2>
+      <p class="muted">Every page below was checked on November 21, 2026.</p>
+      <ol class="sources"><li><a href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/MCP.md" rel="noopener">Shroom Labs MCP server (notes on GitHub)</a></li><li><a href="https://modelcontextprotocol.io/specification" rel="noopener">Model Context Protocol specification</a></li><li><a href="https://github.com/themsquared/openshrooly" rel="noopener">themsquared/openshrooly on GitHub (Shroom Labs firmware, site and API)</a></li></ol>
+      <h2>Keep reading</h2>
+      <ul class="faq-links"><li><a href="/ai">How Shroom Labs uses AI to grow mushrooms</a></li><li><a href="/ai/grow-coach">Grow Coach: per-species advice from your chamber's own readings</a></li><li><a href="/ai/autopilot">Autopilot: how the chamber adjusts itself, and the limits it cannot cross</a></li><li><a href="/ai/photo-check-and-charts">Photo check and readings charts: seeing what the chamber sees</a></li><li><a href="/ai/open-firmware">Open firmware for Shrooly and Lykyn: AI on top, local control underneath</a></li><li><a href="/ai/can-ai-grow-mushrooms">Can AI grow mushrooms?</a></li><li><a href="/ai/smart-mushroom-grow-box-humidity-and-fresh-air">How does a smart mushroom grow box automate humidity and fresh air?</a></li><li><a href="/ai/ai-grow-coach-vs-manual-monitoring">AI grow coach vs checking your grow by hand</a></li><li><a href="/ai/can-ai-identify-mushrooms">Can AI identify mushrooms safely?</a></li><li><a href="/tools/grow-timeline">Grow timeline calculator</a></li><li><a href="/guides/how-long-to-grow-mushrooms">How long do mushrooms take to grow?</a></li></ul>
+      <div class="owner-cta"><a class="button hero-cta" href="/grow">Grow profiles</a><a class="text-link" href="https://github.com/themsquared/openshrooly/blob/cursor/community-platform-fa9c/docs/MCP.md" rel="noopener">MCP notes on GitHub</a></div>
+    </article></main>
+  <!--CHROME_FOOTER-->
+  <footer class="site-footer" data-chrome="footer">
+    <p>Works with Shrooly devices running OpenShrooly.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/install" class="nav-install">Install on your Shrooly</a><a href="/">Profiles</a><a href="/grow">Grow guides</a><a href="/faq">FAQ</a><a href="/docs">Docs</a><a href="/blog">Blog</a><a href="/chambers">Chambers</a><a href="/ai">AI</a></nav>
+    <nav class="footer-nav footer-owners" aria-label="For Shrooly owners"><span class="muted">For Shrooly owners:</span><a href="/what-happened-to-shrooly">What happened to Shrooly?</a><a href="/reuse-your-shrooly">Reuse your Shrooly</a><a href="/shrooly-faq">Shrooly FAQ</a><a href="/beta">Join the beta</a></nav>
+    <p class="muted">Shroom Labs. Open source Community and Hub.</p>
+    <nav class="footer-legal" aria-label="Legal"><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/contact">Contact</a></nav>
+    <p class="egg"><svg class="egg-mark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 4.6s5.6 5.8 5.6 9.6a5.6 5.6 0 1 1-11.2 0C6.4 10.4 12 4.6 12 4.6z"/></svg> A few varieties stay off the printed menu.</p>
+  </footer>
+  <!--/CHROME_FOOTER-->
+  <script type="module" src="/js/lite.js"></script>
+</body>
+</html>

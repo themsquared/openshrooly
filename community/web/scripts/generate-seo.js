@@ -17,6 +17,7 @@ import { GUIDES } from "./guides/index.js";
 import { blogLlms, blogLlmsFull, blogRedirects, blogSitemapEntries, publishedPosts, writeBlogFiles } from "./blog/index.js";
 import { OWNER_PAGES, SOURCES as OWNER_SOURCES, CHECKED as OWNER_CHECKED } from "./owners/index.js";
 import { CHAMBER_PAGES, SOURCES as CHAMBER_SOURCES, CHECKED as CHAMBER_CHECKED } from "./chambers/index.js";
+import { AI_FEATURES, AI_HUB, AI_PAGES, AI_QUESTIONS, AI_SPOKES, SOURCES as AI_SOURCES, CHECKED as AI_CHECKED } from "./ai/index.js";
 import { latinName, orList, otherNames, speciesTitle } from "./species-names.js";
 import { SPECIES as TOOL_SPECIES, TOOL_PAGES, TOOL_SOURCES, TOOLS_UPDATED } from "./tools/index.js";
 import { GROW_LOG, renderGrowLogBody } from "./growlog/index.js";
@@ -1520,6 +1521,78 @@ export function renderChamberPage(page) {
   });
 }
 
+/** AI pages (/ai hub and /ai/ spokes): answer first, question sections, sources, hub and sibling links. */
+export function aiFaq(page) {
+  return page.sections.filter((sec) => sec.faq !== false && sec.h2.endsWith("?")).map((sec) => ({ q: sec.h2, a: sec.answer }));
+}
+
+function aiCardList(pages) {
+  return `<ul class="faq-links">${pages.map((p) => `<li><a href="${p.path}">${escapeHtml(p.h1)}</a> <span class="muted">${escapeHtml(p.description)}</span></li>`).join("")}</ul>`;
+}
+
+export function renderAiPage(page) {
+  const isHub = page.path === AI_HUB.path;
+  const url = `${SITE}${page.path}`;
+  const faq = aiFaq(page);
+  const crumbs = isHub ? [["Home", "/"], [page.crumb, ""]] : [["Home", "/"], [AI_HUB.crumb, AI_HUB.path], [page.crumb, ""]];
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `${url}#article`,
+        headline: page.h1,
+        description: page.answer,
+        url,
+        mainEntityOfPage: url,
+        image: pageOgImage(page.og),
+        inLanguage: "en",
+        dateModified: page.updated,
+        author: AUTHOR,
+        publisher: ORG_REF,
+        citation: page.sources.map((key) => AI_SOURCES[key].url),
+        ...(isHub ? { hasPart: AI_SPOKES.map((p) => ({ "@type": "WebPage", name: p.h1, url: `${SITE}${p.path}` })) } : { isPartOf: { "@type": "WebPage", name: AI_HUB.h1, url: `${SITE}${AI_HUB.path}` } }),
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${url}#faq`,
+        mainEntity: faq.map((item) => ({ "@type": "Question", name: item.q, acceptedAnswer: { "@type": "Answer", text: item.a } })),
+      },
+      breadcrumbs(crumbs.map(([name, href]) => [name, href ? `${SITE}${href === "/" ? "/" : href}` : url])),
+    ],
+  };
+  const sections = page.sections
+    .map((sec) => `<section class="owner-section"><h2>${escapeHtml(sec.h2)}</h2><p class="answer-first">${escapeHtml(sec.answer)}</p>${sec.html || ""}</section>`)
+    .join("\n      ");
+  const spokes = isHub
+    ? `<h2>AI features</h2>${aiCardList(AI_FEATURES.map((f) => AI_SPOKES.find((p) => p.slug === f.slug)))}<h2>Questions growers ask about AI</h2>${aiCardList(AI_QUESTIONS.map((q) => AI_SPOKES.find((p) => p.slug === q.slug)))}`
+    : "";
+  const siblings = isHub ? [] : [[`${AI_HUB.h1}`, AI_HUB.path], ...AI_SPOKES.filter((p) => p.path !== page.path).map((p) => [p.h1, p.path])];
+  const related = [...siblings, ...page.related.filter(([, h]) => !siblings.some(([, o]) => o === h))];
+  const body = `
+    <article class="profile-page guide-page owner-page ai-page">
+      ${crumbsHtml(crumbs)}
+      <p class="eyebrow">${escapeHtml(page.eyebrow)}</p>
+      <h1>${escapeHtml(page.h1)}</h1>
+      ${updatedHtml(page.updated, { byline: true })}
+      <p class="lede answer-first">${escapeHtml(page.answer)}</p>
+      ${chamberCta(page.cta)}
+      ${sections}
+      ${spokes}
+      <h2>Sources</h2>
+      <p class="muted">Every page below was checked on ${AI_CHECKED}.</p>
+      <ol class="sources">${page.sources.map((key) => `<li><a href="${AI_SOURCES[key].url}" rel="noopener">${escapeHtml(AI_SOURCES[key].label)}</a></li>`).join("")}</ol>
+      <h2>Keep reading</h2>
+      <ul class="faq-links">${related.map(([label, href]) => `<li><a href="${href}">${escapeHtml(label)}</a></li>`).join("")}</ul>
+      ${chamberCta(page.cta)}
+    </article>`;
+  return shell({
+    head: { title: page.title, description: page.description, path: page.path, type: "article", image: pageOgImage(page.og), modified: page.updated, jsonLd },
+    activeId: "",
+    body,
+  });
+}
+
 export function sitemapEntries(profiles) {
   const pages = Object.entries(PAGES)
     .filter(([, p]) => p.sitemap)
@@ -1528,6 +1601,7 @@ export function sitemapEntries(profiles) {
     ...pages,
     ...OWNER_PAGES.map((p) => ({ path: `/${p.slug}`, lastmod: p.updated })),
     ...CHAMBER_PAGES.map((p) => ({ path: `/${p.slug}`, lastmod: p.updated })),
+    ...AI_PAGES.map((p) => ({ path: p.path, lastmod: p.updated })),
     { path: "/grow", lastmod: HUB_UPDATED.value },
     { path: "/chefs-line", lastmod: PAGES_UPDATED },
     ...GUIDES.map((g) => ({ path: `/guides/${g.slug}`, lastmod: g.updated })),
@@ -1613,6 +1687,7 @@ ${CHAMBER_PAGES.map((p) => `- [${p.h1}](${SITE}/${p.slug}): ${p.answer}`).join("
 ## Grow Coach and Autopilot
 
 - [Grow Coach](${SITE}/coach): reads your chamber's live readings and recommends humidity and temperature changes for the culinary profile you are growing. Autopilot makes those changes for you inside the profile's safe range. $4.99 a month or $49 a year. Cancel anytime.
+${AI_PAGES.map((p) => `- [${p.h1}](${SITE}${p.path}): ${p.answer}`).join("\n")}
 
 ## Grow guides
 
@@ -1680,6 +1755,13 @@ export function renderLlmsFull(profiles) {
         .join("\n\n")}\n\n### Sources\n\n${p.sources.map((key) => `- ${CHAMBER_SOURCES[key].label}: ${CHAMBER_SOURCES[key].url}`).join("\n")}`
     );
   }
+  for (const p of AI_PAGES) {
+    out.push(
+      `## ${p.h1}\n\nURL: ${SITE}${p.path}\nUpdated: ${p.updated}\n\n${p.answer}\n\n${p.sections
+        .map((sec) => `### ${sec.h2}\n\n${sec.answer}${sec.html ? `\n\n${stripHtml(sec.html)}` : ""}`)
+        .join("\n\n")}\n\n### Sources\n\n${p.sources.map((key) => `- ${AI_SOURCES[key].label}: ${AI_SOURCES[key].url}`).join("\n")}`
+    );
+  }
   out.push(
     `## Join the Shroom Labs beta\n\nURL: ${SITE}/beta\n\n${BETA.answer}\n\n### Join in three steps\n\n${BETA.steps.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\n### Before you start\n\nIt is a beta. Back up first: the installer does not save the original Shrooly software for you. The recovery guide shows how to save it over USB in about 10 minutes, and with that backup you can flash the original back at any time. Without one, you can always reinstall OpenShrooly over USB.\n\n### FAQ\n\n${BETA.faq.map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n\n")}`
   );
@@ -1721,6 +1803,8 @@ export function renderRedirects(profiles) {
   lines.push("/chefs-line.html /chefs-line 301!", "/grow.html /grow 301!", "/terms /tos 301!", "/terms.html /tos 301!");
   for (const p of OWNER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const p of CHAMBER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
+  for (const p of AI_PAGES) lines.push(`${p.path}.html ${p.path} 301!`);
+  lines.push("/ai/ /ai 301!");
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
   for (const t of TOOL_PAGES) lines.push(`${t.path}.html ${t.path} 301!`);
   lines.push("/tools.html /tools 301!", "/grow-log.html /grow-log 301!");
@@ -2003,6 +2087,7 @@ export function writeSeoFiles(dir = PUBLIC) {
   mkdirSync(join(dir, "profiles"), { recursive: true });
   mkdirSync(join(dir, "guides"), { recursive: true });
   mkdirSync(join(dir, "tools"), { recursive: true });
+  mkdirSync(join(dir, "ai"), { recursive: true });
   writeFileSync(join(dir, "sitemap.xml"), renderSitemap(profiles));
   writeFileSync(join(dir, "llms.txt"), renderLlms(profiles));
   writeFileSync(join(dir, "llms-full.txt"), renderLlmsFull(profiles));
@@ -2016,6 +2101,7 @@ export function writeSeoFiles(dir = PUBLIC) {
   for (const guide of GUIDES) writeFileSync(join(dir, "guides", `${guide.slug}.html`), renderGuidePage(guide));
   for (const page of OWNER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderOwnerPage(page));
   for (const page of CHAMBER_PAGES) writeFileSync(join(dir, `${page.slug}.html`), renderChamberPage(page));
+  for (const page of AI_PAGES) writeFileSync(join(dir, `${page.path.slice(1)}.html`), renderAiPage(page));
   for (const tool of TOOL_PAGES) writeFileSync(join(dir, "tools", `${tool.slug}.html`), renderToolPage(tool));
   writeFileSync(join(dir, "tools.html"), renderToolsHub());
   writeFileSync(join(dir, "grow-log.html"), renderGrowLogPage());
@@ -2049,6 +2135,7 @@ export function pageOgCards() {
     ...OWNER_PAGES.map((p) => ({ slug: p.slug, eyebrow: "For Shrooly owners", title: p.h1 })),
     ...CHAMBER_PAGES.map((p) => ({ slug: p.slug, eyebrow: "Chamber guide", title: p.h1 })),
     ...TOOL_PAGES.map((t) => ({ slug: t.slug, eyebrow: "Free tool", title: t.h1 })),
+    ...AI_PAGES.map((p) => ({ slug: p.og, eyebrow: p.eyebrow, title: p.h1, rel: `${p.path.slice(1)}.html` })),
   ];
 }
 

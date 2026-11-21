@@ -37,7 +37,7 @@ function visitorFacing(html) {
 function pages() {
   const names = [
     ...readdirSync(PUBLIC).filter((name) => name.endsWith(".html")),
-    ...["profiles", "auth", "guides"].flatMap((dir) =>
+    ...["profiles", "auth", "guides", "ai"].flatMap((dir) =>
       readdirSync(join(PUBLIC, dir))
         .filter((name) => name.endsWith(".html"))
         .map((name) => `${dir}/${name}`)
