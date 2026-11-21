@@ -1820,7 +1820,9 @@ export function renderRedirects(profiles) {
   for (const p of OWNER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const p of CHAMBER_PAGES) lines.push(`/${p.slug}.html /${p.slug} 301!`);
   for (const p of AI_PAGES) lines.push(`${p.path}.html ${p.path} 301!`);
-  lines.push("/ai/ /ai 301!");
+  // /ai.html and an /ai/ directory both exist. A trailing-slash rule alone
+  // makes Netlify bounce /ai to /ai/ and back. Rewrite /ai to the hub file.
+  lines.push("/ai /ai.html 200!", "/ai/ /ai 301!");
   for (const g of GUIDES) lines.push(`/guides/${g.slug}.html /guides/${g.slug} 301!`);
   for (const t of TOOL_PAGES) lines.push(`${t.path}.html ${t.path} 301!`);
   lines.push("/tools.html /tools 301!", "/grow-log.html /grow-log 301!");
