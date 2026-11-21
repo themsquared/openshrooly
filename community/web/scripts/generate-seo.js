@@ -509,7 +509,7 @@ export function growCoachJsonLd() {
     "@id": `${SITE}/coach#grow-coach`,
     name: "Grow Coach",
     description:
-      "Grow Coach reads a Shrooly chamber's live readings and recommends humidity and temperature changes for the culinary Profile you are growing. Autopilot makes those changes for you, inside the Profile's safe range, and logs every decision with the reason. Needs a Shrooly running OpenShrooly linked to a Shroom Labs account.",
+      "Grow Coach reads a Shrooly or Lykyn chamber's live readings and recommends humidity and temperature changes for the culinary Profile you are growing. Autopilot makes those changes for you, inside the Profile's safe range, and logs every decision with the reason. Needs a Shrooly running OpenShrooly or a Lykyn running Shroom Labs firmware, linked to a Shroom Labs account.",
     url: `${SITE}/coach`,
     applicationCategory: "LifestyleApplication",
     operatingSystem: "Web",
@@ -1903,8 +1903,8 @@ export const PAGES = {
     active: "coach",
     sitemap: true,
     path: "/coach",
-    title: "Grow Coach: automatic grow control for your Shrooly · Shroom Labs",
-    description: "Grow Coach reads your Shrooly chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.",
+    title: "Grow Coach: automatic grow control for your Shrooly or Lykyn · Shroom Labs",
+    description: "Grow Coach reads your Shrooly or Lykyn chamber's live readings and recommends humidity and temperature changes. Autopilot can make them for you. Culinary Profiles only.",
     jsonLd: { "@context": "https://schema.org", "@graph": [growCoachJsonLd(), breadcrumbs([["Home", `${SITE}/`], ["Grow Coach", `${SITE}/coach`]])] },
   },
   "claim.html": {
