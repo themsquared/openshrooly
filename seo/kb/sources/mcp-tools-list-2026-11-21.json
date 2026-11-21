@@ -1,0 +1,131 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "list_profiles",
+        "title": "List mushroom grow profiles",
+        "description": "List Shroom Labs mushroom grow profiles (species and strains such as lion's mane, pearl oyster, shiitake). Each has a slug for get_profile, total grow days and a canonical URL. Culinary only by default; set include_off_menu to also list educational Off-menu profiles (always returned with a legal notice).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "include_off_menu": {
+              "type": "boolean",
+              "description": "Also include educational Off-menu profiles. Default false."
+            },
+            "query": {
+              "type": "string",
+              "description": "Optional filter on name, species or tag, e.g. 'oyster' or 'beginner'."
+            }
+          },
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "get_profile",
+        "title": "Get a mushroom grow profile",
+        "description": "Get the full grow recipe for one mushroom by slug (e.g. 'lions-mane', 'pearl-oyster', 'shiitake'): every stage with days, temperature (C and F), humidity, fresh air exchange (fan) and light hours, plus chamber tips and sources.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string",
+              "description": "Profile slug from list_profiles, e.g. 'lions-mane'. A plain name like 'Lion's Mane' also works."
+            }
+          },
+          "required": [
+            "slug"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "search_grow_content",
+        "title": "Search mushroom growing guides",
+        "description": "Search Shroom Labs grow profiles, troubleshooting guides (not pinning, contamination, leggy stems, humidity and fresh air) and blog posts. Returns titles, short descriptions and canonical URLs to cite.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Words to search for, e.g. 'mushrooms not pinning' or 'oyster kit'."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "description": "Max results. Default 8."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "get_chamber_guide",
+        "title": "Get a grow chamber guide",
+        "description": "Get Shroom Labs guides for automated mushroom grow chambers: which chambers work ('chambers'), installing free OpenShrooly firmware on a Shrooly chamber ('install'), what happened to the Shrooly app ('what-happened-to-shrooly'), keeping a Terrashroom running ('terrashroom'), and more. Omit topic to list all.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "topic": {
+              "type": "string",
+              "enum": [
+                "chambers",
+                "install",
+                "what-happened-to-shrooly",
+                "terrashroom",
+                "reuse-your-shrooly",
+                "shrooly-alternatives",
+                "shrooly-faq"
+              ],
+              "description": "Which guide. Omit to list all topics."
+            }
+          },
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "grow_timeline",
+        "title": "Mushroom grow timeline",
+        "description": "Day by day timeline for growing one mushroom: each stage with its start day, end day and conditions, and the total days from start to harvest. Use for 'how long does X take to grow'.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string",
+              "description": "Profile slug or name, e.g. 'pearl-oyster'."
+            }
+          },
+          "required": [
+            "slug"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        }
+      }
+    ]
+  }
+}
