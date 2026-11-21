@@ -230,7 +230,115 @@ test("every old .html URL has a forced 301 to its clean URL", () => {
     const from = `/${file}`;
     assert.deepEqual(map[from], { to: cleanPath(file), status: "301!" }, from);
   }
-  for (const [, to] of rules) assert.doesNotMatch(to, /\.html/);
+  for (const [, to, status] of rules) {
+    if (String(status).startsWith("301")) assert.doesNotMatch(to, /\.html/, `${status} ${to}`);
+  }
+});
+
+/**
+ * Netlify _redirects plus the public file layout. A 200 rewrite serves a file and
+ * stops. A 301 is a hop. When both hub.html and a hub/ directory exist, and a
+ * rule sends /hub/ back to /hub, Netlify also 301s /hub to /hub/ unless a 200
+ * rewrite claims /hub first. That pair is a loop.
+ */
+function parseRedirectRules(text) {
+  return text
+    .split("\n")
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => {
+      const [from, to, status] = line.split(/\s+/);
+      return { from, to, status };
+    });
+}
+
+function publicLayout(dir) {
+  const files = new Set();
+  const dirs = new Set();
+  function walk(base, prefix) {
+    for (const name of readdirSync(base, { withFileTypes: true })) {
+      const rel = `${prefix}/${name.name}`;
+      if (name.isDirectory()) {
+        dirs.add(rel);
+        walk(join(base, name.name), rel);
+      } else {
+        files.add(rel);
+      }
+    }
+  }
+  walk(dir, "");
+  return { files, dirs };
+}
+
+function resolveRedirects(path, rules, layout) {
+  const hops = [];
+  let current = path;
+  for (let i = 0; i < 10; i++) {
+    if (hops.includes(current)) return { loop: true, hops, status: 301 };
+    const rule = rules.find((r) => r.from === current);
+    if (rule) {
+      const code = Number.parseInt(rule.status, 10);
+      if (code === 200) {
+        hops.push(current);
+        return { loop: false, hops, status: 200, url: current, file: rule.to };
+      }
+      if (code >= 300 && code < 400) {
+        hops.push(current);
+        current = rule.to;
+        continue;
+      }
+    }
+    if (!current.endsWith("/")) {
+      const file = `${current}.html`;
+      const slash = `${current}/`;
+      const slashRule = rules.find((r) => r.from === slash);
+      const slashRedirects = slashRule && Number.parseInt(slashRule.status, 10) >= 300 && Number.parseInt(slashRule.status, 10) < 400;
+      if (layout.dirs.has(current) && layout.files.has(file) && slashRedirects) {
+        hops.push(current);
+        current = slash;
+        continue;
+      }
+      if (layout.files.has(file)) {
+        hops.push(current);
+        return { loop: false, hops, status: 200, url: current, file };
+      }
+      if (layout.dirs.has(current)) {
+        hops.push(current);
+        current = slash;
+        continue;
+      }
+    }
+    hops.push(current);
+    return { loop: false, hops, status: 404, url: current };
+  }
+  return { loop: true, hops, status: 301 };
+}
+
+test("hub file plus directory redirects do not loop, and /ai serves the hub", () => {
+  const rules = parseRedirectRules(read("_redirects"));
+  const layout = publicLayout(PUBLIC);
+  const hubs = [...layout.dirs].filter((dir) => layout.files.has(`${dir}.html`));
+  assert.ok(hubs.includes("/ai"), "expected /ai.html plus an /ai/ directory");
+  for (const hub of hubs) {
+    for (const path of [hub, `${hub}/`, `${hub}.html`]) {
+      const result = resolveRedirects(path, rules, layout);
+      assert.equal(result.loop, false, `${path} loops: ${result.hops.join(" -> ")}`);
+    }
+  }
+  const ai = resolveRedirects("/ai", rules, layout);
+  assert.equal(ai.status, 200);
+  assert.equal(ai.url, "/ai");
+  assert.equal(ai.file, "/ai.html");
+  const slash = resolveRedirects("/ai/", rules, layout);
+  assert.equal(slash.loop, false);
+  assert.equal(slash.hops[0], "/ai/");
+  assert.equal(slash.hops[1], "/ai");
+  assert.equal(slash.status, 200);
+  assert.equal(slash.url, "/ai");
+  const withoutRewrite = rules.filter((r) => !(r.from === "/ai" && r.to === "/ai.html"));
+  const broken = resolveRedirects("/ai", withoutRewrite, layout);
+  assert.equal(broken.loop, true, "the test must catch a /ai/ 301 back to /ai without the 200 rewrite");
+  const html = read("ai.html");
+  assert.match(html, /<link rel="canonical" href="https:\/\/shroomlabs\.io\/ai">/);
 });
 
 test("Off-menu pages carry the legal note and no prices, affiliate links, or Grow Coach", () => {
